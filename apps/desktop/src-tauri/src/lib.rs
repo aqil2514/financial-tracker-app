@@ -37,6 +37,18 @@ mod migrations {
                 sql: include_str!("../migrations/0002_seed_categories.sql"),
                 kind: MigrationKind::Up,
             },
+            Migration {
+                version: 3,
+                description: "accounts",
+                sql: include_str!("../migrations/0003_accounts.sql"),
+                kind: MigrationKind::Up,
+            },
+            Migration {
+                version: 4,
+                description: "allow_transfer_type",
+                sql: include_str!("../migrations/0004_allow_transfer_type.sql"),
+                kind: MigrationKind::Up,
+            },
         ]
     }
 }

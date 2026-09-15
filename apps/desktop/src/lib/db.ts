@@ -16,11 +16,21 @@ export type Category = {
   type: "income" | "expense";
 };
 
+export type Account = {
+  id: number;
+  name: string;
+  icon: string | null;
+  initial_balance: number;
+  created_at: string;
+};
+
 export type Transaction = {
   id: number;
-  type: "income" | "expense";
+  type: "income" | "expense" | "transfer";
   amount: number;
   category_id: number | null;
+  account_id: number | null;
+  transfer_account_id: number | null;
   note: string | null;
   date: string;
   created_at: string;

@@ -8,6 +8,7 @@ import {
   PieChart,
   Settings,
   Wallet,
+  Landmark,
 } from "lucide-react";
 
 import {
@@ -26,6 +27,7 @@ import {
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Transaksi", url: "/transactions", icon: ArrowLeftRight },
+  { title: "Akun", url: "/accounts", icon: Landmark },
   { title: "Laporan", url: "/reports", icon: PieChart },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
