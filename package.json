@@ -1,0 +1,12 @@
+{
+  "name": "financial-app",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:desktop": "npm run tauri dev --workspace=desktop",
+    "build:desktop": "npm run tauri build --workspace=desktop",
+    "dev:mobile": "npm run start --workspace=mobile"
+  }
+}
