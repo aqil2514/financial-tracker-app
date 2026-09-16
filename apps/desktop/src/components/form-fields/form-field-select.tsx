@@ -25,7 +25,12 @@ type FormFieldSelectProps<TFieldValues extends FieldValues> = {
   label: string;
   placeholder?: string;
   options: FormFieldSelectOption[];
+  /** Show a "Tanpa ..." item that clears the field back to null. */
+  allowClear?: boolean;
+  clearLabel?: string;
 };
+
+const CLEAR_VALUE = "__none__";
 
 export function FormFieldSelect<TFieldValues extends FieldValues>({
   form,
@@ -33,6 +38,8 @@ export function FormFieldSelect<TFieldValues extends FieldValues>({
   label,
   placeholder = "Pilih...",
   options,
+  allowClear = false,
+  clearLabel = "Tanpa pilihan",
 }: FormFieldSelectProps<TFieldValues>) {
   return (
     <Controller
@@ -43,7 +50,9 @@ export function FormFieldSelect<TFieldValues extends FieldValues>({
           <Label htmlFor={name}>{label}</Label>
           <Select
             value={field.value != null ? String(field.value) : ""}
-            onValueChange={field.onChange}
+            onValueChange={(value) =>
+              field.onChange(value === CLEAR_VALUE ? null : value)
+            }
           >
             <SelectTrigger id={name} className="w-full">
               <SelectValue placeholder={placeholder}>
@@ -54,6 +63,9 @@ export function FormFieldSelect<TFieldValues extends FieldValues>({
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
+              {allowClear && (
+                <SelectItem value={CLEAR_VALUE}>{clearLabel}</SelectItem>
+              )}
               {options.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}

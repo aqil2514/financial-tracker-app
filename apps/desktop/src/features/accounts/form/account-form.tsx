@@ -42,6 +42,8 @@ export function AccountForm({
         name="group_id"
         label="Group Akun"
         placeholder="Pilih group..."
+        allowClear
+        clearLabel="Tanpa Group"
         options={
           groups?.map((group) => ({
             value: String(group.id),
