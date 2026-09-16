@@ -4,3 +4,4 @@ export { FormFieldCurrency } from "./form-field-currency";
 export { FormFieldSelect } from "./form-field-select";
 export { FormFieldTextarea } from "./form-field-textarea";
 export { FormFieldDate } from "./form-field-date";
+export { FormFieldToggleGroup } from "./form-field-toggle-group";

@@ -9,6 +9,7 @@ import {
   FormFieldDate,
   FormFieldSelect,
   FormFieldTextarea,
+  FormFieldToggleGroup,
 } from "@/components/form-fields";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
@@ -20,19 +21,21 @@ import type {
 type TransactionFormProps = {
   form: UseFormReturn<TransactionFormValues, unknown, TransactionFormOutput>;
   onSubmit: (values: TransactionFormOutput) => void;
+  onSubmitAndContinue?: (values: TransactionFormOutput) => void;
   isPending: boolean;
   submitLabel?: string;
 };
 
 const typeOptions = [
-  { value: "expense", label: "Pengeluaran" },
   { value: "income", label: "Pemasukan" },
+  { value: "expense", label: "Pengeluaran" },
   { value: "transfer", label: "Transfer" },
 ];
 
 export function TransactionForm({
   form,
   onSubmit,
+  onSubmitAndContinue,
   isPending,
   submitLabel = "Simpan",
 }: TransactionFormProps) {
@@ -57,7 +60,7 @@ export function TransactionForm({
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <FormFieldSelect
+      <FormFieldToggleGroup
         form={form}
         name="type"
         label="Tipe Transaksi"
@@ -98,6 +101,16 @@ export function TransactionForm({
         placeholder="Catatan tambahan (opsional)"
       />
       <DialogFooter>
+        {onSubmitAndContinue && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={form.handleSubmit(onSubmitAndContinue)}
+          >
+            Lanjut
+          </Button>
+        )}
         <Button type="submit" disabled={isPending}>
           {isPending ? "Menyimpan..." : submitLabel}
         </Button>

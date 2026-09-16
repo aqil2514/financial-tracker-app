@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useForm,
   type DefaultValues,
@@ -43,20 +43,39 @@ export function useEntityForm<TInput extends FieldValues, TOutput>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, resetOnOpen]);
 
+  const keepOpenRef = useRef(false);
+
   const mutation = useDbMutation({
     mutationFn,
     invalidateKey,
     successMessage,
     errorMessage,
     onSuccess: () => {
-      form.reset();
-      setOpen(false);
+      if (keepOpenRef.current) {
+        form.reset(defaultValues() as DefaultValues<TInput>);
+      } else {
+        form.reset();
+        setOpen(false);
+      }
     },
   });
 
   function onSubmit(values: TOutput) {
+    keepOpenRef.current = false;
     mutation.mutate(values);
   }
 
-  return { open, setOpen, form, onSubmit, isPending: mutation.isPending };
+  function onSubmitAndContinue(values: TOutput) {
+    keepOpenRef.current = true;
+    mutation.mutate(values);
+  }
+
+  return {
+    open,
+    setOpen,
+    form,
+    onSubmit,
+    onSubmitAndContinue,
+    isPending: mutation.isPending,
+  };
 }

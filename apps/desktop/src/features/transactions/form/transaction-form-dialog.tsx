@@ -12,7 +12,8 @@ import { TransactionForm } from "./transaction-form";
 import { useCreateTransaction } from "./use-create-transaction";
 
 export function TransactionFormDialog() {
-  const { open, setOpen, form, onSubmit, isPending } = useCreateTransaction();
+  const { open, setOpen, form, onSubmit, onSubmitAndContinue, isPending } =
+    useCreateTransaction();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -21,7 +22,12 @@ export function TransactionFormDialog() {
         <DialogHeader>
           <DialogTitle>Tambah Transaksi</DialogTitle>
         </DialogHeader>
-        <TransactionForm form={form} onSubmit={onSubmit} isPending={isPending} />
+        <TransactionForm
+          form={form}
+          onSubmit={onSubmit}
+          onSubmitAndContinue={onSubmitAndContinue}
+          isPending={isPending}
+        />
       </DialogContent>
     </Dialog>
   );
