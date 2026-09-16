@@ -1,3 +1,4 @@
+mod import_money_manager;
 mod migrations;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -17,7 +18,11 @@ pub fn run() {
         )
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![greet])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            import_money_manager::import_money_manager
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
