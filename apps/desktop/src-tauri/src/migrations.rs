@@ -32,5 +32,11 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0005_account_groups.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "category_parent",
+            sql: include_str!("../migrations/0006_category_parent.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

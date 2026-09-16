@@ -14,6 +14,7 @@ export type Category = {
   name: string;
   icon: string | null;
   type: "income" | "expense";
+  parent_id: number | null;
 };
 
 export type AccountGroup = {
