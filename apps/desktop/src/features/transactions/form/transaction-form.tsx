@@ -66,7 +66,12 @@ export function TransactionForm({
         label="Tipe Transaksi"
         options={typeOptions}
       />
-      <FormFieldCurrency form={form} name="amount" label="Nominal" />
+      <FormFieldCurrency
+        form={form}
+        name="amount"
+        label="Nominal"
+        useCalculator
+      />
       <FormFieldSelect
         form={form}
         name="account_id"
