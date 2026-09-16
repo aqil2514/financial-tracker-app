@@ -1,7 +1,5 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getDb, type Category } from "@/lib/db";
 import {
   Card,
   CardContent,
@@ -25,22 +23,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useCategories } from "@/features/categories";
 
 const sampleSpending = [
   { category: "Makan", total: 850000 },
   { category: "Transport", total: 320000 },
   { category: "Belanja", total: 500000 },
 ];
-
-function useCategories() {
-  return useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const db = await getDb();
-      return db.select<Category[]>("SELECT * FROM categories ORDER BY id");
-    },
-  });
-}
 
 export default function DashboardPage() {
   const { data: categories, isLoading, error } = useCategories();

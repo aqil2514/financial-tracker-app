@@ -13,7 +13,7 @@ type UseEntityFormOptions<TInput extends FieldValues, TOutput> = {
   schema: Parameters<typeof zodResolver<TInput, unknown, TOutput>>[0];
   defaultValues: () => TInput;
   mutationFn: (values: TOutput) => Promise<unknown>;
-  invalidateKey: QueryKey;
+  invalidateKey: QueryKey | QueryKey[];
   successMessage: string;
   errorMessage: string;
   /** Re-derive defaultValues (e.g. from fresh entity data) whenever the dialog opens. */

@@ -5,3 +5,13 @@ export function formatRupiah(value: number) {
     maximumFractionDigits: 0,
   }).format(value);
 }
+
+export function formatDateTime(value: string) {
+  const hasTime = value.includes("T");
+  const date = new Date(hasTime ? value : `${value}T00:00`);
+
+  return new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: hasTime ? "short" : undefined,
+  }).format(date);
+}

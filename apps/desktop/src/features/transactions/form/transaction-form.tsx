@@ -1,0 +1,107 @@
+"use client";
+
+import { useWatch, type UseFormReturn } from "react-hook-form";
+
+import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
+import {
+  FormFieldCurrency,
+  FormFieldDate,
+  FormFieldSelect,
+  FormFieldTextarea,
+} from "@/components/form-fields";
+import { useAccounts } from "@/features/accounts";
+import { useCategories } from "@/features/categories";
+import type {
+  TransactionFormOutput,
+  TransactionFormValues,
+} from "./transaction.schema";
+
+type TransactionFormProps = {
+  form: UseFormReturn<TransactionFormValues, unknown, TransactionFormOutput>;
+  onSubmit: (values: TransactionFormOutput) => void;
+  isPending: boolean;
+  submitLabel?: string;
+};
+
+const typeOptions = [
+  { value: "expense", label: "Pengeluaran" },
+  { value: "income", label: "Pemasukan" },
+  { value: "transfer", label: "Transfer" },
+];
+
+export function TransactionForm({
+  form,
+  onSubmit,
+  isPending,
+  submitLabel = "Simpan",
+}: TransactionFormProps) {
+  const { data: accounts } = useAccounts();
+  const { data: categories } = useCategories();
+
+  const type = useWatch({ control: form.control, name: "type" });
+
+  const accountOptions =
+    accounts?.map((account) => ({
+      value: String(account.id),
+      label: account.name,
+    })) ?? [];
+
+  const categoryOptions =
+    categories
+      ?.filter((category) => category.type === type)
+      .map((category) => ({
+        value: String(category.id),
+        label: category.name,
+      })) ?? [];
+
+  return (
+    <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+      <FormFieldSelect
+        form={form}
+        name="type"
+        label="Tipe Transaksi"
+        options={typeOptions}
+      />
+      <FormFieldCurrency form={form} name="amount" label="Nominal" />
+      <FormFieldSelect
+        form={form}
+        name="account_id"
+        label={type === "transfer" ? "Dari Akun" : "Akun"}
+        placeholder="Pilih akun..."
+        options={accountOptions}
+      />
+      {type === "transfer" ? (
+        <FormFieldSelect
+          form={form}
+          name="transfer_account_id"
+          label="Ke Akun"
+          placeholder="Pilih akun tujuan..."
+          options={accountOptions}
+        />
+      ) : (
+        <FormFieldSelect
+          form={form}
+          name="category_id"
+          label="Kategori"
+          placeholder="Pilih kategori..."
+          options={categoryOptions}
+          allowClear
+          clearLabel="Tanpa kategori"
+        />
+      )}
+      <FormFieldDate form={form} name="date" label="Tanggal" />
+      <FormFieldTextarea
+        form={form}
+        name="note"
+        label="Catatan"
+        placeholder="Catatan tambahan (opsional)"
+      />
+      <DialogFooter>
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Menyimpan..." : submitLabel}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}

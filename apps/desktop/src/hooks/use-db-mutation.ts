@@ -3,11 +3,15 @@ import { toast } from "sonner";
 
 type UseDbMutationOptions<TInput, TResult> = {
   mutationFn: (values: TInput) => Promise<TResult>;
-  invalidateKey: QueryKey;
+  invalidateKey: QueryKey | QueryKey[];
   successMessage: string;
   errorMessage: string;
   onSuccess?: (result: TResult) => void;
 };
+
+function isQueryKeyList(key: QueryKey | QueryKey[]): key is QueryKey[] {
+  return Array.isArray(key) && key.every((k) => Array.isArray(k));
+}
 
 export function useDbMutation<TInput, TResult = void>({
   mutationFn,
@@ -21,12 +25,16 @@ export function useDbMutation<TInput, TResult = void>({
   return useMutation({
     mutationFn,
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: invalidateKey });
+      const keys = isQueryKeyList(invalidateKey)
+        ? invalidateKey
+        : [invalidateKey];
+      keys.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       toast.success(successMessage);
       onSuccess?.(result);
     },
     onError: (err) => {
-      toast.error(`${errorMessage}: ${(err as Error).message}`);
+      const detail = err instanceof Error ? err.message : String(err);
+      toast.error(`${errorMessage}: ${detail}`);
     },
   });
 }
