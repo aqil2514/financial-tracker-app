@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "desktop",
+  "productName": "Financial App",
   "version": "0.1.0",
   "identifier": "com.windows.financial-app",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "desktop",
+        "title": "Financial App",
         "width": 1100,
         "height": 720,
         "url": "/dashboard"
