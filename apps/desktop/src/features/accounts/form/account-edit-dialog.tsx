@@ -20,11 +20,13 @@ export function AccountEditDialog({ account }: { account: Account }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button variant="ghost" size="icon-sm">
-          <Pencil className="size-4" />
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button variant="ghost" size="icon-sm">
+            <Pencil className="size-4" />
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Akun</DialogTitle>

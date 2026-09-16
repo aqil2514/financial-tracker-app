@@ -16,11 +16,19 @@ export type Category = {
   type: "income" | "expense";
 };
 
+export type AccountGroup = {
+  id: number;
+  name: string;
+  created_at: string;
+};
+
 export type Account = {
   id: number;
   name: string;
   icon: string | null;
   initial_balance: number;
+  group_id: number | null;
+  description: string | null;
   created_at: string;
 };
 

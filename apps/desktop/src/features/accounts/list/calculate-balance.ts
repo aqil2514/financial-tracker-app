@@ -1,6 +1,9 @@
-import type { Account, Transaction } from "@/lib/db";
+import type { Account, AccountGroup, Transaction } from "@/lib/db";
 
-export type AccountWithBalance = Account & { balance: number };
+export type AccountWithBalance = Account & {
+  balance: number;
+  group_name: string | null;
+};
 
 export function calculateAccountBalance(
   account: Account,
@@ -21,10 +24,13 @@ export function calculateAccountBalance(
 
 export function withBalances(
   accounts: Account[],
-  transactions: Transaction[]
+  transactions: Transaction[],
+  groups: AccountGroup[] = []
 ): AccountWithBalance[] {
   return accounts.map((account) => ({
     ...account,
     balance: calculateAccountBalance(account, transactions),
+    group_name:
+      groups.find((group) => group.id === account.group_id)?.name ?? null,
   }));
 }

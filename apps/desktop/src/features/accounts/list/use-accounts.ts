@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getDb, type Account, type Transaction } from "@/lib/db";
+import { getDb, type Account, type AccountGroup, type Transaction } from "@/lib/db";
 import { withBalances, type AccountWithBalance } from "./calculate-balance";
 
 export const accountsQueryKey = ["accounts-with-balance"];
@@ -17,8 +17,11 @@ export function useAccounts() {
       const transactions = await db.select<Transaction[]>(
         "SELECT * FROM transactions"
       );
+      const groups = await db.select<AccountGroup[]>(
+        "SELECT * FROM account_groups"
+      );
 
-      return withBalances(accounts, transactions);
+      return withBalances(accounts, transactions, groups);
     },
   });
 }

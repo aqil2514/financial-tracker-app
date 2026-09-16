@@ -4,7 +4,13 @@ import type { UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
-import { FormFieldText, FormFieldCurrency } from "@/components/form-fields";
+import {
+  FormFieldText,
+  FormFieldCurrency,
+  FormFieldSelect,
+  FormFieldTextarea,
+} from "@/components/form-fields";
+import { useAccountGroups } from "@/features/account-groups";
 import type { AccountFormOutput, AccountFormValues } from "./account.schema";
 
 type AccountFormProps = {
@@ -20,6 +26,8 @@ export function AccountForm({
   isPending,
   submitLabel = "Simpan",
 }: AccountFormProps) {
+  const { data: groups } = useAccountGroups();
+
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
       <FormFieldText
@@ -29,6 +37,24 @@ export function AccountForm({
         placeholder="Contoh: Kartu Kredit"
       />
       <FormFieldCurrency form={form} name="initial_balance" label="Saldo Awal" />
+      <FormFieldSelect
+        form={form}
+        name="group_id"
+        label="Group Akun"
+        placeholder="Pilih group..."
+        options={
+          groups?.map((group) => ({
+            value: String(group.id),
+            label: group.name,
+          })) ?? []
+        }
+      />
+      <FormFieldTextarea
+        form={form}
+        name="description"
+        label="Deskripsi"
+        placeholder="Catatan tambahan tentang akun ini (opsional)"
+      />
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
           {isPending ? "Menyimpan..." : submitLabel}

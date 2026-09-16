@@ -16,9 +16,7 @@ export function AccountFormDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button>Tambah Akun</Button>
-      </DialogTrigger>
+      <DialogTrigger render={<Button>Tambah Akun</Button>} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Tambah Akun Baru</DialogTitle>

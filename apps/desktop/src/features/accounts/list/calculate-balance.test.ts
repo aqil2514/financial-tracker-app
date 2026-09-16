@@ -8,6 +8,8 @@ function makeAccount(overrides: Partial<Account> = {}): Account {
     name: "Tunai",
     icon: null,
     initial_balance: 0,
+    group_id: null,
+    description: null,
     created_at: "2026-01-01T00:00:00Z",
     ...overrides,
   };
@@ -99,8 +101,22 @@ describe("withBalances", () => {
     const result = withBalances(accounts, transactions);
 
     expect(result).toEqual([
-      { ...accounts[0], balance: 75_000 },
-      { ...accounts[1], balance: 10_000 },
+      { ...accounts[0], balance: 75_000, group_name: null },
+      { ...accounts[1], balance: 10_000, group_name: null },
     ]);
+  });
+
+  it("attaches the matching group name when groups are provided", () => {
+    const accounts = [
+      makeAccount({ id: 1, initial_balance: 0, group_id: 2 }),
+    ];
+    const groups = [
+      { id: 1, name: "Bank", created_at: "2026-01-01T00:00:00Z" },
+      { id: 2, name: "E-Wallet", created_at: "2026-01-01T00:00:00Z" },
+    ];
+
+    const result = withBalances(accounts, [], groups);
+
+    expect(result[0].group_name).toBe("E-Wallet");
   });
 });
