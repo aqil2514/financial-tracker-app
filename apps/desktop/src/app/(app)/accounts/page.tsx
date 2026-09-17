@@ -1,13 +1,16 @@
+import { PageContainer } from "@/components/page-container";
+import { PageHeader } from "@/components/page-header";
 import { AccountFormDialog, AccountList } from "@/features/accounts";
 
 export default function AccountsPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Akun</h1>
-        <AccountFormDialog />
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Akun"
+        description="Kelola akun dan saldo keuangan Anda"
+        actions={<AccountFormDialog />}
+      />
       <AccountList />
-    </div>
+    </PageContainer>
   );
 }

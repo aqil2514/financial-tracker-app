@@ -1,3 +1,5 @@
+import { PageContainer } from "@/components/page-container";
+import { PageHeader } from "@/components/page-header";
 import {
   Card,
   CardAction,
@@ -10,8 +12,8 @@ import { ImportMoneyManagerDialog } from "@/features/data-import";
 
 export default function SettingsPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+    <PageContainer>
+      <PageHeader title="Settings" description="Pengaturan aplikasi dan data Anda" />
 
       <Card>
         <CardHeader>
@@ -48,6 +50,6 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

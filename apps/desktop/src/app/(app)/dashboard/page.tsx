@@ -1,3 +1,5 @@
+import { PageContainer } from "@/components/page-container";
+import { PageHeader } from "@/components/page-header";
 import {
   CurrentMonthSummaryCard,
   MiniTrendChart,
@@ -7,8 +9,8 @@ import {
 
 export default function DashboardPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+    <PageContainer>
+      <PageHeader title="Dashboard" description="Ringkasan kondisi keuangan Anda" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <TotalBalanceCard />
@@ -18,6 +20,6 @@ export default function DashboardPage() {
       <MiniTrendChart />
 
       <RecentTransactionsCard />
-    </div>
+    </PageContainer>
   );
 }

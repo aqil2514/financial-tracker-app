@@ -1,3 +1,5 @@
+import { PageContainer } from "@/components/page-container";
+import { PageHeader } from "@/components/page-header";
 import {
   Tabs,
   TabsContent,
@@ -12,8 +14,8 @@ import {
 
 export default function ReportsPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-semibold">Laporan</h1>
+    <PageContainer>
+      <PageHeader title="Laporan" description="Analisis dan tren keuangan Anda" />
 
       <Tabs defaultValue="monthly">
         <TabsList>
@@ -31,6 +33,6 @@ export default function ReportsPage() {
           <AccountBalanceChart />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 }
