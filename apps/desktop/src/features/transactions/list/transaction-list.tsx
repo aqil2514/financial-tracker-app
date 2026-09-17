@@ -14,8 +14,11 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TablePagination } from "@/components/table-pagination";
-import { FilterPanel as NoteFilterPanel } from "@/components/filters/panel";
-import type { FilterKeyOption } from "@/components/filters/panel/panel.interface";
+import { FilterPanel } from "@/components/filters/panel";
+import type {
+  FilterKeyOption,
+  SelectOptionsMap,
+} from "@/components/filters/panel/panel.interface";
 import type { FilterConfig } from "@/components/filters/filter.interface";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
@@ -29,31 +32,38 @@ const typeConfig = {
   transfer: { label: "Transfer", icon: ArrowLeftRight, className: "text-blue-600" },
 };
 
-// TODO: filter tipe & sorter sedang disusun ulang bertahap
-// mengikuti pola panel/ yang baru (lihat NoteFilterPanel di bawah),
-// sementara dilepas dari UI.
+// TODO: sorter sedang disusun ulang bertahap mengikuti pola panel/
+// yang baru, sementara dilepas dari UI.
 
-const NOTE_FILTER_CONFIG: FilterKeyOption[] = [
+const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "note", label: "Catatan", type: "text" },
+  { key: "type", label: "Tipe Transaksi", type: "select" },
 ];
+
+const FILTER_SELECT_OPTIONS: SelectOptionsMap = {
+  type: [
+    { value: "income", label: "Pemasukan" },
+    { value: "expense", label: "Pengeluaran" },
+    { value: "transfer", label: "Transfer" },
+  ],
+};
 
 export function TransactionList({ dateFilter }: { dateFilter?: string }) {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
-  const [noteFilters, setNoteFilters] = useState<FilterConfig[]>([]);
+  const [filters, setFilters] = useState<FilterConfig[]>([]);
   const { data, isLoading, error } = useTransactions(
     page,
     limit,
-    [],
     dateFilter,
     "date_desc",
-    noteFilters
+    filters
   );
 
   useEffect(() => {
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFilter, noteFilters]);
+  }, [dateFilter, filters]);
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
   const deleteTransaction = useDeleteTransaction();
@@ -73,10 +83,11 @@ export function TransactionList({ dateFilter }: { dateFilter?: string }) {
       <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle>Daftar Transaksi</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
-          <NoteFilterPanel
-            config={NOTE_FILTER_CONFIG}
-            initialValue={noteFilters}
-            onApplyFilter={setNoteFilters}
+          <FilterPanel
+            config={FILTER_CONFIG}
+            selectOptions={FILTER_SELECT_OPTIONS}
+            initialValue={filters}
+            onApplyFilter={setFilters}
           />
         </div>
       </CardHeader>

@@ -1,5 +1,5 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import type { FilterConfig } from "../filter.interface";
+import type { FilterConfig, SelectOption } from "../filter.interface";
 
 export type FilterFieldType = "text" | "select" | "number" | "date";
 
@@ -13,8 +13,13 @@ export interface FilterKeyOption {
   type: FilterFieldType;
 }
 
+// Daftar pilihan value untuk tiap field bertipe "select", dikunci
+// dengan `key` field-nya (mis. { type: [...opsi Pemasukan/dst] }).
+export type SelectOptionsMap = Record<string, SelectOption[]>;
+
 export interface FilterPanelContextType {
   config: FilterKeyOption[];
+  selectOptions: SelectOptionsMap;
   snapshot: FilterConfig[];
   setSnapshot: Dispatch<SetStateAction<FilterConfig[]>>;
   activeValue: FilterConfig[];
@@ -25,6 +30,7 @@ export interface FilterPanelContextType {
 
 export interface FilterPanelProviderProps {
   config: FilterKeyOption[];
+  selectOptions?: SelectOptionsMap;
   initialValue: FilterConfig[];
   onApplyFilter: (state: FilterConfig[]) => void;
   children: ReactNode;

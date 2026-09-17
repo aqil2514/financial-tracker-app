@@ -13,17 +13,19 @@ import { Separator } from "@/components/ui/separator";
 import type { FilterConfig } from "../filter.interface";
 import { FilterPanelContent } from "./content";
 import { FilterPanelFooter } from "./footer";
-import type { FilterKeyOption } from "./panel.interface";
+import type { FilterKeyOption, SelectOptionsMap } from "./panel.interface";
 import { FilterPanelProvider, useFilterPanel } from "./provider";
 
 interface FilterPanelProps {
   config: FilterKeyOption[];
+  selectOptions?: SelectOptionsMap;
   initialValue: FilterConfig[];
   onApplyFilter: (state: FilterConfig[]) => void;
 }
 
 export function FilterPanel({
   config,
+  selectOptions,
   initialValue,
   onApplyFilter,
 }: FilterPanelProps) {
@@ -35,6 +37,7 @@ export function FilterPanel({
   return (
     <FilterPanelProvider
       config={config}
+      selectOptions={selectOptions}
       initialValue={initialValue}
       onApplyFilter={onApplyFilter}
     >

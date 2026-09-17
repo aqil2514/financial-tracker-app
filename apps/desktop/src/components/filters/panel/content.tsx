@@ -2,13 +2,13 @@
 
 import type { FilterConfig } from "../filter.interface";
 import { FilterText } from "../text";
-// import { FilterSelect } from "../select";
+import { FilterSelect } from "../select";
 // import { FilterNumber } from "../number";
 // import { FilterDate } from "../date";
 import { useFilterPanel } from "./provider";
 
 export function FilterPanelContent() {
-  const { config, snapshot, setSnapshot, onApplyFilter, setOpen } =
+  const { config, selectOptions, snapshot, setSnapshot, onApplyFilter, setOpen } =
     useFilterPanel();
 
   if (snapshot.length < 1) return null;
@@ -47,17 +47,18 @@ export function FilterPanelContent() {
           );
         }
 
-        // if (fieldType === "select") {
-        //   return (
-        //     <FilterSelect
-        //       key={i}
-        //       state={snap}
-        //       keyOptions={keyOptions}
-        //       onChange={(state) => handleChange(i, state)}
-        //       onRemove={() => handleRemove(i)}
-        //     />
-        //   );
-        // }
+        if (fieldType === "select") {
+          return (
+            <FilterSelect
+              key={i}
+              state={snap}
+              keyOptions={keyOptions}
+              options={selectOptions[snap.filterKey] ?? []}
+              onChange={(state) => handleChange(i, state)}
+              onRemove={() => handleRemove(i)}
+            />
+          );
+        }
 
         // if (fieldType === "number") {
         //   return (

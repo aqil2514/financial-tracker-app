@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getDb, type Transaction } from "@/lib/db";
 import { toPagination } from "@/lib/pagination";
+import { buildWhereClause } from "@/components/filters/builders/sql";
 import type { FilterConfig } from "@/components/filters/filter.interface";
 
 export const transactionsQueryKey = ["transactions"];
@@ -18,46 +19,29 @@ const SORT_CLAUSES: Record<TransactionSort, string> = {
   amount_asc: "amount ASC, id ASC",
 };
 
+// Kolom transactions yang boleh muncul sebagai filterKey — harus
+// sinkron dengan FILTER_CONFIG di transaction-list.tsx.
+const FILTERABLE_COLUMNS = ["note", "type"] as const;
+
 export function useTransactions(
   page: number,
   limit: number,
-  types: Transaction["type"][] = [],
   date?: string,
   sort: TransactionSort = "date_desc",
-  noteFilters: FilterConfig[] = []
+  filters: FilterConfig[] = []
 ) {
   return useQuery({
-    queryKey: [...transactionsQueryKey, page, limit, types, date, sort, noteFilters],
+    queryKey: [...transactionsQueryKey, page, limit, date, sort, filters],
     queryFn: async () => {
       const db = await getDb();
       const offset = (page - 1) * limit;
 
-      const conditions: string[] = [];
-      const params: (string | number)[] = [];
+      const { whereClause, params } = buildWhereClause(
+        filters,
+        FILTERABLE_COLUMNS,
+        date ? [{ condition: "date(date) = $1", params: [date] }] : []
+      );
 
-      if (types.length > 0) {
-        conditions.push(`type IN (${types.map((_, i) => `$${i + 1}`).join(", ")})`);
-        params.push(...types);
-      }
-      if (date) {
-        conditions.push(`date(date) = $${params.length + 1}`);
-        params.push(date);
-      }
-      for (const filter of noteFilters) {
-        if (filter.filterKey !== "note") continue;
-
-        if (filter.filterOperator === "is_null") {
-          conditions.push("note IS NULL");
-        } else if (filter.filterOperator === "is_not_null") {
-          conditions.push("note IS NOT NULL");
-        } else if (typeof filter.filterValue === "string" && filter.filterValue !== "") {
-          const notPrefix = filter.filterOperator === "not_ilike" ? "NOT " : "";
-          conditions.push(`${notPrefix}note LIKE $${params.length + 1}`);
-          params.push(`%${filter.filterValue}%`);
-        }
-      }
-
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
       const orderClause = SORT_CLAUSES[sort];
 
       const [rows, countResult] = await Promise.all([

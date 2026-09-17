@@ -20,6 +20,7 @@ const FilterPanelContext = createContext<FilterPanelContextType>(
 export function FilterPanelProvider({
   children,
   config,
+  selectOptions = {},
   initialValue,
   onApplyFilter,
 }: FilterPanelProviderProps) {
@@ -38,6 +39,7 @@ export function FilterPanelProvider({
     <FilterPanelContext.Provider
       value={{
         config,
+        selectOptions,
         snapshot,
         setSnapshot,
         activeValue: initialValue,
