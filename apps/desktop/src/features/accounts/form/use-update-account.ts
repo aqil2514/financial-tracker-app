@@ -3,7 +3,7 @@
 import { getDb, type Account } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { accountSchema, type AccountFormOutput } from "./account.schema";
-import { accountsQueryKey } from "../list/use-accounts";
+import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 
 export function useUpdateAccount(account: Account) {
   return useEntityForm({
@@ -28,7 +28,7 @@ export function useUpdateAccount(account: Account) {
         ]
       );
     },
-    invalidateKey: accountsQueryKey,
+    invalidateKey: QUERY_DEPENDENCIES.accounts,
     successMessage: "Akun berhasil diperbarui",
     errorMessage: "Gagal memperbarui akun",
   });

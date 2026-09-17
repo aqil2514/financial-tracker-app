@@ -3,7 +3,7 @@
 import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { accountSchema, type AccountFormOutput } from "./account.schema";
-import { accountsQueryKey } from "../list/use-accounts";
+import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 
 export function useCreateAccount() {
   return useEntityForm({
@@ -26,7 +26,7 @@ export function useCreateAccount() {
         ]
       );
     },
-    invalidateKey: accountsQueryKey,
+    invalidateKey: QUERY_DEPENDENCIES.accounts,
     successMessage: "Akun berhasil ditambahkan",
     errorMessage: "Gagal menambahkan akun",
   });

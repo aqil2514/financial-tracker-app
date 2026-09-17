@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { QueryState } from "@/components/query-state";
 import {
   Card,
   CardAction,
@@ -25,7 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatRupiah } from "@/lib/format";
+import { formatCurrency } from "@/lib/format-currency";
+import { formatCompactNotation } from "@/lib/format";
+import { formatDate } from "@/lib/format-date";
 import { useMonthlySummary } from "./use-monthly-summary";
 
 const RANGE_OPTIONS = [
@@ -34,15 +37,6 @@ const RANGE_OPTIONS = [
   { value: "24", label: "24 bulan terakhir" },
   { value: "36", label: "36 bulan terakhir" },
 ];
-
-function formatMonthLabel(month: string) {
-  const [year, monthNum] = month.split("-");
-  const date = new Date(Number(year), Number(monthNum) - 1);
-  return new Intl.DateTimeFormat("id-ID", {
-    month: "short",
-    year: "2-digit",
-  }).format(date);
-}
 
 function ChartTooltip({
   active,
@@ -61,10 +55,10 @@ function ChartTooltip({
   return (
     <div className="bg-popover rounded-lg border p-3 text-sm shadow-md">
       <p className="mb-1 font-medium">{label}</p>
-      <p className="text-green-600">Pemasukan: {formatRupiah(income)}</p>
-      <p className="text-red-600">Pengeluaran: {formatRupiah(expense)}</p>
+      <p className="text-green-600">Pemasukan: {formatCurrency(income, "IDR")}</p>
+      <p className="text-red-600">Pengeluaran: {formatCurrency(expense, "IDR")}</p>
       <p className="text-muted-foreground mt-1 border-t pt-1">
-        Selisih: {formatRupiah(income - expense)}
+        Selisih: {formatCurrency(income - expense, "IDR")}
       </p>
     </div>
   );
@@ -76,7 +70,7 @@ export function MonthlySummaryChart() {
 
   const chartData = data?.map((row) => ({
     ...row,
-    label: formatMonthLabel(row.month),
+    label: formatDate(row.month, "month-label"),
   }));
 
   return (
@@ -102,14 +96,7 @@ export function MonthlySummaryChart() {
         </CardAction>
       </CardHeader>
       <CardContent className="h-80">
-        {isLoading && (
-          <p className="text-muted-foreground text-sm">Memuat...</p>
-        )}
-        {error && (
-          <p className="text-destructive text-sm">
-            Gagal memuat: {(error as Error).message}
-          </p>
-        )}
+        <QueryState isLoading={isLoading} error={error} />
         {chartData && chartData.length === 0 && (
           <p className="text-muted-foreground text-sm">
             Belum ada data transaksi pada periode ini.
@@ -120,14 +107,7 @@ export function MonthlySummaryChart() {
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="label" />
-              <YAxis
-                tickFormatter={(value) =>
-                  new Intl.NumberFormat("id-ID", {
-                    notation: "compact",
-                    compactDisplay: "short",
-                  }).format(value)
-                }
-              />
+              <YAxis tickFormatter={formatCompactNotation} />
               <Tooltip content={<ChartTooltip />} />
               <Bar dataKey="income" fill="#16a34a" radius={4} name="Pemasukan" />
               <Bar dataKey="expense" fill="#dc2626" radius={4} name="Pengeluaran" />

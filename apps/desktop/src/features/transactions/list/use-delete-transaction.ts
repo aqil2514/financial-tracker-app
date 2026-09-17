@@ -2,8 +2,7 @@
 
 import { getDb } from "@/lib/db";
 import { useDbMutation } from "@/hooks/use-db-mutation";
-import { accountsQueryKey } from "@/features/accounts";
-import { transactionsQueryKey } from "./use-transactions";
+import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 
 export function useDeleteTransaction() {
   return useDbMutation({
@@ -11,7 +10,7 @@ export function useDeleteTransaction() {
       const db = await getDb();
       await db.execute("DELETE FROM transactions WHERE id = $1", [id]);
     },
-    invalidateKey: [transactionsQueryKey, accountsQueryKey],
+    invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil dihapus",
     errorMessage: "Gagal menghapus transaksi",
   });

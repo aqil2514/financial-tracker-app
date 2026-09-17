@@ -6,10 +6,14 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { accountsQueryKey } from "@/features/accounts";
-import { accountGroupsQueryKey } from "@/features/account-groups";
-import { categoriesQueryKey } from "@/features/categories";
-import { transactionsQueryKey } from "@/features/transactions";
+import { dependentKeysOf } from "@/lib/query-dependencies";
+
+const IMPORT_AFFECTED_QUERY_KEYS = dependentKeysOf(
+  "transactions",
+  "accounts",
+  "accountGroups",
+  "categories"
+);
 
 export type ImportSummary = {
   account_groups: number;
@@ -68,10 +72,9 @@ export function useImportMoneyManager() {
       toast.success(
         `Berhasil mengimpor ${result.transactions} transaksi, ${result.accounts} akun, ${result.categories} kategori`
       );
-      queryClient.invalidateQueries({ queryKey: accountsQueryKey });
-      queryClient.invalidateQueries({ queryKey: accountGroupsQueryKey });
-      queryClient.invalidateQueries({ queryKey: categoriesQueryKey });
-      queryClient.invalidateQueries({ queryKey: transactionsQueryKey });
+      IMPORT_AFFECTED_QUERY_KEYS.forEach((queryKey) =>
+        queryClient.invalidateQueries({ queryKey })
+      );
       reset();
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);

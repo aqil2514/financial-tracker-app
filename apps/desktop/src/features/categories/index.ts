@@ -1,1 +1,1 @@
-export { useCategories, categoriesQueryKey } from "./use-categories";
+export { useCategories, categoriesQueryKey } from "@/hooks/resources/use-categories";

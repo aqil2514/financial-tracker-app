@@ -6,7 +6,7 @@ import {
   accountGroupSchema,
   type AccountGroupFormOutput,
 } from "./account-group.schema";
-import { accountGroupsQueryKey } from "../list/use-account-groups";
+import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 
 export function useCreateAccountGroup() {
   return useEntityForm({
@@ -18,7 +18,7 @@ export function useCreateAccountGroup() {
         values.name,
       ]);
     },
-    invalidateKey: accountGroupsQueryKey,
+    invalidateKey: QUERY_DEPENDENCIES.accountGroups,
     successMessage: "Group akun berhasil ditambahkan",
     errorMessage: "Gagal menambahkan group akun",
   });

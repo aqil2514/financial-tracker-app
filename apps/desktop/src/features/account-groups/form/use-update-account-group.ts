@@ -6,7 +6,7 @@ import {
   accountGroupSchema,
   type AccountGroupFormOutput,
 } from "./account-group.schema";
-import { accountGroupsQueryKey } from "../list/use-account-groups";
+import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 
 export function useUpdateAccountGroup(group: AccountGroup) {
   return useEntityForm({
@@ -20,7 +20,7 @@ export function useUpdateAccountGroup(group: AccountGroup) {
         [values.name, group.id]
       );
     },
-    invalidateKey: accountGroupsQueryKey,
+    invalidateKey: QUERY_DEPENDENCIES.accountGroups,
     successMessage: "Group akun berhasil diperbarui",
     errorMessage: "Gagal memperbarui group akun",
   });

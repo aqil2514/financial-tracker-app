@@ -9,7 +9,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatNumberCompact, formatRupiah } from "@/lib/format";
+import { formatNumberCompact } from "@/lib/format";
+import { formatCurrency } from "@/lib/format-currency";
 import { useCalendar } from "./calendar-context";
 
 export function DayButtonWithSummary(props: DayButtonProps) {
@@ -53,8 +54,8 @@ export function DayButtonWithSummary(props: DayButtonProps) {
         <TooltipTrigger render={dayButton} />
         <TooltipContent>
           <div className="space-y-0.5">
-            <p className="text-green-400">Pemasukan: {formatRupiah(summary.income)}</p>
-            <p className="text-red-400">Pengeluaran: {formatRupiah(summary.expense)}</p>
+            <p className="text-green-400">Pemasukan: {formatCurrency(summary.income, "IDR")}</p>
+            <p className="text-red-400">Pengeluaran: {formatCurrency(summary.expense, "IDR")}</p>
           </div>
         </TooltipContent>
       </Tooltip>

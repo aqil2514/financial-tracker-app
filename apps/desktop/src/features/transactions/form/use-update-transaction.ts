@@ -2,12 +2,11 @@
 
 import { getDb, type Transaction } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
-import { accountsQueryKey } from "@/features/accounts";
+import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import {
   transactionSchema,
   type TransactionFormOutput,
 } from "./transaction.schema";
-import { transactionsQueryKey } from "../list/use-transactions";
 
 export function useUpdateTransaction(transaction: Transaction) {
   return useEntityForm({
@@ -48,7 +47,7 @@ export function useUpdateTransaction(transaction: Transaction) {
         ]
       );
     },
-    invalidateKey: [transactionsQueryKey, accountsQueryKey],
+    invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil diperbarui",
     errorMessage: "Gagal memperbarui transaksi",
   });

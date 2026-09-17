@@ -2,12 +2,11 @@
 
 import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
-import { accountsQueryKey } from "@/features/accounts";
+import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import {
   transactionSchema,
   type TransactionFormOutput,
 } from "./transaction.schema";
-import { transactionsQueryKey } from "../list/use-transactions";
 
 function now() {
   const date = new Date();
@@ -48,7 +47,7 @@ export function useCreateTransaction() {
         ]
       );
     },
-    invalidateKey: [transactionsQueryKey, accountsQueryKey],
+    invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil ditambahkan",
     errorMessage: "Gagal menambahkan transaksi",
   });

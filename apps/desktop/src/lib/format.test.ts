@@ -1,23 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { formatRupiah } from "./format";
+import { formatNumberCompact, formatCompactNotation } from "./format";
 
-describe("formatRupiah", () => {
-  it("formats a positive number as Indonesian Rupiah", () => {
-    expect(formatRupiah(150_000)).toContain("150.000");
-    expect(formatRupiah(150_000)).toContain("Rp");
+describe("formatNumberCompact", () => {
+  it("formats a positive number without currency symbol", () => {
+    expect(formatNumberCompact(150_000)).toBe("150.000");
   });
 
-  it("formats zero", () => {
-    expect(formatRupiah(0)).toContain("0");
+  it("rounds to whole numbers", () => {
+    expect(formatNumberCompact(1_000.6)).toBe("1.001");
+  });
+});
+
+describe("formatCompactNotation", () => {
+  it("shortens large numbers using compact notation", () => {
+    expect(formatCompactNotation(1_200_000)).toContain("jt");
   });
 
-  it("formats negative numbers with a minus sign", () => {
-    expect(formatRupiah(-50_000)).toMatch(/^-/);
-    expect(formatRupiah(-50_000)).toContain("50.000");
-  });
-
-  it("rounds to whole rupiah (no decimals)", () => {
-    expect(formatRupiah(1_000.6)).toContain("1.001");
-    expect(formatRupiah(1_000.6)).not.toContain(",");
+  it("leaves small numbers unshortened", () => {
+    expect(formatCompactNotation(500)).toBe("500");
   });
 });

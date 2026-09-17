@@ -1,7 +1,8 @@
 "use client";
 
+import { QueryState } from "@/components/query-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatRupiah } from "@/lib/format";
+import { formatCurrency } from "@/lib/format-currency";
 import { useCurrentMonthSummary } from "./use-current-month-summary";
 
 export function CurrentMonthSummaryCard() {
@@ -14,30 +15,25 @@ export function CurrentMonthSummaryCard() {
         <CardTitle>Bulan Ini</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading && <p className="text-muted-foreground text-sm">Memuat...</p>}
-        {error && (
-          <p className="text-destructive text-sm">
-            Gagal memuat: {(error as Error).message}
-          </p>
-        )}
+        <QueryState isLoading={isLoading} error={error} />
         {data && (
           <div className="grid grid-cols-3 gap-2">
             <div>
               <p className="text-muted-foreground text-xs">Pemasukan</p>
               <p className="font-medium text-green-600">
-                {formatRupiah(data.income)}
+                {formatCurrency(data.income, "IDR")}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Pengeluaran</p>
               <p className="font-medium text-red-600">
-                {formatRupiah(data.expense)}
+                {formatCurrency(data.expense, "IDR")}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Selisih</p>
               <p className={`font-medium ${net >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatRupiah(net)}
+                {formatCurrency(net, "IDR")}
               </p>
             </div>
           </div>

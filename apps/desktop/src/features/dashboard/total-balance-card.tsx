@@ -1,7 +1,8 @@
 "use client";
 
+import { QueryState } from "@/components/query-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatRupiah } from "@/lib/format";
+import { formatCurrency } from "@/lib/format-currency";
 import { useAccountBalances } from "@/features/reports";
 
 export function TotalBalanceCard() {
@@ -15,14 +16,9 @@ export function TotalBalanceCard() {
         <CardTitle>Total Saldo</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading && <p className="text-muted-foreground text-sm">Memuat...</p>}
-        {error && (
-          <p className="text-destructive text-sm">
-            Gagal memuat: {(error as Error).message}
-          </p>
-        )}
+        <QueryState isLoading={isLoading} error={error} />
         {data && (
-          <p className="text-3xl font-semibold">{formatRupiah(total)}</p>
+          <p className="text-3xl font-semibold">{formatCurrency(total, "IDR")}</p>
         )}
       </CardContent>
     </Card>

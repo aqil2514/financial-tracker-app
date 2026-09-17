@@ -2,7 +2,7 @@
 
 import { getDb } from "@/lib/db";
 import { useDbMutation } from "@/hooks/use-db-mutation";
-import { accountsQueryKey } from "./use-accounts";
+import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 
 export function useDeleteAccount() {
   return useDbMutation({
@@ -10,7 +10,7 @@ export function useDeleteAccount() {
       const db = await getDb();
       await db.execute("DELETE FROM accounts WHERE id = $1", [id]);
     },
-    invalidateKey: accountsQueryKey,
+    invalidateKey: QUERY_DEPENDENCIES.accounts,
     successMessage: "Akun berhasil dihapus",
     errorMessage: "Gagal menghapus akun",
   });

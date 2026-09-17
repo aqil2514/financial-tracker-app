@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle } from "lucide-react";
 
+import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateTime, formatRupiah } from "@/lib/format";
+import { formatDate } from "@/lib/format-date";
+import { formatCurrency } from "@/lib/format-currency";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
 import { useRecentTransactions } from "./use-recent-transactions";
@@ -39,12 +41,7 @@ export function RecentTransactionsCard() {
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
-        {isLoading && <p className="text-muted-foreground text-sm">Memuat...</p>}
-        {error && (
-          <p className="text-destructive text-sm">
-            Gagal memuat: {(error as Error).message}
-          </p>
-        )}
+        <QueryState isLoading={isLoading} error={error} />
         {transactions && transactions.length === 0 && (
           <p className="text-muted-foreground text-sm">Belum ada transaksi.</p>
         )}
@@ -71,13 +68,13 @@ export function RecentTransactionsCard() {
                     )}
                   </div>
                   <p className="text-muted-foreground text-xs">
-                    {formatDateTime(tx.date)}
+                    {formatDate(tx.date, "date-time")}
                   </p>
                 </div>
               </div>
               <p className={`font-medium ${config.className}`}>
                 {tx.type === "expense" ? "-" : tx.type === "income" ? "+" : ""}
-                {formatRupiah(tx.amount)}
+                {formatCurrency(tx.amount, "IDR")}
               </p>
             </div>
           );

@@ -2,8 +2,9 @@
 
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
+import { QueryState } from "@/components/query-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatRupiah } from "@/lib/format";
+import { formatCurrency } from "@/lib/format-currency";
 import { useMonthlySummary } from "@/features/reports";
 
 const MONTHS = 6;
@@ -21,8 +22,8 @@ function ChartTooltip({
   return (
     <div className="bg-popover rounded-lg border p-3 text-sm shadow-md">
       <p className="font-medium">{row.month}</p>
-      <p className="text-green-600">Pemasukan: {formatRupiah(row.income)}</p>
-      <p className="text-red-600">Pengeluaran: {formatRupiah(row.expense)}</p>
+      <p className="text-green-600">Pemasukan: {formatCurrency(row.income, "IDR")}</p>
+      <p className="text-red-600">Pengeluaran: {formatCurrency(row.expense, "IDR")}</p>
     </div>
   );
 }
@@ -36,12 +37,7 @@ export function MiniTrendChart() {
         <CardTitle>Tren 6 Bulan Terakhir</CardTitle>
       </CardHeader>
       <CardContent className="h-56">
-        {isLoading && <p className="text-muted-foreground text-sm">Memuat...</p>}
-        {error && (
-          <p className="text-destructive text-sm">
-            Gagal memuat: {(error as Error).message}
-          </p>
-        )}
+        <QueryState isLoading={isLoading} error={error} />
         {data && data.length === 0 && (
           <p className="text-muted-foreground text-sm">Belum ada data.</p>
         )}

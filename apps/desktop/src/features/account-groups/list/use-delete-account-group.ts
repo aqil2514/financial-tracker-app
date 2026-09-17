@@ -2,7 +2,7 @@
 
 import { getDb } from "@/lib/db";
 import { useDbMutation } from "@/hooks/use-db-mutation";
-import { accountGroupsQueryKey } from "./use-account-groups";
+import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 
 export function useDeleteAccountGroup() {
   return useDbMutation({
@@ -19,7 +19,7 @@ export function useDeleteAccountGroup() {
       }
       await db.execute("DELETE FROM account_groups WHERE id = $1", [id]);
     },
-    invalidateKey: accountGroupsQueryKey,
+    invalidateKey: QUERY_DEPENDENCIES.accountGroups,
     successMessage: "Group akun berhasil dihapus",
     errorMessage: "Gagal menghapus group akun",
   });

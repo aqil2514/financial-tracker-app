@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
+import { QueryState } from "@/components/query-state";
 import {
   Card,
   CardAction,
@@ -18,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { formatRupiah } from "@/lib/format";
+import { formatCurrency } from "@/lib/format-currency";
 import { useCategoryBreakdown } from "./use-category-breakdown";
 
 const RANGE_OPTIONS = [
@@ -54,7 +55,7 @@ function ChartTooltip({
     <div className="bg-popover rounded-lg border p-3 text-sm shadow-md">
       <p className="font-medium">{row.name}</p>
       <p className="text-muted-foreground">
-        {formatRupiah(row.total)} ({row.percent.toFixed(1)}%)
+        {formatCurrency(row.total, "IDR")} ({row.percent.toFixed(1)}%)
       </p>
     </div>
   );
@@ -126,12 +127,7 @@ export function CategoryBreakdownChart() {
           </ToggleGroupItem>
         </ToggleGroup>
 
-        {isLoading && <p className="text-muted-foreground text-sm">Memuat...</p>}
-        {error && (
-          <p className="text-destructive text-sm">
-            Gagal memuat: {(error as Error).message}
-          </p>
-        )}
+        <QueryState isLoading={isLoading} error={error} />
         {chartData && chartData.length === 0 && (
           <p className="text-muted-foreground text-sm">
             Belum ada data pada periode ini.
@@ -144,7 +140,7 @@ export function CategoryBreakdownChart() {
               <span className="text-muted-foreground text-sm">
                 {type === "expense" ? "Pengeluaran" : "Pemasukan"}
               </span>
-              <span className="font-semibold">{formatRupiah(total)}</span>
+              <span className="font-semibold">{formatCurrency(total, "IDR")}</span>
             </div>
 
             <div className="h-72">
@@ -183,7 +179,7 @@ export function CategoryBreakdownChart() {
                     <span>{row.name}</span>
                   </div>
                   <span className="text-muted-foreground">
-                    {formatRupiah(row.total)}
+                    {formatCurrency(row.total, "IDR")}
                   </span>
                 </li>
               ))}

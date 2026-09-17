@@ -2,7 +2,8 @@
 
 import { ArrowDownCircle, ArrowUpCircle, ArrowLeftRight } from "lucide-react";
 
-import { formatRupiah, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format-date";
+import { formatCurrency } from "@/lib/format-currency";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Badge } from "@/components/ui/badge";
 import type { Transaction } from "@/lib/db";
@@ -56,7 +57,7 @@ const ItemInfo = ({ tx }: { tx: Transaction }) => {
           )}
         </div>
         <p className="text-muted-foreground text-sm">
-          {formatDateTime(tx.date)}
+          {formatDate(tx.date, "date-time")}
         </p>
         {tx.note && <p className="text-muted-foreground text-xs">{tx.note}</p>}
       </div>
@@ -72,7 +73,7 @@ const ItemActions = ({ tx }: { tx: Transaction }) => {
     <div className="flex items-center gap-1">
       <p className={`mr-2 font-medium ${config.className}`}>
         {tx.type === "expense" ? "-" : tx.type === "income" ? "+" : ""}
-        {formatRupiah(tx.amount)}
+        {formatCurrency(tx.amount, "IDR")}
       </p>
       <TransactionEditDialog transaction={tx} />
       <ConfirmDeleteButton

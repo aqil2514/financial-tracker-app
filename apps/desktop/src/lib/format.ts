@@ -1,23 +1,16 @@
-export function formatRupiah(value: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { APP_LOCALE } from "./locale";
 
 export function formatNumberCompact(value: number) {
-  return new Intl.NumberFormat("id-ID", {
+  return new Intl.NumberFormat(APP_LOCALE, {
     maximumFractionDigits: 0,
   }).format(value);
 }
 
-export function formatDateTime(value: string) {
-  const hasTime = value.includes("T");
-  const date = new Date(hasTime ? value : `${value}T00:00`);
-
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: hasTime ? "short" : undefined,
-  }).format(date);
+// Notasi ringkas ("1,2 jt") untuk ruang sempit seperti tick sumbu chart —
+// beda dari formatNumberCompact di atas yang tidak memakai notation: "compact".
+export function formatCompactNotation(value: number) {
+  return new Intl.NumberFormat(APP_LOCALE, {
+    notation: "compact",
+    compactDisplay: "short",
+  }).format(value);
 }

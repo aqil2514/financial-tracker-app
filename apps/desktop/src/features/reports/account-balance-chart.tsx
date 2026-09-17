@@ -10,9 +10,11 @@ import {
   YAxis,
 } from "recharts";
 
+import { QueryState } from "@/components/query-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatRupiah } from "@/lib/format";
+import { formatCurrency } from "@/lib/format-currency";
+import { formatCompactNotation } from "@/lib/format";
 import { useAccountBalances } from "./use-account-balances";
 
 function ChartTooltip({
@@ -28,7 +30,7 @@ function ChartTooltip({
   return (
     <div className="bg-popover rounded-lg border p-3 text-sm shadow-md">
       <p className="font-medium">{row.name}</p>
-      <p className="text-muted-foreground">{formatRupiah(row.balance)}</p>
+      <p className="text-muted-foreground">{formatCurrency(row.balance, "IDR")}</p>
     </div>
   );
 }
@@ -47,14 +49,7 @@ export function AccountBalanceChart() {
         <CardTitle>Saldo per Akun</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading && (
-          <p className="text-muted-foreground text-sm">Memuat...</p>
-        )}
-        {error && (
-          <p className="text-destructive text-sm">
-            Gagal memuat: {(error as Error).message}
-          </p>
-        )}
+        <QueryState isLoading={isLoading} error={error} />
         {chartData && chartData.length === 0 && (
           <p className="text-muted-foreground text-sm">Belum ada akun.</p>
         )}
@@ -66,12 +61,7 @@ export function AccountBalanceChart() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     type="number"
-                    tickFormatter={(value) =>
-                      new Intl.NumberFormat("id-ID", {
-                        notation: "compact",
-                        compactDisplay: "short",
-                      }).format(value)
-                    }
+                    tickFormatter={formatCompactNotation}
                   />
                   <YAxis type="category" dataKey="name" width={110} />
                   <Tooltip content={<ChartTooltip />} />

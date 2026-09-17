@@ -1,11 +1,12 @@
 "use client";
 
-import { formatRupiah } from "@/lib/format";
+import { formatCurrency } from "@/lib/format-currency";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { QueryState } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AccountEditDialog } from "../form/account-edit-dialog";
-import { useAccounts } from "./use-accounts";
+import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useDeleteAccount } from "./use-delete-account";
 
 export function AccountList() {
@@ -18,14 +19,7 @@ export function AccountList() {
         <CardTitle>Daftar Akun</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {isLoading && (
-          <p className="text-muted-foreground text-sm">Memuat...</p>
-        )}
-        {error && (
-          <p className="text-destructive text-sm">
-            Gagal memuat: {(error as Error).message}
-          </p>
-        )}
+        <QueryState isLoading={isLoading} error={error} />
         {accounts?.map((account) => (
           <div
             key={account.id}
@@ -39,7 +33,7 @@ export function AccountList() {
                 )}
               </div>
               <p className="text-muted-foreground text-sm">
-                {formatRupiah(account.balance)}
+                {formatCurrency(account.balance, "IDR")}
               </p>
               {account.description && (
                 <p className="text-muted-foreground text-xs">

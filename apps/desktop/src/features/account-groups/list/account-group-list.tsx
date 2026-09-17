@@ -1,8 +1,9 @@
 "use client";
 
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { QueryState } from "@/components/query-state";
 import { AccountGroupEditDialog } from "../form/account-group-edit-dialog";
-import { useAccountGroups } from "./use-account-groups";
+import { useAccountGroups } from "@/hooks/resources/use-account-groups";
 import { useDeleteAccountGroup } from "./use-delete-account-group";
 
 export function AccountGroupList() {
@@ -11,12 +12,7 @@ export function AccountGroupList() {
 
   return (
     <div className="space-y-2">
-      {isLoading && <p className="text-muted-foreground text-sm">Memuat...</p>}
-      {error && (
-        <p className="text-destructive text-sm">
-          Gagal memuat: {(error as Error).message}
-        </p>
-      )}
+      <QueryState isLoading={isLoading} error={error} />
       {groups?.map((group) => (
         <div
           key={group.id}
