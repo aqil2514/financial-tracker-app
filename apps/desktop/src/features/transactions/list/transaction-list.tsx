@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Trash2, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight } from "lucide-react";
 
 import { formatRupiah, formatDateTime } from "@/lib/format";
@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TablePagination } from "@/components/table-pagination";
+import { FilterPanel as NoteFilterPanel } from "@/components/filters/panel";
+import type { FilterKeyOption } from "@/components/filters/panel/panel.interface";
+import type { FilterConfig } from "@/components/filters/filter.interface";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
 import { TransactionEditDialog } from "../form/transaction-edit-dialog";
@@ -26,10 +29,31 @@ const typeConfig = {
   transfer: { label: "Transfer", icon: ArrowLeftRight, className: "text-blue-600" },
 };
 
-export function TransactionList() {
+// TODO: filter tipe & sorter sedang disusun ulang bertahap
+// mengikuti pola panel/ yang baru (lihat NoteFilterPanel di bawah),
+// sementara dilepas dari UI.
+
+const NOTE_FILTER_CONFIG: FilterKeyOption[] = [
+  { key: "note", label: "Catatan", type: "text" },
+];
+
+export function TransactionList({ dateFilter }: { dateFilter?: string }) {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
-  const { data, isLoading, error } = useTransactions(page, limit);
+  const [noteFilters, setNoteFilters] = useState<FilterConfig[]>([]);
+  const { data, isLoading, error } = useTransactions(
+    page,
+    limit,
+    [],
+    dateFilter,
+    "date_desc",
+    noteFilters
+  );
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFilter, noteFilters]);
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
   const deleteTransaction = useDeleteTransaction();
@@ -46,8 +70,15 @@ export function TransactionList() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle>Daftar Transaksi</CardTitle>
+        <div className="flex flex-wrap items-center gap-2">
+          <NoteFilterPanel
+            config={NOTE_FILTER_CONFIG}
+            initialValue={noteFilters}
+            onApplyFilter={setNoteFilters}
+          />
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading && (
@@ -58,7 +89,7 @@ export function TransactionList() {
             Gagal memuat: {(error as Error).message}
           </p>
         )}
-        <ScrollArea className="h-[600px]">
+        <ScrollArea className="h-[480px]">
           <div className="space-y-3 pr-4">
             {transactions?.map((tx) => {
               const config = typeConfig[tx.type];
