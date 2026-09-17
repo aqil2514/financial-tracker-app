@@ -1,14 +1,9 @@
 "use client";
 
-import {
-  Trash2,
-  ArrowDownCircle,
-  ArrowUpCircle,
-  ArrowLeftRight,
-} from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, ArrowLeftRight } from "lucide-react";
 
 import { formatRupiah, formatDateTime } from "@/lib/format";
-import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Badge } from "@/components/ui/badge";
 import type { Transaction } from "@/lib/db";
 import { TransactionEditDialog } from "../form/transaction-edit-dialog";
@@ -80,14 +75,11 @@ const ItemActions = ({ tx }: { tx: Transaction }) => {
         {formatRupiah(tx.amount)}
       </p>
       <TransactionEditDialog transaction={tx} />
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={() => deleteTransaction(tx.id)}
-        disabled={isDeletingTransaction}
-      >
-        <Trash2 className="text-destructive size-4" />
-      </Button>
+      <ConfirmDeleteButton
+        onConfirm={() => deleteTransaction(tx.id)}
+        isPending={isDeletingTransaction}
+        title="Hapus transaksi ini?"
+      />
     </div>
   );
 };

@@ -1,8 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { AccountGroupEditDialog } from "../form/account-group-edit-dialog";
 import { useAccountGroups } from "./use-account-groups";
 import { useDeleteAccountGroup } from "./use-delete-account-group";
@@ -27,14 +25,12 @@ export function AccountGroupList() {
           <p className="text-sm font-medium">{group.name}</p>
           <div className="flex items-center gap-1">
             <AccountGroupEditDialog group={group} />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => deleteGroup.mutate(group.id)}
-              disabled={deleteGroup.isPending}
-            >
-              <Trash2 className="text-destructive size-4" />
-            </Button>
+            <ConfirmDeleteButton
+              onConfirm={() => deleteGroup.mutate(group.id)}
+              isPending={deleteGroup.isPending}
+              title={`Hapus group "${group.name}"?`}
+              description="Akun yang berada di group ini tidak akan ikut terhapus."
+            />
           </div>
         </div>
       ))}

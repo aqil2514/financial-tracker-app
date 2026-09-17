@@ -1,9 +1,7 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-
 import { formatRupiah } from "@/lib/format";
-import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AccountEditDialog } from "../form/account-edit-dialog";
@@ -51,14 +49,12 @@ export function AccountList() {
             </div>
             <div className="flex items-center gap-1">
               <AccountEditDialog account={account} />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => deleteAccount.mutate(account.id)}
-                disabled={deleteAccount.isPending}
-              >
-                <Trash2 className="text-destructive size-4" />
-              </Button>
+              <ConfirmDeleteButton
+                onConfirm={() => deleteAccount.mutate(account.id)}
+                isPending={deleteAccount.isPending}
+                title={`Hapus akun "${account.name}"?`}
+                description="Seluruh transaksi yang terkait dengan akun ini tidak akan ikut terhapus, tapi referensinya akan hilang."
+              />
             </div>
           </div>
         ))}

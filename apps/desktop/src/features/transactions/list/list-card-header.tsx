@@ -13,9 +13,6 @@ const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "amount", label: "Jumlah", type: "number" },
 ];
 
-// TODO: sorter sedang disusun ulang bertahap mengikuti pola panel/
-// yang baru, sementara dilepas dari UI.
-
 export function ListCardHeader() {
   const { filterSelectOptions, filters, setFilters } = useList();
 
