@@ -20,7 +20,7 @@ Analoginya: `filterKey` = kolom di database, `filterOperator` = operator SQL (`L
 
 Ini sumber kebingungan paling umum, jadi ditegaskan di sini:
 
-- **`FilterKeyOption`** (`panel/panel.interface.ts`) — daftar STATIS field yang BISA difilter di suatu halaman. Disiapkan sekali oleh pemanggil (mis. `transaction-list.tsx`), berisi `key`, `label`, dan `type` (`"text" | "select" | "number" | "date"`). Ibarat daftar menu.
+- **`FilterKeyOption`** (`panel/panel.interface.ts`) — daftar STATIS field yang BISA difilter di suatu halaman. Disiapkan sekali oleh pemanggil (mis. `transaction-list.tsx`), berisi `key`, `label`, dan `type` (`"text" | "select" | "combobox" | "number" | "date"`). Ibarat daftar menu.
 - **`FilterConfig`** (`filter.interface.ts`) — satu baris filter yang SEDANG dipilih/diisi user, disimpan di `snapshot` (draft) dan `activeValue`/`initialValue` (yang sudah diterapkan). Ibarat pesanan yang dibuat dari menu itu.
 
 `FilterConfig` **tidak** membawa `type` — nilai itu selalu di-*lookup* dari `FilterKeyOption` berdasarkan `filterKey` (lihat `content.tsx`: `config.find(c => c.key === snap.filterKey)?.type`). Ini keputusan sadar, bukan kelalaian: satu sumber kebenaran untuk `type`, tidak ada duplikasi yang bisa tidak sinkron antara `config` dan `snapshot`.
@@ -46,6 +46,22 @@ filters/
 │   ├── operator.tsx          — dropdown operator (Adalah/Bukan/Kosong/dst)
 │   ├── input.tsx             — Select multi-select native (base-ui `multiple`)
 │   └── index.tsx             — FilterSelect: orchestrator
+├── combobox/                 — implementasi UI untuk field bertipe "combobox"
+│   │                            (sama semantik operator dengan "select", TAPI
+│   │                            untuk field dengan opsi BANYAK — searchable,
+│   │                            bukan cuma dropdown. Pilih "select" kalau opsi
+│   │                            sedikit & tidak perlu dicari, mis. tipe transaksi
+│   │                            income/expense/transfer; pilih "combobox" kalau
+│   │                            opsi bisa puluhan/ratusan, mis. kategori/akun)
+│   ├── operator.tsx          — dropdown operator (Adalah/Bukan/Kosong/dst),
+│   │                            union operator SAMA dengan select (SelectOperatorType)
+│   ├── input.tsx             — base-ui Combobox multi-select bergaya chip
+│   │                            (ComboboxChips/ComboboxChip/ComboboxChipsInput),
+│   │                            item combobox berupa objek SelectOption utuh
+│   │                            (base-ui otomatis resolve label dari bentuk
+│   │                            {value, label}), dikonversi ke/dari string[]
+│   │                            di titik masuk/keluar komponen ini
+│   └── index.tsx             — FilterCombobox: orchestrator
 ├── number/                   — implementasi UI untuk field bertipe "number"
 │   ├── operator.tsx          — dropdown operator (Sama dengan/Lebih besar dari/
 │   │                            Di antara/Kosong/dst)
@@ -145,7 +161,7 @@ Ini pola yang disengaja (bukan yang ideal secara type-safety murni, tapi paling 
 
 ## Menambah tipe field baru (mis. `date`)
 
-Ikuti urutan yang sudah terbukti untuk `text`, `select`, dan `number`:
+Ikuti urutan yang sudah terbukti untuk `text`, `select`, `combobox`, dan `number`:
 
 1. Tambah subset operator ke `filter.interface.ts` (pola: `export type NumberOperatorType = ...`, lalu masukkan ke union `FilterOperatorType`).
 2. Buat folder baru (`number/`), isi bertahap: `operator.tsx` (dropdown operator, jangan lupa prop `items`) → `input.tsx` (kontrol value spesifik tipe itu) → `index.tsx` (orchestrator, controlled component, tanpa baca context).

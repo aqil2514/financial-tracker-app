@@ -94,9 +94,14 @@ export function buildWhereClause(
         if (values.length === 0) break;
 
         const notPrefix = filterOperator === "neq" ? "NOT " : "";
-        const placeholders = values.map(() => `$${nextIndex()}`).join(", ");
+        const placeholders = values
+          .map((value) => {
+            const index = nextIndex();
+            params.push(value);
+            return `$${index}`;
+          })
+          .join(", ");
         conditions.push(`${notPrefix}${filterKey} IN (${placeholders})`);
-        params.push(...values);
         break;
       }
 

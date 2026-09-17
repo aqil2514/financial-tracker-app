@@ -3,6 +3,7 @@
 import type { FilterConfig } from "../filter.interface";
 import { FilterText } from "../text";
 import { FilterSelect } from "../select";
+import { FilterCombobox } from "../combobox";
 import { FilterNumber } from "../number";
 // import { FilterDate } from "../date";
 import { DEFAULT_OPERATOR } from "./default-operator";
@@ -70,6 +71,19 @@ export function FilterPanelContent() {
         if (fieldType === "select") {
           return (
             <FilterSelect
+              key={i}
+              state={snap}
+              keyOptions={keyOptions}
+              options={selectOptions[snap.filterKey] ?? []}
+              onChange={(state) => handleChange(i, state)}
+              onRemove={() => handleRemove(i)}
+            />
+          );
+        }
+
+        if (fieldType === "combobox") {
+          return (
+            <FilterCombobox
               key={i}
               state={snap}
               keyOptions={keyOptions}

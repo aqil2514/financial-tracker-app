@@ -7,6 +7,7 @@ import type { FilterFieldType } from "./panel.interface";
 export const DEFAULT_OPERATOR: Record<FilterFieldType, FilterOperatorType> = {
   text: "ilike",
   select: "eq",
+  combobox: "eq",
   number: "eq",
   date: "eq",
 };

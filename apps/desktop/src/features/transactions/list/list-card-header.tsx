@@ -8,8 +8,8 @@ import { useList } from "./list-context";
 const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "note", label: "Catatan", type: "text" },
   { key: "type", label: "Tipe Transaksi", type: "select" },
-  { key: "category_id", label: "Kategori", type: "select" },
-  { key: "account_id", label: "Akun", type: "select" },
+  { key: "category_id", label: "Kategori", type: "combobox" },
+  { key: "account_id", label: "Akun", type: "combobox" },
   { key: "amount", label: "Jumlah", type: "number" },
 ];
 

@@ -1,7 +1,7 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { FilterConfig, SelectOption } from "../filter.interface";
 
-export type FilterFieldType = "text" | "select" | "number" | "date";
+export type FilterFieldType = "text" | "select" | "combobox" | "number" | "date";
 
 // Dipakai sebagai pilihan field di key selector — konsep milik
 // panel (UI), bukan kontainer filter generik. Field pendukung
