@@ -1,18 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import type { FilterOperatorType } from "../filter.interface";
-import type { FilterFieldType } from "./panel.interface";
+import { DEFAULT_OPERATOR } from "./default-operator";
 import { useFilterPanel } from "./provider";
-
-// Operator default per tipe field — dipasang saat filter baru
-// ditambahkan lewat tombol "Tambah Filter".
-const DEFAULT_OPERATOR: Record<FilterFieldType, FilterOperatorType> = {
-  text: "ilike",
-  select: "eq",
-  number: "eq",
-  date: "eq",
-};
 
 export function FilterPanelFooter() {
   const { config, snapshot, setSnapshot, onApplyFilter, setOpen } =

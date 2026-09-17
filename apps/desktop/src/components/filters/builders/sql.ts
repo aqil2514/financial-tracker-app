@@ -1,4 +1,4 @@
-import type { FilterConfig } from "../filter.interface";
+import type { FilterConfig, FilterRangeValue } from "../filter.interface";
 
 export interface WhereClauseResult {
   whereClause: string;
@@ -32,10 +32,9 @@ export interface ExtraCondition {
  * ($1, $2, ...) yang ditulis di `extraConditions` tetap sesuai posisi
  * aslinya, tanpa perlu pemanggil menghitung offset manual.
  *
- * Operator yang TIDAK bisa diseragamkan lintas tipe (mis. "between"
- * untuk number/date) belum ditangani di sini — lempar error yang
- * jelas kalau ditemukan, supaya cepat ketahuan saat number/date
- * dibangun dan builder ini perlu diperluas.
+ * Operator yang belum dikenali builder ini (mis. saat tipe field baru
+ * ditambah tapi builder belum diperbarui) sengaja melempar error di
+ * `default`, bukan diam-diam diabaikan.
  */
 export function buildWhereClause(
   filters: FilterConfig[],
@@ -98,6 +97,30 @@ export function buildWhereClause(
         const placeholders = values.map(() => `$${nextIndex()}`).join(", ");
         conditions.push(`${notPrefix}${filterKey} IN (${placeholders})`);
         params.push(...values);
+        break;
+      }
+
+      case "gt":
+      case "gte":
+      case "lt":
+      case "lte": {
+        if (typeof filterValue !== "number") break;
+        const sqlOperator = { gt: ">", gte: ">=", lt: "<", lte: "<=" }[filterOperator];
+        conditions.push(`${filterKey} ${sqlOperator} $${nextIndex()}`);
+        params.push(filterValue);
+        break;
+      }
+
+      case "between":
+      case "not_between": {
+        const range = filterValue as FilterRangeValue | null;
+        if (!range || range.from == null || range.to == null) break;
+        const notPrefix = filterOperator === "not_between" ? "NOT " : "";
+        const fromIndex = nextIndex();
+        params.push(range.from);
+        const toIndex = nextIndex();
+        params.push(range.to);
+        conditions.push(`${notPrefix}${filterKey} BETWEEN $${fromIndex} AND $${toIndex}`);
         break;
       }
 

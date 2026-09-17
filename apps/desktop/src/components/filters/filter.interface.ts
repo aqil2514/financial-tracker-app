@@ -14,16 +14,19 @@ export type FilterValueType =
 
 export type TextOperatorType = "ilike" | "not_ilike" | "is_null" | "is_not_null";
 export type SelectOperatorType = "eq" | "neq" | "is_null" | "is_not_null";
-
-export type FilterOperatorType =
-  | TextOperatorType
-  | SelectOperatorType
+export type NumberOperatorType =
+  | "eq"
+  | "neq"
   | "gt"
   | "gte"
   | "lt"
   | "lte"
   | "between"
-  | "not_between";
+  | "not_between"
+  | "is_null"
+  | "is_not_null";
+
+export type FilterOperatorType = TextOperatorType | SelectOperatorType | NumberOperatorType;
 
 export interface FilterConfig {
   filterKey: string;

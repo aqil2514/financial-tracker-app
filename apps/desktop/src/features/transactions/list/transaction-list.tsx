@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Trash2, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight } from "lucide-react";
 
 import { formatRupiah, formatDateTime } from "@/lib/format";
@@ -38,9 +38,12 @@ const typeConfig = {
 const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "note", label: "Catatan", type: "text" },
   { key: "type", label: "Tipe Transaksi", type: "select" },
+  { key: "category_id", label: "Kategori", type: "select" },
+  { key: "account_id", label: "Akun", type: "select" },
+  { key: "amount", label: "Jumlah", type: "number" },
 ];
 
-const FILTER_SELECT_OPTIONS: SelectOptionsMap = {
+const STATIC_FILTER_SELECT_OPTIONS: SelectOptionsMap = {
   type: [
     { value: "income", label: "Pemasukan" },
     { value: "expense", label: "Pengeluaran" },
@@ -66,6 +69,21 @@ export function TransactionList({ dateFilter }: { dateFilter?: string }) {
   }, [dateFilter, filters]);
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+
+  const filterSelectOptions = useMemo<SelectOptionsMap>(
+    () => ({
+      ...STATIC_FILTER_SELECT_OPTIONS,
+      category_id: (categories ?? []).map((category) => ({
+        value: String(category.id),
+        label: category.name,
+      })),
+      account_id: (accounts ?? []).map((account) => ({
+        value: String(account.id),
+        label: account.name,
+      })),
+    }),
+    [categories, accounts]
+  );
   const deleteTransaction = useDeleteTransaction();
 
   const transactions = data?.transactions;
@@ -85,7 +103,7 @@ export function TransactionList({ dateFilter }: { dateFilter?: string }) {
         <div className="flex flex-wrap items-center gap-2">
           <FilterPanel
             config={FILTER_CONFIG}
-            selectOptions={FILTER_SELECT_OPTIONS}
+            selectOptions={filterSelectOptions}
             initialValue={filters}
             onApplyFilter={setFilters}
           />

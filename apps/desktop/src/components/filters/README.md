@@ -46,6 +46,15 @@ filters/
 │   ├── operator.tsx          — dropdown operator (Adalah/Bukan/Kosong/dst)
 │   ├── input.tsx             — Select multi-select native (base-ui `multiple`)
 │   └── index.tsx             — FilterSelect: orchestrator
+├── number/                   — implementasi UI untuk field bertipe "number"
+│   ├── operator.tsx          — dropdown operator (Sama dengan/Lebih besar dari/
+│   │                            Di antara/Kosong/dst)
+│   ├── input.tsx             — satu input angka untuk operator tunggal (eq, gt,
+│   │                            dst), atau dua input "Dari"/"Sampai" saat operator
+│   │                            between/not_between — dipilih lewat prop `isRange`
+│   │                            (ditentukan orchestrator dari operator, bukan
+│   │                            ditebak dari bentuk value)
+│   └── index.tsx             — FilterNumber: orchestrator
 └── builders/                 — konsumsi FilterConfig[] menjadi sesuatu yang siap
     └── sql.ts                  pakai di luar UI. Satu file per target output —
                                  TIDAK dikelompokkan per tipe field (sql.ts berlaku
@@ -57,7 +66,7 @@ filters/
                                  ini kalau/ketika dibutuhkan.
 ```
 
-Folder `number/` dan `date/` belum dibangun — akan mengikuti pola yang sama persis ketika dibutuhkan (lihat "Menambah tipe field baru" di bawah).
+Folder `date/` belum dibangun — akan mengikuti pola yang sama persis ketika dibutuhkan (lihat "Menambah tipe field baru" di bawah).
 
 ## Alur data
 
@@ -88,7 +97,7 @@ Poin penting soal timing:
 
 ## Komponen per tipe field HARUS controlled, TIDAK BOLEH baca context
 
-`FilterText` dan `FilterSelect` (dan `FilterNumber`/`FilterDate` nanti) sengaja dirancang sebagai *controlled component* murni: terima `state: FilterConfig` + `onChange` lewat props, tidak pernah memanggil `useFilterPanel()` di dalamnya.
+`FilterText`, `FilterSelect`, `FilterNumber` (dan `FilterDate` nanti) sengaja dirancang sebagai *controlled component* murni: terima `state: FilterConfig` + `onChange` lewat props, tidak pernah memanggil `useFilterPanel()` di dalamnya.
 
 Ini bukan detail implementasi sepele — ini yang memungkinkan `FilterText`/`FilterSelect` dipakai **tanpa** `FilterPanel` sama sekali (misalnya taruh langsung di suatu halaman dengan `useState` lokal biasa), kalau suatu saat dibutuhkan UI filter tunggal tanpa popover/multi-filter. Context (`useFilterPanel`) hanya boleh dipakai di lapisan `panel/`, tidak boleh bocor ke komponen per-tipe.
 
@@ -121,13 +130,22 @@ const value = typeof state.filterValue === "string" ? state.filterValue : "";
 
 // select/index.tsx
 const value = Array.isArray(state.filterValue) ? state.filterValue.map(String) : [];
+
+// number/index.tsx — dua kemungkinan bentuk (angka tunggal atau FilterRangeValue),
+// mana yang dipakai (`value` vs `rangeValue`) ditentukan orchestrator dari
+// OPERATOR (between/not_between = range), bukan ditebak dari bentuk value
+const value = typeof state.filterValue === "number" ? state.filterValue : null;
+const rangeValue =
+  state.filterValue && typeof state.filterValue === "object" && !Array.isArray(state.filterValue)
+    ? (state.filterValue as FilterRangeValue)
+    : EMPTY_RANGE;
 ```
 
 Ini pola yang disengaja (bukan yang ideal secara type-safety murni, tapi paling sederhana untuk `FilterConfig` yang satu bentuk untuk semua tipe) — jangan coba "perbaiki" dengan generic yang rumit tanpa alasan kuat.
 
-## Menambah tipe field baru (mis. `number` atau `date`)
+## Menambah tipe field baru (mis. `date`)
 
-Ikuti urutan yang sudah terbukti untuk `text` dan `select`:
+Ikuti urutan yang sudah terbukti untuk `text`, `select`, dan `number`:
 
 1. Tambah subset operator ke `filter.interface.ts` (pola: `export type NumberOperatorType = ...`, lalu masukkan ke union `FilterOperatorType`).
 2. Buat folder baru (`number/`), isi bertahap: `operator.tsx` (dropdown operator, jangan lupa prop `items`) → `input.tsx` (kontrol value spesifik tipe itu) → `index.tsx` (orchestrator, controlled component, tanpa baca context).
@@ -146,7 +164,7 @@ Hasil akhir dari seluruh sistem panel/UI ini cuma satu: array `FilterConfig[]`. 
 - Mengembalikan `{ whereClause: string, params: (string|number)[] }` — **langsung siap pakai**, bukan potongan yang masih perlu di-join manual. `whereClause` sudah termasuk kata `"WHERE ..."` (string kosong kalau tidak ada kondisi sama sekali), tinggal disisipkan langsung ke template query.
 - **`allowedColumns` wajib diisi** — whitelist nama kolom yang sah untuk tabel terkait. `filterKey` disisipkan LANGSUNG sebagai nama kolom SQL (SQLite tidak bisa mem-bind nama kolom lewat parameter `$1`, `$2`, dst — cuma value yang bisa), jadi tanpa whitelist ini, `filterKey` yang salah sasaran atau (di masa depan) berasal dari sumber kurang terpercaya bisa jadi celah SQL injection lewat nama kolom. Definisikan whitelist ini di file yang sama dengan query-nya (lihat `FILTERABLE_COLUMNS` di `use-transactions.ts`) dan pastikan selalu sinkron dengan `FILTER_CONFIG` di komponen pemanggil.
 - **`extraConditions`** (opsional) untuk kondisi di luar sistem `FilterConfig` yang perlu ikut digabung ke `whereClause` yang sama — mis. filter tanggal dari kalender, yang bukan bagian dari filter panel. Tiap entri `{ condition: string, params?: (string|number)[] }`; nomor parameter (`$1`, `$2`, dst) ditulis relatif terhadap urutan `extraConditions` itu sendiri (selalu ditempatkan duluan, sebelum kondisi dari `filters`) — jadi pemanggil tidak perlu menghitung offset manual sama sekali.
-- Operator yang belum dikenali (mis. `"between"` untuk number/date yang belum dibangun) sengaja **melempar error**, bukan diam-diam diabaikan — supaya begitu tipe field baru ditambahkan tapi builder belum diperbarui, kesalahannya cepat ketahuan saat testing, bukan jadi bug senyap di production (filter yang terlihat "diterapkan" tapi sebenarnya tidak berefek).
+- Sudah menangani seluruh operator `text`/`select`/`number` yang ada saat ini (termasuk `gt`/`gte`/`lt`/`lte` dan `between`/`not_between` untuk range). Operator yang belum dikenali (mis. saat tipe field baru seperti `date` ditambahkan tapi builder belum diperbarui) sengaja **melempar error**, bukan diam-diam diabaikan — supaya kesalahannya cepat ketahuan saat testing, bukan jadi bug senyap di production (filter yang terlihat "diterapkan" tapi sebenarnya tidak berefek).
 
 **Menambah builder baru**: kalau nanti dibutuhkan konsumsi ke target lain, tambahkan file baru sejajar (`builders/url.ts`, `builders/memory.ts`, dst) — jangan dikelompokkan per tipe field (`text.ts`/`select.ts`) karena satu builder pada dasarnya berlaku lintas tipe field selama operatornya dikenali.
 

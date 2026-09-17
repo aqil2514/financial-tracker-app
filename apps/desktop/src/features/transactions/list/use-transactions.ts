@@ -21,7 +21,7 @@ const SORT_CLAUSES: Record<TransactionSort, string> = {
 
 // Kolom transactions yang boleh muncul sebagai filterKey — harus
 // sinkron dengan FILTER_CONFIG di transaction-list.tsx.
-const FILTERABLE_COLUMNS = ["note", "type"] as const;
+const FILTERABLE_COLUMNS = ["note", "type", "category_id", "account_id", "amount"] as const;
 
 export function useTransactions(
   page: number,
