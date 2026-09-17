@@ -12,7 +12,7 @@ export function useAccounts() {
     queryFn: async (): Promise<AccountWithBalance[]> => {
       const db = await getDb();
       const accounts = await db.select<Account[]>(
-        "SELECT * FROM accounts ORDER BY id"
+        "SELECT * FROM accounts ORDER BY name COLLATE NOCASE"
       );
       const transactions = await db.select<Transaction[]>(
         "SELECT * FROM transactions"

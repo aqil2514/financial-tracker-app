@@ -8,7 +8,9 @@ export function useCategories() {
     queryKey: categoriesQueryKey,
     queryFn: async () => {
       const db = await getDb();
-      return db.select<Category[]>("SELECT * FROM categories ORDER BY id");
+      return db.select<Category[]>(
+        "SELECT * FROM categories ORDER BY name COLLATE NOCASE"
+      );
     },
   });
 }
