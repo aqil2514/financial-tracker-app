@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-import type { FilterConfig } from "@/components/filters/filter.interface";
-import type { SelectOptionsMap } from "@/components/filters/panel/panel.interface";
+import type { FilterConfig } from "@/components/query/filters/filter.interface";
+import type { SelectOptionsMap } from "@/components/query/filters/panel/panel.interface";
+import type { SortConfig } from "@/components/query/sort";
 import { useAccounts, type AccountWithBalance } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
 import type { Category, Transaction } from "@/lib/db";
@@ -32,6 +33,8 @@ interface ListContextType {
   filters: FilterConfig[];
   setFilters: (filters: FilterConfig[]) => void;
   filterSelectOptions: SelectOptionsMap;
+  sorts: SortConfig[];
+  setSorts: (sorts: SortConfig[]) => void;
   accountName: (id: number | null) => string;
   categoryName: (id: number | null) => string | null;
   deleteTransaction: (id: number) => void;
@@ -45,19 +48,20 @@ export function ListProvider({ children }: { children: React.ReactNode }) {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [filters, setFilters] = useState<FilterConfig[]>([]);
+  const [sorts, setSorts] = useState<SortConfig[]>([]);
 
   const { data, isLoading, error } = useTransactions(
     page,
     limit,
     dateFilter,
-    "date_desc",
+    sorts,
     filters
   );
 
   useEffect(() => {
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFilter, filters]);
+  }, [dateFilter, filters, sorts]);
 
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
@@ -100,6 +104,8 @@ export function ListProvider({ children }: { children: React.ReactNode }) {
         filters,
         setFilters,
         filterSelectOptions,
+        sorts,
+        setSorts,
         accountName,
         categoryName,
         deleteTransaction: deleteTransaction.mutate,

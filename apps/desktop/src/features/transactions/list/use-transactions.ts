@@ -1,40 +1,35 @@
 import { useQuery } from "@tanstack/react-query";
 import { getDb, type Transaction } from "@/lib/db";
 import { toPagination } from "@/lib/pagination";
-import { buildWhereClause } from "@/components/filters/builders/sql";
-import type { FilterConfig } from "@/components/filters/filter.interface";
+import { buildWhereClause } from "@/components/query/filters/builders/sql";
+import type { FilterConfig } from "@/components/query/filters/filter.interface";
+import { buildOrderClause } from "@/components/query/sort/builders/sql";
+import type { SortConfig } from "@/components/query/sort/sort.interface";
+import { buildLimitOffset } from "@/components/query/pagination/builders/sql";
 
 export const transactionsQueryKey = ["transactions"];
 
-export type TransactionSort =
-  | "date_desc"
-  | "date_asc"
-  | "amount_desc"
-  | "amount_asc";
-
-const SORT_CLAUSES: Record<TransactionSort, string> = {
-  date_desc: "date DESC, id DESC",
-  date_asc: "date ASC, id ASC",
-  amount_desc: "amount DESC, id DESC",
-  amount_asc: "amount ASC, id ASC",
-};
+const DEFAULT_ORDER_CLAUSE = "date DESC, id DESC";
 
 // Kolom transactions yang boleh muncul sebagai filterKey — harus
 // sinkron dengan FILTER_CONFIG di transaction-list.tsx.
 const FILTERABLE_COLUMNS = ["note", "type", "category_id", "account_id", "amount"] as const;
 
+// Kolom transactions yang boleh muncul sebagai sortKey — harus
+// sinkron dengan SORT_CONFIG di list-card-header.tsx.
+const SORTABLE_COLUMNS = ["date", "amount"] as const;
+
 export function useTransactions(
   page: number,
   limit: number,
   date?: string,
-  sort: TransactionSort = "date_desc",
+  sorts: SortConfig[] = [],
   filters: FilterConfig[] = []
 ) {
   return useQuery({
-    queryKey: [...transactionsQueryKey, page, limit, date, sort, filters],
+    queryKey: [...transactionsQueryKey, page, limit, date, sorts, filters],
     queryFn: async () => {
       const db = await getDb();
-      const offset = (page - 1) * limit;
 
       const { whereClause, params } = buildWhereClause(
         filters,
@@ -42,12 +37,17 @@ export function useTransactions(
         date ? [{ condition: "date(date) = $1", params: [date] }] : []
       );
 
-      const orderClause = SORT_CLAUSES[sort];
+      const orderClause = buildOrderClause(sorts, SORTABLE_COLUMNS, DEFAULT_ORDER_CLAUSE);
+      const { clause: limitOffsetClause, params: limitOffsetParams } = buildLimitOffset(
+        page,
+        limit,
+        params.length + 1
+      );
 
       const [rows, countResult] = await Promise.all([
         db.select<Transaction[]>(
-          `SELECT * FROM transactions ${whereClause} ORDER BY ${orderClause} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-          [...params, limit, offset]
+          `SELECT * FROM transactions ${whereClause} ${orderClause} ${limitOffsetClause}`,
+          [...params, ...limitOffsetParams]
         ),
         db.select<{ total: number }[]>(
           `SELECT COUNT(*) as total FROM transactions ${whereClause}`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { TablePagination } from "@/components/table-pagination";
+import { TablePagination } from "@/components/query/pagination";
 import { useList } from "./list-context";
 
 export function ListCardFooter() {
