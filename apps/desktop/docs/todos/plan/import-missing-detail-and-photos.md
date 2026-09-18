@@ -186,17 +186,86 @@ transaksi tujuannya.
   dibaca lewat `ref` (bukan snapshot) di dalam `mutationFn`/`onSuccess`
   supaya selalu memakai nilai terbaru saat submit terjadi.
 
+**Sudah diuji visual di aplikasi (`tauri dev`) dan berfungsi**:
+- Simpan lampiran lewat form Tambah transaksi (mode buffer/pending) —
+  transaksi tersimpan dengan benar, foto ikut tersimpan ke disk +
+  `transaction_attachments` setelah `transaction_id` diketahui.
+- Ketiga cara capture foto: dialog pilih file, drag & drop, paste
+  clipboard (screenshot/copy image) — lihat "Bug ditemukan saat testing
+  visual" di bawah untuk perbaikan yang diperlukan sebelum ketiganya
+  benar-benar bekerja.
+- UI pengaturan folder kustom sudah dipasang: card "Folder Lampiran Foto"
+  di halaman Settings (`attachment-folder-setting.tsx`) — menampilkan
+  folder aktif (default/kustom), tombol pilih folder lain (native folder
+  picker) dan reset ke default. Command Rust baru
+  `get_default_attachment_dir` ditambahkan supaya path default bisa
+  ditampilkan sebagai informasi. Mengubah folder TIDAK memindahkan file
+  lampiran lama yang sudah tersimpan.
+
+**Bug ditemukan saat testing visual, sudah diperbaiki**:
+1. **Migrasi 0009 (`enforce_fk_set_null`) gagal total secara silent di
+   production** — `no such table: transaction_attachments` muncul
+   meski migrasi "sukses" menurut testing manual sebelumnya. Dua lapis
+   bug berbeda, ditemukan berurutan:
+   - **Lapis 1**: `PRAGMA foreign_keys = OFF/ON` di awal/akhir migrasi
+     tidak berpengaruh sama sekali — SQLite meng-abaikan PRAGMA ini kalau
+     dijalankan di dalam transaksi aktif, dan sqlx migrator (dipakai
+     `tauri-plugin-sql`) SELALU membungkus tiap migrasi dalam satu
+     transaksi tanpa opsi menonaktifkannya. Testing manual sebelumnya
+     lewat `sqlite3` CLI memberi hasil palsu-positif karena CLI
+     menjalankan tiap statement secara autocommit (independen), bukan
+     dalam satu transaksi besar seperti sqlx — jadi PRAGMA-nya betulan
+     berpengaruh di situ, beda dari kondisi nyata di aplikasi.
+   - **Lapis 2** (muncul setelah lapis 1 diperbaiki): urutan "proses
+     tabel satu-per-satu sampai selesai (create+insert+drop+rename), baru
+     lanjut ke tabel berikutnya" — meski diurutkan dari yang paling
+     sedikit direferensikan — TETAP salah. Begitu `transactions` selesai
+     di-rename dan sudah punya FK `ON DELETE SET NULL` ke `accounts`,
+     `DROP TABLE accounts` berikutnya membuat SQLite (dengan FK aktif)
+     memperlakukannya seolah menghapus semua baris `accounts` satu per
+     satu — trigger `ON DELETE SET NULL` di `transactions.account_id`
+     benar-benar tereksekusi, meng-NULL-kan SELURUH `account_id` yang
+     ada, walau `accounts` langsung digantikan tabel baru berisi data
+     identik. Diperbaiki dengan pola berbeda: rename SEMUA tabel lama ke
+     nama sementara (`_old`) dan drop SEMUA index lama-nya di awal, baru
+     buat semua tabel baru + salin data, dan baru drop semua tabel `_old`
+     di paling akhir — supaya tidak pernah ada momen sebuah tabel
+     di-drop selagi ada FK `ON DELETE SET NULL` yang sudah aktif menunjuk
+     ke situ. Diverifikasi lewat replikasi manual transaksi sqlx yang
+     sesungguhnya (`BEGIN`/`COMMIT` + `PRAGMA foreign_keys = ON`) plus
+     `PRAGMA foreign_key_check` bersih.
+2. **Base UI console error**: `Button` (base-ui) dengan `render={<Link />}`
+   di `recent-transactions-card.tsx` memicu warning "expected a native
+   `<button>`" karena `Link` Next.js merender `<a>`, bukan `<button>`.
+   Diperbaiki dengan `nativeButton={false}`.
+3. **Paste clipboard gagal (permission)**: `clipboard-manager:default`
+   TIDAK mengaktifkan permission apa pun (plugin ini sengaja default-deny
+   semua fitur demi keamanan) — `readImage()` selalu ditolak sampai
+   `clipboard-manager:allow-read-image` ditambahkan eksplisit ke
+   `capabilities/default.json`.
+4. **Paste clipboard gagal (format tidak didukung)**: setelah permission
+   diperbaiki, paste hasil Ctrl+C FILE di File Explorer tetap gagal
+   dengan "clipboard contents were not available in the requested
+   format" — Windows menaruh referensi path (`CF_HDROP`) untuk file yang
+   di-copy dari Explorer, bukan data bitmap, dan `readImage()` hanya bisa
+   membaca bitmap asli (hasil screenshot atau "Copy image" di
+   browser/image viewer). Diputuskan TIDAK menambah dukungan baca
+   `CF_HDROP` (di luar cakupan plugin clipboard-manager yang ada, perlu
+   command Rust custom) — cukup perjelas pesan error dan teks bantuan
+   supaya user tahu memakai tombol "Tambah"/drag & drop untuk kasus file
+   dari Explorer.
+5. **Drag & drop tidak pernah terdeteksi ("dropzone tidak terlihat
+   aktif")**: `event.payload.position` dari `onDragDropEvent` Tauri dalam
+   PHYSICAL pixels, sedangkan `getBoundingClientRect()` DOM dalam
+   LOGICAL/CSS pixels — di layar dengan DPI scaling (umum di Windows,
+   mis. 125%/150%) keduanya tidak pernah cocok kalau dibandingkan
+   langsung, sehingga `isInside()` selalu `false`. Diperbaiki dengan
+   membagi `window.devicePixelRatio` pada koordinat sebelum dibandingkan.
+
 **Belum dikerjakan** (lanjutan, disengaja ditunda per keputusan terakhir):
 - Alur import dari Money Manager untuk memindahkan foto lama (folder
   `Pictures/MoneyManager/` di device + tabel `PHOTO` di `.mmbak`) ke
   tabel `transaction_attachments` yang baru ini.
-- Belum diuji visual langsung di aplikasi (`tauri dev`) — semua verifikasi
-  sejauh ini lewat `tsc --noEmit`, `cargo check`, dan unit test logic
-  murni; perlu dicoba manual: dialog pilih file, drag & drop, paste
-  clipboard, di form Tambah maupun Edit transaksi.
-- Belum ada UI untuk mengatur folder kustom (`useSetAttachmentFolder`
-  sudah ada sebagai hook, tapi belum dipasang ke halaman Settings mana
-  pun).
 - Tampilan foto di tempat LAIN (list transaksi, dsb.) masih menunggu
   pembahasan perombakan action card transaksi — saat ini foto hanya
   terlihat di form tambah/edit.

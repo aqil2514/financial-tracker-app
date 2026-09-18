@@ -57,15 +57,47 @@ baik, tapi karena SQLite tidak mengecek sama sekali.
   `account_id`, `transfer_account_id`, `accounts.group_id`,
   `categories.parent_id` — semua nihil), jadi migrasi aman diterapkan
   langsung tanpa perlu pembersihan data dulu.
-- Diverifikasi langsung lewat `sqlite3` CLI terhadap salinan database
-  nyata: row count tetap sama persis sebelum/sesudah migrasi (5488
-  transaksi/74 akun/116 kategori), dan ketiga jenis relasi diuji manual
-  (hapus akun → `account_id` transaksi jadi NULL; hapus grup → `group_id`
-  akun jadi NULL; hapus kategori induk → `parent_id` anak jadi NULL).
-  Sempat ditemukan dan diperbaiki bug di draft migrasi awal
-  (`REFERENCES categories_new(id)` yang salah, seharusnya
-  `REFERENCES categories(id)` — SQLite me-resolve nama tabel di FK secara
-  lazy sehingga otomatis mengikuti hasil `RENAME TO`).
+- **Koreksi penting (ditemukan belakangan lewat testing production
+  nyata — lihat "Bug ditemukan saat testing visual" di
+  `import-missing-detail-and-photos.md` untuk detail lengkap)**:
+  verifikasi awal migrasi ini (row count sama, `SET NULL` "terbukti
+  bekerja") dilakukan lewat `sqlite3` CLI yang menjalankan tiap statement
+  secara **autocommit** (independen) — BUKAN dalam satu transaksi besar
+  seperti cara sqlx (dipakai `tauri-plugin-sql`) benar-benar menjalankan
+  migrasi. Hasilnya false-positive: migrasi ini sempat gagal TOTAL secara
+  silent di production/dev sungguhan dengan dua bug berbeda yang baru
+  ketahuan setelah fitur lampiran foto (migrasi 0010, yang bergantung
+  pada 0009 sukses lebih dulu) diuji manual di aplikasi:
+  1. `PRAGMA foreign_keys = OFF/ON` di migrasi tidak berpengaruh sama
+     sekali di dalam transaksi aktif (no-op resmi SQLite), sehingga FK
+     enforcement tetap aktif sepanjang migrasi dan `DROP TABLE` gagal
+     dengan "FOREIGN KEY constraint failed".
+  2. Setelah PRAGMA dihapus dan urutan DROP diperbaiki (tabel yang
+     tidak direferensikan didrop lebih dulu), migrasi "berhasil" tapi
+     ternyata **merusak data**: begitu `transactions` selesai
+     di-rename dengan FK `ON DELETE SET NULL` aktif ke `accounts`,
+     `DROP TABLE accounts` berikutnya memicu SQLite memperlakukan drop
+     itu seperti menghapus semua baris `accounts` satu per satu —
+     trigger SET NULL benar-benar jalan dan meng-NULL-kan SELURUH
+     `account_id` di `transactions`.
+
+  Migrasi final (isi `0009_enforce_fk_set_null.sql` saat ini) memakai
+  pola berbeda: rename SEMUA tabel lama ke nama sementara (`_old`) dan
+  drop SEMUA index lama-nya di awal, baru buat semua tabel baru + salin
+  data, baru drop semua tabel `_old` di paling akhir — supaya tidak
+  pernah ada momen sebuah tabel di-drop selagi ada FK `ON DELETE SET NULL`
+  aktif yang menunjuk ke situ. Diverifikasi ulang dengan BENAR (replikasi
+  transaksi sqlx yang sesungguhnya: `BEGIN`/`COMMIT` eksplisit +
+  `PRAGMA foreign_keys = ON` sebelum menjalankan SQL migrasi, ditambah
+  `PRAGMA foreign_key_check` setelahnya) dan sudah diuji visual langsung
+  di aplikasi (`tauri dev`) — transaksi baru tersimpan dengan
+  `account_id`/`category_id` utuh, foto lampiran tersimpan dan terbaca
+  benar.
+
+  **Pelajaran**: verifikasi migrasi SQLite yang melibatkan FK harus
+  mereplikasi konteks eksekusi sqlx yang sesungguhnya (transaksi tunggal
+  + FK ON), bukan sekadar menjalankan file `.sql` apa adanya lewat CLI —
+  keduanya bisa memberi hasil yang sangat berbeda.
 
 ### 2. Pola migration "copy-and-rename" belum punya template tertulis
 
