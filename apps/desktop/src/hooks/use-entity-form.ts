@@ -1,26 +1,32 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  useForm,
-  type DefaultValues,
-  type FieldValues,
-} from "react-hook-form";
+import { useForm, type DefaultValues, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { QueryKey } from "@tanstack/react-query";
 
 import { useDbMutation } from "./use-db-mutation";
 
-type UseEntityFormOptions<TInput extends FieldValues, TOutput> = {
+type UseEntityFormOptions<
+  TInput extends FieldValues,
+  TOutput,
+  TResult = unknown,
+> = {
   schema: Parameters<typeof zodResolver<TInput, unknown, TOutput>>[0];
   defaultValues: () => TInput;
-  mutationFn: (values: TOutput) => Promise<unknown>;
+  mutationFn: (values: TOutput) => Promise<TResult>;
   invalidateKey: QueryKey | QueryKey[];
   successMessage: string;
   errorMessage: string;
   /** Re-derive defaultValues (e.g. from fresh entity data) whenever the dialog opens. */
   resetOnOpen?: boolean;
+  /** Called with the mutation result before the form resets/closes. */
+  onSuccess?: (result: TResult) => void | Promise<void>;
 };
 
-export function useEntityForm<TInput extends FieldValues, TOutput>({
+export function useEntityForm<
+  TInput extends FieldValues,
+  TOutput,
+  TResult = unknown,
+>({
   schema,
   defaultValues,
   mutationFn,
@@ -28,7 +34,8 @@ export function useEntityForm<TInput extends FieldValues, TOutput>({
   successMessage,
   errorMessage,
   resetOnOpen = false,
-}: UseEntityFormOptions<TInput, TOutput>) {
+  onSuccess,
+}: UseEntityFormOptions<TInput, TOutput, TResult>) {
   const [open, setOpen] = useState(false);
 
   const form = useForm<TInput, unknown, TOutput>({
@@ -50,7 +57,8 @@ export function useEntityForm<TInput extends FieldValues, TOutput>({
     invalidateKey,
     successMessage,
     errorMessage,
-    onSuccess: () => {
+    onSuccess: async (result) => {
+      await onSuccess?.(result);
       if (keepOpenRef.current) {
         form.reset(defaultValues() as DefaultValues<TInput>);
       } else {

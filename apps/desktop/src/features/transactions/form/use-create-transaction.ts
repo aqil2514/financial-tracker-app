@@ -1,8 +1,12 @@
 "use client";
 
+import { toast } from "sonner";
+
 import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
+import { saveAttachmentToTransaction } from "@/features/attachments/use-add-attachment";
+import type { PendingAttachment } from "@/features/attachments/pending-attachment";
 import {
   transactionSchema,
   type TransactionFormOutput,
@@ -14,7 +18,20 @@ function now() {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
-export function useCreateTransaction() {
+type UseCreateTransactionOptions = {
+  /** Lampiran yang ditangkap sebelum transaksi tersimpan — diproses
+   * (disimpan ke disk + database) setelah insert transaksi berhasil,
+   * karena baru di titik itu `transaction_id`-nya diketahui. Dibaca lewat
+   * getter (bukan array langsung) supaya selalu ambil state terbaru dari
+   * form saat submit terjadi, bukan snapshot saat hook di-mount. */
+  getPendingAttachments?: () => PendingAttachment[];
+  attachmentFolder?: string | null;
+  onAttachmentsSaved?: () => void;
+};
+
+export function useCreateTransaction(options: UseCreateTransactionOptions = {}) {
+  const { getPendingAttachments, attachmentFolder = null, onAttachmentsSaved } = options;
+
   return useEntityForm({
     schema: transactionSchema,
     defaultValues: () => ({
@@ -29,7 +46,7 @@ export function useCreateTransaction() {
     resetOnOpen: true,
     mutationFn: async (values: TransactionFormOutput) => {
       const db = await getDb();
-      await db.execute(
+      const result = await db.execute(
         `INSERT INTO transactions (type, amount, category_id, account_id, transfer_account_id, note, date)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
@@ -46,6 +63,33 @@ export function useCreateTransaction() {
           values.date,
         ]
       );
+      return result.lastInsertId ?? null;
+    },
+    onSuccess: async (transactionId) => {
+      const pending = getPendingAttachments?.() ?? [];
+      if (transactionId == null || pending.length === 0) return;
+
+      // Transaksinya sendiri sudah tersimpan di titik ini — kegagalan
+      // menyimpan lampiran TIDAK boleh dilempar sebagai error mutation
+      // (useDbMutation.onError hanya menangkap error dari mutationFn,
+      // bukan dari onSuccess), jadi ditangani sendiri di sini supaya user
+      // tetap dapat feedback yang jelas alih-alih unhandled rejection.
+      try {
+        await Promise.all(
+          pending.map((attachment) =>
+            saveAttachmentToTransaction(transactionId, attachment.input, attachmentFolder)
+          )
+        );
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        toast.error(`Transaksi tersimpan, tapi lampiran gagal disimpan: ${detail}`);
+      } finally {
+        // Dialog/form tetap reset setelah ini (perilaku useEntityForm) —
+        // pending attachments yang gagal tidak bisa "dicoba ulang" dari
+        // form yang sudah reset, jadi tetap dibersihkan baik sukses
+        // maupun gagal supaya tidak ada state foto "hantu" yang tersisa.
+        onAttachmentsSaved?.();
+      }
     },
     invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil ditambahkan",

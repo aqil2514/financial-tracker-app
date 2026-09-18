@@ -124,17 +124,82 @@ transaksi tujuannya.
 - `cargo check` bersih tanpa warning, 66 test frontend tetap lulus (tidak
   ada perubahan sisi frontend di tahap ini).
 
+**Frontend — hooks & komponen generik** (`src/features/attachments/`):
+- `use-attachment-folder.ts` — baca/tulis folder kustom lewat tabel
+  `settings` (key `attachment_folder`), `null`/kosong berarti pakai
+  default app data dir.
+- `use-transaction-attachments.ts` — list lampiran per transaksi.
+- `use-add-attachment.ts` — `saveFile` (pilih command Rust yang tepat
+  berdasar `source: "path" | "bytes"`, diexport untuk testing/reuse),
+  `saveAttachmentToTransaction` (versi non-hook, dipakai di luar konteks
+  mutation UI biasa), dan `useAddAttachment` (mutation biasa untuk mode
+  edit).
+- `use-delete-attachment.ts` — hapus baris DB + file fisik (gagal hapus
+  file tidak menggagalkan hapus baris — tujuannya melepas lampiran dari
+  transaksi, bukan menjaga file selalu ada).
+- `use-attachment-capture.ts` — logic PENANGKAPAN input (dialog pilih
+  file, drag & drop via `getCurrentWebview().onDragDropEvent()` — BUKAN
+  HTML5 drag-drop biasa, karena WebView Tauri tidak mengisi `File.path`
+  sehingga posisi kursor dicocokkan manual ke area dropzone; dan paste
+  clipboard via `@tauri-apps/plugin-clipboard-manager`, RGBA dikonversi
+  ke PNG lewat Canvas) — diekstrak terpisah dari logic PENYIMPANAN supaya
+  dipakai bersama oleh kedua mode uploader di bawah.
+- `attachment-thumbnail.tsx` — render preview dari `file_path` tersimpan
+  (baca bytes via `read_attachment_bytes` → base64 → data URL, di-chunk
+  per 8192 byte supaya tidak O(n²) untuk foto besar).
+- `attachment-uploader.tsx` (`AttachmentUploader`) — mode DB langsung,
+  untuk transaksi yang SUDAH punya id (form edit).
+- `pending-attachment.ts` + `pending-attachment-uploader.tsx`
+  (`PendingAttachmentUploader`) — mode buffer memori untuk transaksi yang
+  BELUM punya id (form tambah): foto ditangkap dan langsung dipreview
+  lewat `URL.createObjectURL`, TANPA menyentuh disk/database sama sekali,
+  sampai transaksi induknya berhasil disimpan.
+- Dependency baru: `@tauri-apps/plugin-clipboard-manager` (JS) +
+  `tauri-plugin-clipboard-manager` (Rust crate), didaftarkan di `lib.rs`
+  dan `capabilities/default.json`.
+- 14 unit test baru (`attachment-thumbnail.test.ts`,
+  `use-add-attachment.test.ts`) menguji `guessMimeType`/`bytesToDataUrl`
+  (termasuk kasus data besar yang melewati batas chunk) dan `saveFile`
+  (command yang benar terpanggil sesuai `source`, `Uint8Array` dikonversi
+  ke `Array` biasa untuk serialisasi IPC).
+
+**Terpasang ke form transaksi** (`src/features/transactions/form/`):
+- `TransactionForm` menerima `transactionId` (mode edit → `AttachmentUploader`)
+  ATAU `pendingAttachments`/`onPendingAttachmentsChange` (mode create →
+  `PendingAttachmentUploader`), dirender sebagai section terpisah di
+  bawah field Catatan.
+- `useEntityForm`/`useDbMutation` diberi opsi `onSuccess` baru (opsional,
+  backward-compatible untuk 8 pemakaian lain) supaya
+  `use-create-transaction.ts` bisa memproses pending attachments SETELAH
+  insert transaksi berhasil dan `transaction_id`-nya diketahui — SQLite
+  `execute()` sudah mengembalikan `lastInsertId` langsung tanpa perlu
+  `RETURNING`/`select()` terpisah.
+- Kegagalan menyimpan lampiran DITANGANI TERPISAH dari kegagalan
+  menyimpan transaksi (try-catch + toast sendiri di `onSuccess`) —
+  `useDbMutation`'s `onError` cuma menangkap error dari `mutationFn`,
+  bukan dari callback `onSuccess`, jadi tanpa penanganan ini kegagalan
+  simpan foto akan jadi unhandled rejection yang diam-diam gagal tanpa
+  feedback ke user. Pending attachments tetap dibersihkan (state +
+  `revokeObjectURL`) baik sukses maupun gagal sebagian, karena form sudah
+  ikut ter-reset dan tidak bisa "dicoba ulang" dari state yang sama.
+- `TransactionFormDialog` menyimpan `pendingAttachments` sebagai state,
+  dibaca lewat `ref` (bukan snapshot) di dalam `mutationFn`/`onSuccess`
+  supaya selalu memakai nilai terbaru saat submit terjadi.
+
 **Belum dikerjakan** (lanjutan, disengaja ditunda per keputusan terakhir):
-- Frontend: hook baca/tulis setting folder kustom (`useAttachmentFolder`),
-  hook CRUD attachment per transaksi (list/tambah/hapus lewat
-  React Query), dan komponen upload (dialog file + drop zone + listener
-  paste, kemungkinan pakai `@tauri-apps/plugin-clipboard-manager` untuk
-  `readImage()` — belum terpasang di `package.json`).
 - Alur import dari Money Manager untuk memindahkan foto lama (folder
   `Pictures/MoneyManager/` di device + tabel `PHOTO` di `.mmbak`) ke
   tabel `transaction_attachments` yang baru ini.
-- Keputusan tampilan (di mana dan bagaimana foto muncul di UI) — menunggu
-  pembahasan perombakan action card transaksi.
+- Belum diuji visual langsung di aplikasi (`tauri dev`) — semua verifikasi
+  sejauh ini lewat `tsc --noEmit`, `cargo check`, dan unit test logic
+  murni; perlu dicoba manual: dialog pilih file, drag & drop, paste
+  clipboard, di form Tambah maupun Edit transaksi.
+- Belum ada UI untuk mengatur folder kustom (`useSetAttachmentFolder`
+  sudah ada sebagai hook, tapi belum dipasang ke halaman Settings mana
+  pun).
+- Tampilan foto di tempat LAIN (list transaksi, dsb.) masih menunggu
+  pembahasan perombakan action card transaksi — saat ini foto hanya
+  terlihat di form tambah/edit.
 
 ## Kemungkinan arah perbaikan (belum diputuskan, untuk ZDATA/deskripsi)
 

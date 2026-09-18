@@ -32,6 +32,7 @@ export function TransactionEditDialog({
         onSubmit={onSubmit}
         isPending={isPending}
         submitLabel="Simpan Perubahan"
+        transactionId={transaction.id}
       />
     </EntityFormDialog>
   );

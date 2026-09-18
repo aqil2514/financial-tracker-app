@@ -36,7 +36,12 @@ export function RecentTransactionsCard() {
     <Card>
       <CardHeader className="flex items-center justify-between">
         <CardTitle>Transaksi Terbaru</CardTitle>
-        <Button variant="ghost" size="sm" render={<Link href="/transactions" />}>
+        <Button
+          variant="ghost"
+          size="sm"
+          nativeButton={false}
+          render={<Link href="/transactions" />}
+        >
           Lihat semua
         </Button>
       </CardHeader>

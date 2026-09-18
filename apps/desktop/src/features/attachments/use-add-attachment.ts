@@ -24,16 +24,29 @@ export async function saveFile(input: AddAttachmentInput, targetDir: string | nu
   });
 }
 
+/**
+ * Versi non-hook dari penyimpanan lampiran — dipakai di luar konteks
+ * mutation UI biasa, mis. `use-create-transaction.ts` yang memproses
+ * beberapa `PendingAttachment` sekaligus setelah transaksi baru berhasil
+ * disimpan (jadi baru dapat `transactionId`-nya di titik itu).
+ */
+export async function saveAttachmentToTransaction(
+  transactionId: number,
+  input: AddAttachmentInput,
+  targetDir: string | null
+) {
+  const filePath = await saveFile(input, targetDir);
+  const db = await getDb();
+  await db.execute(
+    "INSERT INTO transaction_attachments (transaction_id, file_path) VALUES ($1, $2)",
+    [transactionId, filePath]
+  );
+}
+
 export function useAddAttachment(transactionId: number, targetDir: string | null) {
   return useDbMutation({
-    mutationFn: async (input: AddAttachmentInput) => {
-      const filePath = await saveFile(input, targetDir);
-      const db = await getDb();
-      await db.execute(
-        "INSERT INTO transaction_attachments (transaction_id, file_path) VALUES ($1, $2)",
-        [transactionId, filePath]
-      );
-    },
+    mutationFn: (input: AddAttachmentInput) =>
+      saveAttachmentToTransaction(transactionId, input, targetDir),
     invalidateKey: transactionAttachmentsQueryKey(transactionId),
     successMessage: "Lampiran berhasil ditambahkan",
     errorMessage: "Gagal menambahkan lampiran",

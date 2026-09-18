@@ -6,7 +6,7 @@ type UseDbMutationOptions<TInput, TResult> = {
   invalidateKey: QueryKey | QueryKey[];
   successMessage: string;
   errorMessage: string;
-  onSuccess?: (result: TResult) => void;
+  onSuccess?: (result: TResult) => void | Promise<void>;
 };
 
 function isQueryKeyList(key: QueryKey | QueryKey[]): key is QueryKey[] {
@@ -24,13 +24,13 @@ export function useDbMutation<TInput, TResult = void>({
 
   return useMutation({
     mutationFn,
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       const keys = isQueryKeyList(invalidateKey)
         ? invalidateKey
         : [invalidateKey];
       keys.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
+      await onSuccess?.(result);
       toast.success(successMessage);
-      onSuccess?.(result);
     },
     onError: (err) => {
       const detail = err instanceof Error ? err.message : String(err);

@@ -13,6 +13,9 @@ import {
 } from "@/components/form-fields";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
+import { AttachmentUploader } from "@/features/attachments/attachment-uploader";
+import { PendingAttachmentUploader } from "@/features/attachments/pending-attachment-uploader";
+import type { PendingAttachment } from "@/features/attachments/pending-attachment";
 import type {
   TransactionFormOutput,
   TransactionFormValues,
@@ -24,6 +27,11 @@ type TransactionFormProps = {
   onSubmitAndContinue?: (values: TransactionFormOutput) => void;
   isPending: boolean;
   submitLabel?: string;
+  /** Transaksi sudah tersimpan (mode edit) — lampiran langsung disimpan ke DB. */
+  transactionId?: number;
+  /** Transaksi belum tersimpan (mode create) — lampiran ditunda di memori. */
+  pendingAttachments?: PendingAttachment[];
+  onPendingAttachmentsChange?: (attachments: PendingAttachment[]) => void;
 };
 
 const typeOptions = [
@@ -38,6 +46,9 @@ export function TransactionForm({
   onSubmitAndContinue,
   isPending,
   submitLabel = "Simpan",
+  transactionId,
+  pendingAttachments,
+  onPendingAttachmentsChange,
 }: TransactionFormProps) {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
@@ -130,6 +141,15 @@ export function TransactionForm({
         label="Catatan"
         placeholder="Catatan tambahan (opsional)"
       />
+      {transactionId != null ? (
+        <AttachmentUploader transactionId={transactionId} />
+      ) : onPendingAttachmentsChange ? (
+        <PendingAttachmentUploader
+          pendingAttachments={pendingAttachments ?? []}
+          onChange={onPendingAttachmentsChange}
+          disabled={isPending}
+        />
+      ) : null}
       <DialogFooter>
         {onSubmitAndContinue && (
           <Button
