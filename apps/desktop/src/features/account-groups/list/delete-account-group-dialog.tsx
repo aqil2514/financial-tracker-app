@@ -70,7 +70,7 @@ export function DeleteAccountGroupDialog({ group }: { group: AccountGroup }) {
       <DialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
         <Trash2 className="text-destructive size-4" />
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Hapus group &quot;{group.name}&quot;?</DialogTitle>
           <DialogDescription>
@@ -106,7 +106,12 @@ export function DeleteAccountGroupDialog({ group }: { group: AccountGroup }) {
             {memberAction === "reassign" && (
               <Select value={targetGroupId ?? ""} onValueChange={setTargetGroupId}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Pilih group tujuan..." />
+                  <SelectValue placeholder="Pilih group tujuan...">
+                    {(value: string | null) =>
+                      otherGroups.find((g) => String(g.id) === value)?.name ??
+                      "Pilih group tujuan..."
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {otherGroups.map((g) => (

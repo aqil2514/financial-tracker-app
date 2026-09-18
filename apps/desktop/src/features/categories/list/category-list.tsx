@@ -2,22 +2,19 @@
 
 import { useMemo, useState } from "react";
 
-import type { Category } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Input } from "@/components/ui/input";
 import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CategoryEditDialog } from "../form/category-edit-dialog";
 import { useCategories } from "@/hooks/resources/use-categories";
-import { useDeleteCategory } from "./use-delete-category";
+import { DeleteCategoryDialog } from "./delete-category-dialog";
 
 type TypeFilter = "all" | "income" | "expense";
 
 export function CategoryList() {
   const { data: categories, isLoading, error } = useCategories();
-  const deleteCategory = useDeleteCategory();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
@@ -81,12 +78,7 @@ export function CategoryList() {
               </div>
               <div className="flex items-center gap-1">
                 <CategoryEditDialog category={category} />
-                <ConfirmDeleteButton
-                  onConfirm={() => deleteCategory.mutate(category.id)}
-                  isPending={deleteCategory.isPending}
-                  title={`Hapus kategori "${category.name}"?`}
-                  description="Kategori yang masih dipakai transaksi atau punya sub-kategori tidak bisa dihapus."
-                />
+                <DeleteCategoryDialog category={category} />
               </div>
             </div>
           ))}

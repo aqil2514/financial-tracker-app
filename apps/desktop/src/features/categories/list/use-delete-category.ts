@@ -2,36 +2,52 @@
 
 import { getDb } from "@/lib/db";
 import { useDbMutation } from "@/hooks/use-db-mutation";
-import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
+import { dependentKeysOf } from "@/lib/query-dependencies";
+
+export type DeleteCategoryInput = {
+  id: number;
+  /** Perlakuan sub-kategori (parent_id = id ini) — wajib diisi kalau masih ada sub-kategori. */
+  childAction?: "unassign" | "reassign";
+  targetParentId?: number;
+  /** Perlakuan transaksi (category_id = id ini) — wajib diisi kalau masih ada transaksi. */
+  transactionAction?: "unassign" | "reassign";
+  targetCategoryId?: number;
+};
 
 export function useDeleteCategory() {
   return useDbMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async ({
+      id,
+      childAction,
+      targetParentId,
+      transactionAction,
+      targetCategoryId,
+    }: DeleteCategoryInput) => {
       const db = await getDb();
 
-      const [{ count: transactionCount }] = await db.select<{ count: number }[]>(
-        "SELECT COUNT(*) as count FROM transactions WHERE category_id = $1",
-        [id]
-      );
-      if (transactionCount > 0) {
-        throw new Error(
-          `Masih dipakai oleh ${transactionCount} transaksi. Ubah kategori transaksi tersebut terlebih dahulu.`
-        );
+      if (childAction === "unassign") {
+        await db.execute("UPDATE categories SET parent_id = NULL WHERE parent_id = $1", [id]);
+      } else if (childAction === "reassign" && targetParentId != null) {
+        await db.execute("UPDATE categories SET parent_id = $1 WHERE parent_id = $2", [
+          targetParentId,
+          id,
+        ]);
       }
 
-      const [{ count: childCount }] = await db.select<{ count: number }[]>(
-        "SELECT COUNT(*) as count FROM categories WHERE parent_id = $1",
-        [id]
-      );
-      if (childCount > 0) {
-        throw new Error(
-          `Masih punya ${childCount} sub-kategori. Hapus atau pindahkan sub-kategori tersebut terlebih dahulu.`
+      if (transactionAction === "unassign") {
+        await db.execute("UPDATE transactions SET category_id = NULL WHERE category_id = $1", [
+          id,
+        ]);
+      } else if (transactionAction === "reassign" && targetCategoryId != null) {
+        await db.execute(
+          "UPDATE transactions SET category_id = $1 WHERE category_id = $2",
+          [targetCategoryId, id]
         );
       }
 
       await db.execute("DELETE FROM categories WHERE id = $1", [id]);
     },
-    invalidateKey: QUERY_DEPENDENCIES.categories,
+    invalidateKey: dependentKeysOf("transactions", "categories"),
     successMessage: "Kategori berhasil dihapus",
     errorMessage: "Gagal menghapus kategori",
   });
