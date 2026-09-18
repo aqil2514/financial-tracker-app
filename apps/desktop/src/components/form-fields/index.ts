@@ -4,5 +4,6 @@ export { FormFieldCurrency } from "./form-field-currency";
 export { FormFieldSelect } from "./form-field-select";
 export { FormFieldCombobox } from "./form-field-combobox";
 export { FormFieldTextarea } from "./form-field-textarea";
+export { FormFieldRichText } from "./form-field-rich-text";
 export { FormFieldDate } from "./form-field-date";
 export { FormFieldToggleGroup } from "./form-field-toggle-group";

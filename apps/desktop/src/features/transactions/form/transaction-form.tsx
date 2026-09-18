@@ -4,11 +4,13 @@ import { useWatch, type UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   FormFieldCombobox,
   FormFieldCurrency,
   FormFieldDate,
-  FormFieldTextarea,
+  FormFieldRichText,
+  FormFieldText,
   FormFieldToggleGroup,
 } from "@/components/form-fields";
 import { useAccounts } from "@/features/accounts";
@@ -96,61 +98,71 @@ export function TransactionForm({
       }) ?? [];
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <FormFieldToggleGroup
-        form={form}
-        name="type"
-        label="Tipe Transaksi"
-        options={typeOptions}
-      />
-      <FormFieldCurrency
-        form={form}
-        name="amount"
-        label="Nominal"
-        useCalculator
-      />
-      <FormFieldCombobox
-        form={form}
-        name="account_id"
-        label={type === "transfer" ? "Dari Akun" : "Akun"}
-        placeholder="Cari akun..."
-        options={accountOptions}
-      />
-      {type === "transfer" ? (
-        <FormFieldCombobox
-          form={form}
-          name="transfer_account_id"
-          label="Ke Akun"
-          placeholder="Cari akun tujuan..."
-          options={accountOptions}
-        />
-      ) : (
-        <FormFieldCombobox
-          form={form}
-          name="category_id"
-          label="Kategori"
-          placeholder="Cari kategori..."
-          options={categoryOptions}
-          allowClear
-        />
-      )}
-      <FormFieldDate form={form} name="date" label="Tanggal" />
-      <FormFieldTextarea
-        form={form}
-        name="note"
-        label="Catatan"
-        placeholder="Catatan tambahan (opsional)"
-      />
-      {transactionId != null ? (
-        <AttachmentUploader transactionId={transactionId} />
-      ) : onPendingAttachmentsChange ? (
-        <PendingAttachmentUploader
-          pendingAttachments={pendingAttachments ?? []}
-          onChange={onPendingAttachmentsChange}
-          disabled={isPending}
-        />
-      ) : null}
-      <DialogFooter>
+    <form onSubmit={form.handleSubmit(onSubmit)}>
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div className="space-y-4">
+          <FormFieldText
+            form={form}
+            name="note"
+            label="Catatan"
+            placeholder="Judul singkat transaksi"
+          />
+          <FormFieldToggleGroup
+            form={form}
+            name="type"
+            label="Tipe Transaksi"
+            options={typeOptions}
+          />
+          <FormFieldCurrency
+            form={form}
+            name="amount"
+            label="Nominal"
+            useCalculator
+          />
+          <FormFieldCombobox
+            form={form}
+            name="account_id"
+            label={type === "transfer" ? "Dari Akun" : "Akun"}
+            placeholder="Cari akun..."
+            options={accountOptions}
+          />
+          {type === "transfer" ? (
+            <FormFieldCombobox
+              form={form}
+              name="transfer_account_id"
+              label="Ke Akun"
+              placeholder="Cari akun tujuan..."
+              options={accountOptions}
+            />
+          ) : (
+            <FormFieldCombobox
+              form={form}
+              name="category_id"
+              label="Kategori"
+              placeholder="Cari kategori..."
+              options={categoryOptions}
+              allowClear
+            />
+          )}
+          <FormFieldDate form={form} name="date" label="Tanggal" />
+        </div>
+
+        <div className="space-y-4">
+          <ScrollArea className="max-h-48">
+            {transactionId != null ? (
+              <AttachmentUploader transactionId={transactionId} />
+            ) : onPendingAttachmentsChange ? (
+              <PendingAttachmentUploader
+                pendingAttachments={pendingAttachments ?? []}
+                onChange={onPendingAttachmentsChange}
+                disabled={isPending}
+              />
+            ) : null}
+          </ScrollArea>
+          <FormFieldRichText form={form} name="description" label="Deskripsi" />
+        </div>
+      </div>
+      <DialogFooter className="mt-6">
         {onSubmitAndContinue && (
           <Button
             type="button"

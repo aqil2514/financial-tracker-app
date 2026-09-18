@@ -3,6 +3,7 @@
 import { getDb, type Transaction } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
+import { isEmptyDoc } from "@/components/rich-text";
 import {
   transactionSchema,
   type TransactionFormOutput,
@@ -21,7 +22,8 @@ export function useUpdateTransaction(transaction: Transaction) {
         transaction.transfer_account_id != null
           ? String(transaction.transfer_account_id)
           : null,
-      note: transaction.note,
+      note: transaction.note ?? "",
+      description: transaction.description ? JSON.parse(transaction.description) : null,
       date: transaction.date,
     }),
     resetOnOpen: true,
@@ -29,8 +31,8 @@ export function useUpdateTransaction(transaction: Transaction) {
       const db = await getDb();
       await db.execute(
         `UPDATE transactions
-         SET type = $1, amount = $2, category_id = $3, account_id = $4, transfer_account_id = $5, note = $6, date = $7
-         WHERE id = $8`,
+         SET type = $1, amount = $2, category_id = $3, account_id = $4, transfer_account_id = $5, note = $6, description = $7, date = $8
+         WHERE id = $9`,
         [
           values.type,
           values.amount,
@@ -42,6 +44,7 @@ export function useUpdateTransaction(transaction: Transaction) {
             ? Number(values.transfer_account_id)
             : null,
           values.note,
+          isEmptyDoc(values.description) ? null : JSON.stringify(values.description),
           values.date,
           transaction.id,
         ]

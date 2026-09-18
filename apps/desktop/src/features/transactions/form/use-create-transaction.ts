@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
+import { isEmptyDoc } from "@/components/rich-text";
 import { saveAttachmentToTransaction } from "@/features/attachments/use-add-attachment";
 import type { PendingAttachment } from "@/features/attachments/pending-attachment";
 import {
@@ -40,15 +41,16 @@ export function useCreateTransaction(options: UseCreateTransactionOptions = {}) 
       account_id: "",
       category_id: null,
       transfer_account_id: null,
-      note: null,
+      note: "",
+      description: null,
       date: now(),
     }),
     resetOnOpen: true,
     mutationFn: async (values: TransactionFormOutput) => {
       const db = await getDb();
       const result = await db.execute(
-        `INSERT INTO transactions (type, amount, category_id, account_id, transfer_account_id, note, date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO transactions (type, amount, category_id, account_id, transfer_account_id, note, description, date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           values.type,
           values.amount,
@@ -60,6 +62,7 @@ export function useCreateTransaction(options: UseCreateTransactionOptions = {}) 
             ? Number(values.transfer_account_id)
             : null,
           values.note,
+          isEmptyDoc(values.description) ? null : JSON.stringify(values.description),
           values.date,
         ]
       );

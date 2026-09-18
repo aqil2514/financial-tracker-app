@@ -16,6 +16,7 @@ interface EntityFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
+  contentClassName?: string;
 }
 
 export function EntityFormDialog({
@@ -24,11 +25,12 @@ export function EntityFormDialog({
   open,
   onOpenChange,
   children,
+  contentClassName,
 }: EntityFormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger render={trigger} />
-      <DialogContent>
+      <DialogContent className={contentClassName}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>

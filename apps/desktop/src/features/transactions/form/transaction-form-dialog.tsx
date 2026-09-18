@@ -52,6 +52,7 @@ export function TransactionFormDialog() {
         setOpen(next);
         if (!next) clearPendingAttachments();
       }}
+      contentClassName="sm:!max-w-6xl"
     >
       <TransactionForm
         form={form}

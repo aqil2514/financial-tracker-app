@@ -26,6 +26,7 @@ export function TransactionEditDialog({
       title="Edit Transaksi"
       open={open}
       onOpenChange={setOpen}
+      contentClassName="sm:!max-w-6xl"
     >
       <TransactionForm
         form={form}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { JSONContent } from "@tiptap/react";
 
 export const transactionSchema = z
   .object({
@@ -7,7 +8,8 @@ export const transactionSchema = z
     account_id: z.string().min(1, "Akun wajib dipilih"),
     category_id: z.string().nullable(),
     transfer_account_id: z.string().nullable(),
-    note: z.string().nullable(),
+    note: z.string().min(1, "Catatan wajib diisi"),
+    description: z.custom<JSONContent>().nullable(),
     date: z.string().min(1, "Tanggal wajib diisi"),
   })
   .superRefine((values, ctx) => {
