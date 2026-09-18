@@ -23,6 +23,7 @@ export type Category = {
   icon: string | null;
   type: "income" | "expense";
   parent_id: number | null;
+  is_active: number;
 };
 
 export type AccountGroup = {
@@ -39,6 +40,7 @@ export type Account = {
   group_id: number | null;
   description: string | null;
   created_at: string;
+  is_active: number;
 };
 
 export type Transaction = {

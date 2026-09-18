@@ -38,6 +38,7 @@ const AccountListItem = ({ account }: { account: AccountWithBalance }) => {
           {account.group_name && (
             <Badge variant="secondary">{account.group_name}</Badge>
           )}
+          {!account.is_active && <Badge variant="outline">Nonaktif</Badge>}
         </div>
         <p className="text-muted-foreground text-sm">
           {formatCurrency(account.balance, "IDR")}

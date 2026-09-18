@@ -12,16 +12,18 @@ export function useUpdateCategory(category: Category) {
       name: category.name,
       type: category.type,
       parent_id: category.parent_id != null ? String(category.parent_id) : null,
+      is_active: String(category.is_active) as "1" | "0",
     }),
     resetOnOpen: true,
     mutationFn: async (values: CategoryFormOutput) => {
       const db = await getDb();
       await db.execute(
-        "UPDATE categories SET name = $1, type = $2, parent_id = $3 WHERE id = $4",
+        "UPDATE categories SET name = $1, type = $2, parent_id = $3, is_active = $4 WHERE id = $5",
         [
           values.name,
           values.type,
           values.parent_id ? Number(values.parent_id) : null,
+          Number(values.is_active),
           category.id,
         ]
       );

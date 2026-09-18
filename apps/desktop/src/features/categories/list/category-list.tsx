@@ -6,17 +6,32 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CategoryEditDialog } from "../form/category-edit-dialog";
 import { useCategories } from "@/hooks/resources/use-categories";
 import { DeleteCategoryDialog } from "./delete-category-dialog";
 
+const STATUS_FILTER_LABEL: Record<StatusFilter, string> = {
+  all: "Semua Status",
+  active: "Aktif",
+  inactive: "Nonaktif",
+};
+
 type TypeFilter = "all" | "income" | "expense";
+type StatusFilter = "all" | "active" | "inactive";
 
 export function CategoryList() {
   const { data: categories, isLoading, error } = useCategories();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   function parentName(parentId: number | null) {
     return categories?.find((category) => category.id === parentId)?.name ?? null;
@@ -25,12 +40,14 @@ export function CategoryList() {
   const filtered = useMemo(() => {
     return categories?.filter((category) => {
       if (typeFilter !== "all" && category.type !== typeFilter) return false;
+      if (statusFilter === "active" && !category.is_active) return false;
+      if (statusFilter === "inactive" && category.is_active) return false;
       if (search && !category.name.toLowerCase().includes(search.toLowerCase())) {
         return false;
       }
       return true;
     });
-  }, [categories, search, typeFilter]);
+  }, [categories, search, typeFilter, statusFilter]);
 
   return (
     <div className="space-y-3">
@@ -53,6 +70,21 @@ export function CategoryList() {
           <ToggleGroupItem value="income">Pemasukan</ToggleGroupItem>
           <ToggleGroupItem value="expense">Pengeluaran</ToggleGroupItem>
         </ToggleGroup>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Semua Status">
+              {(value: string) => STATUS_FILTER_LABEL[value as StatusFilter]}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Status</SelectItem>
+            <SelectItem value="active">Aktif</SelectItem>
+            <SelectItem value="inactive">Nonaktif</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <QueryState isLoading={isLoading} error={error} />
@@ -69,6 +101,7 @@ export function CategoryList() {
                   <Badge variant={category.type === "income" ? "default" : "secondary"}>
                     {category.type === "income" ? "Pemasukan" : "Pengeluaran"}
                   </Badge>
+                  {!category.is_active && <Badge variant="outline">Nonaktif</Badge>}
                 </div>
                 {category.parent_id != null && (
                   <p className="text-muted-foreground text-xs">

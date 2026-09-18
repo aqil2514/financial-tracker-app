@@ -9,6 +9,7 @@ import {
   FormFieldCurrency,
   FormFieldSelect,
   FormFieldTextarea,
+  FormFieldToggleGroup,
 } from "@/components/form-fields";
 import { useAccountGroups } from "@/features/account-groups";
 import type { AccountFormOutput, AccountFormValues } from "./account.schema";
@@ -56,6 +57,15 @@ export function AccountForm({
         name="description"
         label="Deskripsi"
         placeholder="Catatan tambahan tentang akun ini (opsional)"
+      />
+      <FormFieldToggleGroup
+        form={form}
+        name="is_active"
+        label="Status"
+        options={[
+          { value: "1", label: "Aktif" },
+          { value: "0", label: "Nonaktif" },
+        ]}
       />
       <DialogFooter>
         <Button type="submit" disabled={isPending}>

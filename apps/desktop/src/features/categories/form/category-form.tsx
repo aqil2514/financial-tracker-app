@@ -62,6 +62,15 @@ export function CategoryForm({
         clearLabel="Tanpa Kategori Induk"
         options={parentOptions}
       />
+      <FormFieldToggleGroup
+        form={form}
+        name="is_active"
+        label="Status"
+        options={[
+          { value: "1", label: "Aktif" },
+          { value: "0", label: "Nonaktif" },
+        ]}
+      />
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
           {isPending ? "Menyimpan..." : submitLabel}

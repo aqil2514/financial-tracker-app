@@ -40,7 +40,7 @@ type AccountRow = Account & { balance: number; group_name: string | null };
 
 // Kolom accounts yang boleh muncul sebagai filterKey — harus
 // sinkron dengan FILTER_CONFIG di header/index.tsx.
-const FILTERABLE_COLUMNS = ["name", "group_id", "initial_balance"] as const;
+const FILTERABLE_COLUMNS = ["name", "group_id", "initial_balance", "is_active"] as const;
 const BALANCE_FILTER_COLUMN = "balance" as const;
 
 // Kolom accounts yang boleh muncul sebagai sortKey — harus

@@ -43,16 +43,33 @@ export function TransactionForm({
   const { data: categories } = useCategories();
 
   const type = useWatch({ control: form.control, name: "type" });
+  const accountId = useWatch({ control: form.control, name: "account_id" });
+  const transferAccountId = useWatch({
+    control: form.control,
+    name: "transfer_account_id",
+  });
+  const categoryId = useWatch({ control: form.control, name: "category_id" });
 
+  // Akun/kategori nonaktif disembunyikan dari opsi baru, tapi tetap
+  // ditampilkan kalau sedang dipakai transaksi yang diedit — supaya form
+  // edit tidak kehilangan nilai yang sudah tersimpan.
   const accountOptions =
-    accounts?.map((account) => ({
-      value: String(account.id),
-      label: account.name,
-    })) ?? [];
+    accounts
+      ?.filter(
+        (account) =>
+          account.is_active ||
+          String(account.id) === accountId ||
+          String(account.id) === transferAccountId
+      )
+      .map((account) => ({
+        value: String(account.id),
+        label: account.name,
+      })) ?? [];
 
   const categoryOptions =
     categories
       ?.filter((category) => category.type === type)
+      .filter((category) => category.is_active || String(category.id) === categoryId)
       .map((category) => ({
         value: String(category.id),
         label: category.name,

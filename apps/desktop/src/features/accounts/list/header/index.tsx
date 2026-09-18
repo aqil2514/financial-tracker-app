@@ -13,6 +13,7 @@ const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "group_id", label: "Grup Akun", type: "combobox" },
   { key: "initial_balance", label: "Saldo Awal", type: "number" },
   { key: "balance", label: "Saldo Berjalan", type: "number" },
+  { key: "is_active", label: "Status", type: "select" },
 ];
 
 // Harus sinkron dengan SORTABLE_COLUMNS di use-accounts-paginated.ts.

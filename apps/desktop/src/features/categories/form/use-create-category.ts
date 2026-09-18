@@ -8,15 +8,21 @@ import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 export function useCreateCategory() {
   return useEntityForm({
     schema: categorySchema,
-    defaultValues: () => ({ name: "", type: "expense" as const, parent_id: null }),
+    defaultValues: () => ({
+      name: "",
+      type: "expense" as const,
+      parent_id: null,
+      is_active: "1" as const,
+    }),
     mutationFn: async (values: CategoryFormOutput) => {
       const db = await getDb();
       await db.execute(
-        "INSERT INTO categories (name, type, parent_id) VALUES ($1, $2, $3)",
+        "INSERT INTO categories (name, type, parent_id, is_active) VALUES ($1, $2, $3, $4)",
         [
           values.name,
           values.type,
           values.parent_id ? Number(values.parent_id) : null,
+          Number(values.is_active),
         ]
       );
     },

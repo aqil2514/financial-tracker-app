@@ -13,16 +13,18 @@ export function useCreateAccount() {
       initial_balance: 0,
       group_id: null,
       description: null,
+      is_active: "1" as const,
     }),
     mutationFn: async (values: AccountFormOutput) => {
       const db = await getDb();
       await db.execute(
-        "INSERT INTO accounts (name, initial_balance, group_id, description) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO accounts (name, initial_balance, group_id, description, is_active) VALUES ($1, $2, $3, $4, $5)",
         [
           values.name,
           values.initial_balance,
           values.group_id ? Number(values.group_id) : null,
           values.description,
+          Number(values.is_active),
         ]
       );
     },

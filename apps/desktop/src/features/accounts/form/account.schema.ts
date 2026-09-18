@@ -5,6 +5,7 @@ export const accountSchema = z.object({
   initial_balance: z.coerce.number(),
   group_id: z.string().nullable(),
   description: z.string().nullable(),
+  is_active: z.enum(["1", "0"]),
 });
 
 export type AccountFormValues = z.input<typeof accountSchema>;

@@ -44,5 +44,11 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0007_transfer_account_index.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "active_flag",
+            sql: include_str!("../migrations/0008_active_flag.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

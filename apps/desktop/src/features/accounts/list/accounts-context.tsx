@@ -26,6 +26,13 @@ interface AccountsContextType {
   setSorts: (sorts: SortConfig[]) => void;
 }
 
+const STATIC_FILTER_SELECT_OPTIONS: SelectOptionsMap = {
+  is_active: [
+    { value: "1", label: "Aktif" },
+    { value: "0", label: "Nonaktif" },
+  ],
+};
+
 const AccountsContext = createContext<AccountsContextType | undefined>(undefined);
 
 export function AccountsProvider({ children }: { children: React.ReactNode }) {
@@ -43,6 +50,7 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
 
   const filterSelectOptions = useMemo<SelectOptionsMap>(
     () => ({
+      ...STATIC_FILTER_SELECT_OPTIONS,
       group_id: (groups ?? []).map((group) => ({
         value: String(group.id),
         label: group.name,
