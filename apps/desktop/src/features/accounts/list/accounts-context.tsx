@@ -9,7 +9,6 @@ import { useAccountGroups } from "@/hooks/resources/use-account-groups";
 import type { Pagination } from "@/lib/pagination";
 import { useAccountsPaginated } from "./use-accounts-paginated";
 import type { AccountWithBalance } from "./calculate-balance";
-import { useDeleteAccount } from "./use-delete-account";
 
 interface AccountsContextType {
   accounts: AccountWithBalance[] | undefined;
@@ -25,8 +24,6 @@ interface AccountsContextType {
   filterSelectOptions: SelectOptionsMap;
   sorts: SortConfig[];
   setSorts: (sorts: SortConfig[]) => void;
-  deleteAccount: (id: number) => void;
-  isDeletingAccount: boolean;
 }
 
 const AccountsContext = createContext<AccountsContextType | undefined>(undefined);
@@ -39,7 +36,6 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
 
   const { data, isLoading, error } = useAccountsPaginated(page, limit, sorts, filters);
   const { data: groups } = useAccountGroups();
-  const deleteAccount = useDeleteAccount();
 
   useEffect(() => {
     setPage(1);
@@ -71,8 +67,6 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
         filterSelectOptions,
         sorts,
         setSorts,
-        deleteAccount: deleteAccount.mutate,
-        isDeletingAccount: deleteAccount.isPending,
       }}
     >
       {children}

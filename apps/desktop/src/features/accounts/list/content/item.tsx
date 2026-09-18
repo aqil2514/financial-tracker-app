@@ -4,7 +4,7 @@ import { AccountWithBalance } from "../calculate-balance";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format-currency";
 import { AccountEditDialog } from "../../form";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { DeleteAccountDialog } from "../delete-account-dialog";
 
 export function AccountListContentItem() {
   const { accounts } = useAccountsList();
@@ -24,26 +24,12 @@ const NoAccounts = () => (
 const WithAccounts: React.FC<{ accounts: AccountWithBalance[] }> = ({
   accounts,
 }) => {
-  const { deleteAccount, isDeletingAccount } = useAccountsList();
   return accounts.map((account) => (
-    <AccountListItem
-      account={account}
-      isDeleting={isDeletingAccount}
-      key={account.id}
-      onDelete={() => deleteAccount(account.id)}
-    />
+    <AccountListItem account={account} key={account.id} />
   ));
 };
 
-const AccountListItem = ({
-  account,
-  onDelete,
-  isDeleting,
-}: {
-  account: AccountWithBalance;
-  onDelete: () => void;
-  isDeleting: boolean;
-}) => {
+const AccountListItem = ({ account }: { account: AccountWithBalance }) => {
   return (
     <div className="flex items-center justify-between rounded-lg border p-4">
       <div className="space-y-1">
@@ -62,12 +48,7 @@ const AccountListItem = ({
       </div>
       <div className="flex items-center gap-1">
         <AccountEditDialog account={account} />
-        <ConfirmDeleteButton
-          onConfirm={onDelete}
-          isPending={isDeleting}
-          title={`Hapus akun "${account.name}"?`}
-          description="Seluruh transaksi yang terkait dengan akun ini tidak akan ikut terhapus, tapi referensinya akan hilang."
-        />
+        <DeleteAccountDialog account={account} />
       </div>
     </div>
   );
