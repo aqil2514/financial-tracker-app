@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 
 import type { Category } from "@/lib/db";
@@ -54,6 +54,15 @@ export function DeleteCategoryDialog({ category }: { category: Category }) {
   const { data: transactionCount } = useTransactionCountByCategory(category.id);
   const deleteCategory = useDeleteCategory();
 
+  useEffect(() => {
+    if (open) {
+      setChildAction("unassign");
+      setTargetParentId(null);
+      setTransactionAction("unassign");
+      setTargetCategoryId(null);
+    }
+  }, [open]);
+
   const children = useMemo(
     () => (categories ?? []).filter((c) => c.parent_id === category.id),
     [categories, category.id]
@@ -70,18 +79,25 @@ export function DeleteCategoryDialog({ category }: { category: Category }) {
   const hasTransactions = (transactionCount ?? 0) > 0;
   const hasAnyRelation = hasChildren || hasTransactions;
 
+  const isTargetParentValid =
+    targetParentId != null &&
+    otherCategoriesSameType.some((c) => String(c.id) === targetParentId);
+  const isTargetCategoryValid =
+    targetCategoryId != null &&
+    otherCategoriesSameType.some((c) => String(c.id) === targetCategoryId);
+
   function handleConfirm() {
     deleteCategory.mutate(
       {
         id: category.id,
         childAction: hasChildren ? childAction : undefined,
         targetParentId:
-          hasChildren && childAction === "reassign" && targetParentId
+          hasChildren && childAction === "reassign" && isTargetParentValid
             ? Number(targetParentId)
             : undefined,
         transactionAction: hasTransactions ? transactionAction : undefined,
         targetCategoryId:
-          hasTransactions && transactionAction === "reassign" && targetCategoryId
+          hasTransactions && transactionAction === "reassign" && isTargetCategoryValid
             ? Number(targetCategoryId)
             : undefined,
       },
@@ -90,10 +106,10 @@ export function DeleteCategoryDialog({ category }: { category: Category }) {
   }
 
   const canConfirm =
-    (!hasChildren || childAction === "unassign" || (childAction === "reassign" && targetParentId != null)) &&
+    (!hasChildren || childAction === "unassign" || (childAction === "reassign" && isTargetParentValid)) &&
     (!hasTransactions ||
       transactionAction === "unassign" ||
-      (transactionAction === "reassign" && targetCategoryId != null));
+      (transactionAction === "reassign" && isTargetCategoryValid));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

@@ -2,9 +2,17 @@ import Database from "@tauri-apps/plugin-sql";
 
 let dbPromise: Promise<Database> | null = null;
 
+// `next dev` (dipakai `tauri dev` lewat beforeDevCommand) selalu
+// NODE_ENV=development, `next build` (dipakai `tauri build`) selalu
+// NODE_ENV=production — jadi ini cara paling andal membedakan dev vs
+// production DI RUNTIME JS (TAURI_ENV_DEBUG hanya tersedia saat proses
+// build, bukan di WebView). Tanpa pemisahan ini, `tauri dev` dan hasil
+// build/installer production berbagi file database yang sama persis.
+const DB_FILE = process.env.NODE_ENV === "development" ? "finance.dev.db" : "finance.db";
+
 export function getDb() {
   if (!dbPromise) {
-    dbPromise = Database.load("sqlite:finance.db");
+    dbPromise = Database.load(`sqlite:${DB_FILE}`);
   }
   return dbPromise;
 }

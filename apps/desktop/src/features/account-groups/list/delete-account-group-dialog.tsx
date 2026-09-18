@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { AccountGroup } from "@/lib/db";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,13 @@ export function DeleteAccountGroupDialog({ group }: { group: AccountGroup }) {
   const { data: groups } = useAccountGroups();
   const deleteGroup = useDeleteAccountGroup();
 
+  useEffect(() => {
+    if (open) {
+      setMemberAction("unassign");
+      setTargetGroupId(null);
+    }
+  }, [open]);
+
   const memberCount = useMemo(
     () => accounts?.filter((account) => account.group_id === group.id).length ?? 0,
     [accounts, group.id]
@@ -45,6 +52,8 @@ export function DeleteAccountGroupDialog({ group }: { group: AccountGroup }) {
     () => (groups ?? []).filter((g) => g.id !== group.id),
     [groups, group.id]
   );
+  const isTargetGroupValid =
+    targetGroupId != null && otherGroups.some((g) => String(g.id) === targetGroupId);
 
   function handleConfirm() {
     deleteGroup.mutate(
@@ -52,7 +61,7 @@ export function DeleteAccountGroupDialog({ group }: { group: AccountGroup }) {
         id: group.id,
         memberAction: memberCount > 0 ? memberAction : undefined,
         targetGroupId:
-          memberCount > 0 && memberAction === "reassign" && targetGroupId
+          memberCount > 0 && memberAction === "reassign" && isTargetGroupValid
             ? Number(targetGroupId)
             : undefined,
       },
@@ -63,7 +72,7 @@ export function DeleteAccountGroupDialog({ group }: { group: AccountGroup }) {
   const canConfirm =
     memberCount === 0 ||
     memberAction === "unassign" ||
-    (memberAction === "reassign" && targetGroupId != null);
+    (memberAction === "reassign" && isTargetGroupValid);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

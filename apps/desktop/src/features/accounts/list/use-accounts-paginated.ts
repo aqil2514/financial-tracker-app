@@ -69,13 +69,12 @@ export function useAccountsPaginated(
       const balanceFilters = filters.filter((f) => f.filterKey === BALANCE_FILTER_COLUMN);
 
       const { whereClause, params } = buildWhereClause(columnFilters, FILTERABLE_COLUMNS);
-      const { whereClause: balanceHavingClause, params: balanceParams } = buildWhereClause(
+      const { whereClause: balanceWhereClause, params: balanceParams } = buildWhereClause(
         balanceFilters,
         [BALANCE_FILTER_COLUMN],
         [],
         params.length + 1
       );
-      const havingClause = balanceHavingClause.replace(/^WHERE/, "HAVING");
 
       const orderClause = buildOrderClause(sorts, SORTABLE_COLUMNS, DEFAULT_ORDER_CLAUSE);
 
@@ -86,11 +85,17 @@ export function useAccountsPaginated(
         combinedParams.length + 1
       );
 
-      const selectWithBalance = `SELECT accounts.*, ${BALANCE_EXPRESSION} AS balance, account_groups.name AS group_name
+      // balanceWhereClause memfilter alias `balance` — SQLite tidak izinkan
+      // merujuk alias SELECT di WHERE pada level query yang sama tempat
+      // alias itu didefinisikan, jadi query dasar (dengan BALANCE_EXPRESSION)
+      // dibungkus sebagai subquery dulu, baru difilter oleh balanceWhereClause
+      // di level luar.
+      const baseSelect = `SELECT accounts.*, ${BALANCE_EXPRESSION} AS balance, account_groups.name AS group_name
          FROM accounts
          LEFT JOIN account_groups ON account_groups.id = accounts.group_id
-         ${whereClause}
-         ${havingClause}`;
+         ${whereClause}`;
+
+      const selectWithBalance = `SELECT * FROM (${baseSelect}) AS accounts_with_balance ${balanceWhereClause}`;
 
       const [accounts, countResult] = await Promise.all([
         db.select<AccountRow[]>(

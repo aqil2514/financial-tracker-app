@@ -9,11 +9,21 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Debug build (`tauri dev` / `tauri build --debug`) pakai file
+    // database terpisah dari release build, supaya development tidak
+    // pernah menyentuh data production secara tidak sengaja. Harus
+    // sinkron dengan DB_FILE di src/lib/db.ts (frontend).
+    let db_url = if cfg!(debug_assertions) {
+        "sqlite:finance.dev.db"
+    } else {
+        "sqlite:finance.db"
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:finance.db", migrations::get())
+                .add_migrations(db_url, migrations::get())
                 .build(),
         )
         .plugin(tauri_plugin_fs::init())

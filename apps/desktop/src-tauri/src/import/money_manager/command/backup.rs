@@ -7,7 +7,15 @@ pub fn app_db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .path()
         .app_data_dir()
         .map_err(|e| format!("Gagal menemukan app data dir: {e}"))?;
-    Ok(dir.join("finance.db"))
+    // Harus sinkron dengan db_url di lib.rs — debug build pakai file
+    // terpisah supaya import/backup tidak pernah menyentuh finance.db
+    // production saat development.
+    let file_name = if cfg!(debug_assertions) {
+        "finance.dev.db"
+    } else {
+        "finance.db"
+    };
+    Ok(dir.join(file_name))
 }
 
 pub fn backup_database(db_path: &PathBuf) -> Result<(), String> {

@@ -6,7 +6,7 @@ import {
   accountGroupSchema,
   type AccountGroupFormOutput,
 } from "./account-group.schema";
-import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
+import { dependentKeysOf } from "@/lib/query-dependencies";
 
 export function useUpdateAccountGroup(group: AccountGroup) {
   return useEntityForm({
@@ -20,7 +20,9 @@ export function useUpdateAccountGroup(group: AccountGroup) {
         [values.name, group.id]
       );
     },
-    invalidateKey: QUERY_DEPENDENCIES.accountGroups,
+    // Domain "accounts" ikut di-invalidate karena rename grup mengubah
+    // group_name yang di-cache di accountsQueryKey (hasil LEFT JOIN).
+    invalidateKey: dependentKeysOf("accounts", "accountGroups"),
     successMessage: "Group akun berhasil diperbarui",
     errorMessage: "Gagal memperbarui group akun",
   });
