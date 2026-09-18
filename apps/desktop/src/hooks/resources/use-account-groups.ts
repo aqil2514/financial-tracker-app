@@ -9,7 +9,7 @@ export function useAccountGroups() {
     queryFn: async () => {
       const db = await getDb();
       return db.select<AccountGroup[]>(
-        "SELECT * FROM account_groups ORDER BY id"
+        "SELECT * FROM account_groups ORDER BY name COLLATE NOCASE"
       );
     },
   });
