@@ -19,6 +19,17 @@ fn ensure_dir(dir: &Path) -> Result<(), String> {
     fs::create_dir_all(dir).map_err(|e| format!("Gagal membuat folder lampiran: {e}"))
 }
 
+/// Dipakai frontend untuk menampilkan lokasi folder default di UI
+/// pengaturan, supaya user tahu ke mana file tersimpan kalau belum
+/// memilih folder kustom.
+#[tauri::command]
+pub fn get_default_attachment_dir(app: tauri::AppHandle) -> Result<String, String> {
+    default_attachment_dir(&app)?
+        .to_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Path folder default mengandung karakter tidak valid".to_string())
+}
+
 /// Nama file unik supaya foto dengan nama sama dari sumber berbeda
 /// (mis. dua kali paste screenshot bernama sama) tidak saling menimpa.
 fn unique_file_name(original_name: &str) -> String {

@@ -10,6 +10,7 @@ import {
 import { AccountGroupList, AccountGroupFormDialog } from "@/features/account-groups";
 import { CategoryList, CategoryFormDialog } from "@/features/categories";
 import { ImportMoneyManagerDialog } from "@/features/data-import";
+import { AttachmentFolderSetting } from "@/features/attachments";
 
 export default function SettingsPage() {
   return (
@@ -50,6 +51,15 @@ export default function SettingsPage() {
             Manager (.mmbak). Seluruh data yang ada saat ini akan diganti.
           </p>
           <ImportMoneyManagerDialog />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Folder Lampiran Foto</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AttachmentFolderSetting />
         </CardContent>
       </Card>
 
