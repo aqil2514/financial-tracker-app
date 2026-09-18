@@ -1,3 +1,4 @@
+mod attachments;
 mod import;
 mod migrations;
 
@@ -29,9 +30,14 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             greet,
-            import::money_manager::command::import_money_manager
+            import::money_manager::command::import_money_manager,
+            attachments::save_attachment_bytes,
+            attachments::save_attachment_from_path,
+            attachments::read_attachment_bytes,
+            attachments::delete_attachment_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

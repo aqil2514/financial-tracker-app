@@ -77,7 +77,66 @@ mengandalkan fitur "Ekspor File Foto" Money Manager), lalu proses import
 mencocokkan tiap file di folder itu ke `PHOTO.FILE_NAME`/`uid` untuk tahu
 transaksi tujuannya.
 
-## Kemungkinan arah perbaikan (belum diputuskan)
+## Status implementasi (foto/lampiran)
+
+**Keputusan yang sudah diambil**:
+- Tabel baru `transaction_attachments` (bukan kolom tunggal di
+  `transactions`), karena relasinya one-to-many — satu transaksi bisa
+  punya beberapa foto, sama seperti tabel `PHOTO` di Money Manager.
+- `ON DELETE CASCADE` dari `transactions.id` (BUKAN `SET NULL` seperti
+  relasi lain di `database-integrity-audit.md`) — foto tidak punya makna
+  tanpa transaksi induknya, jadi wajar ikut hilang (baris DB-nya) saat
+  transaksi dihapus.
+- File fisik disimpan di app data dir (`<app_data_dir>/attachments/`)
+  secara default, tapi user nantinya bisa pilih folder kustom sendiri —
+  disimpan sebagai key di tabel `settings` yang sudah ada di skema
+  (belum diimplementasikan di sisi frontend).
+- Cakupan fitur diperluas: bukan cuma target hasil import Money Manager,
+  tapi juga fitur baru — user bisa attach foto manual ke transaksi lewat
+  tiga cara: dialog pilih file OS, drag & drop, dan paste dari clipboard.
+- Tampilan foto (di form transaksi, list, dll) SENGAJA belum diputuskan —
+  kemungkinan ada perombakan action card transaksi terlebih dahulu, jadi
+  UI ditunda supaya tidak dibangun dua kali.
+
+**Sudah dikerjakan dan diverifikasi**:
+- Migration `0010_transaction_attachments.sql` — tabel
+  `transaction_attachments` (`transaction_id`, `file_path`, `created_at`)
+  + index `idx_transaction_attachments_transaction`. Diverifikasi lewat
+  `sqlite3` CLI: migrasi jalan bersih, dan `ON DELETE CASCADE` terbukti
+  bekerja (hapus transaksi → baris attachment terkait otomatis lenyap).
+- Rust command baru di `src-tauri/src/attachments/mod.rs`, didaftarkan di
+  `lib.rs`:
+  - `save_attachment_bytes` — simpan bytes (untuk hasil paste clipboard,
+    yang tidak punya path file sumber) ke folder tujuan (default atau
+    kustom), nama file di-generate UUID supaya tidak pernah tabrakan.
+  - `save_attachment_from_path` — salin file dari path sumber (untuk
+    dialog pilih file dan drag & drop, yang keduanya memberi path native).
+  - `read_attachment_bytes` — baca isi file jadi bytes, untuk ditampilkan
+    sebagai preview di WebView nanti (dikonversi ke data URL) — karena
+    WebView tidak bisa akses filesystem lokal langsung.
+  - `delete_attachment_file` — hapus file fisik dari disk. Terpisah dari
+    penghapusan baris DB (yang bisa terjadi otomatis lewat CASCADE) karena
+    CASCADE cuma membersihkan database, bukan file di storage.
+  - Dependency baru: `uuid` (fitur `v4`) di `Cargo.toml`.
+  - Dicek: command custom Tauri (bukan command dari plugin) tidak perlu
+    entry permission tambahan di `capabilities/default.json` — hanya
+    command dari plugin yang butuh ACL eksplisit.
+- `cargo check` bersih tanpa warning, 66 test frontend tetap lulus (tidak
+  ada perubahan sisi frontend di tahap ini).
+
+**Belum dikerjakan** (lanjutan, disengaja ditunda per keputusan terakhir):
+- Frontend: hook baca/tulis setting folder kustom (`useAttachmentFolder`),
+  hook CRUD attachment per transaksi (list/tambah/hapus lewat
+  React Query), dan komponen upload (dialog file + drop zone + listener
+  paste, kemungkinan pakai `@tauri-apps/plugin-clipboard-manager` untuk
+  `readImage()` — belum terpasang di `package.json`).
+- Alur import dari Money Manager untuk memindahkan foto lama (folder
+  `Pictures/MoneyManager/` di device + tabel `PHOTO` di `.mmbak`) ke
+  tabel `transaction_attachments` yang baru ini.
+- Keputusan tampilan (di mana dan bagaimana foto muncul di UI) — menunggu
+  pembahasan perombakan action card transaksi.
+
+## Kemungkinan arah perbaikan (belum diputuskan, untuk ZDATA/deskripsi)
 
 **Untuk `ZDATA`**:
 - Gabung ke `note` saat import, mis. format `"{ZCONTENT}: {ZDATA}"` atau
@@ -87,25 +146,17 @@ transaksi tujuannya.
   terpisah dari `note` — mempertahankan struktur asli Money Manager, tapi
   perlu migrasi skema dan keputusan UI (field baru di form transaksi).
 
-**Untuk foto** (sudah dikonfirmasi filenya MASIH ADA di
-`Pictures/MoneyManager/` di device Android):
-- Tabel baru `transaction_attachments` (`transaction_id`, `file_path`,
-  dst) untuk menyimpan referensi foto per transaksi di aplikasi ini.
-- Alur import perlu diperluas: selain file `.mmbak`, user juga perlu
-  arahkan ke folder foto (`Pictures/MoneyManager/`) — Tauri punya akses
-  file system jadi ini secara teknis memungkinkan (dialog pilih folder,
-  bukan cuma pilih file). Proses import lalu: baca tabel `PHOTO` dari
-  `.mmbak` → dapat `uid`/`FILE_NAME` per transaksi (`txUid`) → cari file
-  dengan nama itu di folder yang dipilih → salin ke storage aplikasi
-  sendiri (App data dir Tauri) → simpan referensinya di
-  `transaction_attachments`.
-- Kalau device sumbernya bukan device yang sama dengan yang menjalankan
-  aplikasi desktop ini (kemungkinan besar — ini app desktop, foto ada di
-  HP Android), user perlu transfer folder itu ke PC dulu (USB/cloud) baru
-  bisa diarahkan saat import — bukan sesuatu yang bisa otomatis diakses
-  langsung dari desktop app tanpa langkah manual itu.
+**Untuk foto**: skema dan command penyimpanan file sudah dieksekusi —
+lihat "Status implementasi (foto/lampiran)" di atas. Alur import dari
+`Pictures/MoneyManager/` + tabel `PHOTO` masih seperti dijelaskan di
+Temuan 2 (folder foto perlu ditransfer manual ke PC dulu, fitur "Ekspor
+File Foto" bawaan Money Manager tidak bisa diandalkan) dan belum
+dikerjakan — proses import nanti: baca tabel `PHOTO` dari `.mmbak` →
+dapat `uid`/`FILE_NAME` per transaksi (`txUid`) → cari file dengan nama
+itu di folder yang dipilih user → panggil `save_attachment_from_path` →
+simpan referensinya di `transaction_attachments`.
 
-Kedua arah ini BUTUH keputusan skema (kolom/tabel baru) sebelum
+`ZDATA`/deskripsi BUTUH keputusan skema (kolom baru) sebelum
 diimplementasikan — beda dengan `import-category-dedup.md` yang bisa
 diperbaiki di level query import tanpa ubah skema.
 

@@ -5,9 +5,9 @@ import { useWatch, type UseFormReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
+  FormFieldCombobox,
   FormFieldCurrency,
   FormFieldDate,
-  FormFieldSelect,
   FormFieldTextarea,
   FormFieldToggleGroup,
 } from "@/components/form-fields";
@@ -53,6 +53,8 @@ export function TransactionForm({
   // Akun/kategori nonaktif disembunyikan dari opsi baru, tapi tetap
   // ditampilkan kalau sedang dipakai transaksi yang diedit — supaya form
   // edit tidak kehilangan nilai yang sudah tersimpan.
+  // Label menyertakan induk (grup akun / kategori induk) karena beberapa
+  // akun/kategori berbeda memakai nama yang sama persis.
   const accountOptions =
     accounts
       ?.filter(
@@ -63,17 +65,24 @@ export function TransactionForm({
       )
       .map((account) => ({
         value: String(account.id),
-        label: account.name,
+        label: account.group_name
+          ? `${account.name} — ${account.group_name}`
+          : account.name,
       })) ?? [];
 
   const categoryOptions =
     categories
       ?.filter((category) => category.type === type)
       .filter((category) => category.is_active || String(category.id) === categoryId)
-      .map((category) => ({
-        value: String(category.id),
-        label: category.name,
-      })) ?? [];
+      .map((category) => {
+        const parentName = categories?.find(
+          (parent) => parent.id === category.parent_id
+        )?.name;
+        return {
+          value: String(category.id),
+          label: parentName ? `${category.name} — ${parentName}` : category.name,
+        };
+      }) ?? [];
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
@@ -89,30 +98,29 @@ export function TransactionForm({
         label="Nominal"
         useCalculator
       />
-      <FormFieldSelect
+      <FormFieldCombobox
         form={form}
         name="account_id"
         label={type === "transfer" ? "Dari Akun" : "Akun"}
-        placeholder="Pilih akun..."
+        placeholder="Cari akun..."
         options={accountOptions}
       />
       {type === "transfer" ? (
-        <FormFieldSelect
+        <FormFieldCombobox
           form={form}
           name="transfer_account_id"
           label="Ke Akun"
-          placeholder="Pilih akun tujuan..."
+          placeholder="Cari akun tujuan..."
           options={accountOptions}
         />
       ) : (
-        <FormFieldSelect
+        <FormFieldCombobox
           form={form}
           name="category_id"
           label="Kategori"
-          placeholder="Pilih kategori..."
+          placeholder="Cari kategori..."
           options={categoryOptions}
           allowClear
-          clearLabel="Tanpa kategori"
         />
       )}
       <FormFieldDate form={form} name="date" label="Tanggal" />

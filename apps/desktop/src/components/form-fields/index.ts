@@ -2,6 +2,7 @@ export { FormFieldText } from "./form-field-text";
 export { FormFieldNumber } from "./form-field-number";
 export { FormFieldCurrency } from "./form-field-currency";
 export { FormFieldSelect } from "./form-field-select";
+export { FormFieldCombobox } from "./form-field-combobox";
 export { FormFieldTextarea } from "./form-field-textarea";
 export { FormFieldDate } from "./form-field-date";
 export { FormFieldToggleGroup } from "./form-field-toggle-group";

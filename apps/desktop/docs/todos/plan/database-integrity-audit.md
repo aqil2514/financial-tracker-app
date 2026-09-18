@@ -10,7 +10,10 @@ menyebabkan kehilangan/korupsi data, bukan sekadar soal reuse kode.
 
 ## Temuan
 
-### 1. Foreign key TIDAK ditegakkan sama sekali (prioritas tertinggi)
+### 1. Foreign key TIDAK ditegakkan sama sekali — SELESAI
+
+**Status: dieksekusi.** Lihat `src-tauri/migrations/0009_enforce_fk_set_null.sql`
+dan `src/lib/db.ts`.
 
 Semua FK di skema (`transactions.category_id`, `transactions.account_id`,
 `transactions.transfer_account_id`, `accounts.group_id`,
@@ -34,28 +37,35 @@ Ini menjelaskan (secara tidak sengaja) kenapa app tidak pernah "error"
 saat hapus data yang masih direferensikan — bukan karena ditangani dengan
 baik, tapi karena SQLite tidak mengecek sama sekali.
 
-**Kemungkinan arah perbaikan (belum diputuskan)**:
-- Aktifkan `PRAGMA foreign_keys = ON` per koneksi (biasanya lewat opsi
-  koneksi `tauri-plugin-sql` atau dijalankan sekali saat `getDb()`) — TAPI
-  ini mengubah perilaku delete secara signifikan: begitu diaktifkan, hapus
-  kategori/akun yang masih dipakai transaksi akan GAGAL (constraint
-  violation) alih-alih silently orphan, kecuali FK-nya didefinisikan
-  ulang dengan `ON DELETE SET NULL`/`CASCADE` eksplisit di migration
-  berikutnya (butuh migration "copy-and-rename" seperti pola
-  `0004_allow_transfer_type.sql`, karena SQLite tidak bisa `ALTER
-  TABLE` FK constraint pada tabel yang sudah ada).
-- Perlu diputuskan per relasi, `ON DELETE` seperti apa yang benar secara
-  bisnis: `transactions.category_id`/`account_id` mungkin lebih masuk akal
-  `SET NULL` (transaksi historis tetap ada, tapi kategorinya jadi
-  "tidak diketahui") daripada `CASCADE` (menghapus akun otomatis
-  menghapus semua transaksinya — kemungkinan besar TIDAK diinginkan untuk
-  app finance, karena riwayat finansial semestinya tidak boleh hilang
-  begitu saja).
-- Sebelum mengaktifkan enforcement, sebaiknya cek dulu apakah sudah ada
-  data orphan di database pengguna existing (termasuk dari hasil import
-  Money Manager) — mengaktifkan FK enforcement pada database yang sudah
-  punya orphan reference akan menyebabkan migration/query berikutnya
-  gagal.
+**Perbaikan yang dieksekusi**:
+- Migration `0009_enforce_fk_set_null.sql` menerapkan pola copy-and-rename
+  (tabel `_new` → copy data → drop → rename, sama seperti
+  `0004_allow_transfer_type.sql`) untuk mendefinisikan ulang keempat FK
+  opsional dengan `ON DELETE SET NULL`: `transactions.category_id`,
+  `transactions.account_id`, `transactions.transfer_account_id`,
+  `accounts.group_id`, `categories.parent_id`. `SET NULL` dipilih (bukan
+  `CASCADE`/`RESTRICT`) supaya riwayat transaksi tidak pernah ikut
+  terhapus otomatis hanya karena akun/kategori/grup rujukannya dihapus —
+  konsisten dengan pola "smart delete" (unassign/reassign) yang sudah
+  diterapkan di semua dialog hapus akun/kategori/grup akun.
+- `src/lib/db.ts` menjalankan `PRAGMA foreign_keys = ON` setiap kali
+  `getDb()` membuka koneksi baru — wajib dilakukan di sini, bukan cukup
+  lewat migrasi, karena PRAGMA di dalam migrasi hanya berlaku untuk
+  koneksi yang menjalankan migrasi itu, bukan koneksi-koneksi berikutnya.
+- Dicek lebih dulu: tidak ada orphan reference existing di database
+  production maupun hasil import Money Manager (`category_id`,
+  `account_id`, `transfer_account_id`, `accounts.group_id`,
+  `categories.parent_id` — semua nihil), jadi migrasi aman diterapkan
+  langsung tanpa perlu pembersihan data dulu.
+- Diverifikasi langsung lewat `sqlite3` CLI terhadap salinan database
+  nyata: row count tetap sama persis sebelum/sesudah migrasi (5488
+  transaksi/74 akun/116 kategori), dan ketiga jenis relasi diuji manual
+  (hapus akun → `account_id` transaksi jadi NULL; hapus grup → `group_id`
+  akun jadi NULL; hapus kategori induk → `parent_id` anak jadi NULL).
+  Sempat ditemukan dan diperbaiki bug di draft migrasi awal
+  (`REFERENCES categories_new(id)` yang salah, seharusnya
+  `REFERENCES categories(id)` — SQLite me-resolve nama tabel di FK secara
+  lazy sehingga otomatis mengikuti hasil `RENAME TO`).
 
 ### 2. Pola migration "copy-and-rename" belum punya template tertulis
 
@@ -91,7 +101,8 @@ migration terus bertambah dan risiko regresi skema makin nyata.
 Temuan #1 levelnya SAMA dengan "delete tanpa konfirmasi" yang sudah
 diperbaiki di `scalability-audit.md` — ini bug data-integrity nyata, bukan
 sekadar preferensi arsitektur, karena bisa menyebabkan referensi rusak
-tanpa peringatan apa pun ke pengguna. Belum dieksekusi karena keputusan
-`ON DELETE` per relasi (SET NULL vs CASCADE vs RESTRICT) berdampak ke
-perilaku bisnis yang perlu dipastikan dulu sebelum mengubah skema —
-bukan keputusan teknis semata.
+tanpa peringatan apa pun ke pengguna. **Sudah dieksekusi** (lihat Temuan
+#1 di atas) setelah keputusan `ON DELETE SET NULL` per relasi diambil,
+konsisten dengan pola smart-delete yang sudah ada di UI.
+
+Temuan #2 dan #3 masih terbuka.

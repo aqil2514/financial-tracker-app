@@ -50,5 +50,17 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0008_active_flag.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 9,
+            description: "enforce_fk_set_null",
+            sql: include_str!("../migrations/0009_enforce_fk_set_null.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 10,
+            description: "transaction_attachments",
+            sql: include_str!("../migrations/0010_transaction_attachments.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

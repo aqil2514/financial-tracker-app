@@ -12,7 +12,14 @@ const DB_FILE = process.env.NODE_ENV === "development" ? "finance.dev.db" : "fin
 
 export function getDb() {
   if (!dbPromise) {
-    dbPromise = Database.load(`sqlite:${DB_FILE}`);
+    // SQLite mematikan foreign key enforcement secara default per koneksi —
+    // wajib diaktifkan ulang di sini setiap kali database dibuka, bukan
+    // cukup lewat migrasi (PRAGMA di migrasi hanya berlaku untuk koneksi
+    // yang menjalankan migrasi itu, bukan koneksi-koneksi berikutnya).
+    dbPromise = Database.load(`sqlite:${DB_FILE}`).then(async (db) => {
+      await db.execute("PRAGMA foreign_keys = ON");
+      return db;
+    });
   }
   return dbPromise;
 }
