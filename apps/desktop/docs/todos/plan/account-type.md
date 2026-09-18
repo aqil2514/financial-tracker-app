@@ -27,3 +27,7 @@ Tiap tipe berpotensi punya field/fitur sendiri:
 
 - Daftar final tipe akun yang mau didukung di awal.
 - Field spesifik tiap tipe (baru dibahas kredit/investasi/valas sebagai contoh, belum final).
+
+## Use case yang menunggu fitur ini
+
+- Panel pie chart di halaman Akun (`AccountBalancePieChart`) saat ini punya 2 tab: "Per Akun" dan "Per Grup Akun" (`account_groups`). Sempat ditanyakan apakah bisa ditambah tab "Per Tipe Akun" — belum bisa, karena `account_type` belum ada sebagai kolom sungguhan di database, masih sebatas rencana di dokumen ini. Begitu `account_type` diimplementasikan, tambahkan tab ketiga di `src/features/accounts/balance-pie-chart.tsx` (pola sudah ada: tinggal buat `useAccountTypeBalances()` mirip `use-account-group-balances.ts`, lalu tambah `TabsTrigger`/`TabsContent` baru).

@@ -12,3 +12,4 @@ export {
   type AccountFormValues,
   type AccountFormOutput,
 } from "./form";
+export { AccountBalancePieChart } from "./balance-pie-chart";

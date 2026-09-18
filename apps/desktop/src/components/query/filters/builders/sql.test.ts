@@ -297,4 +297,35 @@ describe("buildWhereClause", () => {
       });
     });
   });
+
+  describe("startIndex", () => {
+    it("continues placeholder numbering from startIndex instead of $1", () => {
+      const result = buildWhereClause(
+        [{ filterKey: "amount", filterOperator: "gt", filterValue: 1000 }],
+        ALLOWED_COLUMNS,
+        [],
+        3
+      );
+      expect(result).toEqual({
+        whereClause: "WHERE amount > $3",
+        params: [1000],
+      });
+    });
+
+    it("keeps subsequent placeholders sequential after startIndex", () => {
+      const result = buildWhereClause(
+        [
+          { filterKey: "note", filterOperator: "ilike", filterValue: "kopi" },
+          { filterKey: "amount", filterOperator: "gt", filterValue: 1000 },
+        ],
+        ALLOWED_COLUMNS,
+        [],
+        2
+      );
+      expect(result).toEqual({
+        whereClause: "WHERE note LIKE $2 AND amount > $3",
+        params: ["%kopi%", 1000],
+      });
+    });
+  });
 });

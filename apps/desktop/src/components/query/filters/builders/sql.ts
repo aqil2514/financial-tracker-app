@@ -32,6 +32,11 @@ export interface ExtraCondition {
  * ($1, $2, ...) yang ditulis di `extraConditions` tetap sesuai posisi
  * aslinya, tanpa perlu pemanggil menghitung offset manual.
  *
+ * `startIndex` untuk kasus hasil builder ini digabung dengan params
+ * dari builder/klausa lain dalam query yang sama (mis. WHERE dan HAVING
+ * terpisah) — isi dengan `params.length + 1` dari builder sebelumnya
+ * supaya nomor placeholder tidak bentrok.
+ *
  * Operator yang belum dikenali builder ini (mis. saat tipe field baru
  * ditambah tapi builder belum diperbarui) sengaja melempar error di
  * `default`, bukan diam-diam diabaikan.
@@ -39,7 +44,8 @@ export interface ExtraCondition {
 export function buildWhereClause(
   filters: FilterConfig[],
   allowedColumns: readonly string[],
-  extraConditions: ExtraCondition[] = []
+  extraConditions: ExtraCondition[] = [],
+  startIndex = 1
 ): WhereClauseResult {
   const conditions: string[] = [];
   const params: (string | number)[] = [];
@@ -50,7 +56,7 @@ export function buildWhereClause(
   }
 
   function nextIndex() {
-    return params.length + 1;
+    return startIndex + params.length;
   }
 
   for (const filter of filters) {

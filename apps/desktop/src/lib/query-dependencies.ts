@@ -8,6 +8,7 @@ import { currentMonthSummaryQueryKey } from "@/features/dashboard/use-current-mo
 import { monthlySummaryQueryKey } from "@/features/reports/use-monthly-summary";
 import { categoryBreakdownQueryKey } from "@/features/reports/use-category-breakdown";
 import { accountBalancesQueryKey } from "@/features/reports/use-account-balances";
+import { accountGroupBalancesQueryKey } from "@/features/accounts/use-account-group-balances";
 import { transactionDaysQueryKey } from "@/features/transactions/calendar/use-transaction-days";
 import { monthSummaryQueryKey } from "@/features/transactions/calendar/use-month-summary";
 
@@ -29,11 +30,12 @@ export const QUERY_DEPENDENCIES = {
     monthlySummaryQueryKey,
     categoryBreakdownQueryKey,
     accountBalancesQueryKey,
+    accountGroupBalancesQueryKey,
     transactionDaysQueryKey,
     monthSummaryQueryKey,
   ],
-  accounts: [accountsQueryKey, accountBalancesQueryKey],
-  accountGroups: [accountGroupsQueryKey],
+  accounts: [accountsQueryKey, accountBalancesQueryKey, accountGroupBalancesQueryKey],
+  accountGroups: [accountGroupsQueryKey, accountGroupBalancesQueryKey],
   categories: [categoriesQueryKey],
 } satisfies Record<string, QueryKey[]>;
 
