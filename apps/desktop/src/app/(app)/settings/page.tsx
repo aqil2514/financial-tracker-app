@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { AccountGroupList, AccountGroupFormDialog } from "@/features/account-groups";
+import { CategoryList, CategoryFormDialog } from "@/features/categories";
 import { ImportMoneyManagerDialog } from "@/features/data-import";
 
 export default function SettingsPage() {
@@ -24,6 +25,18 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <AccountGroupList />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Kategori Transaksi</CardTitle>
+          <CardAction>
+            <CategoryFormDialog />
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <CategoryList />
         </CardContent>
       </Card>
 
