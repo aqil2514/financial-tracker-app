@@ -9,8 +9,15 @@ import {
   Settings,
   Wallet,
   Landmark,
+  HandCoins,
+  ChevronRight,
 } from "lucide-react";
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +29,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 
 const navItems = [
@@ -29,11 +39,21 @@ const navItems = [
   { title: "Transaksi", url: "/transactions", icon: ArrowLeftRight },
   { title: "Akun", url: "/accounts", icon: Landmark },
   { title: "Laporan", url: "/reports", icon: PieChart },
-  { title: "Settings", url: "/settings", icon: Settings },
 ];
+
+const debtsNavItem = {
+  title: "Utang Piutang",
+  icon: HandCoins,
+  items: [
+    { title: "Ringkasan Kontak", url: "/debts" },
+    { title: "Piutang", url: "/debts/receivables" },
+    { title: "Utang", url: "/debts/payables" },
+  ],
+};
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const isDebtsGroupActive = debtsNavItem.items.some((item) => item.url === pathname);
 
   return (
     <Sidebar collapsible="icon">
@@ -66,6 +86,48 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              <Collapsible defaultOpen={isDebtsGroupActive} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger
+                    render={
+                      <SidebarMenuButton
+                        isActive={isDebtsGroupActive}
+                        tooltip={debtsNavItem.title}
+                      />
+                    }
+                  >
+                    <debtsNavItem.icon />
+                    <span>{debtsNavItem.title}</span>
+                    <ChevronRight className="ml-auto transition-transform group-data-panel-open/collapsible:rotate-90" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {debtsNavItem.items.map((item) => (
+                        <SidebarMenuSubItem key={item.url}>
+                          <SidebarMenuSubButton
+                            render={<Link href={item.url} />}
+                            isActive={pathname === item.url}
+                          >
+                            <span>{item.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={<Link href="/settings" />}
+                  isActive={pathname === "/settings"}
+                  tooltip="Settings"
+                >
+                  <Settings />
+                  <span>Settings</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
