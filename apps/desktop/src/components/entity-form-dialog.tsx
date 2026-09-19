@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dialog";
 
 interface EntityFormDialogProps {
-  trigger: ReactElement;
+  /** Opsional — kosongkan kalau dialog dipicu dari luar (mis. item menu
+   * aksi) lewat `open`/`onOpenChange` saja, tanpa trigger visible sendiri. */
+  trigger?: ReactElement;
   title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,7 +31,7 @@ export function EntityFormDialog({
 }: EntityFormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger render={trigger} />
+      {trigger && <DialogTrigger render={trigger} />}
       <DialogContent className={contentClassName}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

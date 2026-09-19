@@ -7,10 +7,10 @@ import type { SelectOptionsMap } from "@/components/query/filters/panel/panel.in
 import type { SortConfig } from "@/components/query/sort";
 import { useAccounts, type AccountWithBalance } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
-import type { Category, Transaction } from "@/lib/db";
+import type { Category } from "@/lib/db";
 import type { Pagination } from "@/lib/pagination";
 import { useTransactionsPage } from "../page/transactions-page-context";
-import { useTransactions } from "./use-transactions";
+import { useTransactions, type TransactionListRow } from "./use-transactions";
 import { useDeleteTransaction } from "./use-delete-transaction";
 
 const STATIC_FILTER_SELECT_OPTIONS: SelectOptionsMap = {
@@ -26,7 +26,7 @@ const STATIC_FILTER_SELECT_OPTIONS: SelectOptionsMap = {
 };
 
 interface ListContextType {
-  transactions: Transaction[] | undefined;
+  transactions: TransactionListRow[] | undefined;
   pagination: Pagination | undefined;
   isLoading: boolean;
   error: Error | null;

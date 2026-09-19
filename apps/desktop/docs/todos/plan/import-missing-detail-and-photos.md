@@ -262,37 +262,118 @@ transaksi tujuannya.
    langsung, sehingga `isInside()` selalu `false`. Diperbaiki dengan
    membagi `window.devicePixelRatio` pada koordinat sebelum dibandingkan.
 
-**Belum dikerjakan** (lanjutan, disengaja ditunda per keputusan terakhir):
-- Alur import dari Money Manager untuk memindahkan foto lama (folder
-  `Pictures/MoneyManager/` di device + tabel `PHOTO` di `.mmbak`) ke
-  tabel `transaction_attachments` yang baru ini.
-- Tampilan foto di tempat LAIN (list transaksi, dsb.) masih menunggu
-  pembahasan perombakan action card transaksi — saat ini foto hanya
-  terlihat di form tambah/edit.
+## Status implementasi (kolom `description`/ZDATA)
 
-## Kemungkinan arah perbaikan (belum diputuskan, untuk ZDATA/deskripsi)
+**Keputusan yang sudah diambil**: kolom baru `description` (bukan gabung
+ke `note`) — mempertahankan pemisahan semantik Money Manager
+(`ZCONTENT` = judul singkat → `note`, `ZDATA` = detail → `description`).
+`note` tetap plain text, HANYA `description` yang jadi rich text.
+Rich text pakai Tiptap, mulai dari core saja (`StarterKit` — bold,
+italic, strikethrough, heading, list, blockquote — tanpa ekstensi lanjutan
+seperti table/image/mention). Data transaksi LAMA (7704 baris hasil
+import sebelumnya) TIDAK di-re-import — kolom baru ini kosong (`NULL`)
+untuk semuanya, hanya transaksi baru ke depannya yang bisa mengisinya
+lewat form. Alur re-import `ZDATA` dari `.mmbak` untuk data lama BELUM
+dikerjakan (lihat "Belum dikerjakan" di bawah).
 
-**Untuk `ZDATA`**:
-- Gabung ke `note` saat import, mis. format `"{ZCONTENT}: {ZDATA}"` atau
-  `"{ZCONTENT}\n{ZDATA}"` — paling sederhana, tidak perlu ubah skema, tapi
-  kehilangan pemisahan semantik judul vs detail.
-- Tambah kolom baru `description` (atau nama lain) di `transactions`,
-  terpisah dari `note` — mempertahankan struktur asli Money Manager, tapi
-  perlu migrasi skema dan keputusan UI (field baru di form transaksi).
+**Sudah dikerjakan dan diverifikasi**:
+- Migration `0011_transaction_description.sql` — `ALTER TABLE
+  transactions ADD COLUMN description TEXT` (nullable). Jauh lebih
+  sederhana dari migrasi 0009 (bukan copy-and-rename), tapi tetap
+  diverifikasi dengan replikasi transaksi sqlx yang benar (`BEGIN`/
+  `COMMIT` + `PRAGMA foreign_keys = ON`) mengikuti pelajaran dari bug
+  0009 — aman, tidak ada DROP TABLE yang bisa memicu FK cascade.
+- Package baru: `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`
+  (core Tiptap), `@tailwindcss/typography` (untuk styling `prose` pada
+  konten rich text) — didaftarkan lewat `@plugin "@tailwindcss/typography"`
+  di `globals.css` (Tailwind v4, CSS-based config).
+- `src/components/rich-text/`: `rich-text-editor.tsx` (`RichTextEditor`,
+  editor dengan toolbar bold/italic/strikethrough/bullet-list/
+  ordered-list/blockquote), `rich-text-viewer.tsx` (`RichTextViewer`,
+  render read-only — disiapkan untuk dipakai di tempat lain nanti,
+  belum dipasang ke mana pun karena tampilan detail transaksi masih
+  menunggu perombakan action card), `is-empty-doc.ts` (`isEmptyDoc` —
+  deteksi dokumen Tiptap "kosong" secara struktural, bukan cuma
+  truthy-check, supaya tidak menyimpan `{"type":"doc","content":
+  [{"type":"paragraph"}]}` sebagai "terisi").
+- `src/components/form-fields/form-field-rich-text.tsx`
+  (`FormFieldRichText`) — wrapper react-hook-form, pola sama seperti
+  `FormFieldTextarea`/dkk lain.
+- Disimpan sebagai `JSON.stringify` dokumen Tiptap di kolom
+  `description` (`TEXT`), dibaca balik lewat `JSON.parse` saat form edit
+  dibuka. `isEmptyDoc` dicek sebelum simpan — dokumen kosong disimpan
+  sebagai `NULL`, bukan JSON kosong.
+- Terpasang di `TransactionForm` (create & edit), field "Deskripsi" di
+  kolom kanan grid (lihat "Layout form transaksi" di bawah).
 
-**Untuk foto**: skema dan command penyimpanan file sudah dieksekusi —
-lihat "Status implementasi (foto/lampiran)" di atas. Alur import dari
-`Pictures/MoneyManager/` + tabel `PHOTO` masih seperti dijelaskan di
-Temuan 2 (folder foto perlu ditransfer manual ke PC dulu, fitur "Ekspor
-File Foto" bawaan Money Manager tidak bisa diandalkan) dan belum
-dikerjakan — proses import nanti: baca tabel `PHOTO` dari `.mmbak` →
-dapat `uid`/`FILE_NAME` per transaksi (`txUid`) → cari file dengan nama
-itu di folder yang dipilih user → panggil `save_attachment_from_path` →
-simpan referensinya di `transaction_attachments`.
+**Belum dikerjakan**:
+- Alur import `ZDATA` dari `.mmbak` untuk transaksi LAMA yang sudah
+  ter-import — 262 dari 7704 baris sumber (`INOUTCOME`) punya `ZDATA`
+  terisi, semuanya masih hilang di aplikasi ini kecuali di-re-import.
+- `RichTextViewer` belum dipasang ke tempat manapun untuk display
+  (list transaksi, dll) — menunggu keputusan perombakan action card
+  transaksi.
 
-`ZDATA`/deskripsi BUTUH keputusan skema (kolom baru) sebelum
-diimplementasikan — beda dengan `import-category-dedup.md` yang bisa
-diperbaiki di level query import tanpa ubah skema.
+## Layout form transaksi (perombakan setelah lampiran + deskripsi ditambahkan)
+
+Dialog Tambah/Edit Transaksi dirombak jadi grid 2 kolom (lebih lebar,
+`sm:!max-w-4xl` — `!important` diperlukan karena default `DialogContent`
+punya `sm:max-w-sm` yang bersaing pada breakpoint sama, lihat catatan di
+bawah) supaya semua field baru (Deskripsi, Lampiran Foto) tidak membuat
+dialog jadi sangat panjang ke bawah:
+- **Kolom kiri**: Catatan (dipindah ke PALING ATAS, bertindak sebagai
+  judul/title transaksi — sekarang `FormFieldText` input satu baris, BUKAN
+  textarea, dan WAJIB diisi: `z.string().min(1, "Catatan wajib diisi")`,
+  berubah dari opsional sebelumnya) → Tipe Transaksi → Nominal → Akun →
+  Kategori/Ke Akun → Tanggal.
+- **Kolom kanan**: Lampiran Foto (dibungkus `ScrollArea` dengan
+  `max-h-48` supaya tidak memakan ruang vertikal berlebih walau foto
+  banyak) di atas, Deskripsi (rich text) di bawahnya.
+- `EntityFormDialog` (dipakai bersama semua entitas — akun, kategori,
+  dst) diberi prop opsional baru `contentClassName` supaya dialog
+  transaksi bisa lebih lebar dari default `sm:max-w-sm` TANPA mengubah
+  lebar dialog entitas lain.
+- **Catatan teknis (Tailwind v4 class override)**: `contentClassName`
+  awalnya di-set `sm:max-w-3xl` tapi TIDAK berpengaruh sama sekali —
+  root cause: Tailwind v4 meng-generate CSS berdasar urutan pertama
+  kemunculan tiap class di seluruh source yang di-scan (bukan urutan di
+  `className` string), dan kebetulan `sm:max-w-sm` (default
+  `DialogContent`) muncul di CSS output SETELAH `sm:max-w-3xl`/`4xl` —
+  keduanya sama-sama di breakpoint `sm:` dengan specificity identik,
+  jadi yang terakhir di stylesheet yang menang, terlepas dari `cn()`/
+  `tailwind-merge` sudah benar menghapus `sm:max-w-sm` dari string
+  className (dikonfirmasi lewat test langsung). Diperbaiki dengan `!`
+  modifier (`sm:!max-w-4xl`) untuk memaksa menang secara pasti.
+
+## Filter transaksi baru (Deskripsi, Gambar)
+
+Ditambahkan ke filter generik halaman Transaksi
+(`list-card-header.tsx`/`use-transactions.ts`):
+- **Deskripsi** (`type: "text"`): `LIKE` langsung terhadap kolom
+  `description` (TEXT berisi JSON Tiptap) — tetap match karena teks isi
+  tersimpan sebagai string biasa di dalam struktur JSON, meski secara
+  teori bisa false-positive kalau kata kunci kebetulan cocok bagian
+  struktur JSON (risiko sangat kecil untuk kata biasa).
+- **Gambar** (`type: "select"`, key `has_attachment`, opsi "Ada
+  gambar"/"Tidak ada gambar"): BUKAN kolom asli `transactions` (lampiran
+  ada di tabel terpisah `transaction_attachments`), jadi tidak bisa
+  lewat `buildWhereClause` generik yang mengasumsikan `filterKey` = nama
+  kolom. Disaring lebih dulu di `use-transactions.ts`
+  (`extractAttachmentCondition`) dan diterjemahkan jadi kondisi
+  `EXISTS`/`NOT EXISTS (SELECT 1 FROM transaction_attachments WHERE
+  transaction_attachments.transaction_id = transactions.id)` lewat
+  mekanisme `extraConditions` yang sudah ada di `buildWhereClause`
+  (sebelumnya cuma dipakai untuk filter tanggal kalender). Diverifikasi
+  manual lewat `sqlite3`: jumlah baris "ada gambar" + "tidak ada gambar"
+  cocok dengan total transaksi.
+- Sempat diminta filter Gambar dibuat single-select (bukan multi-select
+  seperti filter select lain), tapi diputuskan REVERT ke perilaku
+  default (`FilterSelectInput` multi-select, konsisten dengan pola
+  `is_active` di filter akun) karena tidak ada mekanisme single-select
+  di komponen filter generik saat ini dan menambahkannya dianggap tidak
+  sepadan untuk kasus ini — memilih dua opsi (Ada + Tidak ada) sekaligus
+  secara efektif berarti tidak memfilter apa-apa, jadi tidak berbahaya
+  dibiarkan sebagai multi-select.
 
 ## Catatan
 

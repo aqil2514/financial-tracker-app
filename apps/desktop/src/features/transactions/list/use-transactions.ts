@@ -26,6 +26,12 @@ const FILTERABLE_COLUMNS = [
 const HAS_ATTACHMENT_SUBQUERY =
   "EXISTS (SELECT 1 FROM transaction_attachments WHERE transaction_attachments.transaction_id = transactions.id)";
 
+/** Transaction hasil query list — punya `has_attachment` tambahan (dari
+ * subquery EXISTS) supaya card list bisa menampilkan indikator lampiran
+ * tanpa query terpisah per-item (hindari N+1). SQLite mengembalikan hasil
+ * EXISTS sebagai 0/1, bukan boolean. */
+export type TransactionListRow = Transaction & { has_attachment: number };
+
 /**
  * `has_attachment` bukan kolom asli `transactions` (lampiran ada di tabel
  * terpisah `transaction_attachments`), jadi tidak bisa lewat
@@ -93,8 +99,9 @@ export function useTransactions(
       );
 
       const [rows, countResult] = await Promise.all([
-        db.select<Transaction[]>(
-          `SELECT * FROM transactions ${whereClause} ${orderClause} ${limitOffsetClause}`,
+        db.select<TransactionListRow[]>(
+          `SELECT transactions.*, ${HAS_ATTACHMENT_SUBQUERY} as has_attachment
+           FROM transactions ${whereClause} ${orderClause} ${limitOffsetClause}`,
           [...params, ...limitOffsetParams]
         ),
         db.select<{ total: number }[]>(
