@@ -8,7 +8,7 @@ import { currentMonthSummaryQueryKey } from "@/features/dashboard/current-month-
 import { monthlySummaryQueryKey } from "@/features/reports/use-monthly-summary";
 import { categoryBreakdownQueryKey } from "@/features/reports/use-category-breakdown";
 import { accountBalancesQueryKey } from "@/features/reports/use-account-balances";
-import { accountGroupBalancesQueryKey } from "@/features/accounts/balance-pie-chart/use-account-group-balances";
+import { accountGroupBalancesQueryKey } from "@/features/accounts/sections/balance-pie-chart/use-account-group-balances";
 import { transactionDaysQueryKey } from "@/features/transactions/calendar/use-transaction-days";
 import { monthSummaryQueryKey } from "@/features/transactions/calendar/use-month-summary";
 

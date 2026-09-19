@@ -4,12 +4,12 @@ export {
   accountsQueryKey,
   useDeleteAccount,
   type AccountWithBalance,
-} from "./list";
+} from "./sections/list";
 export {
-  AccountFormDialog,
   useCreateAccount,
   accountSchema,
   type AccountFormValues,
   type AccountFormOutput,
 } from "./form";
-export { AccountBalancePieChart } from "./balance-pie-chart";
+export { AccountFormDialog } from "./dialogs";
+export { AccountBalancePieChart } from "./sections/balance-pie-chart";

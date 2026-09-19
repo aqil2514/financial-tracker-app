@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/format-currency";
-import type { AccountWithBalance } from "./calculate-balance";
+import type { AccountWithBalance } from "../../sections/list/calculate-balance";
 
 /** Tampilan read-only ringkasan akun — saldo awal, saldo berjalan, grup,
  * dan status, tanpa harus buka form Edit hanya untuk melihat. */

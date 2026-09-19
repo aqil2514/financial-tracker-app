@@ -6,10 +6,12 @@ import { AccountWithBalance } from "../calculate-balance";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format-currency";
 import { ListItemActionsMenu } from "@/components/list-item-actions-menu";
-import { AccountEditDialog } from "../../form";
-import { AccountDetailDialog } from "../account-detail-dialog";
-import { AccountBalanceCorrectionDialog } from "../account-balance-correction-dialog";
-import { DeleteAccountDialog } from "../delete-account-dialog";
+import {
+  AccountEditDialog,
+  AccountDetailDialog,
+  AccountBalanceCorrectionDialog,
+  DeleteAccountDialog,
+} from "../../../dialogs";
 
 export function AccountListContentItem() {
   const { accounts } = useAccountsList();

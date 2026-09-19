@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { EntityFormDialog } from "@/components/entity-form-dialog";
 import { KeyboardShortcutBadge } from "@/components/keyboard-shortcut-badge";
 import { useCreateShortcut } from "@/hooks/use-create-shortcut";
-import { AccountForm } from "./account-form";
-import { useCreateAccount } from "./use-create-account";
+import { AccountForm } from "../../form/account-form";
+import { useCreateAccount } from "../../form/use-create-account";
 
 export function AccountFormDialog() {
   const { open, setOpen, form, onSubmit, isPending } = useCreateAccount();
