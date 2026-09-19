@@ -8,9 +8,10 @@ import {
   PieChart,
   Settings,
   Wallet,
-  Landmark,
   HandCoins,
+  Database,
   ChevronRight,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -37,23 +38,37 @@ import {
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Transaksi", url: "/transactions", icon: ArrowLeftRight },
-  { title: "Akun", url: "/accounts", icon: Landmark },
   { title: "Laporan", url: "/reports", icon: PieChart },
 ];
 
-const debtsNavItem = {
-  title: "Utang Piutang",
-  icon: HandCoins,
-  items: [
-    { title: "Ringkasan Kontak", url: "/debts" },
-    { title: "Piutang", url: "/debts/receivables" },
-    { title: "Utang", url: "/debts/payables" },
-  ],
-};
+const collapsibleNavItems: {
+  title: string;
+  icon: LucideIcon;
+  items: { title: string; url: string }[];
+}[] = [
+  {
+    title: "Utang Piutang",
+    icon: HandCoins,
+    items: [
+      { title: "Ringkasan Kontak", url: "/debts" },
+      { title: "Piutang", url: "/debts/receivables" },
+      { title: "Utang", url: "/debts/payables" },
+    ],
+  },
+  {
+    title: "Master Data",
+    icon: Database,
+    items: [
+      { title: "Akun", url: "/master-data/accounts" },
+      { title: "Grup Akun", url: "/master-data/account-groups" },
+      { title: "Kategori", url: "/master-data/categories" },
+      { title: "Nama Pihak", url: "/master-data/contacts" },
+    ],
+  },
+];
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const isDebtsGroupActive = debtsNavItem.items.some((item) => item.url === pathname);
 
   return (
     <Sidebar collapsible="icon">
@@ -87,36 +102,42 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
 
-              <Collapsible defaultOpen={isDebtsGroupActive} className="group/collapsible">
-                <SidebarMenuItem>
-                  <CollapsibleTrigger
-                    render={
-                      <SidebarMenuButton
-                        isActive={isDebtsGroupActive}
-                        tooltip={debtsNavItem.title}
-                      />
-                    }
+              {collapsibleNavItems.map((group) => {
+                const isGroupActive = group.items.some((item) => item.url === pathname);
+                return (
+                  <Collapsible
+                    key={group.title}
+                    defaultOpen={isGroupActive}
+                    className="group/collapsible"
                   >
-                    <debtsNavItem.icon />
-                    <span>{debtsNavItem.title}</span>
-                    <ChevronRight className="ml-auto transition-transform group-data-panel-open/collapsible:rotate-90" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      {debtsNavItem.items.map((item) => (
-                        <SidebarMenuSubItem key={item.url}>
-                          <SidebarMenuSubButton
-                            render={<Link href={item.url} />}
-                            isActive={pathname === item.url}
-                          >
-                            <span>{item.title}</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton isActive={isGroupActive} tooltip={group.title} />
+                        }
+                      >
+                        <group.icon />
+                        <span>{group.title}</span>
+                        <ChevronRight className="ml-auto transition-transform group-data-panel-open/collapsible:rotate-90" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {group.items.map((item) => (
+                            <SidebarMenuSubItem key={item.url}>
+                              <SidebarMenuSubButton
+                                render={<Link href={item.url} />}
+                                isActive={pathname === item.url}
+                              >
+                                <span>{item.title}</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                );
+              })}
 
               <SidebarMenuItem>
                 <SidebarMenuButton

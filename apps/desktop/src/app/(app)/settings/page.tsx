@@ -2,13 +2,10 @@ import { PageContainer } from "@/components/page-container";
 import { PageHeader } from "@/components/page-header";
 import {
   Card,
-  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { AccountGroupList, AccountGroupFormDialog } from "@/features/account-groups";
-import { CategoryList, CategoryFormDialog } from "@/features/categories";
 import { ImportMoneyManagerDialog } from "@/features/data-import";
 import { AttachmentFolderSetting } from "@/shared/attachments";
 
@@ -16,30 +13,6 @@ export default function SettingsPage() {
   return (
     <PageContainer>
       <PageHeader title="Settings" description="Pengaturan aplikasi dan data Anda" />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Group Akun</CardTitle>
-          <CardAction>
-            <AccountGroupFormDialog />
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <AccountGroupList />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Kategori Transaksi</CardTitle>
-          <CardAction>
-            <CategoryFormDialog />
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <CategoryList />
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
