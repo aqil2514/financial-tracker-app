@@ -9,10 +9,12 @@ import { useList } from "./list-context";
 
 const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "note", label: "Catatan", type: "text" },
+  { key: "description", label: "Deskripsi", type: "text" },
   { key: "type", label: "Tipe Transaksi", type: "select" },
   { key: "category_id", label: "Kategori", type: "combobox" },
   { key: "account_id", label: "Akun", type: "combobox" },
   { key: "amount", label: "Jumlah", type: "number" },
+  { key: "has_attachment", label: "Gambar", type: "select" },
 ];
 
 // Harus sinkron dengan SORTABLE_COLUMNS di use-transactions.ts.

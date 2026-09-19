@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import {
   Dialog,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 
 interface EntityFormDialogProps {
-  trigger: ReactNode;
+  trigger: ReactElement;
   title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
