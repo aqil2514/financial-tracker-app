@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getDb, type Account } from "@/lib/db";
-import type { AccountWithBalance } from "@/features/accounts/sections/list/calculate-balance";
+import type { AccountWithBalance } from "@/features/accounts/calculate-balance";
 
 export const accountsQueryKey = ["accounts-with-balance"];
 

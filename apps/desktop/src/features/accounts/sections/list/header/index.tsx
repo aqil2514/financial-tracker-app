@@ -7,11 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SortDropdown } from "@/components/query/sort";
 import type { SortKeyOption } from "@/components/query/sort";
-import { useAccountsList } from "../accounts-context";
+import { useAccountsList } from "../context";
 
 // Harus sinkron dengan FILTERABLE_COLUMNS/BALANCE_FILTER_COLUMN di use-accounts-paginated.ts.
 // is_active TIDAK dimasukkan di sini — dikontrol lewat switch "Tampilkan nonaktif"
-// terpisah, lalu digabung ke FilterConfig[] di accounts-context.tsx.
+// terpisah, lalu digabung ke FilterConfig[] di context/index.tsx.
 const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "name", label: "Nama Akun", type: "text" },
   { key: "group_id", label: "Grup Akun", type: "combobox" },

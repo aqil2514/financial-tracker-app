@@ -2,9 +2,8 @@ export {
   AccountList,
   useAccounts,
   accountsQueryKey,
-  useDeleteAccount,
-  type AccountWithBalance,
 } from "./sections/list";
+export type { AccountWithBalance } from "./calculate-balance";
 export {
   useCreateAccount,
   accountSchema,

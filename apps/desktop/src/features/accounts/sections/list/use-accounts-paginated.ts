@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getDb, type Account } from "@/lib/db";
-import type { AccountWithBalance } from "./calculate-balance";
+import type { AccountWithBalance } from "../../calculate-balance";
 import { buildWhereClause } from "@/components/query/filters/builders/sql";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import { buildOrderClause } from "@/components/query/sort/builders/sql";

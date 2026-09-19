@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import type { AccountWithBalance } from "../../sections/list/calculate-balance";
-import { useCorrectAccountBalance } from "../../sections/list/use-correct-account-balance";
+import type { AccountWithBalance } from "../../calculate-balance";
+import { useCorrectAccountBalance } from "./use-correct-account-balance";
 import {
   accountBalanceCorrectionSchema,
   type AccountBalanceCorrectionFormOutput,

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { EntityFormDialog } from "@/components/entity-form-dialog";
 import { FormFieldCurrency } from "@/components/form-fields";
-import type { AccountWithBalance } from "../../sections/list/calculate-balance";
+import type { AccountWithBalance } from "../../calculate-balance";
 import { useBalanceCorrectionForm } from "./use-balance-correction-form";
 
 /** Koreksi saldo akun dengan membuat 1 transaksi penyesuaian otomatis

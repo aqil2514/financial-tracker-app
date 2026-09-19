@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Account } from "@/lib/db";
 import { getDb } from "@/lib/db";
 import { useAccounts } from "@/hooks/resources/use-accounts";
-import { useDeleteAccount } from "../../sections/list/use-delete-account";
+import { useDeleteAccount } from "./use-delete-account";
 
 type RelationAction = "unassign" | "reassign";
 

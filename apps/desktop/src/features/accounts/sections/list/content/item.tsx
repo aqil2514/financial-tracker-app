@@ -1,17 +1,11 @@
-import React, { useState } from "react";
+import React from "react";
 import { Eye, Pencil, ScaleIcon, Trash2 } from "lucide-react";
 
-import { useAccountsList } from "../accounts-context";
-import { AccountWithBalance } from "../calculate-balance";
+import { useAccountsList } from "../context";
+import { AccountWithBalance } from "../../../calculate-balance";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format-currency";
 import { ListItemActionsMenu } from "@/components/list-item-actions-menu";
-import {
-  AccountEditDialog,
-  AccountDetailDialog,
-  AccountBalanceCorrectionDialog,
-  DeleteAccountDialog,
-} from "../../../dialogs";
 
 export function AccountListContentItem() {
   const { accounts } = useAccountsList();
@@ -37,10 +31,7 @@ const WithAccounts: React.FC<{ accounts: AccountWithBalance[] }> = ({
 };
 
 const AccountListItem = ({ account }: { account: AccountWithBalance }) => {
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [correctionOpen, setCorrectionOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const { openDialog } = useAccountsList();
 
   return (
     <div className="flex items-center justify-between rounded-lg border p-4">
@@ -61,25 +52,17 @@ const AccountListItem = ({ account }: { account: AccountWithBalance }) => {
       </div>
       <ListItemActionsMenu
         actions={[
-          { label: "Lihat Detail", icon: Eye, onClick: () => setDetailOpen(true) },
-          { label: "Koreksi Saldo", icon: ScaleIcon, onClick: () => setCorrectionOpen(true) },
-          { label: "Edit", icon: Pencil, onClick: () => setEditOpen(true) },
+          { label: "Lihat Detail", icon: Eye, onClick: () => openDialog(account, "detail") },
+          { label: "Koreksi Saldo", icon: ScaleIcon, onClick: () => openDialog(account, "correction") },
+          { label: "Edit", icon: Pencil, onClick: () => openDialog(account, "edit") },
           {
             label: "Hapus",
             icon: Trash2,
             variant: "destructive",
-            onClick: () => setDeleteOpen(true),
+            onClick: () => openDialog(account, "delete"),
           },
         ]}
       />
-      <AccountDetailDialog account={account} open={detailOpen} onOpenChange={setDetailOpen} />
-      <AccountBalanceCorrectionDialog
-        account={account}
-        open={correctionOpen}
-        onOpenChange={setCorrectionOpen}
-      />
-      <AccountEditDialog account={account} open={editOpen} onOpenChange={setEditOpen} />
-      <DeleteAccountDialog account={account} open={deleteOpen} onOpenChange={setDeleteOpen} />
     </div>
   );
 };

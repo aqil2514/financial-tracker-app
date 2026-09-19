@@ -1,7 +1,7 @@
 import { QueryState } from "@/components/query-state";
 import { CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAccountsList } from "../accounts-context";
+import { useAccountsList } from "../context";
 import { AccountListContentItem } from "./item";
 
 export function AccountListContent() {

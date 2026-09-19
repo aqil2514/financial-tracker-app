@@ -6,27 +6,11 @@ import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SelectOptionsMap } from "@/components/query/filters/panel/panel.interface";
 import type { SortConfig } from "@/components/query/sort";
 import { useAccountGroups } from "@/hooks/resources/use-account-groups";
-import type { Pagination } from "@/lib/pagination";
-import { useAccountsPaginated } from "./use-accounts-paginated";
-import type { AccountWithBalance } from "./calculate-balance";
+import type { AccountWithBalance } from "../../../calculate-balance";
+import { useAccountsPaginated } from "../use-accounts-paginated";
+import type { AccountDialogType, AccountsContextType } from "./types";
 
-interface AccountsContextType {
-  accounts: AccountWithBalance[] | undefined;
-  pagination: Pagination | undefined;
-  isLoading: boolean;
-  error: Error | null;
-  page: number;
-  setPage: (page: number) => void;
-  limit: number;
-  setLimit: (limit: number) => void;
-  filters: FilterConfig[];
-  setFilters: (filters: FilterConfig[]) => void;
-  filterSelectOptions: SelectOptionsMap;
-  sorts: SortConfig[];
-  setSorts: (sorts: SortConfig[]) => void;
-  showInactive: boolean;
-  setShowInactive: (showInactive: boolean) => void;
-}
+export type { AccountDialogType } from "./types";
 
 const AccountsContext = createContext<AccountsContextType | undefined>(undefined);
 
@@ -36,6 +20,17 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
   const [filters, setFilters] = useState<FilterConfig[]>([]);
   const [sorts, setSorts] = useState<SortConfig[]>([]);
   const [showInactive, setShowInactive] = useState(false);
+  const [activeAccount, setActiveAccount] = useState<AccountWithBalance | null>(null);
+  const [activeDialog, setActiveDialog] = useState<AccountDialogType | null>(null);
+
+  function openDialog(account: AccountWithBalance, dialog: AccountDialogType) {
+    setActiveAccount(account);
+    setActiveDialog(dialog);
+  }
+
+  function closeDialog() {
+    setActiveDialog(null);
+  }
 
   // Gabungkan filter dari FilterPanel dengan is_active dari switch
   // "Tampilkan nonaktif" — kontrak FilterConfig[] yang dikonsumsi
@@ -83,6 +78,10 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
         setSorts,
         showInactive,
         setShowInactive,
+        activeAccount,
+        activeDialog,
+        openDialog,
+        closeDialog,
       }}
     >
       {children}

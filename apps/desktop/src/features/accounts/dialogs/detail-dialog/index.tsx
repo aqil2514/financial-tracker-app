@@ -1,17 +1,23 @@
 "use client";
 
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/format-currency";
-import type { AccountWithBalance } from "../../sections/list/calculate-balance";
+import type { AccountWithBalance } from "../../calculate-balance";
+import { RecentTransactionsList } from "./recent-transactions-list";
 
-/** Tampilan read-only ringkasan akun — saldo awal, saldo berjalan, grup,
- * dan status, tanpa harus buka form Edit hanya untuk melihat. */
+/** Tampilan read-only ringkasan akun — saldo, grup, status, deskripsi,
+ * dan transaksi terbaru akun ini tanpa harus buka form Edit atau pindah
+ * ke halaman Transaksi lalu filter manual by akun. */
 export function AccountDetailDialog({
   account,
   open,
@@ -48,6 +54,25 @@ export function AccountDetailDialog({
               <p>{account.description}</p>
             </div>
           )}
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground">Transaksi Terbaru</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                nativeButton={false}
+                render={<Link href="/transactions" />}
+              >
+                Lihat semua
+              </Button>
+            </div>
+            <ScrollArea className="h-64">
+              <div className="pr-4">
+                <RecentTransactionsList accountId={account.id} />
+              </div>
+            </ScrollArea>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

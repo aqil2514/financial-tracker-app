@@ -1,7 +1,7 @@
 "use client";
 
 import { TablePagination } from "@/components/query/pagination";
-import { useAccountsList } from "../accounts-context";
+import { useAccountsList } from "../context";
 
 export function AccountsCardFooter() {
   const { pagination, setPage, setLimit } = useAccountsList();
