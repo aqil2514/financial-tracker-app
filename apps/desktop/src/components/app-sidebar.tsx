@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -70,6 +71,25 @@ const collapsibleNavItems: {
 export function AppSidebar() {
   const pathname = usePathname();
 
+  // Fully controlled (bukan defaultOpen) — pathname bisa berubah antar
+  // navigasi tanpa Collapsible ini di-remount (key-nya stabil per grup),
+  // dan base-ui menganggap perubahan defaultOpen setelah mount sebagai
+  // pola tidak valid untuk komponen uncontrolled. State dimulai `false`
+  // lalu disinkronkan ke grup yang aktif via `pathname` di effect,
+  // supaya user tetap bisa toggle manual (tidak otomatis menutup lagi)
+  // begitu grup itu sudah pernah dibuka via navigasi.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const activeGroup = collapsibleNavItems.find((group) =>
+      group.items.some((item) => item.url === pathname)
+    );
+    if (activeGroup) {
+      setOpenGroups((prev) => ({ ...prev, [activeGroup.title]: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -107,7 +127,10 @@ export function AppSidebar() {
                 return (
                   <Collapsible
                     key={group.title}
-                    defaultOpen={isGroupActive}
+                    open={openGroups[group.title] ?? false}
+                    onOpenChange={(open) =>
+                      setOpenGroups((prev) => ({ ...prev, [group.title]: open }))
+                    }
                     className="group/collapsible"
                   >
                     <SidebarMenuItem>

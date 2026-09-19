@@ -1,11 +1,26 @@
 -- Fitur utang piutang: entitas sendiri (bukan sekadar transaksi biasa),
--- lihat docs/todos/plan/debt-receivable-tracking.md. Satu tabel menangani
--- KEDUA arah (piutang & utang), dibedakan lewat kolom `type` — strukturnya
--- identik, cuma beda arah uang.
+-- lihat docs/todos/plan/debt-receivable-tracking.md. Satu tabel `debts`
+-- menangani KEDUA arah (piutang & utang), dibedakan lewat kolom `type` —
+-- strukturnya identik, cuma beda arah uang.
+
+-- Kontak sebagai entitas UMUM (bukan cuma untuk utang piutang) — nama
+-- pihak yang sama sering berulang di transaksi biasa juga (mis. "Dikasih
+-- Mama", "Wayu Nukerin"), jadi dibuat sebagai tabel mandiri, bukan kolom
+-- TEXT bebas per-debts (yang akan pecah karena variasi penulisan seperti
+-- "Mama Minjem" vs "mama balikin" di data historis).
+CREATE TABLE contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_contacts_name ON contacts(name);
+
 CREATE TABLE debts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT NOT NULL CHECK (type IN ('receivable', 'payable')),
-    contact_name TEXT NOT NULL,
+    contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
     amount REAL NOT NULL,
     account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
     transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
@@ -15,7 +30,7 @@ CREATE TABLE debts (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_debts_contact_name ON debts(contact_name);
+CREATE INDEX idx_debts_contact_id ON debts(contact_id);
 CREATE INDEX idx_debts_status ON debts(status);
 
 -- Cicilan/pelunasan sebagian, terhubung ke satu `debts` (pokok). Sisa

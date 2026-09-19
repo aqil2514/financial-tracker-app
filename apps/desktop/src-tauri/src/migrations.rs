@@ -68,5 +68,17 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0011_transaction_description.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 12,
+            description: "debts",
+            sql: include_str!("../migrations/0012_debts.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 13,
+            description: "account_type",
+            sql: include_str!("../migrations/0013_account_type.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

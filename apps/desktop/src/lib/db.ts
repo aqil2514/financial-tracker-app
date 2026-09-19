@@ -64,3 +64,12 @@ export type Transaction = {
   date: string;
   created_at: string;
 };
+
+export type Contact = {
+  id: number;
+  name: string;
+  /** JSON dokumen Tiptap terserialisasi (`JSON.stringify`), atau `null`
+   * kalau belum diisi. */
+  note: string | null;
+  created_at: string;
+};
