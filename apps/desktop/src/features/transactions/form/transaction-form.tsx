@@ -15,9 +15,9 @@ import {
 } from "@/components/form-fields";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
-import { AttachmentUploader } from "@/features/attachments/attachment-uploader";
-import { PendingAttachmentUploader } from "@/features/attachments/pending-attachment-uploader";
-import type { PendingAttachment } from "@/features/attachments/pending-attachment";
+import { AttachmentUploader } from "@/shared/attachments/attachment-uploader";
+import { PendingAttachmentUploader } from "@/shared/attachments/pending-attachment-uploader";
+import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import type {
   TransactionFormOutput,
   TransactionFormValues,

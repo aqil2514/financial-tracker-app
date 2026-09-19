@@ -1,12 +1,12 @@
-export { TotalBalanceCard } from "./total-balance-card";
-export { CurrentMonthSummaryCard } from "./current-month-summary-card";
+export { TotalBalanceCard } from "./total-balance";
+export { CurrentMonthSummaryCard } from "./current-month-summary";
 export {
   useCurrentMonthSummary,
   currentMonthSummaryQueryKey,
-} from "./use-current-month-summary";
+} from "./current-month-summary/use-current-month-summary";
 export { MiniTrendChart } from "./mini-trend-chart";
-export { RecentTransactionsCard } from "./recent-transactions-card";
+export { RecentTransactionsCard } from "./recent-transactions";
 export {
   useRecentTransactions,
   recentTransactionsQueryKey,
-} from "./use-recent-transactions";
+} from "./recent-transactions/use-recent-transactions";

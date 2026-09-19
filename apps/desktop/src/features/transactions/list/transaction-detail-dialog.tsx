@@ -10,8 +10,8 @@ import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
 import type { Transaction } from "@/lib/db";
 import { RichTextViewer } from "@/components/rich-text";
-import { AttachmentThumbnail } from "@/features/attachments/attachment-thumbnail";
-import { useTransactionAttachments } from "@/features/attachments/use-transaction-attachments";
+import { AttachmentThumbnail } from "@/shared/attachments/attachment-thumbnail";
+import { useTransactionAttachments } from "@/shared/attachments/use-transaction-attachments";
 import { useList } from "./list-context";
 
 /** Tampilan read-only ringkasan transaksi — deskripsi (rich text) dan

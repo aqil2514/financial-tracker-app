@@ -6,8 +6,8 @@ import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { isEmptyDoc } from "@/components/rich-text";
-import { saveAttachmentToTransaction } from "@/features/attachments/use-add-attachment";
-import type { PendingAttachment } from "@/features/attachments/pending-attachment";
+import { saveAttachmentToTransaction } from "@/shared/attachments/use-add-attachment";
+import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import {
   transactionSchema,
   type TransactionFormOutput,

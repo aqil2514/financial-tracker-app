@@ -10,7 +10,7 @@ import {
 import { AccountGroupList, AccountGroupFormDialog } from "@/features/account-groups";
 import { CategoryList, CategoryFormDialog } from "@/features/categories";
 import { ImportMoneyManagerDialog } from "@/features/data-import";
-import { AttachmentFolderSetting } from "@/features/attachments";
+import { AttachmentFolderSetting } from "@/shared/attachments";
 
 export default function SettingsPage() {
   return (

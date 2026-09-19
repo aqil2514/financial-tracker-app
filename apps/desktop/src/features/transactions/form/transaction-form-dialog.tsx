@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { EntityFormDialog } from "@/components/entity-form-dialog";
 import { KeyboardShortcutBadge } from "@/components/keyboard-shortcut-badge";
 import { useCreateShortcut } from "@/hooks/use-create-shortcut";
-import { useAttachmentFolder } from "@/features/attachments/use-attachment-folder";
+import { useAttachmentFolder } from "@/shared/attachments/use-attachment-folder";
 import {
   revokePendingAttachment,
   type PendingAttachment,
-} from "@/features/attachments/pending-attachment";
+} from "@/shared/attachments/pending-attachment";
 import { TransactionForm } from "./transaction-form";
 import { useCreateTransaction } from "./use-create-transaction";
 
