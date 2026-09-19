@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, Pencil } from "lucide-react";
+import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, Pencil, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
 import { useAccounts } from "@/hooks/resources/use-accounts";
@@ -12,6 +14,7 @@ import { useCategories } from "@/features/categories";
 import { RichTextViewer } from "@/components/rich-text";
 import { AttachmentThumbnail } from "@/shared/attachments/attachment-thumbnail";
 import { useTransactionAttachments } from "@/shared/attachments/use-transaction-attachments";
+import { useDeleteTransaction } from "@/features/transactions";
 import { useAccountDetail } from "../detail-context";
 import { useTransactionById } from "./use-transaction-by-id";
 
@@ -26,16 +29,28 @@ const typeConfig = {
  * pesan penuntun kalau belum ada transaksi yang dipilih. */
 export function DetailTab() {
   const router = useRouter();
-  const { selectedTransactionId, closeParentDialog } = useAccountDetail();
+  const { selectedTransactionId, closeParentDialog, setActiveTab } = useAccountDetail();
   const { data: transaction } = useTransactionById(selectedTransactionId);
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
   const { data: attachments } = useTransactionAttachments(selectedTransactionId);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const deleteTransaction = useDeleteTransaction();
 
   function handleEdit() {
     if (!selectedTransactionId) return;
     closeParentDialog();
     router.push(`/transactions?edit=${selectedTransactionId}`);
+  }
+
+  function handleDelete() {
+    if (!selectedTransactionId) return;
+    deleteTransaction.mutate(selectedTransactionId, {
+      onSuccess: () => {
+        setDeleteOpen(false);
+        setActiveTab("recent");
+      },
+    });
   }
 
   const accountName = (id: number | null) =>
@@ -65,15 +80,21 @@ export function DetailTab() {
     <div className="space-y-6 text-sm">
       {/* Kartu ringkasan: ikon, nominal besar, tipe */}
       <div className="relative flex flex-col items-center gap-2 rounded-lg border p-6 text-center">
-        <Button
-          variant="outline"
-          size="sm"
-          className="absolute top-3 right-3"
-          onClick={handleEdit}
-        >
-          <Pencil className="size-4" />
-          Edit
-        </Button>
+        <div className="absolute top-3 right-3 flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleEdit}>
+            <Pencil className="size-4" />
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="size-4" />
+            Hapus
+          </Button>
+        </div>
         <Icon className={`size-10 ${config.className}`} />
         <p className={`text-2xl font-semibold ${config.className}`}>
           {transaction.type === "expense" ? "-" : transaction.type === "income" ? "+" : ""}
@@ -117,6 +138,15 @@ export function DetailTab() {
           <RichTextViewer value={description} />
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onConfirm={handleDelete}
+        isPending={deleteTransaction.isPending}
+        title="Hapus transaksi ini?"
+        description="Tindakan ini tidak bisa dibatalkan. Saldo akun akan otomatis menyesuaikan."
+      />
     </div>
   );
 }

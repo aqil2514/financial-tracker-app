@@ -5,10 +5,10 @@ import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/format-date";
 import { formatCurrency } from "@/lib/format-currency";
-import type { Transaction } from "@/lib/db";
 import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useCategories } from "@/features/categories";
 import { useAccountDetail } from "../detail-context";
+import type { TransactionWithRunningBalance } from "./running-balance-query";
 
 const typeConfig = {
   income: { icon: ArrowUpCircle, className: "text-green-600" },
@@ -23,7 +23,7 @@ export function TransactionList({
   transactions,
   accountId,
 }: {
-  transactions: Transaction[] | undefined;
+  transactions: TransactionWithRunningBalance[] | undefined;
   accountId: number;
 }) {
   const { selectTransaction } = useAccountDetail();
@@ -75,10 +75,15 @@ export function TransactionList({
                 </p>
               </div>
             </div>
-            <p className={`font-medium ${config.className}`}>
-              {tx.type === "expense" ? "-" : tx.type === "income" ? "+" : ""}
-              {formatCurrency(tx.amount, "IDR")}
-            </p>
+            <div className="text-right">
+              <p className={`font-medium ${config.className}`}>
+                {tx.type === "expense" ? "-" : tx.type === "income" ? "+" : ""}
+                {formatCurrency(tx.amount, "IDR")}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Saldo {formatCurrency(tx.running_balance, "IDR")}
+              </p>
+            </div>
           </button>
         );
       })}
