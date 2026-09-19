@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import { PageContainer } from "@/components/page-container";
 import { PageHeader } from "@/components/page-header";
 import {
+  DeepLinkEditDialog,
   TransactionCalendarPanel,
   TransactionFormDialog,
   TransactionList,
@@ -24,6 +26,10 @@ export default function TransactionsPage() {
           <TransactionCalendarPanel />
         </div>
       </PageContainer>
+
+      <Suspense fallback={null}>
+        <DeepLinkEditDialog />
+      </Suspense>
     </TransactionsPageProvider>
   );
 }

@@ -1,23 +1,20 @@
 "use client";
 
-import Link from "next/link";
-
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatCurrency } from "@/lib/format-currency";
 import type { AccountWithBalance } from "../../calculate-balance";
-import { RecentTransactionsList } from "./recent-transactions-list";
+import { AccountDetailProvider } from "./detail-context";
+import { LeftSide } from "./left-side";
+import { RightSide } from "./right-side";
 
 /** Tampilan read-only ringkasan akun — saldo, grup, status, deskripsi,
- * dan transaksi terbaru akun ini tanpa harus buka form Edit atau pindah
- * ke halaman Transaksi lalu filter manual by akun. */
+ * dan ringkasan pemasukan/pengeluaran per bulan, tanpa harus buka form
+ * Edit hanya untuk melihat. */
 export function AccountDetailDialog({
   account,
   open,
@@ -29,7 +26,7 @@ export function AccountDetailDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-7xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {account.name}
@@ -38,42 +35,12 @@ export function AccountDetailDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Saldo Berjalan</span>
-            <span className="font-medium">{formatCurrency(account.balance, "IDR")}</span>
+        <AccountDetailProvider onCloseParentDialog={() => onOpenChange(false)}>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <LeftSide account={account} />
+            <RightSide account={account} />
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Saldo Awal</span>
-            <span>{formatCurrency(account.initial_balance, "IDR")}</span>
-          </div>
-
-          {account.description && (
-            <div className="space-y-2">
-              <p className="text-muted-foreground">Deskripsi</p>
-              <p>{account.description}</p>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground">Transaksi Terbaru</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                nativeButton={false}
-                render={<Link href="/transactions" />}
-              >
-                Lihat semua
-              </Button>
-            </div>
-            <ScrollArea className="h-64">
-              <div className="pr-4">
-                <RecentTransactionsList accountId={account.id} />
-              </div>
-            </ScrollArea>
-          </div>
-        </div>
+        </AccountDetailProvider>
       </DialogContent>
     </Dialog>
   );

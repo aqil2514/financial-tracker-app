@@ -5,9 +5,10 @@ import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/format-date";
 import { formatCurrency } from "@/lib/format-currency";
+import type { Transaction } from "@/lib/db";
 import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useCategories } from "@/features/categories";
-import { useAccountTransactions } from "./use-account-transactions";
+import { useAccountDetail } from "../detail-context";
 
 const typeConfig = {
   income: { icon: ArrowUpCircle, className: "text-green-600" },
@@ -15,11 +16,17 @@ const typeConfig = {
   transfer: { icon: ArrowLeftRight, className: "text-blue-600" },
 };
 
-/** Transaksi terbaru akun ini (sebagai account_id ATAU transfer_account_id)
- * — ringkasan cepat tanpa harus pindah ke halaman Transaksi dan filter
- * manual by akun. */
-export function RecentTransactionsList({ accountId }: { accountId: number }) {
-  const { data: transactions } = useAccountTransactions(accountId);
+/** Daftar transaksi klik-able akun ini — dipakai bersama oleh tab
+ * "Terbaru" dan "Bulan Ini" (bedanya cuma sumber datanya), klik satu
+ * transaksi memilihnya dan memindahkan tab aktif ke Detail. */
+export function TransactionList({
+  transactions,
+  accountId,
+}: {
+  transactions: Transaction[] | undefined;
+  accountId: number;
+}) {
+  const { selectTransaction } = useAccountDetail();
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
 
@@ -42,9 +49,11 @@ export function RecentTransactionsList({ accountId }: { accountId: number }) {
         const Icon = config.icon;
 
         return (
-          <div
+          <button
             key={tx.id}
-            className="flex items-center justify-between rounded-lg border p-3"
+            type="button"
+            onClick={() => selectTransaction(tx.id)}
+            className="hover:bg-muted/50 flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors"
           >
             <div className="flex items-center gap-3">
               <Icon className={`size-5 shrink-0 ${config.className}`} />
@@ -70,7 +79,7 @@ export function RecentTransactionsList({ accountId }: { accountId: number }) {
               {tx.type === "expense" ? "-" : tx.type === "income" ? "+" : ""}
               {formatCurrency(tx.amount, "IDR")}
             </p>
-          </div>
+          </button>
         );
       })}
     </div>

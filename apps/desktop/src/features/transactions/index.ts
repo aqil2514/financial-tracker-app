@@ -4,6 +4,7 @@ export {
   transactionsQueryKey,
   useDeleteTransaction,
 } from "./list";
+export { useTransactionById } from "./list/use-transaction-by-id";
 export {
   TransactionCalendarPanel,
   useTransactionDays,
@@ -21,4 +22,4 @@ export {
   type TransactionFormValues,
   type TransactionFormOutput,
 } from "./form";
-export { TransactionsPageProvider, useTransactionsPage } from "./page";
+export { TransactionsPageProvider, useTransactionsPage, DeepLinkEditDialog } from "./page";
