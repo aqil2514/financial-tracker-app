@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
 
 import type { Account } from "@/lib/db";
 import { Button } from "@/components/ui/button";
@@ -12,7 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -43,8 +41,15 @@ function useTransactionCountByAccount(accountId: number) {
   });
 }
 
-export function DeleteAccountDialog({ account }: { account: Account }) {
-  const [open, setOpen] = useState(false);
+export function DeleteAccountDialog({
+  account,
+  open,
+  onOpenChange: setOpen,
+}: {
+  account: Account;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [transactionAction, setTransactionAction] = useState<RelationAction>("unassign");
   const [targetAccountId, setTargetAccountId] = useState<string | null>(null);
 
@@ -89,9 +94,6 @@ export function DeleteAccountDialog({ account }: { account: Account }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
-        <Trash2 className="text-destructive size-4" />
-      </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Hapus akun &quot;{account.name}&quot;?</DialogTitle>

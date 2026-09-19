@@ -1,9 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
+import { Eye, Pencil, ScaleIcon, Trash2 } from "lucide-react";
+
 import { useAccountsList } from "../accounts-context";
 import { AccountWithBalance } from "../calculate-balance";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format-currency";
+import { ListItemActionsMenu } from "@/components/list-item-actions-menu";
 import { AccountEditDialog } from "../../form";
+import { AccountDetailDialog } from "../account-detail-dialog";
+import { AccountBalanceCorrectionDialog } from "../account-balance-correction-dialog";
 import { DeleteAccountDialog } from "../delete-account-dialog";
 
 export function AccountListContentItem() {
@@ -30,6 +35,11 @@ const WithAccounts: React.FC<{ accounts: AccountWithBalance[] }> = ({
 };
 
 const AccountListItem = ({ account }: { account: AccountWithBalance }) => {
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
   return (
     <div className="flex items-center justify-between rounded-lg border p-4">
       <div className="space-y-1">
@@ -47,10 +57,27 @@ const AccountListItem = ({ account }: { account: AccountWithBalance }) => {
           <p className="text-muted-foreground text-xs">{account.description}</p>
         )}
       </div>
-      <div className="flex items-center gap-1">
-        <AccountEditDialog account={account} />
-        <DeleteAccountDialog account={account} />
-      </div>
+      <ListItemActionsMenu
+        actions={[
+          { label: "Lihat Detail", icon: Eye, onClick: () => setDetailOpen(true) },
+          { label: "Koreksi Saldo", icon: ScaleIcon, onClick: () => setCorrectionOpen(true) },
+          { label: "Edit", icon: Pencil, onClick: () => setEditOpen(true) },
+          {
+            label: "Hapus",
+            icon: Trash2,
+            variant: "destructive",
+            onClick: () => setDeleteOpen(true),
+          },
+        ]}
+      />
+      <AccountDetailDialog account={account} open={detailOpen} onOpenChange={setDetailOpen} />
+      <AccountBalanceCorrectionDialog
+        account={account}
+        open={correctionOpen}
+        onOpenChange={setCorrectionOpen}
+      />
+      <AccountEditDialog account={account} open={editOpen} onOpenChange={setEditOpen} />
+      <DeleteAccountDialog account={account} open={deleteOpen} onOpenChange={setDeleteOpen} />
     </div>
   );
 };

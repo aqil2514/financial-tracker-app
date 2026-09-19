@@ -24,14 +24,9 @@ interface AccountsContextType {
   filterSelectOptions: SelectOptionsMap;
   sorts: SortConfig[];
   setSorts: (sorts: SortConfig[]) => void;
+  showInactive: boolean;
+  setShowInactive: (showInactive: boolean) => void;
 }
-
-const STATIC_FILTER_SELECT_OPTIONS: SelectOptionsMap = {
-  is_active: [
-    { value: "1", label: "Aktif" },
-    { value: "0", label: "Nonaktif" },
-  ],
-};
 
 const AccountsContext = createContext<AccountsContextType | undefined>(undefined);
 
@@ -40,17 +35,28 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
   const [limit, setLimit] = useState(20);
   const [filters, setFilters] = useState<FilterConfig[]>([]);
   const [sorts, setSorts] = useState<SortConfig[]>([]);
+  const [showInactive, setShowInactive] = useState(false);
 
-  const { data, isLoading, error } = useAccountsPaginated(page, limit, sorts, filters);
+  // Gabungkan filter dari FilterPanel dengan is_active dari switch
+  // "Tampilkan nonaktif" — kontrak FilterConfig[] yang dikonsumsi
+  // useAccountsPaginated tidak berubah, cuma sumber UI-nya dipecah dua.
+  const combinedFilters = useMemo<FilterConfig[]>(
+    () =>
+      showInactive
+        ? filters
+        : [...filters, { filterKey: "is_active", filterValue: "1", filterOperator: "eq" }],
+    [filters, showInactive]
+  );
+
+  const { data, isLoading, error } = useAccountsPaginated(page, limit, sorts, combinedFilters);
   const { data: groups } = useAccountGroups();
 
   useEffect(() => {
     setPage(1);
-  }, [filters, sorts]);
+  }, [filters, sorts, showInactive]);
 
   const filterSelectOptions = useMemo<SelectOptionsMap>(
     () => ({
-      ...STATIC_FILTER_SELECT_OPTIONS,
       group_id: (groups ?? []).map((group) => ({
         value: String(group.id),
         label: group.name,
@@ -75,6 +81,8 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
         filterSelectOptions,
         sorts,
         setSorts,
+        showInactive,
+        setShowInactive,
       }}
     >
       {children}
