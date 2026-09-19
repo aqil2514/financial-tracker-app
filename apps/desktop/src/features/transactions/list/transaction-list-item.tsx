@@ -124,7 +124,12 @@ const ItemActions = ({ tx }: { tx: TransactionListRow }) => {
           },
         ]}
       />
-      <TransactionDetailDialog transaction={tx} open={detailOpen} onOpenChange={setDetailOpen} />
+      <TransactionDetailDialog
+        transaction={tx}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onEdit={() => setEditOpen(true)}
+      />
       <TransactionEditDialog transaction={tx} open={editOpen} onOpenChange={setEditOpen} />
       <ConfirmDeleteDialog
         open={deleteOpen}

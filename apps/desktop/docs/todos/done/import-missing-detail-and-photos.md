@@ -77,6 +77,18 @@ mengandalkan fitur "Ekspor File Foto" Money Manager), lalu proses import
 mencocokkan tiap file di folder itu ke `PHOTO.FILE_NAME`/`uid` untuk tahu
 transaksi tujuannya.
 
+**Update — sumber foto asli ditemukan lewat draft Gmail otomatis Money
+Manager**: draft kosong (tanpa subjek/isi) di akun Gmail pribadi ternyata
+punya belasan lampiran foto UUID — hasil fitur backup terjadwal Money
+Manager yang mengirim ke diri sendiri via draft (bukan email terkirim).
+Lampiran itu TIDAK bisa diakses langsung lewat MCP Gmail yang dipakai di
+sini (`get_draft`/`list_drafts` tidak mengekspos field `attachments` untuk
+draft, dan mode `RAW` gagal karena kemungkinan ukuran gabungan lampiran
+kebesaran) — user mengunduh manual lalu mengarsipkannya sebagai
+`internal/MoneyManager.7z` (20 file, format nama UUID cocok dengan
+`PHOTO.FILE_NAME`). Proses pencocokan & pemasangan sudah dikerjakan (lihat
+di bawah), bukan lewat alur import formal, sama seperti pendekatan ZDATA.
+
 ## Status implementasi (foto/lampiran)
 
 **Keputusan yang sudah diambil**:
@@ -90,7 +102,8 @@ transaksi tujuannya.
 - File fisik disimpan di app data dir (`<app_data_dir>/attachments/`)
   secara default, tapi user nantinya bisa pilih folder kustom sendiri —
   disimpan sebagai key di tabel `settings` yang sudah ada di skema
-  (belum diimplementasikan di sisi frontend).
+  (frontend-nya sudah diimplementasikan, lihat "UI pengaturan folder
+  kustom" di bagian "Sudah diuji visual" di bawah).
 - Cakupan fitur diperluas: bukan cuma target hasil import Money Manager,
   tapi juga fitur baru — user bisa attach foto manual ke transaksi lewat
   tiga cara: dialog pilih file OS, drag & drop, dan paste dari clipboard.
@@ -124,7 +137,9 @@ transaksi tujuannya.
 - `cargo check` bersih tanpa warning, 66 test frontend tetap lulus (tidak
   ada perubahan sisi frontend di tahap ini).
 
-**Frontend — hooks & komponen generik** (`src/features/attachments/`):
+**Frontend — hooks & komponen generik** (`src/shared/attachments/` —
+dipindah dari `src/features/attachments/` saat perapian struktur folder
+`features/` vs `shared/`, lihat catatan folder di bawah):
 - `use-attachment-folder.ts` — baca/tulis folder kustom lewat tabel
   `settings` (key `attachment_folder`), `null`/kosong berarti pakai
   default app data dir.
@@ -262,6 +277,36 @@ transaksi tujuannya.
    langsung, sehingga `isInside()` selalu `false`. Diperbaiki dengan
    membagi `window.devicePixelRatio` pada koordinat sebelum dibandingkan.
 
+## Foto lama dari Money Manager: sudah dipasang ke 20 transaksi
+
+Sama seperti ZDATA, dikerjakan lewat script pencocokan sekali jalan
+(bukan alur import formal) setelah 20 file foto asli berhasil didapat
+dari `internal/MoneyManager.7z` (lihat "Update — sumber foto asli
+ditemukan lewat draft Gmail" di atas):
+- Pencocokan pakai `PHOTO.txUid` → `INOUTCOME` untuk dapat
+  `(tanggal, tipe, nominal, catatan)` tiap foto, lalu dicocokkan ke
+  `transactions` dengan kombinasi yang sama persis seperti pencocokan
+  ZDATA. Pasangan transfer (`DO_TYPE` 3 & 4) yang menunjuk foto dan
+  detail transaksi identik dideduplikasi dulu (satu foto untuk satu baris
+  `type = 'transfer'`), sama seperti pola dedup ZDATA.
+- Dari 29 baris `PHOTO` (tidak terhapus) di sumber, cuma 20 file yang
+  benar-benar tersedia di archive — sisanya (5 nama file unik) tidak ada
+  filenya sama sekali di `MoneyManager.7z` sehingga tidak bisa diproses.
+  Ke-20 file itu SEMUANYA berhasil dicocokkan ke satu `transaction_id`
+  unik (tidak ada yang ambigu atau tanpa match).
+- Diterapkan ke `finance.dev.db` DAN `finance.db` (prod), masing-masing
+  dibackup dulu: file fisik disalin ke folder `<app_data_dir>/attachments/`
+  bersama (satu folder dipakai dev & prod) dengan nama di-generate UUID
+  baru — pola identik dengan upload manual lewat `save_attachment_from_path`
+  — lalu baris `transaction_attachments` di-insert menunjuk ke situ.
+  Karena file fisiknya sudah tersalin sekali saat proses dev, proses ke
+  prod tinggal insert baris DB yang reuse `file_path` yang sama (tidak
+  menyalin file dua kali) — dicocokkan lewat `transaction_id` yang sama
+  persis antara dev & prod (datanya identik, historis).
+- Hasil dikonfirmasi valid: file JPEG/PNG asli (bukan corrupt), jumlah
+  baris `transaction_attachments` bertambah tepat 20 di kedua database,
+  tidak ada transaksi yang sebelumnya sudah punya lampiran jadi tertimpa.
+
 ## Status implementasi (kolom `description`/ZDATA)
 
 **Keputusan yang sudah diambil**: kolom baru `description` (bukan gabung
@@ -290,9 +335,7 @@ dikerjakan (lihat "Belum dikerjakan" di bawah).
 - `src/components/rich-text/`: `rich-text-editor.tsx` (`RichTextEditor`,
   editor dengan toolbar bold/italic/strikethrough/bullet-list/
   ordered-list/blockquote), `rich-text-viewer.tsx` (`RichTextViewer`,
-  render read-only — disiapkan untuk dipakai di tempat lain nanti,
-  belum dipasang ke mana pun karena tampilan detail transaksi masih
-  menunggu perombakan action card), `is-empty-doc.ts` (`isEmptyDoc` —
+  render read-only), `is-empty-doc.ts` (`isEmptyDoc` —
   deteksi dokumen Tiptap "kosong" secara struktural, bukan cuma
   truthy-check, supaya tidak menyimpan `{"type":"doc","content":
   [{"type":"paragraph"}]}` sebagai "terisi").
@@ -306,13 +349,52 @@ dikerjakan (lihat "Belum dikerjakan" di bawah).
 - Terpasang di `TransactionForm` (create & edit), field "Deskripsi" di
   kolom kanan grid (lihat "Layout form transaksi" di bawah).
 
-**Belum dikerjakan**:
-- Alur import `ZDATA` dari `.mmbak` untuk transaksi LAMA yang sudah
-  ter-import — 262 dari 7704 baris sumber (`INOUTCOME`) punya `ZDATA`
-  terisi, semuanya masih hilang di aplikasi ini kecuali di-re-import.
-- `RichTextViewer` belum dipasang ke tempat manapun untuk display
-  (list transaksi, dll) — menunggu keputusan perombakan action card
-  transaksi.
+**Sudah dipasang untuk display** (setelah perombakan action card jadi
+`ListItemActionsMenu` generik):
+- `TransactionDetailDialog` (`features/transactions/list/`) — dialog
+  read-only "Lihat Detail" dari menu aksi transaksi.
+- `DetailTab` (`features/accounts/dialogs/detail-dialog/right-side/`) —
+  tab Detail di dialog detail akun, untuk transaksi yang dipilih dari
+  tab Terbaru/Bulan Ini.
+
+**Sudah dikerjakan — isi manual `ZDATA` untuk transaksi lama (bukan alur
+import baru, cukup pencocokan sekali jalan)**:
+- Diputuskan TIDAK membangun alur re-import formal (pilih file `.mmbak`
+  lagi lewat UI import) — cukup script sekali pakai yang mencocokkan 262
+  baris `ZDATA` dari backup terbaru (`MMAuto[GF260918](18-09-26-045151).mmbak`)
+  ke transaksi yang SUDAH ada di `transactions`, lalu `UPDATE description`
+  langsung by `id`. Lebih murah daripada bikin alur import formal untuk
+  kasus satu kali ini.
+- Pencocokan pakai kombinasi `(tanggal, tipe, nominal, catatan)` — 262
+  baris ZDATA mentah terdiri dari 154 income/expense + 108 baris
+  transfer (54 pasang `transfer_out`/`transfer_in` Money Manager yang
+  deskripsinya identik per pasang). Karena skema aplikasi ini menyimpan
+  satu transfer sebagai SATU baris `type = 'transfer'` (bukan dua baris
+  terpisah seperti Money Manager), pasangan transfer identik dideduplikasi
+  dulu sebelum dicocokkan — jadi penyebut sebenarnya 208 unit (154 + 54),
+  bukan 262.
+- Hasil: **199 dari 208 unit (96%) berhasil dicocokkan otomatis** dan
+  langsung di-`UPDATE` ke kolom `description` — diterapkan ke
+  `finance.dev.db` DAN `finance.db` (prod), masing-masing dibackup dulu
+  sebelum diubah. Deskripsi disimpan sebagai dokumen Tiptap JSON (bukan
+  teks polos) — teks ZDATA multi-baris dipecah jadi beberapa node
+  `paragraph` terpisah, diverifikasi valid dan bisa dirender
+  `RichTextViewer` tanpa error.
+- **9 unit (63 baris ZDATA mentah kalau dihitung sebelum dedup) tidak
+  cocok otomatis**, dibiarkan kosong untuk diisi manual lewat form edit
+  transaksi:
+  - 4 pasang transfer "Jasa Tukang"/"Rak Susun"/"Alat Olahraga" yang di
+    DB ternyata tersimpan sebagai `type = 'expense'` dengan
+    `transfer_account_id` ikut terisi (bukan `type = 'transfer'` murni)
+    — kasus tidak umum, kemungkinan hasil edit manual sebelumnya, di luar
+    pola pencocokan standar.
+  - 4 transaksi "Selisih saldo" bertanggal 2026-04-29 yang nominalnya di
+    DB sudah tergabung/dijumlah berbeda dari nominal per-baris di sumber
+    `.mmbak`, sehingga tidak match by-nominal.
+  - Daftar detail (tanggal, tipe, nominal, kategori, catatan, teks
+    deskripsi lengkap) untuk SEMUA 262 baris awal — termasuk 9 unit yang
+    belum terisi ini — didokumentasikan di checklist terpisah (artifact
+    interaktif, di luar repo) untuk dicek/diisi manual satu-satu.
 
 ## Layout form transaksi (perombakan setelah lampiran + deskripsi ditambahkan)
 
@@ -375,10 +457,24 @@ Ditambahkan ke filter generik halaman Transaksi
   secara efektif berarti tidak memfilter apa-apa, jadi tidak berbahaya
   dibiarkan sebagai multi-select.
 
+## Indikator lampiran/deskripsi di list transaksi
+
+`has_attachment` (subquery `EXISTS` yang sama dengan filter Gambar) juga
+dipasang sebagai kolom terhitung langsung di `SELECT` utama
+`useTransactions` — dipakai di `transaction-list-item.tsx` untuk
+menampilkan ikon kecil (gambar/deskripsi) di tiap baris transaksi, dengan
+tooltip penjelas saat hover. Menghindari N+1 query per baris karena
+subquery-nya sudah ikut di query list yang sama, bukan query terpisah per
+transaksi.
+
 ## Catatan
 
-Data yang SUDAH ter-import (7704 transaksi) tidak akan otomatis dapat
-`ZDATA`/foto kalau perbaikan ini baru dikerjakan nanti — perlu re-import
-atau migrasi terpisah untuk data lama, sama seperti pertimbangan risiko di
-`import-category-dedup.md`. Untuk saat ini dibiarkan apa adanya, dicatat
-supaya tidak terlupa saat proses import ditinjau ulang.
+Kedua temuan awal dokumen ini sudah ditangani lewat script pencocokan
+sekali jalan (bukan alur import formal): `ZDATA` — 199 dari 208 unit
+terisi otomatis, sisa 9 unit menunggu isi manual (lihat "Status
+implementasi (kolom `description`/ZDATA)"); foto — 20 dari 25 unit
+foto unik (29 baris `PHOTO`, dedup pasangan transfer) terpasang, sisa 5
+tidak punya file sumber sama sekali (lihat "Foto lama dari Money Manager").
+Untuk keduanya, sisa yang tidak terisi otomatis butuh isi manual satu-satu
+lewat form edit transaksi kalau mau dilengkapi — tidak ada rencana alur
+otomatis lanjutan untuk sisa kasus ini karena jumlahnya kecil.
