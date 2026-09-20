@@ -457,15 +457,91 @@ SUDAH selesai:
   diblokir, edit transaksi pelunasan itu sendiri, edit field aman saja),
   plus query SQL verifikasi cepat.
 
+## Aksi tulis dari halaman `/debts` — "Tambah" dan "Bayar"
+
+Muncul dari pertanyaan: transaksi transfer BIASA sudah bisa memicu
+`debts` otomatis (lihat di atas) — apakah arah SEBALIKNYA juga masuk
+akal, yaitu dari halaman `/debts` sendiri memicu pembuatan transaksi?
+**Jawaban: ya**, konsisten dengan pola [balance-correction-dialog](../../../src/features/accounts/dialogs/balance-correction-dialog/)
+yang sudah dipakai (entitas domain + transaksi otomatis sebagai jejak,
+dipicu dari UI yang BUKAN form transaksi biasa) — bukan jalur data baru,
+cuma titik masuk (entry point) baru ke `applyDebtTransaction` yang sama.
+
+Diputuskan sebagai **2 form terpisah** (bukan 1 form gabungan seperti di
+form transaksi), karena bentuk datanya beda:
+
+1. **"Tambah Utang/Piutang Baru"** (`features/debts/new-debt-form/`) —
+   tidak butuh referensi ke `debts` yang sudah ada sama sekali. Field:
+   Jenis (Piutang/Utang, toggle group — menentukan arah transfer yang
+   dibuat di baliknya), Nama Kontak, Nominal, Akun Kas, Akun Utang
+   Piutang, Tanggal, Catatan. Tombol trigger di `PageHeader` (slot
+   `actions`) ketiga halaman (`/debts`, `/debts/receivables`,
+   `/debts/payables`) — dialog & form sama untuk ketiganya.
+   - `use-create-debt.ts`: insert 1 transaksi transfer (arah dari
+     `debt_type`: receivable = kas->debt, payable = debt->kas) lalu
+     panggil `applyDebtTransaction` yang SAMA PERSIS dengan jalur form
+     transaksi. Untuk arah payable, `debtAction` DIPAKSA `'payable'`
+     (bukan ditanya lewat `DebtActionField`) karena form ini secara
+     definisi selalu berarti "utang baru", tidak pernah pelunasan — itu
+     tugas form "Bayar" yang terpisah.
+   - Diverifikasi live di `tauri dev` (bukan cuma simulasi): 2 transaksi
+     baru (piutang ke "Mama Dicky" via akun "Keluarga", utang dari "Adel"
+     via akun "Tes Utang Piutang") menghasilkan baris `debts` yang benar
+     DAN arah `account_id`/`transfer_account_id` transaksi sesuai
+     ekspektasi (dicek lewat query SQL ke `finance.dev.db`).
+2. **"Bayar"** (`features/debts/pay-debt-form/`) — SELALU menargetkan
+   SATU `debts.id` spesifik yang sudah diketahui dari baris yang diklik
+   (beda dari `DebtActionField` di form transaksi yang perlu checklist
+   multi-pilih karena kontaknya belum tentu 1 piutang) — jadi field-nya
+   lebih sedikit: Nominal, Akun Kas, Tanggal, Catatan. Dipicu per-baris
+   lewat menu aksi (`ListItemActionsMenu`) di `DebtListTable`, muncul
+   hanya untuk baris `status='ongoing'` — TIDAK ada tombol umum di
+   `PageHeader` seperti "Tambah" karena aksi ini perlu tahu piutang/utang
+   mana yang dituju.
+   - `use-pay-debt.ts`: insert 1 transaksi transfer arah debt->kas lalu
+     `applyDebtTransaction` dengan `debtAction: 'settlement'`,
+     `settleDebtIds: [String(debt.id)]` — reuse jalur FIFO yang sama
+     persis, walau kandidatnya cuma 1 debt di sini.
+   - Cicilan SEBAGIAN (nominal < sisa) didukung sengaja — validasi cuma
+     menolak kalau nominal MELEBIHI sisa (`debt.remaining`), konsisten
+     dengan validasi overpay yang sudah ada di form transaksi.
+   - Dialog dikontrol PENUH dari luar (state `payingDebt` di
+     `DebtListTable`, satu instance dialog dipakai bergantian untuk
+     baris mana pun) — mengikuti pola single-source-of-truth
+     `AccountEditDialog` (lihat catatan di atas soal bug dialog macet)
+     untuk menghindari masalah yang sama.
+   - Diverifikasi live di `tauri dev`: pelunasan penuh piutang Mama Dicky
+     Rp10.000 (debt id 3, via akun "Keluarga") dan utang Adel Rp15.000
+     (debt id 4, via akun "Tes Utang Piutang") — keduanya menghasilkan
+     transaksi transfer arah debt->kas yang benar, `debt_payments`
+     tercatat dengan `transaction_id` yang sesuai, dan `debts.status`
+     ikut berubah jadi `'paid'` otomatis karena nominalnya pas melunasi
+     sisa (dicek lewat query SQL ke `finance.dev.db`, termasuk WAL-nya).
+3. **`ContactField`** (`features/transactions/form/contact-field.tsx`)
+   digeneralisasi — sebelumnya terkunci ke `Control<TransactionFormValues>`,
+   sekarang generic (`Control<TFieldValues extends { contact_name: string
+   | null }>`) supaya bisa dipakai ulang oleh `new-debt-form` juga, tidak
+   cuma form transaksi.
+
 BELUM ditulis / batasan yang diketahui:
 - Poles UI halaman `/debts`/`receivables`/`payables` — filter status,
   aksi manual (mis. tandai `written_off`), detail per piutang (riwayat
   `debt_payments`-nya), dan style/layout yang lebih baik (saat ini murni
-  `Table` polos, belum ada empty state ilustrasi dsb).
-- Komponen `Checkbox` (`components/ui/checkbox.tsx`) baru dibuat untuk
-  kebutuhan `DebtActionField` — belum dipakai di tempat lain.
-- Alur "Debt→Kas" (baik "Utang baru" maupun "Pelunasan" FIFO multi-debt,
-  DAN jalur edit yang baru ditambahkan) BELUM diuji lewat `tauri dev`
-  secara live — cuma tervalidasi lewat simulasi SQL manual + unit test
+  `Table` polos, belum ada empty state ilustrasi dsb). Sudah TIDAK
+  murni read-only lagi (lihat "Aksi tulis dari halaman /debts" di atas),
+  tapi poles visual/filter di atas masih belum digarap.
+- Alur "Debt→Kas" arah "Utang baru" DAN "Pelunasan" dari FORM TRANSAKSI
+  (`DebtActionField`, FIFO multi-debt, jalur edit) — beda dari jalur
+  `pay-debt-form`/`new-debt-form` di atas — BELUM diuji lewat `tauri dev`
+  secara live, cuma tervalidasi lewat simulasi SQL manual + unit test
   fake-DB. Checklist manual (`docs/checklist/debt-receivable-testing.md`)
-  sudah dibuat, TAPI belum dijalankan.
+  sudah dibuat, TAPI belum dijalankan sepenuhnya (baru sebagian bagian A
+  & B).
+- ~~Cicilan SEBAGIAN (nominal < sisa) untuk "Bayar" per baris~~ **SUDAH
+  DICOBA LIVE** — cicilan Rp100.000 dari sisa Rp1.000.000 piutang Mama
+  Dicky (debt id 1, akun "Keluarga") menghasilkan `debt_payments` baru
+  (Rp100.000, total kumulatif jadi Rp900.000) dengan `debts.status`
+  TETAP `'ongoing'` (sisa Rp100.000, belum 0) — tidak salah menandai
+  lunas. "Bayar" per baris (baik pelunasan penuh maupun cicilan
+  sebagian, kedua arah receivable/payable) kini SEPENUHNYA terverifikasi
+  live di `tauri dev`.

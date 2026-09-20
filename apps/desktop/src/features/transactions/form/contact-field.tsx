@@ -15,21 +15,34 @@ import {
 } from "@/components/ui/combobox";
 import { useContacts } from "@/shared/contacts/use-contacts";
 import { findSimilarContacts } from "@/shared/contacts/find-similar-contacts";
-import type { TransactionFormValues } from "./transaction.schema";
 
 type ContactOption = { value: string; label: string };
 
 const CREATE_PREFIX = "__create__:";
 
-type ContactFieldProps = {
-  control: Control<TransactionFormValues>;
+/** Bentuk minimal form yang dibutuhkan field ini — dipakai bareng oleh
+ * form transaksi (`transaction.schema.ts`) dan form-form lain yang juga
+ * punya field kontak (mis. `new-debt-form`). */
+type ContactFormValues = { contact_name: string | null };
+
+type ContactFieldProps<TFieldValues extends ContactFormValues> = {
+  control: Control<TFieldValues>;
   label: string;
   disabled?: boolean;
 };
 
-export function ContactField({ control, label, disabled }: ContactFieldProps) {
+export function ContactField<TFieldValues extends ContactFormValues>({
+  control,
+  label,
+  disabled,
+}: ContactFieldProps<TFieldValues>) {
   const { data: contacts } = useContacts();
   const anchor = useComboboxAnchor();
+  // react-hook-form tidak bisa menyempitkan Path<TFieldValues> generik ke
+  // literal "contact_name" hanya dari constraint TFieldValues extends
+  // ContactFormValues — cast ini aman karena constraint itu menjamin
+  // field contact_name ada dengan tipe yang sama persis.
+  const contactControl = control as unknown as Control<ContactFormValues>;
   const [query, setQuery] = useState("");
 
   const options: ContactOption[] =
@@ -49,7 +62,7 @@ export function ContactField({ control, label, disabled }: ContactFieldProps) {
 
   return (
     <Controller
-      control={control}
+      control={contactControl}
       name="contact_name"
       render={({ field, fieldState }) => {
         const similar = contacts
