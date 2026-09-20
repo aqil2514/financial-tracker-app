@@ -11,6 +11,7 @@ import {
   Wallet,
   HandCoins,
   Database,
+  Building2,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +36,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { useRetailkuSettings } from "@/shared/retailku";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -42,11 +44,13 @@ const navItems = [
   { title: "Laporan", url: "/reports", icon: PieChart },
 ];
 
-const collapsibleNavItems: {
+type CollapsibleNavGroup = {
   title: string;
   icon: LucideIcon;
   items: { title: string; url: string }[];
-}[] = [
+};
+
+const staticCollapsibleNavItems: CollapsibleNavGroup[] = [
   {
     title: "Utang Piutang",
     icon: HandCoins,
@@ -68,8 +72,24 @@ const collapsibleNavItems: {
   },
 ];
 
+/** Grup "Retailku" cuma disisipkan begitu kredensial (URL MCP + API
+ * Key) sudah tersimpan — menu setup mapping akun tidak ada gunanya
+ * sebelum terkoneksi, lihat "Status implementasi" di
+ * retailku-integration.md. */
+const retailkuNavGroup: CollapsibleNavGroup = {
+  title: "Retailku",
+  icon: Building2,
+  items: [{ title: "Mapping Akun", url: "/retailku/mapping" }],
+};
+
 export function AppSidebar() {
   const pathname = usePathname();
+  const { data: retailkuSettings } = useRetailkuSettings();
+  const isRetailkuConnected = !!retailkuSettings?.mcpUrl && !!retailkuSettings?.apiKey;
+
+  const collapsibleNavItems: CollapsibleNavGroup[] = isRetailkuConnected
+    ? [...staticCollapsibleNavItems, retailkuNavGroup]
+    : staticCollapsibleNavItems;
 
   // Fully controlled (bukan defaultOpen) — pathname bisa berubah antar
   // navigasi tanpa Collapsible ini di-remount (key-nya stabil per grup),
@@ -88,7 +108,7 @@ export function AppSidebar() {
       setOpenGroups((prev) => ({ ...prev, [activeGroup.title]: true }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [pathname, isRetailkuConnected]);
 
   return (
     <Sidebar collapsible="icon">

@@ -67,3 +67,36 @@ export function assertRetailkuConfigured(settings: RetailkuSettings): RetailkuMc
   }
   return { mcpUrl: settings.mcpUrl, apiKey: settings.apiKey };
 }
+
+/** Satu baris chart of accounts Retailku — bentuk field dikonfirmasi
+ * lewat panggilan nyata ke MCP "Warung Aqil" (lihat
+ * docs/todos/plan/retailku-integration.md). `isPaymentMethod: true`
+ * secara eksplisit memisahkan akun kas/bank/e-wallet ASLI (tempat uang
+ * benar-benar disimpan) dari akun akuntansi murni (HPP, Persediaan,
+ * Piutang, dst) — cuma akun `isPaymentMethod` yang relevan untuk
+ * mapping ke akun `financial-app`. */
+export type RetailkuFinanceAccount = {
+  id: string;
+  code: string;
+  name: string;
+  category: "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE";
+  normalBalance: "DEBIT" | "CREDIT";
+  isHeader: boolean;
+  isPaymentMethod: boolean;
+  isTrackedAsset: boolean;
+  isInvestmentAccount: boolean;
+  parentId: string | null;
+  accountMappings: { role: string }[];
+};
+
+/** Panggil tool `get_finance_accounts` — hasilnya dikembalikan MCP
+ * sebagai satu block teks berisi JSON array (bukan objek terstruktur
+ * MCP sendiri), jadi perlu di-parse manual dari `content[0].text`. */
+export async function getFinanceAccounts(client: Client): Promise<RetailkuFinanceAccount[]> {
+  const result = await client.callTool({ name: "get_finance_accounts", arguments: {} });
+  const firstBlock = Array.isArray(result.content) ? result.content[0] : undefined;
+  if (!firstBlock || firstBlock.type !== "text") {
+    throw new Error("Respons get_finance_accounts tidak sesuai format yang diharapkan.");
+  }
+  return JSON.parse(firstBlock.text) as RetailkuFinanceAccount[];
+}
