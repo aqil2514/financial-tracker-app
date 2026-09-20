@@ -1,4 +1,9 @@
-# Rencana Integrasi dengan Retailku
+# Fondasi Integrasi dengan Retailku (SELESAI)
+
+> **Status: DONE.** Dokumen ini mencakup fondasi koneksi ke Retailku
+> saja — kredensial, MCP client, dan UI mapping akun (tampilan). Fitur
+> lanjutan (sync harian, agregasi transaksi, persistensi mapping, dst)
+> akan dibahas di dokumen terpisah, bukan di sini.
 
 ## Latar belakang
 
@@ -359,20 +364,43 @@ DIPUTUSKAN SEBALIKNYA setelah dianalisis: **TypeScript, lewat
   (semua bersih) DAN `cargo check` di `src-tauri/` (compile bersih
   dengan plugin baru).
 
-**BELUM dikerjakan** (langkah selanjutnya kalau dilanjutkan):
-- Memanggil `client.callTool({name: "get_cashflow_allocation",
-  arguments: {...}})` dan memproses hasilnya (baru sampai `listTools()`
-  untuk verifikasi koneksi, belum ada pemanggilan tool sungguhan).
-- Parsing respons per `sourceType`, agregasi harian, mapping ke
-  transaksi ringkasan `financial-app` (lihat "Bentuk konkret yang
-  diinginkan" di atas) — belum didesain sampai level kode.
-- Skema `retailku_account_mapping` dan kolom `source`/`source_ref` di
-  `transactions` (lihat "Kebutuhan skema baru" di atas) — masih level
-  identifikasi kebutuhan, belum migrasi SQL konkret.
-- UI untuk setup mapping akun, trigger/jadwal sync (kapan sync
-  dipanggil — saat app dibuka? manual tombol "Sync sekarang"? interval
-  timer di React saat app aktif?) — belum dibahas/diputuskan sama
-  sekali.
+## SUDAH dibangun: UI mapping akun (tampilan saja, belum tersimpan)
+
+- **`shared/retailku/retailku-mcp-client.ts`** diperluas: `getFinanceAccounts(client)`
+  — panggil tool `get_finance_accounts`, parse block teks JSON dari
+  respons MCP, kembalikan sebagai `RetailkuFinanceAccount[]` (`id`,
+  `code`, `name`, `category`, `isPaymentMethod`, dll).
+- **`shared/retailku/use-retailku-payment-accounts.ts`** — hook query
+  yang buka koneksi MCP, ambil seluruh akun via `getFinanceAccounts`,
+  filter ke `isPaymentMethod: true` saja, tutup koneksi di `finally`.
+- **`features/retailku/account-mapping-list.tsx`** — tabel: kode+nama
+  akun Retailku (dari MCP, real-time) berdampingan dengan dropdown akun
+  kas lokal `financial-app` (dari `useAccounts()`, filter
+  `is_active && account_type === "cash"`). **Pilihan mapping HANYA di
+  state React lokal (`useState`) — BELUM disimpan ke database**, sesuai
+  keputusan eksplisit untuk memisahkan "bangun tampilan dulu" dari
+  "desain skema penyimpanan", supaya keduanya bisa dibahas terpisah.
+- **Halaman `/retailku/mapping`** (`app/(app)/retailku/mapping/page.tsx`).
+- **Sidebar kondisional** (`components/app-sidebar.tsx`): grup baru
+  "Retailku" (item "Mapping Akun") HANYA muncul kalau
+  `useRetailkuSettings()` sudah punya `mcpUrl` DAN `apiKey` tersimpan —
+  supaya menu setup tidak ada gunanya/membingungkan sebelum benar-benar
+  terkoneksi.
+- **Diuji live**: akun Retailku sungguhan (Warung Aqil) muncul benar di
+  tabel — persis 2 baris, "Kas Tunai" (1101) dan "Seabank" (1102),
+  sesuai yang dikonfirmasi sebelumnya sebagai satu-satunya akun
+  `isPaymentMethod: true`.
+- Diverifikasi `tsc --noEmit`/`npm test` (94/94)/`npm run build` (15
+  route, termasuk `/retailku/mapping` baru) — semua bersih.
+
+## Lanjutan: di dokumen terpisah
+
+Fondasi di dokumen ini (kredensial, MCP client, UI mapping akun tampilan)
+dianggap **selesai**. Yang belum dikerjakan — persistensi mapping akun,
+pemanggilan `get_cashflow_allocation`, agregasi harian per `sourceType`,
+kolom `source`/`source_ref` di `transactions`, trigger/jadwal sync — akan
+dibahas dan direncanakan di dokumen `.md` baru, bukan sebagai lanjutan
+dokumen ini, supaya scope masing-masing dokumen tetap jelas.
 
 ## Catatan
 
