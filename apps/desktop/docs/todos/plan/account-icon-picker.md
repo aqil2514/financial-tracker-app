@@ -1,4 +1,4 @@
-# Icon Akun: Kolom Ada, UI Belum Dibangun
+# Icon Akun: Sudah Dibangun
 
 ## Latar belakang
 
@@ -24,32 +24,60 @@ UI tidak ada.
   dipilih user secara independen dari bentuk icon-nya — bukan icon dan
   warna digabung jadi satu pilihan.
 
-## Yang perlu dikerjakan (belum diputuskan urutan/detailnya)
+## Status implementasi
 
-- **Migrasi skema**: tambah kolom `accounts.color` (`TEXT`, nullable) —
-  kolom `icon` sendiri sudah ada, tidak perlu migrasi untuk itu.
-- **Komponen picker icon**: UI untuk memilih salah satu dari daftar nama
-  icon lucide yang di-whitelist (bukan seluruh library, supaya daftar
-  pilihan tidak kebanyakan) — perlu ditentukan daftar icon apa saja yang
-  relevan untuk konteks akun keuangan (dompet, bank, kartu, tunai,
-  investasi, dst).
-- **Komponen picker warna**: palet warna terbatas (bukan color picker
-  bebas) supaya hasilnya tetap konsisten dengan desain sistem aplikasi —
-  perlu ditentukan daftar warna yang cocok dengan tema light/dark yang
-  sudah ada.
-- **Render icon+color**: di `account-list.tsx` (daftar akun), kemungkinan
-  juga di tempat lain yang menampilkan akun (dropdown pilih akun di form
-  transaksi, filter kategori/akun, chart saldo per akun) — perlu
-  diputuskan seberapa luas cakupan render-nya, jangan langsung diterapkan
-  ke semua tempat sekaligus kalau belum jelas manfaatnya di tiap lokasi.
-- **Lookup map nama→komponen**: fungsi/util kecil yang memetakan string
-  nama icon ke komponen `lucide-react` aktual, dengan fallback icon
-  default kalau `icon` null atau nama tidak dikenali (mis. dari data lama
-  yang belum diisi).
+SUDAH selesai:
+- **Migrasi** `0015_account_color.sql` — `accounts.color TEXT` nullable,
+  diverifikasi lewat simulasi SQL terhadap salinan `finance.dev.db`
+  (`foreign_key_check` bersih), teregistrasi di `migrations.rs` versi 15.
+- **Whitelist icon** (`lib/account-icons.ts`) — 18 nama icon lucide-react
+  relevan konteks akun keuangan (Wallet, Banknote, PiggyBank, Landmark,
+  CreditCard, Coins, TrendingUp, Bitcoin, Building2, HandCoins, Gem,
+  Home, Car, Plane, ShoppingBag, Smartphone, Receipt, Gift), plus
+  `resolveAccountIcon()` dengan fallback ke `Wallet` kalau null/nama
+  tidak dikenali.
+- **Palet warna** (`lib/account-colors.ts`) — 10 warna terbatas (slate,
+  red, orange, amber, green, teal, blue, indigo, purple, pink) memakai
+  className Tailwind polos (`text-{color}-600`/`bg-{color}-600`, TANPA
+  varian `dark:` eksplisit — mengikuti pola yang sudah dipakai untuk
+  income/expense/transfer di `transaction-list-item.tsx`), plus
+  `resolveAccountColorText()` dengan fallback ke `slate`.
+- **Komponen picker**: `FormFieldIconPicker`/`FormFieldColorPicker`
+  (`components/form-fields/`) — grid pilihan di dalam `Popover`, dipicu
+  dari tombol yang menampilkan pilihan saat ini. Diintegrasikan ke
+  `AccountForm` (create & edit).
+- **Persistensi**: `use-create-account.ts`/`use-update-account.ts` sudah
+  menyertakan `icon`/`color` di SQL insert/update. Semua query akun yang
+  sudah ada (`useAccounts`, `useAccountsPaginated`) pakai `accounts.*` /
+  `SELECT *`, jadi kolom baru otomatis ikut ter-select tanpa perlu
+  diubah.
+- **Render — cakupan pertama**: daftar akun (`account-list/content/item.tsx`)
+  menampilkan icon berwarna di kiri nama akun.
+- **Render — cakupan kedua**: dropdown pilih akun di form transaksi
+  (`FormFieldCombobox` diperluas dengan prop `renderOption` opsional,
+  default tetap `item.label` polos supaya pemakai lain seperti kategori
+  tidak terpengaruh) — `transaction-form.tsx` pasang `renderAccountOption`
+  ke kedua combobox akun (`account_id`/`transfer_account_id`). **Batasan
+  yang diketahui**: icon cuma muncul DI DALAM dropdown saat dibuka, TIDAK
+  di kotak input yang menampilkan akun yang SUDAH terpilih —
+  `ComboboxInput` (base-ui) adalah text input native, tidak mendukung
+  custom render untuk nilai terpilih tanpa mengubah pola combobox secara
+  lebih mendasar. Diputuskan diterima sebagai batasan (bukan blocker).
+- Diverifikasi `tsc --noEmit` (bersih), `npm test` (94/94), `npm run
+  build` (semua 14 route sukses) di setiap tahap.
+
+BELUM dikerjakan (opsional, tidak prioritas):
+- Render icon+color di tempat LAIN yang menampilkan akun: chart saldo
+  per akun (`AccountBalancePieChart`), baris transaksi transfer
+  (`transaction-list-item.tsx`), header `AccountDetailDialog`, dropdown
+  filter akun di laporan/kalender. Sengaja ditunda satu-satu sesuai
+  prinsip "jangan diterapkan ke semua tempat sekaligus kalau belum jelas
+  manfaatnya" — kandidat berikutnya yang disebut paling bernilai:
+  combobox akun (SUDAH selesai di atas).
 
 ## Catatan
 
-Prioritas rendah — kosmetik/UX, bukan bug atau kehilangan data. Dicatat
-supaya kolom `icon` yang sudah ada di skema tidak terus jadi dead column,
-dan supaya keputusan format nilai (lucide name + color terpisah) tidak
-perlu didiskusikan ulang saat fitur ini akhirnya dikerjakan.
+Awalnya prioritas rendah (kosmetik/UX, bukan bug atau kehilangan data),
+tapi dikerjakan tuntas dalam satu sesi begitu diangkat kembali — kolom
+`icon` (lama) dan `color` (baru) sekarang keduanya benar-benar dipakai,
+bukan dead column lagi.

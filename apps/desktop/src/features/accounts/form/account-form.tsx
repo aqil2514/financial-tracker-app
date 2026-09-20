@@ -10,6 +10,8 @@ import {
   FormFieldSelect,
   FormFieldTextarea,
   FormFieldToggleGroup,
+  FormFieldIconPicker,
+  FormFieldColorPicker,
 } from "@/components/form-fields";
 import { useAccountGroups } from "@/features/account-groups";
 import type { AccountFormOutput, AccountFormValues } from "./account.schema";
@@ -38,6 +40,10 @@ export function AccountForm({
         placeholder="Contoh: Kartu Kredit"
       />
       <FormFieldCurrency form={form} name="initial_balance" label="Saldo Awal" />
+      <div className="grid grid-cols-2 gap-4">
+        <FormFieldIconPicker form={form} name="icon" label="Icon" />
+        <FormFieldColorPicker form={form} name="color" label="Warna" />
+      </div>
       <FormFieldSelect
         form={form}
         name="group_id"

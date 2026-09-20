@@ -6,6 +6,8 @@ import { AccountWithBalance } from "../../../calculate-balance";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format-currency";
 import { ListItemActionsMenu } from "@/components/list-item-actions-menu";
+import { resolveAccountIcon } from "@/lib/account-icons";
+import { resolveAccountColorText } from "@/lib/account-colors";
 
 export function AccountListContentItem() {
   const { accounts } = useAccountsList();
@@ -32,23 +34,28 @@ const WithAccounts: React.FC<{ accounts: AccountWithBalance[] }> = ({
 
 const AccountListItem = ({ account }: { account: AccountWithBalance }) => {
   const { openDialog } = useAccountsList();
+  const AccountIcon = resolveAccountIcon(account.icon);
+  const colorText = resolveAccountColorText(account.color);
 
   return (
     <div className="flex items-center justify-between rounded-lg border p-4">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <p className="font-medium">{account.name}</p>
-          {account.group_name && (
-            <Badge variant="secondary">{account.group_name}</Badge>
+      <div className="flex items-start gap-3">
+        <AccountIcon className={`size-5 shrink-0 ${colorText}`} />
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <p className="font-medium">{account.name}</p>
+            {account.group_name && (
+              <Badge variant="secondary">{account.group_name}</Badge>
+            )}
+            {!account.is_active && <Badge variant="outline">Nonaktif</Badge>}
+          </div>
+          <p className="text-muted-foreground text-sm">
+            {formatCurrency(account.balance, "IDR")}
+          </p>
+          {account.description && (
+            <p className="text-muted-foreground text-xs">{account.description}</p>
           )}
-          {!account.is_active && <Badge variant="outline">Nonaktif</Badge>}
         </div>
-        <p className="text-muted-foreground text-sm">
-          {formatCurrency(account.balance, "IDR")}
-        </p>
-        {account.description && (
-          <p className="text-muted-foreground text-xs">{account.description}</p>
-        )}
       </div>
       <ListItemActionsMenu
         actions={[

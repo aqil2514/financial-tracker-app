@@ -15,13 +15,15 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
       description: account.description,
       is_active: String(account.is_active) as "1" | "0",
       account_type: account.account_type,
+      icon: account.icon,
+      color: account.color,
     }),
     resetOnOpen: true,
     onSuccess,
     mutationFn: async (values: AccountFormOutput) => {
       const db = await getDb();
       await db.execute(
-        "UPDATE accounts SET name = $1, initial_balance = $2, group_id = $3, description = $4, is_active = $5, account_type = $6 WHERE id = $7",
+        "UPDATE accounts SET name = $1, initial_balance = $2, group_id = $3, description = $4, is_active = $5, account_type = $6, icon = $7, color = $8 WHERE id = $9",
         [
           values.name,
           values.initial_balance,
@@ -29,6 +31,8 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
           values.description,
           Number(values.is_active),
           values.account_type,
+          values.icon,
+          values.color,
           account.id,
         ]
       );

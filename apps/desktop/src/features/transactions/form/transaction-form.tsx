@@ -15,6 +15,8 @@ import {
 } from "@/components/form-fields";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
+import { resolveAccountIcon } from "@/lib/account-icons";
+import { resolveAccountColorText } from "@/lib/account-colors";
 import { AttachmentUploader } from "@/shared/attachments/attachment-uploader";
 import { PendingAttachmentUploader } from "@/shared/attachments/pending-attachment-uploader";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
@@ -184,6 +186,23 @@ export function TransactionForm({
           : account.name,
       })) ?? [];
 
+  // Icon+warna cuma bisa dirender di DALAM dropdown (ComboboxItem) —
+  // ComboboxInput adalah text input native, tidak mendukung custom
+  // render untuk nilai yang sudah terpilih. Lookup balik ke `accounts`
+  // dari option.value karena FormFieldComboboxOption generic cuma bawa
+  // {value, label}, tidak bawa data akun mentah.
+  function renderAccountOption(option: { value: string; label: string }) {
+    const account = accounts?.find((a) => String(a.id) === option.value);
+    const AccountIcon = resolveAccountIcon(account?.icon ?? null);
+    const colorText = resolveAccountColorText(account?.color ?? null);
+    return (
+      <span className="flex items-center gap-2">
+        <AccountIcon className={`size-4 shrink-0 ${colorText}`} />
+        {option.label}
+      </span>
+    );
+  }
+
   const categoryOptions =
     categories
       ?.filter((category) => category.type === type)
@@ -229,6 +248,7 @@ export function TransactionForm({
             placeholder="Cari akun..."
             options={accountOptions}
             disabled={debtFieldsLocked}
+            renderOption={renderAccountOption}
           />
           {type === "transfer" ? (
             <FormFieldCombobox
@@ -238,6 +258,7 @@ export function TransactionForm({
               placeholder="Cari akun tujuan..."
               options={accountOptions}
               disabled={debtFieldsLocked}
+              renderOption={renderAccountOption}
             />
           ) : (
             <FormFieldCombobox

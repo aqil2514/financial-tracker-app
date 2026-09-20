@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Controller,
   type FieldPath,
@@ -30,6 +31,11 @@ type FormFieldComboboxProps<TFieldValues extends FieldValues> = {
   /** Show a clear button that resets the field back to null. */
   allowClear?: boolean;
   disabled?: boolean;
+  /** Custom isi tiap baris opsi di dropdown (mis. sisipkan icon di
+   * depan label) — nilai TERPILIH di kotak input tetap teks polos
+   * (`ComboboxInput` adalah text input native, tidak mendukung custom
+   * render). Default: `item.label` seperti biasa. */
+  renderOption?: (item: FormFieldComboboxOption) => ReactNode;
 };
 
 export function FormFieldCombobox<TFieldValues extends FieldValues>({
@@ -40,6 +46,7 @@ export function FormFieldCombobox<TFieldValues extends FieldValues>({
   options,
   allowClear = false,
   disabled,
+  renderOption,
 }: FormFieldComboboxProps<TFieldValues>) {
   const anchor = useComboboxAnchor();
 
@@ -74,7 +81,7 @@ export function FormFieldCombobox<TFieldValues extends FieldValues>({
                   <ComboboxList>
                     {(item: FormFieldComboboxOption) => (
                       <ComboboxItem key={item.value} value={item}>
-                        {item.label}
+                        {renderOption ? renderOption(item) : item.label}
                       </ComboboxItem>
                     )}
                   </ComboboxList>

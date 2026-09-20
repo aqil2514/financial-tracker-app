@@ -7,3 +7,5 @@ export { FormFieldTextarea } from "./form-field-textarea";
 export { FormFieldRichText } from "./form-field-rich-text";
 export { FormFieldDate } from "./form-field-date";
 export { FormFieldToggleGroup } from "./form-field-toggle-group";
+export { FormFieldIconPicker } from "./form-field-icon-picker";
+export { FormFieldColorPicker } from "./form-field-color-picker";

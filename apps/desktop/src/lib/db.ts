@@ -42,7 +42,14 @@ export type AccountGroup = {
 export type Account = {
   id: number;
   name: string;
+  /** Nama komponen lucide-react (mis. "Wallet"), lihat
+   * lib/account-icons.ts — null kalau belum dipilih (fallback ke icon
+   * default saat dirender). */
   icon: string | null;
+  /** Nama warna dari palet TERBATAS, lihat lib/account-colors.ts — null
+   * kalau belum dipilih (fallback ke warna default saat dirender).
+   * Independen dari `icon`: bentuk dan warna dipilih terpisah. */
+  color: string | null;
   initial_balance: number;
   group_id: number | null;
   description: string | null;
