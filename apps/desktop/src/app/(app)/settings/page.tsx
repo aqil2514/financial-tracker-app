@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { ImportMoneyManagerDialog } from "@/features/data-import";
 import { AttachmentFolderSetting } from "@/shared/attachments";
+import { RetailkuSettingsForm } from "@/shared/retailku";
 
 export default function SettingsPage() {
   return (
@@ -44,6 +45,15 @@ export default function SettingsPage() {
           <p className="text-muted-foreground text-sm">
             Belum ada pengaturan. Menyusul.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Integrasi Retailku</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RetailkuSettingsForm />
         </CardContent>
       </Card>
     </PageContainer>

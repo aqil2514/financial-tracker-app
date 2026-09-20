@@ -261,6 +261,119 @@ Satu-satunya state baru yang dibutuhkan: "tanggal terakhir yang sudah
 disinkron", disimpan lokal di SQLite seperti data lainnya — bukan
 dependency ke server luar untuk itu.
 
+## Status implementasi
+
+**Kredensial sisi Retailku dikonfirmasi 100% SIAP, TIDAK PERLU
+perubahan apa pun** — dicek langsung ke source `retail-multitenant`:
+- Endpoint MCP: `POST {server}/{storeSlug}/mcp`
+  (`apps/api/src/app/mcp/mcp.controller.ts`, `@Controller(':slug/mcp')`)
+  sudah aktif, memakai `StreamableHTTPServerTransport` dari SDK MCP resmi.
+- Otentikasi: `McpApiKeyGuard`
+  (`apps/api/src/app/mcp/mcp-auth.guard.ts`) — header
+  `Authorization: Bearer sk_...` (atau query `?api_key=`), key di-hash
+  SHA-256 sebelum disimpan (`ApiKeyService.createKey`, format
+  `sk_<64 hex>`), terikat ke `storeId` tertentu (tidak bisa dipakai
+  lintas toko), raw key hanya ditampilkan SEKALI saat dibuat.
+- Generate key: halaman
+  `{server}/{storeSlug}/settings/api-keys`
+  (`apps/web/src/app/(protected)/[storeSlug]/settings/api-keys/`) sudah
+  ada UI-nya — buat/cabut key, lihat `lastUsedAt`/`createdAt`.
+
+**SUDAH dibangun di sisi `financial-app`** (langkah pertama, fondasi
+penyimpanan kredensial — BELUM ada logic pemanggilan MCP/sync apa pun):
+- `shared/retailku/use-retailku-settings.ts` — simpan/baca `storeSlug` +
+  `apiKey` di tabel `settings` (key-value) yang SUDAH ADA sejak migrasi
+  awal (`0001_initial.sql`), TIDAK perlu migrasi baru. Mengikuti pola
+  persis `attachment_folder`
+  (`shared/attachments/use-attachment-folder.ts`).
+- **Keputusan penyimpanan**: plaintext di tabel `settings` SQLite biasa
+  (BUKAN OS keychain/`tauri-plugin-store` terenkripsi) — diputuskan
+  cukup karena aplikasi desktop single-user, database tidak pernah
+  meninggalkan mesin sendiri kecuali saat memanggil Retailku itu
+  sendiri. Bisa direvisi ke penyimpanan lebih aman nanti kalau dirasa
+  perlu, tanpa mengubah bentuk data (masih string key/value).
+- `shared/retailku/retailku-settings-form.tsx` — form 2 field (Store
+  Slug, API Key sebagai `type="password"`) + indikator "Tersambung",
+  dipasang di halaman Settings (card baru "Integrasi Retailku").
+- Diverifikasi `tsc --noEmit`/`npm test` (94/94)/`npm run build` bersih.
+
+## Keputusan: MCP client di TypeScript, BUKAN Rust
+
+Sempat muncul asumsi implisit "MCP client = fungsi Rust" (istilah
+"background service" sering diasosiasikan native) — DIKLARIFIKASI dan
+DIPUTUSKAN SEBALIKNYA setelah dianalisis: **TypeScript, lewat
+`@tauri-apps/plugin-http`**, BUKAN Rust `reqwest`. Alasan:
+
+- Memanggil HTTP API eksternal BUKAN kategori pekerjaan yang butuh Rust
+  di aplikasi ini (Rust dipakai untuk yang MEMANG butuh akses
+  sistem/file — migrasi SQL, baca-tulis lampiran foto). Seluruh logic
+  bisnis lain (validasi, agregasi, mapping, `useEntityForm`) ada di TS.
+- `@tauri-apps/plugin-http` MEMANG dibuat untuk kasus ini: `fetch()`
+  drop-in yang dieksekusi native lewat Rust di baliknya — otomatis
+  TIDAK kena CORS WebView, TANPA perlu menulis satu baris Rust pun
+  untuk logic pemanggilannya.
+- Alasan "Rust lebih aman untuk kredensial" TIDAK berlaku di sini —
+  `apiKey` sudah tersimpan di tabel `settings` SQLite dan dibaca lewat
+  query TS (`useRetailkuSettings`), jadi proteksi itu sudah tidak
+  relevan kalau logic MCP-nya dipindah ke Rust (kredensialnya tetap
+  perlu "naik" ke Rust dari TS lewat `invoke()`, sama saja).
+- Satu-satunya alasan valid pindah ke Rust adalah kebutuhan jalan
+  BACKGROUND TANPA WINDOW TERBUKA (daemon OS) — di luar konteks app ini
+  yang memang harus dibuka user untuk dipakai.
+
+## SUDAH dibangun: MCP client TypeScript dasar
+
+- **Dependency baru**: `tauri-plugin-http` (Rust, `Cargo.toml` +
+  registrasi `lib.rs`) dengan capability `http:default` (scope
+  `https://*` di `capabilities/default.json` — permisif karena
+  `serverUrl` dikonfigurasi user, bisa domain self-hosted apa saja,
+  dibatasi ke HTTPS saja). `@tauri-apps/plugin-http` (npm) — `fetch()`
+  drop-in native. `@modelcontextprotocol/sdk` (npm, dipasang EKSPLISIT
+  sebagai dependency `financial-app` — sebelumnya cuma numpang lewat
+  hoisting monorepo dari proyek lain) — SDK resmi MCP client, BUKAN
+  JSON-RPC manual, supaya handshake `initialize`/session-id/format
+  `tools/call` mengikuti spesifikasi protokol persis (sama seperti
+  `McpServer` dari SDK yang sama di sisi Retailku).
+- **`shared/retailku/retailku-mcp-client.ts`**:
+  `connectRetailkuMcp(config)` — buka `StreamableHTTPClientTransport`
+  dengan `fetch` dari plugin-http disuntikkan (opsi `fetch` di SDK,
+  bukan browser fetch bawaan) + header `Authorization: Bearer <apiKey>`
+  lewat `requestInit`, lalu `client.connect()` (melakukan handshake
+  MCP). `assertRetailkuConfigured()` + `RetailkuNotConfiguredError`
+  untuk validasi kredensial lengkap sebelum dipakai.
+- **Form Settings — disederhanakan jadi 2 field** (revisi dari draf
+  awal `serverUrl`+`storeSlug` terpisah): screenshot halaman Settings →
+  API Keys Retailku menunjukkan URL MCP SUDAH dalam bentuk siap pakai
+  (`https://api.retailku.com/warung-aqil/mcp`) — jadi disimpan APA
+  ADANYA sebagai 1 field `mcpUrl` (`use-retailku-settings.ts`), TIDAK
+  dipecah jadi server+slug lalu di-reconstruct. Form: URL MCP + API Key
+  saja, tombol "Tes Koneksi" memanggil `client.listTools()`.
+- **DIUJI LIVE dan BERHASIL** di `tauri dev` dengan API key sungguhan
+  ("Financial Tracker", dibuat dari halaman API Keys Warung Aqil):
+  simpan pengaturan sukses, "Tes Koneksi" → "Berhasil terhubung — 101
+  tools tersedia." Membuktikan seluruh rantai bekerja end-to-end:
+  `@tauri-apps/plugin-http` fetch native (tanpa CORS), handshake
+  `initialize` MCP via SDK resmi, otentikasi Bearer diterima server
+  Retailku sungguhan, `listTools()` mengembalikan daftar lengkap.
+- Diverifikasi `tsc --noEmit`/`npm test` (94/94)/`npm run build`
+  (semua bersih) DAN `cargo check` di `src-tauri/` (compile bersih
+  dengan plugin baru).
+
+**BELUM dikerjakan** (langkah selanjutnya kalau dilanjutkan):
+- Memanggil `client.callTool({name: "get_cashflow_allocation",
+  arguments: {...}})` dan memproses hasilnya (baru sampai `listTools()`
+  untuk verifikasi koneksi, belum ada pemanggilan tool sungguhan).
+- Parsing respons per `sourceType`, agregasi harian, mapping ke
+  transaksi ringkasan `financial-app` (lihat "Bentuk konkret yang
+  diinginkan" di atas) — belum didesain sampai level kode.
+- Skema `retailku_account_mapping` dan kolom `source`/`source_ref` di
+  `transactions` (lihat "Kebutuhan skema baru" di atas) — masih level
+  identifikasi kebutuhan, belum migrasi SQL konkret.
+- UI untuk setup mapping akun, trigger/jadwal sync (kapan sync
+  dipanggil — saat app dibuka? manual tombol "Sync sekarang"? interval
+  timer di React saat app aktif?) — belum dibahas/diputuskan sama
+  sekali.
+
 ## Catatan
 
 Proposal secara eksplisit menyebut rencana ini masuk jalur yang PASTI
@@ -269,4 +382,6 @@ tenggat waktu spesifik disebutkan — hanya "jangka menengah". Dokumen ini
 dicatat supaya konteks strategis ini tidak hilang dan bisa jadi
 pertimbangan kalau ke depan ada keputusan arsitektur besar (skema
 database, format export/import data, dll) yang berpotensi mempermudah
-atau mempersulit integrasi nanti — bukan untuk dieksekusi sekarang.
+atau mempersulit integrasi nanti. Fondasi kredensial (di atas) sudah
+mulai dibangun sebagai langkah kecil pertama, tapi bagian inti (MCP
+client, agregasi, mapping skema) masih di depan.

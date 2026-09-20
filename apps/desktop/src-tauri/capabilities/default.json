@@ -16,6 +16,10 @@
     "store:default",
     "dialog:default",
     "clipboard-manager:default",
-    "clipboard-manager:allow-read-image"
+    "clipboard-manager:allow-read-image",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://*" }]
+    }
   ]
 }
