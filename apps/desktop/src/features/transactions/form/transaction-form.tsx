@@ -74,7 +74,18 @@ export function TransactionForm({
     contacts?.find(
       (contact) => contact.name.toLowerCase() === contactName?.trim().toLowerCase()
     )?.id ?? null;
-  const { data: ongoingDebts } = useOngoingDebts(contactId);
+
+  // debtStatus dipakai DUA kali: mengunci field berbahaya (di bawah) DAN
+  // memastikan piutang yang jadi target pembayaran transaksi ini SENDIRI
+  // tetap muncul di checklist DebtActionField meski statusnya sudah
+  // 'paid' (lihat use-ongoing-debts.ts) — tanpa ini, edit transaksi yang
+  // tadinya melunasi PENUH sebuah piutang tidak bisa memilih ulang
+  // piutang yang sama di form.
+  const { data: debtStatus } = useTransactionDebtStatus(transactionId);
+  const { data: ongoingDebts } = useOngoingDebts(contactId, {
+    excludeDebtId: debtStatus?.role === "payment" ? debtStatus.debtId : undefined,
+    excludeTransactionId: debtStatus?.role === "payment" ? transactionId : undefined,
+  });
 
   const sourceAccount = accounts?.find((account) => String(account.id) === accountId);
   const destinationAccount = accounts?.find(
@@ -92,7 +103,6 @@ export function TransactionForm({
   // transaksi yang sudah py debts terkait" di debt-receivable-tracking.md.
   // Transaksi yang berperan sebagai PEMBAYARAN (bukan induk), atau induk
   // yang belum py cicilan, TETAP bebas diedit — recreate-nya aman.
-  const { data: debtStatus } = useTransactionDebtStatus(transactionId);
   const debtFieldsLocked = debtStatus?.role === "principal" && debtStatus.hasPayments;
 
   // debt -> cash: arah transfer semata ambigu (pelunasan piutang existing
@@ -251,7 +261,13 @@ export function TransactionForm({
               cicilannya tidak hilang.
             </p>
           )}
-          {needsDebtAction && <DebtActionField control={form.control} />}
+          {needsDebtAction && (
+            <DebtActionField
+              control={form.control}
+              transactionId={transactionId}
+              debtStatus={debtStatus}
+            />
+          )}
           <FormFieldDate form={form} name="date" label="Tanggal" />
         </div>
 

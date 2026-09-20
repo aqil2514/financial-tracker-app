@@ -530,13 +530,137 @@ BELUM ditulis / batasan yang diketahui:
   `Table` polos, belum ada empty state ilustrasi dsb). Sudah TIDAK
   murni read-only lagi (lihat "Aksi tulis dari halaman /debts" di atas),
   tapi poles visual/filter di atas masih belum digarap.
-- Alur "Debt→Kas" arah "Utang baru" DAN "Pelunasan" dari FORM TRANSAKSI
-  (`DebtActionField`, FIFO multi-debt, jalur edit) — beda dari jalur
-  `pay-debt-form`/`new-debt-form` di atas — BELUM diuji lewat `tauri dev`
-  secara live, cuma tervalidasi lewat simulasi SQL manual + unit test
-  fake-DB. Checklist manual (`docs/checklist/debt-receivable-testing.md`)
-  sudah dibuat, TAPI belum dijalankan sepenuhnya (baru sebagian bagian A
-  & B).
+- ~~Alur "Debt→Kas" arah "Utang baru" DAN "Pelunasan" dari FORM
+  TRANSAKSI (`DebtActionField`)~~ **SUDAH DIUJI LIVE** (dikonfirmasi
+  belakangan, sempat salah tercatat BELUM di draf sebelumnya) — transaksi
+  5501 ("Test Transaksi Piutang", kas->debt "Tes Utang Piutang") membuat
+  `debts` id 2 (`receivable`) via jalur simpel yang tidak ambigu;
+  transaksi 5503 ("Cicil Pelunasan", debt "Orang Lain"->kas, Rp800.000)
+  memilih **"Pelunasan"** lewat `DebtActionField` dan mengalokasikan ke
+  **debt id 1** (piutang Keluarga Rp1.000.000, akun BEDA dari akun
+  transaksi 5503 itu sendiri) — membuktikan combobox pemilihan piutang
+  (bukan cuma deteksi arah transfer) benar-benar berfungsi.
+  ~~Skenario FIFO dengan >1 piutang dicentang sekaligus~~ **JUGA SUDAH
+  DIUJI LIVE**: 3 piutang `ongoing` Adel (masing-masing Rp10.000, akun
+  berbeda-beda) dilunasi SEKALIGUS dalam 1 transaksi transfer Rp25.000 —
+  hasilnya 3 baris `debt_payments` TERPISAH (1 per `debt_id`, sesuai
+  desain) dengan `transaction_id` yang sama: 2 piutang pertama (FIFO
+  berdasar `date` terlama) lunas penuh Rp10.000 masing-masing, piutang
+  ke-3 cuma kebagian sisa Rp5.000 (partial, tetap `ongoing`) — total
+  alokasi Rp25.000 pas sama dengan nominal transaksi, tidak ada yang
+  hilang/overpay.
+  ~~Jalur EDIT transaksi yang sudah py debts terkait, kasus BLOKIR
+  (`principal`, `hasPayments=true`)~~ **JUGA SUDAH DIUJI LIVE**: edit
+  transaksi 5510 (pembuat debt id 6 milik Adel, SUDAH lunas lewat
+  cicilan dari transaksi FIFO 5512 di atas — transaksi LAIN, bukan
+  dirinya sendiri) — field Tipe Transaksi/Nominal/Dari Akun/Ke
+  Akun/Nama Kontak semua ter-disable di form, pesan blokir muncul
+  persis seperti yang ditulis di kode
+  (`"Piutang ini sudah menerima cicilan dari transaksi lain..."`),
+  SEMENTARA field aman (Catatan/Deskripsi/Tanggal/Lampiran) tetap bisa
+  diedit dan submit — perubahan catatan tersimpan ke `transactions.note`
+  tanpa menyentuh `debts`/`debt_payments` sama sekali, dikonfirmasi
+  lewat query SQL.
+  - **Bug ditemukan & diperbaiki selama pengujian ini** (di luar logic
+    blokir field itu sendiri, yang sudah benar): `TransactionEditDialog`
+    (`features/transactions/form/transaction-edit-dialog.tsx`) punya bug
+    PERSIS SAMA dengan `AccountEditDialog` yang pernah diperbaiki
+    sebelumnya (lihat catatan di atas) — merender dari `open` state
+    INTERNAL `useEntityForm` (bukan `controlledOpen`), dan
+    `handleOpenChange` menyinkronkan DUA ARAH. Begitu submit sukses
+    menutup `open` internal tanpa memberi tahu context, dialog tidak
+    bisa dibuka lagi untuk transaksi manapun (ditemukan user: "Edit
+    pertama bisa. Setelah simpan perubahan, buka edit, tidak bisa").
+    Fix: `useUpdateTransaction` sekarang terima parameter `onSuccess`
+    opsional (diteruskan ke `useEntityForm`), dan
+    `TransactionEditDialog` di-rewrite mengikuti pola
+    single-source-of-truth `AccountEditDialog` persis — render
+    `open={isControlled ? controlledOpen : open}`, sinkron SATU ARAH
+    (`controlledOpen -> open` internal), tutup eksplisit lewat
+    `() => setControlledOpen?.(false)`. Diverifikasi `tsc`/`npm
+    test`/`npm run build` bersih, DAN dikonfirmasi live di `tauri dev`
+    — edit transaksi lagi setelah submit sebelumnya sekarang berhasil
+    membuka dialog seperti biasa, bug teratasi.
+- ~~Kasus RECREATE aman (`principal`, `hasPayments=false`)~~ **SUDAH
+  DIUJI LIVE**: transaksi 5513 ("Tes Recreate", kas "Dompet Bebas"->debt
+  "Tes Utang Piutang", kontak Adel) awalnya Rp50.000 membuat debt id 9
+  (`ongoing`, 0 pembayaran) — diedit NOMINAL-nya jadi Rp75.000 (field
+  berbahaya, TIDAK terkunci karena belum pernah dicicil sama sekali).
+  Hasilnya: debt id 9 lama TERHAPUS SEPENUHNYA, debt id 10 baru dibuat
+  dengan `amount=75000`, `transaction_id=5513` (tetap merujuk transaksi
+  yang sama) — persis sesuai desain "hapus lalu buat ulang", dikonfirmasi
+  lewat query SQL.
+- ~~Edit transaksi PEMBAYARAN itu sendiri (`role: 'payment'`)~~ **SUDAH
+  DIUJI LIVE**: transaksi 5508 ("Cicilan Terakhir", debt "Keluarga"->kas
+  "Dompet Bisnis", Rp100.000, pembayaran TUNGGAL untuk debt id 1 milik
+  Mama Dicky) dibuka Edit — dikonfirmasi field TIDAK PERNAH terkunci
+  (beda dari kasus `principal, hasPayments=true`), termasuk
+  `DebtActionField`-nya kosong/wajib dipilih ulang sesuai desain
+  ("Reset ke kosong..."). Nominal diubah jadi Rp40.000 (field
+  berbahaya) + pilih ulang "Pelunasan" + centang debt id 1. Hasilnya:
+  `debt_payments` id 5 lama (Rp100.000) TERHAPUS SEPENUHNYA, id 9 baru
+  dibuat dengan `amount=40000`, `transaction_id=5508` tetap sama — sisa
+  debt id 1 BERTAMBAH kembali dari Rp100.000 jadi Rp160.000 (persis
+  sesuai hitungan: total pembayaran lain Rp800.000 + Rp40.000 baru =
+  Rp840.000, sisa Rp1.000.000-Rp840.000), `status` tetap `'ongoing'`.
+  Confirmed benar lewat query SQL. Yang belum sempat diuji dari sub-
+  kasus ini: revert `debts.status` dari `'paid'` balik ke `'ongoing'`
+  (perlu kasus di mana pembayaran yang direvisi tadinya PERSIS
+  melunasi sisa jadi `'paid'`) — variasi kecil dari logic yang sama,
+  risiko rendah karena source code-nya (bukan cuma UI) sama persis
+  dengan yang baru diuji ini.
+
+**Kesimpulan checklist edit-transaksi**: seluruh 3 role/kondisi utama
+(`none` implisit dari alur create yang sudah lama teruji, `principal`
+recreate-aman, `principal` blokir-karena-dicicil, `payment` recreate
+bebas) SUDAH terverifikasi live. Sisa gap hanya poles UI `/debts`
+(lihat di atas) dan variasi kecil revert status `paid`->`ongoing`.
+
+## Bug ditemukan: checklist `DebtActionField` tidak menampilkan piutang
+`'paid'` milik transaksi yang sedang diedit sendiri
+
+Ditemukan user (bukan dari checklist manual) lewat pertanyaan tajam:
+"Edit payment datanya ambil dari data utang piutang yang sudah dibayar.
+fetch daftar hanya ambil yang belum dibayar. Jadi, sewaktu-waktu
+pembayaran sudah lunas, fetch daftar bagaimana?"
+
+**Skenario konkret**: transaksi 5507 ("Pelunasan", debt "Keluarga"->kas,
+Rp10.000) melunasi debt id 3 (Mama Dicky) PENUH sampai `status='paid'`.
+Kalau transaksi 5507 ini diedit (field berbahaya, mis. nominal), form
+me-reset `debt_action`/`settle_debt_ids` kosong (sesuai desain), lalu
+`needsDebtAction` jadi true lagi — user pilih "Pelunasan", TAPI
+`useOngoingDebts` cuma filter `status='ongoing'`, jadi debt id 3 (yang
+justru "milik" transaksi ini sebelumnya) **TIDAK MUNCUL** di checklist.
+User terjebak: tidak bisa mencentang piutang yang sebenarnya valid untuk
+dipilih ulang.
+
+**Root cause**: backend (`applyDebtTransactionEdit`, lihat kode di
+atas) SUDAH benar — `DELETE FROM debt_payments` dan revert
+`debts.status` ke `'ongoing'` (kalau perlu) terjadi SEBELUM
+`settleDebtsFifo` baru dijalankan saat submit. Tapi checklist di UI
+di-fetch SEBELUM submit terjadi, saat `debts.status` di DB masih
+`'paid'` (revert-nya baru terjadi di backend nanti) — ayam-telur murni
+di sisi query UI, bukan bug logic backend.
+
+**Fix**: `useOngoingDebts` (`shared/debts/use-ongoing-debts.ts`)
+diperluas terima opsi `excludeDebtId`/`excludeTransactionId` — kalau
+diisi, filter jadi `status='ongoing' OR id=excludeDebtId` (piutang
+target transaksi ini SELALU disertakan apa pun statusnya), dan
+`remaining` dihitung dengan MENGECUALIKAN `debt_payments` dari
+`excludeTransactionId` (supaya tidak menampilkan "Sisa Rp0" yang
+membingungkan — situasi SEANDAINYA pembayaran lama sudah dihapus, sesuai
+apa yang akan terjadi setelah submit). `transaction-form.tsx` dan
+`debt-action-field.tsx` diteruskan `transactionId`/`debtStatus` supaya
+opsi ini cuma aktif saat `debtStatus.role === 'payment'` — jalur create
+dan role lain tidak terpengaruh sama sekali. Diverifikasi `tsc`/`npm
+test` (94/94)/`npm run build` bersih, DAN dikonfirmasi live: edit
+transaksi 5507 ("Pelunasan", Rp10.000, melunasi debt id 3 sampai
+`'paid'`) → pilih "Pelunasan piutang yang sudah ada" → checklist
+sekarang menampilkan DUA piutang — debt id 1 (Sisa Rp160.000, ongoing,
+seperti biasa) DAN debt id 3 (Sisa Rp10.000, MESKI statusnya `'paid'`
+di DB) — persis nilai pokoknya, karena pembayaran Rp10.000 dari
+transaksi 5507 sendiri dikecualikan dari perhitungan `remaining`.
+Sebelum fix, baris debt id 3 ini tidak akan muncul sama sekali.
 - ~~Cicilan SEBAGIAN (nominal < sisa) untuk "Bayar" per baris~~ **SUDAH
   DICOBA LIVE** — cicilan Rp100.000 dari sisa Rp1.000.000 piutang Mama
   Dicky (debt id 1, akun "Keluarga") menghasilkan `debt_payments` baru

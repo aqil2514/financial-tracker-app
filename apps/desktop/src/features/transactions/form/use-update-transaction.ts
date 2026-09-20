@@ -13,7 +13,7 @@ import {
   type TransactionFormOutput,
 } from "./transaction.schema";
 
-export function useUpdateTransaction(transaction: Transaction) {
+export function useUpdateTransaction(transaction: Transaction, onSuccess?: () => void) {
   const { data: contacts } = useContacts();
   const contactName =
     contacts?.find((contact) => contact.id === transaction.contact_id)?.name ?? null;
@@ -112,5 +112,6 @@ export function useUpdateTransaction(transaction: Transaction) {
     invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil diperbarui",
     errorMessage: "Gagal memperbarui transaksi",
+    onSuccess,
   });
 }

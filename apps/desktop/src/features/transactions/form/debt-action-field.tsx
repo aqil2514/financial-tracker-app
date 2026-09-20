@@ -9,10 +9,18 @@ import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
 import { useContacts } from "@/shared/contacts/use-contacts";
 import { useOngoingDebts } from "@/shared/debts/use-ongoing-debts";
+import type { TransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
 import type { TransactionFormValues } from "./transaction.schema";
 
 type DebtActionFieldProps = {
   control: Control<TransactionFormValues>;
+  /** ID transaksi yang sedang diedit + status debt-nya — dipakai supaya
+   * kalau transaksi ini SENDIRI adalah pembayaran (`role: 'payment'`)
+   * untuk sebuah piutang yang sudah `status='paid'`, piutang itu TETAP
+   * muncul di checklist (lihat use-ongoing-debts.ts). Undefined saat
+   * form create (transaksi belum ada, tidak mungkin py peran apa pun). */
+  transactionId?: number;
+  debtStatus?: TransactionDebtStatus;
 };
 
 /**
@@ -22,14 +30,17 @@ type DebtActionFieldProps = {
  * utang baru (lihat "Deteksi otomatis debts dari transfer" di
  * debt-receivable-tracking.md), jadi user memilih eksplisit di sini.
  */
-export function DebtActionField({ control }: DebtActionFieldProps) {
+export function DebtActionField({ control, transactionId, debtStatus }: DebtActionFieldProps) {
   const contactName = useWatch({ control, name: "contact_name" });
   const { data: contacts } = useContacts();
   const contactId =
     contacts?.find((contact) => contact.name.toLowerCase() === contactName?.trim().toLowerCase())
       ?.id ?? null;
 
-  const { data: ongoingDebts } = useOngoingDebts(contactId);
+  const { data: ongoingDebts } = useOngoingDebts(contactId, {
+    excludeDebtId: debtStatus?.role === "payment" ? debtStatus.debtId : undefined,
+    excludeTransactionId: debtStatus?.role === "payment" ? transactionId : undefined,
+  });
 
   return (
     <div className="space-y-4 rounded-lg border p-4">

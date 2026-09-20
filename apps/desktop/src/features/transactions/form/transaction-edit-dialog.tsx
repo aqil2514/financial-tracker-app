@@ -21,10 +21,23 @@ export function TransactionEditDialog({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const { open, setOpen, form, onSubmit, isPending } =
-    useUpdateTransaction(transaction);
-
   const isControlled = controlledOpen !== undefined;
+
+  // Saat controlled, `controlledOpen` adalah SATU-SATUNYA sumber
+  // kebenaran untuk MERENDER Dialog — `open` internal dari useEntityForm
+  // tidak pernah dibaca balik untuk itu. Sinkronisasi hanya SATU ARAH
+  // (controlledOpen -> open internal, lewat effect di bawah) supaya
+  // resetOnOpen tetap jalan; penutupan ke context sekarang EKSPLISIT
+  // lewat onSuccess (dipanggil useEntityForm setelah mutation sukses,
+  // sebelum form direset) — sama persis pola AccountEditDialog. Sebelum
+  // fix ini, `open={open}` merender dari state internal DAN
+  // handleOpenChange menyinkronkan dua arah — begitu submit sukses
+  // menutup `open` internal tanpa memberi tahu context, dialog jadi
+  // tidak bisa dibuka lagi lain kali (context/internal saling berbeda).
+  const { open, setOpen, form, onSubmit, isPending } = useUpdateTransaction(
+    transaction,
+    () => setControlledOpen?.(false)
+  );
 
   useEffect(() => {
     if (isControlled) setOpen(controlledOpen);
@@ -32,8 +45,11 @@ export function TransactionEditDialog({
   }, [isControlled, controlledOpen]);
 
   function handleOpenChange(next: boolean) {
-    setOpen(next);
-    setControlledOpen?.(next);
+    if (isControlled) {
+      setControlledOpen?.(next);
+    } else {
+      setOpen(next);
+    }
   }
 
   return (
@@ -46,7 +62,7 @@ export function TransactionEditDialog({
         )
       }
       title="Edit Transaksi"
-      open={open}
+      open={isControlled ? controlledOpen : open}
       onOpenChange={handleOpenChange}
       contentClassName="sm:!max-w-6xl"
     >
