@@ -29,6 +29,7 @@ type FormFieldComboboxProps<TFieldValues extends FieldValues> = {
   options: FormFieldComboboxOption[];
   /** Show a clear button that resets the field back to null. */
   allowClear?: boolean;
+  disabled?: boolean;
 };
 
 export function FormFieldCombobox<TFieldValues extends FieldValues>({
@@ -38,6 +39,7 @@ export function FormFieldCombobox<TFieldValues extends FieldValues>({
   placeholder = "Cari...",
   options,
   allowClear = false,
+  disabled,
 }: FormFieldComboboxProps<TFieldValues>) {
   const anchor = useComboboxAnchor();
 
@@ -65,6 +67,7 @@ export function FormFieldCombobox<TFieldValues extends FieldValues>({
                   id={name}
                   placeholder={placeholder}
                   showClear={allowClear}
+                  disabled={disabled}
                 />
                 <ComboboxContent anchor={anchor}>
                   <ComboboxEmpty>Tidak ditemukan</ComboboxEmpty>

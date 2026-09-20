@@ -58,6 +58,23 @@ export function AccountForm({
         label="Deskripsi"
         placeholder="Catatan tambahan tentang akun ini (opsional)"
       />
+      <FormFieldSelect
+        form={form}
+        name="account_type"
+        label="Tipe Akun"
+        options={[
+          {
+            value: "cash",
+            label: "Kas/Bank",
+            description: "Akun uang sungguhan, seperti dompet, rekening bank, atau kartu kredit.",
+          },
+          {
+            value: "debt",
+            label: "Utang Piutang",
+            description: "Akun virtual untuk melacak pinjaman ke/dari orang lain — bukan uang sungguhan.",
+          },
+        ]}
+      />
       <FormFieldToggleGroup
         form={form}
         name="is_active"

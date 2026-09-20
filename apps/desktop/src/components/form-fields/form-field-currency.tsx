@@ -25,6 +25,7 @@ type FormFieldCurrencyProps<TFieldValues extends FieldValues> = {
   placeholder?: string;
   /** Use the numpad-with-expression popover instead of a plain input. */
   useCalculator?: boolean;
+  disabled?: boolean;
 };
 
 export function FormFieldCurrency<TFieldValues extends FieldValues>({
@@ -33,6 +34,7 @@ export function FormFieldCurrency<TFieldValues extends FieldValues>({
   label,
   placeholder = "Masukkan nominal...",
   useCalculator = false,
+  disabled,
 }: FormFieldCurrencyProps<TFieldValues>) {
   return (
     <Controller
@@ -48,6 +50,7 @@ export function FormFieldCurrency<TFieldValues extends FieldValues>({
             onBlur={field.onBlur}
             placeholder={placeholder}
             error={fieldState.error?.message}
+            disabled={disabled}
           />
         ) : (
           <div className="space-y-2">
@@ -61,6 +64,7 @@ export function FormFieldCurrency<TFieldValues extends FieldValues>({
               }}
               onBlur={field.onBlur}
               placeholder={placeholder}
+              disabled={disabled}
               prefix="Rp "
               decimalsLimit={0}
               groupSeparator="."
@@ -91,6 +95,7 @@ function CalculatorCurrencyField({
   onBlur,
   placeholder,
   error,
+  disabled,
 }: {
   id: string;
   label: string;
@@ -99,6 +104,7 @@ function CalculatorCurrencyField({
   onBlur: () => void;
   placeholder: string;
   error?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -114,12 +120,13 @@ function CalculatorCurrencyField({
           }}
           onBlur={onBlur}
           placeholder={placeholder}
+          disabled={disabled}
           prefix="Rp "
           decimalsLimit={0}
           groupSeparator="."
           decimalSeparator=","
           className={cn(
-            "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent py-1 pr-9 pl-2.5 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30",
+            "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent py-1 pr-9 pl-2.5 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80",
             error &&
               "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40"
           )}
@@ -132,6 +139,7 @@ function CalculatorCurrencyField({
                 variant="ghost"
                 size="icon-sm"
                 className="absolute top-1/2 right-1 -translate-y-1/2"
+                disabled={disabled}
               >
                 <CalculatorIcon className="size-4" />
               </Button>

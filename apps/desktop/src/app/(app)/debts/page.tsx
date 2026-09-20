@@ -1,5 +1,7 @@
 import { PageContainer } from "@/components/page-container";
 import { PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ContactSummaryTable } from "@/features/debts";
 
 export default function DebtsPage() {
   return (
@@ -8,7 +10,14 @@ export default function DebtsPage() {
         title="Ringkasan Kontak"
         description="Rangkuman piutang dan utang per kontak"
       />
-      <p className="text-muted-foreground text-sm">Segera hadir.</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Per Kontak</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ContactSummaryTable />
+        </CardContent>
+      </Card>
     </PageContainer>
   );
 }

@@ -48,6 +48,7 @@ export type Account = {
   description: string | null;
   created_at: string;
   is_active: number;
+  account_type: "cash" | "debt";
 };
 
 export type Transaction = {
@@ -63,6 +64,7 @@ export type Transaction = {
   description: string | null;
   date: string;
   created_at: string;
+  contact_id: number | null;
 };
 
 export type Contact = {
@@ -71,5 +73,33 @@ export type Contact = {
   /** JSON dokumen Tiptap terserialisasi (`JSON.stringify`), atau `null`
    * kalau belum diisi. */
   note: string | null;
+  created_at: string;
+};
+
+export type Debt = {
+  id: number;
+  /** 'receivable' = piutang (orang lain berutang ke saya), 'payable' =
+   * utang (saya berutang ke orang lain). */
+  type: "receivable" | "payable";
+  contact_id: number | null;
+  amount: number;
+  account_id: number | null;
+  /** Jejak transaksi transfer otomatis yang membuat piutang/utang ini. */
+  transaction_id: number | null;
+  status: "ongoing" | "paid" | "written_off";
+  note: string | null;
+  date: string;
+  created_at: string;
+};
+
+export type DebtPayment = {
+  id: number;
+  debt_id: number;
+  amount: number;
+  account_id: number | null;
+  /** Jejak transaksi transfer otomatis untuk cicilan/pelunasan ini. */
+  transaction_id: number | null;
+  note: string | null;
+  date: string;
   created_at: string;
 };

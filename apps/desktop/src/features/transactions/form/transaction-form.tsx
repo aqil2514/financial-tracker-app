@@ -18,6 +18,11 @@ import { useCategories } from "@/features/categories";
 import { AttachmentUploader } from "@/shared/attachments/attachment-uploader";
 import { PendingAttachmentUploader } from "@/shared/attachments/pending-attachment-uploader";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
+import { useTransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
+import { useOngoingDebts } from "@/shared/debts/use-ongoing-debts";
+import { useContacts } from "@/shared/contacts/use-contacts";
+import { ContactField } from "./contact-field";
+import { DebtActionField } from "./debt-action-field";
 import type {
   TransactionFormOutput,
   TransactionFormValues,
@@ -62,6 +67,92 @@ export function TransactionForm({
     name: "transfer_account_id",
   });
   const categoryId = useWatch({ control: form.control, name: "category_id" });
+  const contactName = useWatch({ control: form.control, name: "contact_name" });
+
+  const { data: contacts } = useContacts();
+  const contactId =
+    contacts?.find(
+      (contact) => contact.name.toLowerCase() === contactName?.trim().toLowerCase()
+    )?.id ?? null;
+  const { data: ongoingDebts } = useOngoingDebts(contactId);
+
+  const sourceAccount = accounts?.find((account) => String(account.id) === accountId);
+  const destinationAccount = accounts?.find(
+    (account) => String(account.id) === transferAccountId
+  );
+  const sourceIsDebt = sourceAccount?.account_type === "debt";
+  const destinationIsDebt = destinationAccount?.account_type === "debt";
+  const involvesDebtAccount = sourceIsDebt || destinationIsDebt;
+
+  // Transaksi (mode edit) yang berperan sebagai piutang INDUK dan SUDAH
+  // menerima cicilan dari transaksi LAIN — field berbahaya (kontak,
+  // nominal, akun, aksi debt) dikunci read-only, karena merevisinya
+  // butuh recreate yang akan menghapus cicilan itu lewat CASCADE. Lihat
+  // apply-debt-transaction.ts (applyDebtTransactionEdit) dan "Edit
+  // transaksi yang sudah py debts terkait" di debt-receivable-tracking.md.
+  // Transaksi yang berperan sebagai PEMBAYARAN (bukan induk), atau induk
+  // yang belum py cicilan, TETAP bebas diedit — recreate-nya aman.
+  const { data: debtStatus } = useTransactionDebtStatus(transactionId);
+  const debtFieldsLocked = debtStatus?.role === "principal" && debtStatus.hasPayments;
+
+  // debt -> cash: arah transfer semata ambigu (pelunasan piutang existing
+  // vs utang baru) — lihat "Deteksi otomatis debts dari transfer" di
+  // debt-receivable-tracking.md. debt -> debt sengaja TIDAK termasuk
+  // (di luar scope, tidak trigger apa pun).
+  const needsDebtAction =
+    !debtFieldsLocked && type === "transfer" && sourceIsDebt && !destinationIsDebt;
+
+  function validateDebtFields(values: TransactionFormOutput): string | null {
+    if (debtFieldsLocked) return null;
+    if (involvesDebtAccount && !values.contact_name?.trim()) {
+      return "Nama kontak wajib diisi untuk transaksi yang melibatkan akun utang piutang";
+    }
+    if (needsDebtAction) {
+      if (!values.debt_action) {
+        return "Pilih dulu apakah ini pelunasan piutang atau utang baru";
+      }
+      if (values.debt_action === "settlement") {
+        if (values.settle_debt_ids.length === 0) {
+          return "Pilih minimal satu piutang yang dilunasi";
+        }
+        // Konsisten dengan pola pembayaran nyata yang ditemukan di data
+        // ("Kak Ipit Paylater" — pokok & kelebihan SELALU 2 transaksi
+        // terpisah) — lihat "Update besar" poin 5 di
+        // debt-receivable-tracking.md. Tanpa validasi ini, kelebihan
+        // bayar hilang begitu saja (settleDebtsFifo cuma mengalokasikan
+        // sampai piutang yang dicentang habis, sisanya dibuang).
+        const totalRemaining = (ongoingDebts ?? [])
+          .filter((debt) => values.settle_debt_ids.includes(String(debt.id)))
+          .reduce((sum, debt) => sum + debt.remaining, 0);
+        if (values.amount > totalRemaining) {
+          return "Nominal melebihi total sisa piutang yang dipilih — catat kelebihannya sebagai transaksi terpisah";
+        }
+      }
+    }
+    return null;
+  }
+
+  function handleSubmit(values: TransactionFormOutput) {
+    const error = validateDebtFields(values);
+    if (error) {
+      form.setError(needsDebtAction && values.debt_action ? "settle_debt_ids" : "contact_name", {
+        message: error,
+      });
+      return;
+    }
+    onSubmit(values);
+  }
+
+  function handleSubmitAndContinue(values: TransactionFormOutput) {
+    const error = validateDebtFields(values);
+    if (error) {
+      form.setError(needsDebtAction && values.debt_action ? "settle_debt_ids" : "contact_name", {
+        message: error,
+      });
+      return;
+    }
+    onSubmitAndContinue?.(values);
+  }
 
   // Akun/kategori nonaktif disembunyikan dari opsi baru, tapi tetap
   // ditampilkan kalau sedang dipakai transaksi yang diedit — supaya form
@@ -98,8 +189,8 @@ export function TransactionForm({
       }) ?? [];
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)}>
-      <div className="grid gap-6 sm:grid-cols-2">
+    <form onSubmit={form.handleSubmit(handleSubmit)}>
+      <div className="grid max-h-[70vh] gap-6 overflow-y-auto pr-1 sm:grid-cols-2">
         <div className="space-y-4">
           <FormFieldText
             form={form}
@@ -112,12 +203,14 @@ export function TransactionForm({
             name="type"
             label="Tipe Transaksi"
             options={typeOptions}
+            disabled={debtFieldsLocked}
           />
           <FormFieldCurrency
             form={form}
             name="amount"
             label="Nominal"
             useCalculator
+            disabled={debtFieldsLocked}
           />
           <FormFieldCombobox
             form={form}
@@ -125,6 +218,7 @@ export function TransactionForm({
             label={type === "transfer" ? "Dari Akun" : "Akun"}
             placeholder="Cari akun..."
             options={accountOptions}
+            disabled={debtFieldsLocked}
           />
           {type === "transfer" ? (
             <FormFieldCombobox
@@ -133,6 +227,7 @@ export function TransactionForm({
               label="Ke Akun"
               placeholder="Cari akun tujuan..."
               options={accountOptions}
+              disabled={debtFieldsLocked}
             />
           ) : (
             <FormFieldCombobox
@@ -144,6 +239,19 @@ export function TransactionForm({
               allowClear
             />
           )}
+          <ContactField
+            control={form.control}
+            label={involvesDebtAccount ? "Nama Kontak (wajib)" : "Nama Kontak (opsional)"}
+            disabled={debtFieldsLocked}
+          />
+          {debtFieldsLocked && (
+            <p className="text-muted-foreground text-sm">
+              Piutang ini sudah menerima cicilan dari transaksi lain — kontak,
+              nominal, dan akun tidak bisa diubah dari sini supaya riwayat
+              cicilannya tidak hilang.
+            </p>
+          )}
+          {needsDebtAction && <DebtActionField control={form.control} />}
           <FormFieldDate form={form} name="date" label="Tanggal" />
         </div>
 
@@ -168,7 +276,7 @@ export function TransactionForm({
             type="button"
             variant="outline"
             disabled={isPending}
-            onClick={form.handleSubmit(onSubmitAndContinue)}
+            onClick={form.handleSubmit(handleSubmitAndContinue)}
           >
             Lanjut
           </Button>

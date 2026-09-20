@@ -11,6 +11,14 @@ export const transactionSchema = z
     note: z.string().min(1, "Catatan wajib diisi"),
     description: z.custom<JSONContent>().nullable(),
     date: z.string().min(1, "Tanggal wajib diisi"),
+    contact_name: z.string().nullable(),
+    /** Cuma relevan saat transfer dari akun `debt` ke akun `cash` —
+     * arah transfer semata ambigu (bisa pelunasan piutang ATAU utang
+     * baru), jadi user pilih eksplisit. Null di luar kasus itu. */
+    debt_action: z.enum(["settlement", "payable"]).nullable(),
+    /** Piutang (debts.id, sebagai string) yang dipilih untuk dilunasi —
+     * cuma relevan saat debt_action === 'settlement'. */
+    settle_debt_ids: z.array(z.string()),
   })
   .superRefine((values, ctx) => {
     if (values.type === "transfer") {

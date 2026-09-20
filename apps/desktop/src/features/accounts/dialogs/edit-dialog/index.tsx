@@ -21,9 +21,23 @@ export function AccountEditDialog({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const { open, setOpen, form, onSubmit, isPending } = useUpdateAccount(account);
-
   const isControlled = controlledOpen !== undefined;
+
+  // Saat controlled, `controlledOpen` (context) adalah SATU-SATUNYA
+  // sumber kebenaran untuk MERENDER Dialog — `open` internal dari
+  // useEntityForm tidak pernah dibaca balik untuk itu. Sinkronisasi
+  // hanya SATU ARAH (controlledOpen -> open internal, lewat effect di
+  // bawah) supaya resetOnOpen tetap jalan; sebelumnya ada sinkronisasi
+  // DUA ARAH (open internal juga menulis balik ke context), dan race
+  // antara "mutation sukses menutup dialog lewat open internal" vs
+  // "effect menyinkronkan balik ke context" membuat dialog macet (kadang
+  // selalu tertutup, kadang selalu terbuka, tergantung urutan render).
+  // Penutupan ke context sekarang EKSPLISIT lewat onSuccess (dipanggil
+  // useEntityForm setelah mutation sukses, sebelum form direset).
+  const { open, setOpen, form, onSubmit, isPending } = useUpdateAccount(
+    account,
+    () => setControlledOpen?.(false)
+  );
 
   useEffect(() => {
     if (isControlled) setOpen(controlledOpen);
@@ -31,8 +45,11 @@ export function AccountEditDialog({
   }, [isControlled, controlledOpen]);
 
   function handleOpenChange(next: boolean) {
-    setOpen(next);
-    setControlledOpen?.(next);
+    if (isControlled) {
+      setControlledOpen?.(next);
+    } else {
+      setOpen(next);
+    }
   }
 
   return (
@@ -45,7 +62,7 @@ export function AccountEditDialog({
         )
       }
       title="Edit Akun"
-      open={open}
+      open={isControlled ? controlledOpen : open}
       onOpenChange={handleOpenChange}
     >
       <AccountForm

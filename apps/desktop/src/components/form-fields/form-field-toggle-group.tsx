@@ -17,14 +17,18 @@ type FormFieldToggleGroupProps<TFieldValues extends FieldValues> = {
   form: UseFormReturn<TFieldValues>;
   name: FieldPath<TFieldValues>;
   label: string;
+  description?: string;
   options: FormFieldToggleGroupOption[];
+  disabled?: boolean;
 };
 
 export function FormFieldToggleGroup<TFieldValues extends FieldValues>({
   form,
   name,
   label,
+  description,
   options,
+  disabled,
 }: FormFieldToggleGroupProps<TFieldValues>) {
   return (
     <Controller
@@ -33,6 +37,9 @@ export function FormFieldToggleGroup<TFieldValues extends FieldValues>({
       render={({ field, fieldState }) => (
         <div className="space-y-2">
           <Label>{label}</Label>
+          {description && (
+            <p className="text-muted-foreground text-sm">{description}</p>
+          )}
           <ToggleGroup
             value={field.value ? [field.value] : []}
             onValueChange={(values: string[]) => {
@@ -47,6 +54,7 @@ export function FormFieldToggleGroup<TFieldValues extends FieldValues>({
                 key={option.value}
                 value={option.value}
                 className="flex-1"
+                disabled={disabled}
               >
                 {option.label}
               </ToggleGroupItem>

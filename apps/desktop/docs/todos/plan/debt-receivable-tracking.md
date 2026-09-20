@@ -240,20 +240,85 @@ dibuat di skema `transactions` saat ini.
   DIJAWAB** — lihat "Update besar" di atas: arah ditentukan dari ARAH
   TRANSFER (kas→debt = piutang baru, debt→kas = pelunasan), bukan
   dipetakan manual per kombinasi type.
-- **BARU**: alokasi pembayaran ke tiap `debt_id` saat MULTI-piutang
-  dipilih dalam satu transaksi "Balikin" dan totalnya tidak habis pas di
-  satu piutang saja — FIFO (piutang terlama dulu) atau proporsional
-  (dibagi rata sesuai porsi masing-masing)? Atau user yang menentukan
-  manual porsi tiap piutang di form?
-- **BARU**: `contacts` create-on-the-fly di combobox — kalau user ketik
-  nama yang MIRIP tapi tidak identik dengan kontak existing (mis. "Wayu"
-  vs "Nde Wayu"), perlu mekanisme cegah duplikat (fuzzy match/suggest),
-  atau dibiarkan user yang menjaga konsistensi penulisan sendiri?
+- ~~**BARU**: alokasi pembayaran ke tiap `debt_id` saat MULTI-piutang
+  dipilih~~ **SUDAH DIJAWAB** — **FIFO** (piutang dengan `date` TERLAMA
+  dilunasi duluan sampai habis/lunas, sisa nominal mengalir ke piutang
+  berikutnya). User cukup pilih piutang mana saja yang mau dibayar +
+  total nominal transaksi, alokasi per `debt_id` dihitung otomatis, TIDAK
+  input manual per piutang.
+- ~~**BARU**: `contacts` create-on-the-fly di combobox~~ **SUDAH
+  DIJAWAB** (lihat "Field Nama Kontak" di atas) — warning non-blocking
+  fuzzy-match (`find-similar-contacts.ts`, substring + Levenshtein ≤2),
+  keputusan akhir pakai yang sudah ada / tetap buat baru diserahkan ke
+  user, TIDAK ada pencegahan otomatis.
 - **BARU**: transaksi transfer ke akun `debt` yang BUKAN utang-piutang
   personal (ditemukan di data: "Balikin Modal", "Minjem Modal",
   "Dipinjem Cor" — lebih ke modal bisnis) — apakah tetap otomatis
   dianggap `debts` (dengan kontak = nama modal/proyek), atau perlu
-  pengecualian/opsi "jangan catat sebagai debt" saat submit?
+  pengecualian/opsi "jangan catat sebagai debt" saat submit? **BELUM
+  DIJAWAB** — untuk implementasi awal, kasus ini tetap diperlakukan
+  sama seperti piutang personal (kontak = nama modal/proyek yang
+  diketik di field Nama Kontak), tidak ada pengecualian khusus.
+
+## Deteksi otomatis debts dari transfer — keputusan implementasi (final)
+
+Melengkapi "Update besar" di atas dengan detail yang sebelumnya belum
+dijawab, khusus soal ARAH `debt → cash` (yang sebelumnya cuma disebut
+"pelunasan" tanpa membahas kemungkinan itu justru UTANG baru):
+
+1. **Kas → Debt** (uang keluar dari akun cash ke akun `debt`) — SELALU
+   otomatis jadi **piutang baru** (`type='receivable'`). Tidak ada
+   pilihan lain untuk arah ini — kontak (wajib) jadi `debts.contact_id`.
+2. **Debt → Kas** (uang masuk dari akun `debt` ke akun cash) — arah
+   transfer semata TIDAK cukup untuk tahu apakah ini pelunasan piutang
+   existing atau justru UTANG baru (saya pinjam dari kontak itu) — dua
+   makna berbeda, sama-sama valid secara arah uang. **User memilih
+   eksplisit di form**, muncul begitu arah ini terdeteksi:
+   - **"Pelunasan piutang yang sudah ada"** → lanjut ke alur multi-select
+     (poin 3).
+   - **"Utang baru dari kontak ini"** → langsung buat 1 baris `debts`
+     baru `type='payable'`, `contact_id` dari field kontak, `amount`
+     dari nominal transaksi, `transaction_id` dijejak seperti piutang.
+3. **Multi-select pelunasan** — daftar pilihan HANYA menampilkan `debts`
+   `status='ongoing'` MILIK KONTAK yang dipilih di field Nama Kontak
+   (bukan semua kontak) — mencegah salah pilih piutang orang lain.
+   Validasi: total nominal transaksi WAJIB ≤ total sisa (`amount - SUM
+   (debt_payments.amount)`) dari piutang-piutang yang dicentang.
+   Alokasi ke tiap `debt_id` FIFO berdasar `debts.date` TERLAMA
+   (lihat poin di atas) — 1 baris `debt_payments` dibuat PER `debt_id`
+   yang menerima alokasi (bukan 1 baris gabungan), masing-masing dengan
+   `amount` sesuai porsi FIFO-nya, `transaction_id`/`account_id` sama
+   (merujuk transaksi transfer yang sama). Status `debts` di-update
+   jadi `'paid'` otomatis kalau sisa jadi 0 setelah alokasi ini.
+4. **Debt ↔ Debt** (kedua akun sumber & tujuan sama-sama `account_type
+   ='debt'`) — TIDAK trigger logic otomatis apa pun. Diperlakukan
+   sebagai transfer biasa (field kontak tetap muncul, opsional, boleh
+   diisi untuk catatan, tapi tidak ada insert ke `debts`/`debt_payments`).
+   Kasus ini tidak ditemukan polanya di data nyata, di luar scope awal.
+
+## Kredit/Paylater BUKAN bagian `account_type='debt'` — DITUNDA
+
+Muncul pertanyaan: apakah akun kredit/paylater (Kredivo, Shopee
+PayLater — grup akun "Kredit"/"Utang" di data saat ini) sebaiknya
+disatukan ke `account_type='debt'` juga? **Jawaban: TIDAK, keduanya
+konsep berbeda:**
+
+- **`debt` (utang piutang, sedang dibangun)** — person-to-person, uang
+  dititip/dipinjamkan ke kontak tertentu, dilacak lewat `contact_id`,
+  dipicu dari ARAH TRANSFER, pelunasan = uangnya balik utuh (bukan
+  cicilan berjadwal, bukan bunga).
+- **Kredit/paylater** — utang ke institusi/pihak ketiga, biasanya
+  berupa EXPENSE langsung (belanja pakai Kredivo = expense, bukan
+  transfer dari akun kas), punya limit/jatuh tempo/cicilan terjadwal
+  yang tidak cocok dengan logic "transfer kas↔debt account" atau
+  validasi "bayar ≤ sisa piutang" yang sedang dirancang untuk `debt`.
+
+**Keputusan**: `account_type` TETAP cuma `'cash'`/`'debt'` untuk
+sekarang (sesuai `0013_account_type.sql`). Kredit/paylater tetap
+diperlakukan sebagai akun `'cash'` biasa. Kalau nanti mau digarap,
+perlu `account_type` baru (mis. `'credit'`) dengan logic terpisah
+sepenuhnya dari fitur ini — TIDAK dipaksakan reuse `debts`/`debt_payments`.
+Ditunda sampai fitur utang piutang personal ini selesai.
 
 ## Catatan
 
@@ -263,11 +328,144 @@ dependency sistem eksternal/auth — dan langsung menjawab pain point
 personal yang sudah dikonfirmasi nyata, DIPERKUAT temuan pola nyata 70
 transaksi "minjem"/"balikin" di data — bukan cuma hipotesis).
 
-**Status implementasi saat ini**: masih tahap desain, BELUM implementasi
-sama sekali kecuali kerangka navigasi sidebar (lihat di atas). Yang
-BELUM ditulis: migrasi SQL final (`contacts`, `debts` versi
-`contact_id`, `accounts.account_type`), logic deteksi otomatis di form
-transaksi transfer, logic alokasi multi-payment. Desain skema di
-`0012_debts.sql` (migrasi yang SUDAH ada di repo) SUDAH OUTDATED —
-masih pakai `contact_name TEXT`, perlu migrasi tambahan atau ditulis
-ulang sebelum kolom `contacts`/`contact_id` diimplementasikan.
+**Status implementasi saat ini** (diperbarui):
+
+SUDAH selesai:
+- Kerangka navigasi sidebar (accordion "Utang Piutang" + "Master Data").
+- Migrasi `0012_debts.sql` (revisi, sudah pakai `contact_id` bukan
+  `contact_name`), `0013_account_type.sql` (`accounts.account_type`
+  `'cash'`/`'debt'`), `0014_transaction_contact.sql`
+  (`transactions.contact_id`) — semua teregistrasi di `migrations.rs`
+  dan terverifikasi.
+- Fitur Kontak (`contacts`) end-to-end: CRUD lewat
+  `/master-data/contacts`, rich text note, dipakai umum (bukan cuma
+  debt) sesuai keputusan "Kontak sebagai entitas umum" di atas.
+- Field "Tipe Akun" (`Kas/Bank` / `Utang Piutang`) di form akun — select
+  dengan deskripsi kontekstual per opsi, bebas diedit create & edit.
+- Field "Nama Kontak" di form transaksi — combobox creatable (bisa pilih
+  existing atau ketik nama baru → otomatis jadi kontak baru saat
+  submit), dengan warning fuzzy-match non-blocking (`find-similar-contacts.ts`).
+  Field ini SELALU muncul (opsional untuk transaksi biasa), TAPI WAJIB
+  diisi kalau akun sumber/tujuan yang dipilih `account_type='debt'` —
+  tidak dibatasi ke `type='transfer'` saja (income/expense langsung ke
+  akun debt juga butuh kontak).
+- `resolveContactId()` (`shared/contacts/resolve-contact.ts`) — get-or-
+  create dipakai dari `use-create-transaction.ts`/`use-update-transaction.ts`.
+- **Logic OTOMATIS pembuatan `debts`/`debt_payments` dari transfer**
+  (`shared/debts/apply-debt-transaction.ts`, dipanggil dari
+  `use-create-transaction.ts` SETELAH insert transaksi, di dalam
+  `mutationFn` yang sama — bukan best-effort seperti lampiran, kegagalan
+  di sini membatalkan seluruh mutation):
+  - Kas→Debt: `INSERT debts type='receivable'` otomatis, tidak ambigu.
+  - Debt→Kas: field `DebtActionField` (`debt-action-field.tsx`) muncul
+    di form, user pilih eksplisit "Pelunasan" atau "Utang baru" —
+    disimpan sementara di `debt_action`/`settle_debt_ids` (field form,
+    BUKAN kolom `transactions`, cuma dipakai saat submit).
+  - Pelunasan: multi-select checkbox `debts` `status='ongoing'` MILIK
+    KONTAK yang dipilih (`useOngoingDebts`,
+    `shared/debts/use-ongoing-debts.ts`), alokasi FIFO berdasar
+    `debts.date` TERLAMA (`settleDebtsFifo` di `apply-debt-transaction.ts`)
+    — 1 baris `debt_payments` per `debt_id` yang menerima alokasi,
+    `debts.status` di-update `'paid'` otomatis kalau sisa jadi 0.
+  - Debt↔Debt: sengaja tidak trigger apa pun (sesuai keputusan di atas).
+  - Diverifikasi manual lewat simulasi SQL di salinan `finance.dev.db`
+    (insert receivable, lalu FIFO 2-debt settlement) — hasil sesuai
+    ekspektasi, `foreign_key_check` bersih.
+- **Edit transaksi TIDAK memicu ulang logic debt** — `use-update-transaction.ts`
+  sengaja TIDAK memanggil `applyDebtTransaction` sama sekali (menghindari
+  duplikat/inkonsistensi). `useTransactionHasDebtLink()`
+  (`shared/debts/use-transaction-has-debt-link.ts`) mendeteksi transaksi
+  yang SUDAH py `debts`/`debt_payments` terkait (`transaction_id` match)
+  — kalau ya, field kontak & aksi debt DIKUNCI read-only di form edit
+  (`debtFieldsLocked` di `transaction-form.tsx`), field lain (nominal,
+  akun, dst) tetap bebas diedit.
+
+- **Halaman `/debts`, `/debts/receivables`, `/debts/payables` — READ-ONLY,
+  sengaja belum dipoles** (`features/debts/`: `ContactSummaryTable`,
+  `DebtListTable`), sesuai permintaan eksplisit "cukup read only saja
+  dlu, akan dipoles nanti. Hanya sekadar untuk lihat efek dari transaksi
+  otomatisnya":
+  - `/debts` — `ContactSummaryTable` (`use-contact-summary.ts`): per
+    kontak, total sisa piutang & utang `status='ongoing'` (agregat, cuma
+    kontak yang PERNAH punya `debts` yang muncul).
+  - `/debts/receivables`, `/debts/payables` — `DebtListTable`
+    (`use-debts-list.ts`): SEMUA `debts` per `type` (semua status, badge
+    Berjalan/Lunas/Dihapuskan), kolom kontak/akun/pokok/sisa.
+  - Belum ada aksi apa pun di halaman ini (tidak ada create/edit/hapus
+    manual, tidak ada filter/sort) — murni untuk verifikasi visual hasil
+    logic otomatis.
+  - **Diverifikasi dengan data nyata** (bukan cuma simulasi SQL): transfer
+    Rp1.000.000 dari akun cash ke akun "Keluarga" (`debt`) dengan kontak
+    "Mama Dicky" via `tauri dev` → otomatis menghasilkan
+    `debts(type='receivable', contact_id=2, amount=1000000,
+    account_id=26, transaction_id=5500, status='ongoing')`, muncul benar
+    di kedua halaman. Alur "Debt→Kas" (pelunasan FIFO/utang baru) BELUM
+    dicoba live di `tauri dev` — baru simulasi SQL manual (lihat di atas).
+
+- **Edit transaksi yang sudah py debts terkait — REVISI dari keputusan
+  lama "TIDAK memicu ulang sama sekali"**. Keputusan lama itu digantikan
+  oleh logic granular di `applyDebtTransactionEdit()`
+  (`shared/debts/apply-debt-transaction.ts`), berdasar PERAN transaksi
+  (`useTransactionDebtStatus()`, `shared/debts/use-transaction-debt-status.ts`)
+  dan apakah "field berbahaya" (`amount`, `type`, `account_id`,
+  `transfer_account_id`, `contact_id`, `debt_action`, `settle_debt_ids`)
+  berubah dari nilai semula (`note`/`description`/`date`/lampiran TIDAK
+  pernah dianggap berbahaya):
+  - `role: 'none'` (belum pernah trigger apa pun) → jalankan
+    `applyDebtTransaction` seperti create.
+  - `role: 'principal'` (transaksi ini MEMBUAT sebuah `debts`), field
+    berbahaya TIDAK berubah → cuma sinkronkan `debts.date`.
+  - `principal`, field berbahaya berubah, `hasPayments=false` (piutang
+    BELUM dicicil transaksi lain) → aman untuk RECREATE: hapus `debts`
+    lama, buat ulang dari nilai baru.
+  - `principal`, field berbahaya berubah, `hasPayments=true` (piutang
+    SUDAH dicicil transaksi LAIN) → **DIBLOKIR** (`DebtEditBlockedError`)
+    — recreate akan menghapus cicilan itu lewat `ON DELETE CASCADE`.
+    UI mengunci field berbahaya (`debtFieldsLocked` di
+    `transaction-form.tsx`, dengan `disabled` yang sekarang didukung
+    `FormFieldCurrency`/`FormFieldCombobox`/`FormFieldToggleGroup`) —
+    field aman (note/description/date/lampiran) TETAP bebas diedit.
+  - `role: 'payment'` (transaksi ini SATU cicilan/pelunasan), field
+    berbahaya TIDAK berubah → cuma sinkronkan `debt_payments.date`.
+  - `payment`, field berbahaya berubah → SELALU aman untuk RECREATE
+    (tidak ada yang bergantung pada satu baris `debt_payments`) — hapus
+    baris lama, revert `debts.status` ke `'ongoing'` kalau perlu, buat
+    ulang dari nilai baru.
+  - Field `debt_action`/`settle_debt_ids` di form edit SELALU mulai
+    KOSONG (tidak direkonstruksi dari `debt_payments` lama) — kalau
+    field berbahaya diedit pada transaksi pelunasan, user wajib pilih
+    ulang piutang mana yang dilunasi dari awal.
+  - Diverifikasi lewat 14 unit test
+    (`shared/debts/apply-debt-transaction.test.ts`, fake in-memory DB —
+    bukan SQLite asli, cukup untuk menguji branching logic) DAN simulasi
+    SQL manual 3 skenario kunci di salinan `finance.dev.db` (recreate
+    induk belum dicicil, blokir induk sudah dicicil, recreate pelunasan).
+- **Validasi overpay ditambahkan** — gap ditemukan saat menulis checklist
+  manual testing: form TIDAK memvalidasi "nominal ≤ total sisa piutang
+  yang dicentang" sebelum submit, padahal `settleDebtsFifo` diam-diam
+  MEMBUANG kelebihan nominal (loop berhenti begitu piutang yang
+  dicentang habis, sisa `remainingToAllocate` tidak pernah dipakai).
+  Diperbaiki di `validateDebtFields()` (`transaction-form.tsx`) — total
+  sisa dihitung dari `useOngoingDebts()` yang sudah difilter ke
+  `settle_debt_ids` yang dicentang, dibandingkan ke `amount` sebelum
+  submit diizinkan.
+- Checklist manual testing lengkap ada di
+  `docs/checklist/debt-receivable-testing.md` — cakupan: setup akun,
+  create (kas→debt, debt→kas payable/settlement, partial payment, FIFO
+  multi-debt, debt↔debt, expense/income langsung ke akun debt), edit
+  (belum ada link, induk belum dicicil, induk sudah dicicil/harus
+  diblokir, edit transaksi pelunasan itu sendiri, edit field aman saja),
+  plus query SQL verifikasi cepat.
+
+BELUM ditulis / batasan yang diketahui:
+- Poles UI halaman `/debts`/`receivables`/`payables` — filter status,
+  aksi manual (mis. tandai `written_off`), detail per piutang (riwayat
+  `debt_payments`-nya), dan style/layout yang lebih baik (saat ini murni
+  `Table` polos, belum ada empty state ilustrasi dsb).
+- Komponen `Checkbox` (`components/ui/checkbox.tsx`) baru dibuat untuk
+  kebutuhan `DebtActionField` — belum dipakai di tempat lain.
+- Alur "Debt→Kas" (baik "Utang baru" maupun "Pelunasan" FIFO multi-debt,
+  DAN jalur edit yang baru ditambahkan) BELUM diuji lewat `tauri dev`
+  secara live — cuma tervalidasi lewat simulasi SQL manual + unit test
+  fake-DB. Checklist manual (`docs/checklist/debt-receivable-testing.md`)
+  sudah dibuat, TAPI belum dijalankan.

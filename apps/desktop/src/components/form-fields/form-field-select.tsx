@@ -17,6 +17,8 @@ import {
 type FormFieldSelectOption = {
   value: string;
   label: string;
+  /** Shown below the select when this option is the current value. */
+  description?: string;
 };
 
 type FormFieldSelectProps<TFieldValues extends FieldValues> = {
@@ -73,6 +75,16 @@ export function FormFieldSelect<TFieldValues extends FieldValues>({
               ))}
             </SelectContent>
           </Select>
+          {(() => {
+            const selected = options.find(
+              (option) => option.value === field.value
+            );
+            return selected?.description ? (
+              <p className="text-muted-foreground text-sm">
+                {selected.description}
+              </p>
+            ) : null;
+          })()}
           {fieldState.error && (
             <p className="text-destructive text-sm">
               {fieldState.error.message}

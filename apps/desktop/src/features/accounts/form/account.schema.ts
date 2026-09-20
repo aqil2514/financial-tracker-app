@@ -6,6 +6,7 @@ export const accountSchema = z.object({
   group_id: z.string().nullable(),
   description: z.string().nullable(),
   is_active: z.enum(["1", "0"]),
+  account_type: z.enum(["cash", "debt"]),
 });
 
 export type AccountFormValues = z.input<typeof accountSchema>;

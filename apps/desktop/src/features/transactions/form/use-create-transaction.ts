@@ -7,6 +7,8 @@ import { useEntityForm } from "@/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { isEmptyDoc } from "@/components/rich-text";
 import { saveAttachmentToTransaction } from "@/shared/attachments/use-add-attachment";
+import { resolveContactId } from "@/shared/contacts/resolve-contact";
+import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import {
   transactionSchema,
@@ -44,29 +46,54 @@ export function useCreateTransaction(options: UseCreateTransactionOptions = {}) 
       note: "",
       description: null,
       date: now(),
+      contact_name: null,
+      debt_action: null,
+      settle_debt_ids: [],
     }),
     resetOnOpen: true,
     mutationFn: async (values: TransactionFormOutput) => {
+      const contactId = await resolveContactId(values.contact_name);
+
       const db = await getDb();
+      const accountId = Number(values.account_id);
+      const transferAccountId =
+        values.type === "transfer" ? Number(values.transfer_account_id) : null;
+
       const result = await db.execute(
-        `INSERT INTO transactions (type, amount, category_id, account_id, transfer_account_id, note, description, date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        `INSERT INTO transactions (type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           values.type,
           values.amount,
           values.type === "transfer" || !values.category_id
             ? null
             : Number(values.category_id),
-          Number(values.account_id),
-          values.type === "transfer"
-            ? Number(values.transfer_account_id)
-            : null,
+          accountId,
+          transferAccountId,
           values.note,
           isEmptyDoc(values.description) ? null : JSON.stringify(values.description),
           values.date,
+          contactId,
         ]
       );
-      return result.lastInsertId ?? null;
+      const transactionId = result.lastInsertId ?? null;
+
+      if (transactionId != null) {
+        await applyDebtTransaction({
+          db,
+          transactionId,
+          type: values.type,
+          accountId,
+          transferAccountId,
+          contactId,
+          amount: values.amount,
+          date: values.date,
+          debtAction: values.debt_action,
+          settleDebtIds: values.settle_debt_ids,
+        });
+      }
+
+      return transactionId;
     },
     onSuccess: async (transactionId) => {
       const pending = getPendingAttachments?.() ?? [];

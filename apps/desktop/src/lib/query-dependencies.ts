@@ -3,6 +3,9 @@ import type { QueryKey } from "@tanstack/react-query";
 import { accountsQueryKey, accountGroupsQueryKey } from "@/hooks/resources";
 import { categoriesQueryKey } from "@/hooks/resources";
 import { contactsQueryKey } from "@/shared/contacts/use-contacts";
+import { ongoingDebtsQueryKey } from "@/shared/debts/use-ongoing-debts";
+import { debtsListQueryKey } from "@/shared/debts/use-debts-list";
+import { contactSummaryQueryKey } from "@/shared/debts/use-contact-summary";
 import { transactionsQueryKey } from "@/features/transactions/list/use-transactions";
 import { recentTransactionsQueryKey } from "@/features/dashboard/recent-transactions/use-recent-transactions";
 import { currentMonthSummaryQueryKey } from "@/features/dashboard/current-month-summary/use-current-month-summary";
@@ -34,11 +37,15 @@ export const QUERY_DEPENDENCIES = {
     accountGroupBalancesQueryKey,
     transactionDaysQueryKey,
     monthSummaryQueryKey,
+    ongoingDebtsQueryKey, // transaksi transfer bisa membuat/melunasi debts
+    debtsListQueryKey,
+    contactSummaryQueryKey,
   ],
   accounts: [accountsQueryKey, accountBalancesQueryKey, accountGroupBalancesQueryKey],
   accountGroups: [accountGroupsQueryKey, accountGroupBalancesQueryKey],
   categories: [categoriesQueryKey],
   contacts: [contactsQueryKey],
+  debts: [ongoingDebtsQueryKey, debtsListQueryKey, contactSummaryQueryKey],
 } satisfies Record<string, QueryKey[]>;
 
 export type QueryDependencyDomain = keyof typeof QUERY_DEPENDENCIES;
