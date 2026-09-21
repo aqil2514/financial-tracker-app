@@ -1,4 +1,4 @@
-import type { RetailkuSettings } from "../use-retailku-settings";
+import type { RetailkuSettings } from "../mcp-hooks/use-retailku-settings";
 import type { RetailkuMcpConfig } from "./connect";
 
 /**

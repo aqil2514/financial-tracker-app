@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { CashflowDateRange } from "@/shared/retailku";
+import type { CashflowDateRange } from "./summary/use-retailku-cashflow";
 import { ArApTab } from "./summary/ar-ap";
 import { CashflowAllocationTab } from "./summary/cashflow-allocation";
 import { CashflowSummaryTab } from "./summary/cashflow-summary";

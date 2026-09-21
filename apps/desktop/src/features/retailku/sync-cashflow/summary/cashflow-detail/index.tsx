@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
-import { useRetailkuCashflowDetail, type CashflowDateRange } from "@/shared/retailku";
+import { useRetailkuCashflowDetail, type CashflowDateRange } from "../use-retailku-cashflow";
 
 /** Tab "Pergerakan" — data get_cashflow_detail (tool baru, lihat
  * retailku-cashflow-sync.md), pergerakan kas per transaksi individual

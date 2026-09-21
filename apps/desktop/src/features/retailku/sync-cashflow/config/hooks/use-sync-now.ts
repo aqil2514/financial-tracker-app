@@ -2,12 +2,8 @@
 
 import { toast } from "sonner";
 
-import {
-  assertRetailkuConfigured,
-  useSyncRetailkuAll,
-  type RetailkuCashflowSyncMode,
-  type RetailkuSettings,
-} from "@/shared/retailku";
+import { assertRetailkuConfigured, type RetailkuSettings } from "@/shared/retailku";
+import { useSyncRetailkuAll, type RetailkuCashflowSyncMode } from "../../sync";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);

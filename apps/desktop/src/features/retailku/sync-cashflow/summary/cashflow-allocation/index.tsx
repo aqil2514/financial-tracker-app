@@ -2,7 +2,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/format-currency";
-import { useRetailkuCashflowAllocation, type CashflowDateRange } from "@/shared/retailku";
+import { useRetailkuCashflowAllocation, type CashflowDateRange } from "../use-retailku-cashflow";
 
 /** Tab "Alokasi" — data get_cashflow_allocation, breakdown per
  * sourceType -> akun lawan NON-KAS (akun kas sendiri sengaja

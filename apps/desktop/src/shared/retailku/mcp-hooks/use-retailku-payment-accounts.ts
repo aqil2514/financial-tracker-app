@@ -2,8 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { assertRetailkuConfigured, connectRetailkuMcp } from "./mcp-connection";
-import { getFinanceAccounts, type RetailkuFinanceAccount } from "./mcp-tools";
+import { assertRetailkuConfigured, connectRetailkuMcp } from "../mcp-connection";
+import { getFinanceAccounts, type RetailkuFinanceAccount } from "../mcp-tools";
 import { useRetailkuSettings } from "./use-retailku-settings";
 
 export const retailkuPaymentAccountsQueryKey = ["retailku", "payment-accounts"];

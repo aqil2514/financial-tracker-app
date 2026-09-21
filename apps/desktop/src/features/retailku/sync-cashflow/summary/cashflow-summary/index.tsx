@@ -2,7 +2,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/format-currency";
-import { useRetailkuCashflowSummary, type CashflowDateRange } from "@/shared/retailku";
+import { useRetailkuCashflowSummary, type CashflowDateRange } from "../use-retailku-cashflow";
 
 /** Tab "Ringkasan" — persis data get_cashflow_summary: total periode +
  * rincian per hari, mirip kartu ringkasan di halaman Cashflow Retailku

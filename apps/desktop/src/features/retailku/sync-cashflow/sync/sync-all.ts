@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import type { RetailkuMcpConfig } from "./mcp-connection";
+import type { RetailkuMcpConfig } from "@/shared/retailku";
 import { syncCashflow, type SyncCashflowResult } from "./sync-cashflow";
 import { syncArAp, rollbackArApSnapshots, type SyncArApResult } from "./sync-ar-ap";
 import type { RetailkuCashflowSyncMode } from "./use-retailku-cashflow-sync-settings";

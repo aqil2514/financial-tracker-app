@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/format-currency";
-import { useRetailkuArAp } from "@/shared/retailku";
+import { useRetailkuArAp } from "../use-retailku-cashflow";
 
 /** Tab "Utang Piutang" — data get_ar_ap, snapshot outstanding SAAT INI
  * per pihak (bukan rentang tanggal, lihat "Keterkaitan dengan sync

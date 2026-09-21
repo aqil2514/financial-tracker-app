@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { RetailkuCashflowSyncSettings } from "@/shared/retailku";
+import type { RetailkuCashflowSyncSettings } from "../../sync";
 
 type SetSyncSettings = {
   mutate: (

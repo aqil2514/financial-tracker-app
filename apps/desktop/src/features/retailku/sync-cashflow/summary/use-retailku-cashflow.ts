@@ -2,18 +2,19 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { assertRetailkuConfigured, connectRetailkuMcp } from "./mcp-connection";
 import {
+  assertRetailkuConfigured,
+  connectRetailkuMcp,
   getArAp,
   getCashflowAllocation,
   getCashflowDetail,
   getCashflowSummary,
+  useRetailkuSettings,
   type RetailkuArAp,
   type RetailkuCashflowAllocation,
   type RetailkuCashflowDetail,
   type RetailkuCashflowSummary,
-} from "./mcp-tools";
-import { useRetailkuSettings } from "./use-retailku-settings";
+} from "@/shared/retailku";
 
 export type CashflowDateRange = {
   dateFrom: string;

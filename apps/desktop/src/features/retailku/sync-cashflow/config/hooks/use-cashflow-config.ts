@@ -5,6 +5,7 @@ import { useCashflowSyncFields } from "./use-cashflow-sync-fields";
 import { useDebtAccountsDraft } from "./use-debt-accounts-draft";
 import { useSyncFromDraft } from "./use-sync-from-draft";
 import { useSyncNow } from "./use-sync-now";
+import { usePreviewSync } from "./use-preview-sync";
 
 /**
  * Orkestrator state + logic untuk tab "Konfigurasi", lihat
@@ -28,7 +29,10 @@ import { useSyncNow } from "./use-sync-now";
  * - `syncFrom` (`useSyncFromDraft`) — draft "Titik Awal Sync"
  * - `syncNow` (`useSyncNow`) — orkestrasi aksi "Sync Sekarang", pakai
  *   NILAI EFEKTIF (draft ?? saved) dari semua field di atas
+ * - `preview` (`usePreviewSync`) — hitung APA yang akan disinkronkan
+ *   TANPA insert, dipakai dialog preview di sections/preview-sync-section.tsx
  *
+
  * CATATAN keputusan #2 revisi: TIDAK ADA LAGI validasi "semua mapping
  * harus ke akun lokal yang sama" — cashflow sekarang sync per akun kas
  * Retailku sendiri-sendiri (lihat sync-cashflow.ts), jadi mapping akun
@@ -56,5 +60,7 @@ export function useCashflowConfig() {
     onSynced: syncFrom.advanceSyncFromToToday,
   });
 
-  return { prerequisites, fields, debtAccounts, syncFrom, syncNow };
+  const preview = usePreviewSync();
+
+  return { prerequisites, fields, debtAccounts, syncFrom, syncNow, preview };
 }

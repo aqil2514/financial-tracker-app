@@ -1,8 +1,6 @@
 import { getDb } from "@/lib/db";
 import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
-import type { RetailkuMcpConfig } from "./mcp-connection";
-import { connectRetailkuMcp } from "./mcp-connection";
-import { getArAp, type RetailkuArApParty } from "./mcp-tools";
+import { connectRetailkuMcp, getArAp, type RetailkuArApParty, type RetailkuMcpConfig } from "@/shared/retailku";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
@@ -49,6 +47,71 @@ type SnapshotRow = {
   outstanding_payable: number;
 };
 
+/** Satu pihak (piutang ATAU utang, satu arah per baris) yang delta-nya
+ * AKAN diproses — hasil `computeArApSync`, dipakai baik untuk insert
+ * sungguhan (`syncArAp`) maupun preview (baca-saja, lihat
+ * use-preview-sync.ts). Delta negatif/nol TIDAK memicu apa pun (lihat
+ * catatan "Delta NEGATIF" di `computeArApSync`), jadi tidak muncul di
+ * sini sama sekali — preview cuma menampilkan piutang/utang BARU yang
+ * akan tercatat. */
+export type ArApSyncPlanRow = {
+  partyId: string;
+  partyName: string;
+  direction: "receivable" | "payable";
+  amount: number;
+};
+
+export type ArApSyncPlan = {
+  rows: ArApSyncPlanRow[];
+  /** Snapshot MENTAH per pihak dari `get_ar_ap` — dibawa serta supaya
+   * `syncArAp` tidak perlu fetch ulang ke MCP untuk `upsertSnapshot`. */
+  parties: RetailkuArApParty[];
+  previousByPartyId: Map<string, SnapshotRow>;
+};
+
+/**
+ * Hitung APA yang akan disinkronkan (fetch MCP + bandingkan dengan
+ * snapshot tersimpan) TANPA menulis apa pun ke database — dipakai BAIK
+ * oleh `syncArAp` (lanjut insert, reuse hasil compute INI, tidak fetch
+ * ulang) MAUPUN oleh preview (`use-preview-sync.ts`, baca-saja saja).
+ *
+ * Strategi selisih-per-pihak dan alasan delta negatif diabaikan: lihat
+ * dokumentasi lengkap di `syncArAp` di bawah.
+ */
+export async function computeArApSync(db: Db, mcpConfig: RetailkuMcpConfig): Promise<ArApSyncPlan> {
+  const client = await connectRetailkuMcp(mcpConfig);
+  let parties: RetailkuArApParty[];
+  try {
+    const result = await getArAp(client);
+    parties = result.parties;
+  } finally {
+    await client.close();
+  }
+
+  const previousSnapshots = await db.select<SnapshotRow[]>(
+    "SELECT retailku_party_id, party_name, outstanding_receivable, outstanding_payable FROM retailku_ar_ap_snapshot"
+  );
+  const previousByPartyId = new Map(previousSnapshots.map((row) => [row.retailku_party_id, row]));
+
+  const rows: ArApSyncPlanRow[] = [];
+  for (const party of parties) {
+    const previous = previousByPartyId.get(party.id);
+    const receivableDelta = party.outstandingReceivable - (previous?.outstanding_receivable ?? 0);
+    const payableDelta = party.outstandingPayable - (previous?.outstanding_payable ?? 0);
+
+    // Delta NEGATIF (pelunasan/koreksi turun) SENGAJA tidak memicu apa
+    // pun — lihat dokumentasi lengkap di `syncArAp`.
+    if (receivableDelta > 0) {
+      rows.push({ partyId: party.id, partyName: party.name, direction: "receivable", amount: receivableDelta });
+    }
+    if (payableDelta > 0) {
+      rows.push({ partyId: party.id, partyName: party.name, direction: "payable", amount: payableDelta });
+    }
+  }
+
+  return { rows, parties, previousByPartyId };
+}
+
 /**
  * Sinkronisasi piutang/utang Retailku (get_ar_ap) -> `debts` lokal.
  * TIDAK dibungkus BEGIN/COMMIT SQL (lihat "Bug ditemukan live" di
@@ -71,67 +134,41 @@ type SnapshotRow = {
  * kontak lokal generik ("Piutang Retailku"/"Utang Retailku") sesuai
  * keputusan — snapshot per pihak murni state internal untuk deteksi
  * selisih, BUKAN sumber kontak individual.
+ *
+ * Perhitungan delta (fetch MCP + bandingkan snapshot) ada di
+ * `computeArApSync`, DIPAKAI ULANG di sini (tidak fetch MCP dua kali) —
+ * fungsi ini tinggal insert per baris plan + update snapshot per pihak
+ * yang tersentuh (SEMUA pihak dari `plan.parties`, bukan cuma yang
+ * delta-nya positif, supaya snapshot tetap akurat untuk sync
+ * berikutnya).
  */
 export async function syncArAp(db: Db, input: SyncArApInput): Promise<SyncArApResult> {
-  const client = await connectRetailkuMcp(input.mcpConfig);
-  let parties: RetailkuArApParty[];
-  try {
-    const result = await getArAp(client);
-    parties = result.parties;
-  } finally {
-    await client.close();
-  }
-
-  const previousSnapshots = await db.select<SnapshotRow[]>(
-    "SELECT retailku_party_id, party_name, outstanding_receivable, outstanding_payable FROM retailku_ar_ap_snapshot"
-  );
-  const previousByPartyId = new Map(previousSnapshots.map((row) => [row.retailku_party_id, row]));
+  const plan = await computeArApSync(db, input.mcpConfig);
 
   const receivableContactId = await resolveGenericContactId(db, RECEIVABLE_CONTACT_NAME);
   const payableContactId = await resolveGenericContactId(db, PAYABLE_CONTACT_NAME);
 
   const insertedSourceRefs: string[] = [];
+  for (const planRow of plan.rows) {
+    const sourceRef = `${input.today}:${planRow.partyId}:${planRow.direction}`;
+    const isReceivable = planRow.direction === "receivable";
+    await insertDebtTransaction(db, {
+      contactId: isReceivable ? receivableContactId : payableContactId,
+      cashAccountId: input.localCashAccountId,
+      debtAccountId: isReceivable ? input.receivableDebtAccountId : input.payableDebtAccountId,
+      amount: planRow.amount,
+      date: input.today,
+      direction: planRow.direction,
+      sourceRef,
+    });
+    insertedSourceRefs.push(sourceRef);
+  }
+
   const touchedPartyIds: string[] = [];
   const previousSnapshotsById = new Map<string, SnapshotRow | undefined>();
-
-  for (const party of parties) {
-    const previous = previousByPartyId.get(party.id);
-    const receivableDelta = party.outstandingReceivable - (previous?.outstanding_receivable ?? 0);
-    const payableDelta = party.outstandingPayable - (previous?.outstanding_payable ?? 0);
-
-    if (receivableDelta > 0) {
-      await insertDebtTransaction(db, {
-        contactId: receivableContactId,
-        cashAccountId: input.localCashAccountId,
-        debtAccountId: input.receivableDebtAccountId,
-        amount: receivableDelta,
-        date: input.today,
-        direction: "receivable",
-        sourceRef: `${input.today}:${party.id}:receivable`,
-      });
-      insertedSourceRefs.push(`${input.today}:${party.id}:receivable`);
-    }
-    if (payableDelta > 0) {
-      await insertDebtTransaction(db, {
-        contactId: payableContactId,
-        cashAccountId: input.localCashAccountId,
-        debtAccountId: input.payableDebtAccountId,
-        amount: payableDelta,
-        date: input.today,
-        direction: "payable",
-        sourceRef: `${input.today}:${party.id}:payable`,
-      });
-      insertedSourceRefs.push(`${input.today}:${party.id}:payable`);
-    }
-    // Delta NEGATIF (pelunasan/koreksi turun) SENGAJA tidak memicu
-    // apa pun di sini — pelunasan piutang/utang lokal punya jalur sendiri
-    // (form/tombol "Bayar" di /debts, dilakukan manual oleh user), sync
-    // ini cuma bertanggung jawab mencatat piutang/utang BARU yang muncul
-    // di Retailku. Snapshot tetap di-update ke nilai terbaru di bawah,
-    // supaya sync berikutnya membandingkan dari titik yang benar.
-
+  for (const party of plan.parties) {
     touchedPartyIds.push(party.id);
-    previousSnapshotsById.set(party.id, previous);
+    previousSnapshotsById.set(party.id, plan.previousByPartyId.get(party.id));
     await upsertSnapshot(db, party);
   }
 
