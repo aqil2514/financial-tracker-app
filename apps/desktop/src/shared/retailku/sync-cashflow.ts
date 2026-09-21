@@ -18,6 +18,12 @@ export type SyncCashflowResult = {
   /** Berapa baris transaksi baru yang berhasil di-insert (tanggal/baris
    * yang sudah pernah tersinkron sebelumnya di-skip, TIDAK dihitung). */
   insertedCount: number;
+  /** `source_ref` dari SEMUA baris yang berhasil di-insert sync ini —
+   * dipakai `sync-all.ts` untuk ROLLBACK MANUAL (DELETE) kalau jalur
+   * AR/AP gagal setelah cashflow sukses, lihat "Keterkaitan dengan sync
+   * utang-piutang" (@tauri-apps/plugin-sql tidak mendukung BEGIN/COMMIT
+   * lintas-panggilan dengan aman — connection pool, bukan 1 koneksi). */
+  insertedSourceRefs: string[];
   /** `accountId` Retailku yang muncul di data TAPI belum ada baris
    * `retailku_account_mapping` untuknya — di-skip, TIDAK menggagalkan
    * seluruh sync (lihat keputusan #2 revisi). */
@@ -31,8 +37,13 @@ export type SyncCashflowResult = {
  * satu akun lokal) dan #6 (mode ringkas/detail). SUMBER DATA SEKARANG
  * SELALU `get_cashflow_detail` (punya `accountId` per baris) — TIDAK
  * LAGI memakai `get_cashflow_summary` sama sekali, bahkan untuk mode
- * ringkas, karena tool itu tidak punya breakdown per akun. SELALU
- * dibungkus BEGIN/COMMIT/ROLLBACK oleh CALLER (`sync-all.ts`).
+ * ringkas, karena tool itu tidak punya breakdown per akun.
+ *
+ * TIDAK dibungkus BEGIN/COMMIT SQL (lihat "Bug ditemukan live" di
+ * retailku-cashflow-sync.md — @tauri-apps/plugin-sql tidak mendukung
+ * itu dengan aman) — caller (`sync-all.ts`) melakukan rollback MANUAL
+ * (DELETE) berdasar `insertedSourceRefs` yang dikembalikan di sini kalau
+ * jalur lain gagal.
  */
 export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<SyncCashflowResult> {
   const client = await connectRetailkuMcp(input.mcpConfig);
@@ -45,7 +56,7 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
         ? aggregateByDateAndAccount(rows)
         : aggregateByDateAccountAndSourceType(rows);
 
-    let insertedCount = 0;
+    const insertedSourceRefs: string[] = [];
     const unmappedAccountIds = new Set<string>();
 
     for (const total of totals) {
@@ -67,10 +78,14 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
         note: total.note,
         sourceRef: total.sourceRef,
       });
-      insertedCount += 1;
+      insertedSourceRefs.push(total.sourceRef);
     }
 
-    return { insertedCount, unmappedAccountIds: [...unmappedAccountIds] };
+    return {
+      insertedCount: insertedSourceRefs.length,
+      insertedSourceRefs,
+      unmappedAccountIds: [...unmappedAccountIds],
+    };
   } finally {
     await client.close();
   }

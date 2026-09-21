@@ -413,6 +413,60 @@ di-update ke nilai terbaru supaya sync berikutnya membandingkan dari
 titik yang benar, tapi TIDAK ada logic "deteksi pelunasan otomatis" di
 sync ini sendiri.
 
+## Bug ditemukan live: BEGIN/COMMIT manual bikin "database is locked" — DIPERBAIKI pakai rollback manual
+
+Saat tombol "Sync Sekarang" pertama kali dicoba live di `tauri dev`,
+muncul error `Sinkronisasi Retailku gagal... error returned from
+database: (code: 5) database is locked`. Diteliti: `@tauri-apps/
+plugin-sql` memakai CONNECTION POOL di balik layar (`close()`
+dokumentasinya sendiri bilang "Closes the database connection pool") —
+tiap panggilan `execute()`/`select()` bisa jatuh ke koneksi fisik SQLite
+BERBEDA. `BEGIN` yang dijalankan di satu `execute()` call TIDAK
+menjamin `INSERT` berikutnya jalan di koneksi yang sama, jadi transaksi
+SQLite (yang terikat per-koneksi) tidak pernah benar-benar terbentuk
+dengan benar — malah dua koneksi saling kunci.
+
+Dikonfirmasi via riset (WebSearch + WebFetch ke GitHub): ini keterbatasan
+DIKETAHUI di plugin resmi Tauri, bukan salah implementasi —
+`tauri-apps/plugins-workspace` issue #886 ("[sql] Add support for
+transactions", dibuka Januari 2024) melaporkan persis masalah yang sama
+(manual `BEGIN`/`ROLLBACK` tidak bekerja seperti diharapkan), BELUM ada
+fix resmi dari tim Tauri per tanggal dokumen ini ditulis.
+
+**Solusi yang diputuskan: ROLLBACK MANUAL (DELETE eksplisit), BUKAN
+BEGIN/COMMIT/ROLLBACK SQL asli** — mempertahankan semangat
+all-or-nothing yang sudah disepakati, diimplementasikan lewat cara yang
+benar-benar didukung plugin ini:
+- `syncCashflow()`/`syncArAp()` SEKARANG mengembalikan
+  `insertedSourceRefs` (daftar `source_ref` yang BERHASIL di-insert),
+  bukan cuma hitungan. `syncArAp()` juga mengembalikan
+  `touchedPartyIds`/`previousSnapshotsById` (snapshot AR/AP SEBELUM
+  sync ini, untuk restore).
+- `syncAll()` (`shared/retailku/sync-all.ts`) menjalankan cashflow lalu
+  AR/AP seperti biasa (TANPA `BEGIN`). Kalau SALAH SATU melempar error,
+  `catch` block menjalankan `DELETE` manual untuk SEMUA `source_ref`
+  yang sudah ter-insert dari KEDUA jalur (termasuk jalur yang sudah
+  sukses duluan), plus `rollbackArApSnapshots()` untuk mengembalikan
+  `retailku_ar_ap_snapshot` ke nilai sebelum sync.
+- **Detail kritis**: `debts.transaction_id` pakai `ON DELETE SET NULL`
+  (bukan CASCADE, lihat `0012_debts.sql`) — `DELETE FROM transactions`
+  SAJA tidak ikut menghapus `debts`/`debt_payments` terkait, cuma
+  membuat `transaction_id`-nya jadi NULL (piutang/utang "yatim" tanpa
+  jejak). Rollback HARUS hapus `debts` dulu secara eksplisit (dengan
+  subquery `WHERE transaction_id IN (SELECT id FROM transactions
+  WHERE source_ref IN (...))`) SEBELUM hapus `transactions`-nya —
+  `debt_payments` ikut terhapus otomatis lewat CASCADE dari `debts`.
+
+**Trade-off yang disadari**: ini BUKAN atomicity sungguhan di level
+database (tidak ada isolation dari transaksi konkuren lain yang
+mungkin baca data "setengah jalan" di antara insert dan rollback) —
+untuk aplikasi desktop single-user tanpa akses konkuren, risiko ini
+diterima sebagai satu-satunya cara praktis mencapai semangat
+all-or-nothing dengan plugin yang tersedia. Diverifikasi
+`tsc`/`npm test` (94/94)/`npm run build` bersih setelah perbaikan —
+BELUM dicoba ulang live di `tauri dev` untuk konfirmasi bug ini benar-
+benar teratasi (lihat TODO "verifikasi live" di bawah).
+
 ## TODO
 
 - [x] ~~Validasi prasyarat mapping sebelum sync bisa aktif: semua baris
@@ -484,16 +538,73 @@ sync ini sendiri.
       gagal) — lihat "Pertanyaan terbuka #2". Field-field pengaturannya
       sudah ada (item di atas), TAPI belum ada kode yang benar-benar
       memicunya secara otomatis.
-- [ ] **BELUM**: verifikasi LIVE di `tauri dev` — migrasi `0018` belum
-      dikonfirmasi jalan nyata, dan `syncAll()` belum pernah benar-benar
-      dieksekusi (cuma diverifikasi `tsc`/`test`/`build`, yang tidak
-      menyentuh Tauri/SQLite sungguhan). WAJIB dicoba live sebelum
-      dianggap selesai — sync ini MENULIS transaksi sungguhan, beda
-      dari fitur read-only yang sebelumnya cukup `tsc`/`test`/`build`.
+- [x] Verifikasi LIVE di `tauri dev` — DIKONFIRMASI BERHASIL (2026-09-21
+      malam, database `finance.dev.db` + WAL). Migrasi `0018` jalan
+      sukses (`_sqlx_migrations` versi 18, `success=1`). Tombol "Sync
+      Sekarang" (mode ringkas, titik awal "2026-09-01") menghasilkan:
+      - 41 transaksi cashflow, rentang 2026-09-01 s/d 2026-09-21, MASING-
+        MASING akun kas Retailku (Seabank/Kas Tunai) ke akun LOKALNYA
+        SENDIRI (id 44 "Kantong Utama"/id 51 "Dompet Bisnis") — bukan
+        digabung ke satu akun, sesuai keputusan #2 revisi.
+      - 5 transaksi transfer AR/AP (4 piutang baru + 1 utang baru),
+        semua ber-`contact_id` mengarah ke kontak generik "Piutang
+        Retailku"/"Utang Retailku" sesuai desain.
+      - 5 baris `debts` baru (id 11-15) lahir otomatis lewat
+        `applyDebtTransaction`, `transaction_id` terisi benar,
+        `status='ongoing'` — persis pola yang sudah teruji untuk input
+        manual, dikonfirmasi bekerja sama untuk sync.
+      - `retailku_ar_ap_snapshot` terisi 5 baris (1 per party) dengan
+        nilai outstanding terkini.
+      TIDAK ADA error "database is locked" — perbaikan rollback manual
+      (lihat "Bug ditemukan live" di atas) berhasil menghindari masalah
+      connection pool. Jalur ROLLBACK ITU SENDIRI (saat salah satu jalur
+      benar-benar gagal di tengah) BELUM sempat teruji live — sync
+      pertama ini langsung sukses penuh, tidak ada skenario gagal yang
+      terpicu secara alami untuk diverifikasi.
+
+## Bug ditemukan live #2: field akun/mode di tab Konfigurasi TIDAK tersimpan — DIPERBAIKI
+
+Setelah sync pertama berhasil (di atas), user menutup lalu membuka lagi
+tab Konfigurasi — Titik Awal Sync (yang memang tersambung ke `settings`)
+tetap benar, TAPI field "Akun Kas untuk Utang Piutang", "Akun untuk
+Piutang", "Akun untuk Utang", dan toggle Mode Sync semuanya KEMBALI KE
+KOSONG/DEFAULT, padahal sebelumnya sudah dipilih dan sync sempat
+berjalan sukses memakainya.
+
+**Root cause**: `mode`/`arApCashAccountId`/`receivableDebtAccountId`/
+`payableDebtAccountId` di `cashflow-config-tab.tsx` SEMPAT cuma
+`useState` lokal murni — TIDAK PERNAH ditulis ke `settings` sama sekali,
+beda dari `syncFrom`/`autoSyncEnabled` yang dari awal sudah benar
+tersambung ke `useRetailkuCashflowSyncSettings`. State React lokal
+hilang begitu komponen unmount (pindah tab lain di `Tabs`, atau
+navigasi keluar halaman) — murni oversight implementasi, bukan masalah
+desain (skema `settings` untuk `syncMode` bahkan SUDAH ada dari awal,
+cuma lupa dipakai).
+
+**Perbaikan**: tambah TIGA key `settings` baru di
+`use-retailku-cashflow-sync-settings.ts` — `retailku_ar_ap_cash_account_id`,
+`retailku_receivable_debt_account_id`, `retailku_payable_debt_account_id`
+(pola sama seperti key lain, `INSERT ... ON CONFLICT DO UPDATE`). Field
+`syncMode` yang skemanya sudah ada dari awal juga baru SEKARANG benar-
+benar dipakai (sebelumnya sama-sama diabaikan, tertutup oleh `useState`
+lokal yang tidak sengaja lebih "menang"). `cashflow-config-tab.tsx`
+ditulis ulang: SEMUA field baca nilai dari `syncSettings` (query), tulis
+langsung lewat `setSyncSettings.mutate()` saat dipilih (bukan
+`setState` lokal lalu simpan terpisah seperti pola `syncFromDraft`) —
+dropdown/toggle group natural untuk auto-save langsung, beda dari input
+teks tanggal yang perlu konfirmasi eksplisit sebelum ditulis.
+Diverifikasi `tsc`/`npm test` (94/94)/`npm run build` bersih. BELUM
+diverifikasi live ulang (ganti tab lalu kembali, pastikan field
+benar-benar persisten) — lihat TODO.
+
 - [x] Penanganan revisi data Retailku setelah sync — DIPUTUSKAN
       diamkan, TIDAK ADA aksi implementasi (lihat "Pertanyaan terbuka
       #4"). Dicatat di TODO ini hanya sebagai jejak bahwa pertanyaan
       ini SUDAH dibahas & sengaja tidak dibangun, bukan terlewat.
+- [ ] **BELUM**: verifikasi live ulang untuk "Bug ditemukan live #2" di
+      atas — pilih field akun/mode, pindah ke tab lain (mis. tab
+      Ringkasan) lalu kembali ke tab Konfigurasi, pastikan nilainya
+      TETAP terisi (tidak kembali kosong seperti sebelum diperbaiki).
 
 ## Pertanyaan terbuka (BELUM diputuskan — dibahas sebelum implementasi)
 

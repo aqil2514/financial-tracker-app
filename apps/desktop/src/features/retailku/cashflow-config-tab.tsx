@@ -32,6 +32,15 @@ function todayIso() {
  * masuk terpisah (mis. AppSidebar), tab ini baru menyediakan
  * pengaturannya.
  *
+ * SEMUA field di sini (mode, 3 field akun, titik awal, toggle
+ * auto-sync) disimpan ke `settings` lewat `useRetailkuCashflowSyncSettings`
+ * — BUKAN `useState` lokal murni. Ditemukan bug live: mode & 3 field
+ * akun SEMPAT cuma `useState`, hilang begitu pindah tab/tutup app
+ * ("sudah berhasil disimpan, tapi kembali ke halaman ini tidak ada yang
+ * benar-benar tersimpan") — diperbaiki dengan menyambungkan semuanya ke
+ * `settings`, pola sama seperti `syncFrom`/`autoSyncEnabled` yang dari
+ * awal sudah benar.
+ *
  * CATATAN keputusan #2 revisi: TIDAK ADA LAGI validasi "semua mapping
  * harus ke akun lokal yang sama" — cashflow sekarang sync per akun kas
  * Retailku sendiri-sendiri (lihat sync-cashflow.ts), jadi mapping akun
@@ -45,10 +54,6 @@ export function CashflowConfigTab() {
   const setSyncSettings = useSetRetailkuCashflowSyncSettings();
   const syncAll = useSyncRetailkuAll();
 
-  const [mode, setMode] = useState<RetailkuCashflowSyncMode>("summary");
-  const [arApCashAccountId, setArApCashAccountId] = useState<string>("");
-  const [receivableDebtAccountId, setReceivableDebtAccountId] = useState<string>("");
-  const [payableDebtAccountId, setPayableDebtAccountId] = useState<string>("");
   const [syncFromDraft, setSyncFromDraft] = useState<string | null>(null);
 
   const hasMappings = (mappings?.length ?? 0) > 0;
@@ -57,6 +62,10 @@ export function CashflowConfigTab() {
   const debtAccountOptions =
     accounts?.filter((account) => account.account_type === "debt" && account.is_active) ?? [];
 
+  const mode = syncSettings?.syncMode ?? "summary";
+  const arApCashAccountId = syncSettings?.arApCashAccountId?.toString() ?? "";
+  const receivableDebtAccountId = syncSettings?.receivableDebtAccountId?.toString() ?? "";
+  const payableDebtAccountId = syncSettings?.payableDebtAccountId?.toString() ?? "";
   const syncFromValue = syncFromDraft ?? syncSettings?.syncFrom ?? "";
 
   const canSync =
@@ -133,7 +142,7 @@ export function CashflowConfigTab() {
           value={[mode]}
           onValueChange={(values: string[]) => {
             if (values.length > 0) {
-              setMode(values[values.length - 1] as RetailkuCashflowSyncMode);
+              setSyncSettings.mutate({ syncMode: values[values.length - 1] as RetailkuCashflowSyncMode });
             }
           }}
         >
@@ -148,7 +157,10 @@ export function CashflowConfigTab() {
           Sisi kas dari transaksi transfer piutang/utang baru — independen dari mapping cashflow per akun
           di atas.
         </p>
-        <Select value={arApCashAccountId} onValueChange={(value) => setArApCashAccountId(value ?? "")}>
+        <Select
+          value={arApCashAccountId}
+          onValueChange={(value) => setSyncSettings.mutate({ arApCashAccountId: value ? Number(value) : null })}
+        >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Pilih akun kas...">
               {(value: string | null) =>
@@ -177,7 +189,9 @@ export function CashflowConfigTab() {
             <Label>Akun untuk Piutang</Label>
             <Select
               value={receivableDebtAccountId}
-              onValueChange={(value) => setReceivableDebtAccountId(value ?? "")}
+              onValueChange={(value) =>
+                setSyncSettings.mutate({ receivableDebtAccountId: value ? Number(value) : null })
+              }
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Pilih akun...">
@@ -199,7 +213,9 @@ export function CashflowConfigTab() {
             <Label>Akun untuk Utang</Label>
             <Select
               value={payableDebtAccountId}
-              onValueChange={(value) => setPayableDebtAccountId(value ?? "")}
+              onValueChange={(value) =>
+                setSyncSettings.mutate({ payableDebtAccountId: value ? Number(value) : null })
+              }
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Pilih akun...">

@@ -1,8 +1,10 @@
 import { getDb } from "@/lib/db";
 import type { RetailkuMcpConfig } from "./retailku-mcp-client";
-import { syncCashflow } from "./sync-cashflow";
-import { syncArAp } from "./sync-ar-ap";
+import { syncCashflow, type SyncCashflowResult } from "./sync-cashflow";
+import { syncArAp, rollbackArApSnapshots, type SyncArApResult } from "./sync-ar-ap";
 import type { RetailkuCashflowSyncMode } from "./use-retailku-cashflow-sync-settings";
+
+type Db = Awaited<ReturnType<typeof getDb>>;
 
 export type SyncAllInput = {
   mcpConfig: RetailkuMcpConfig;
@@ -27,29 +29,36 @@ export type SyncAllResult = {
 
 /**
  * Titik masuk tunggal sinkronisasi Retailku — menjalankan cashflow DAN
- * AR/AP dalam SATU database transaction ALL-OR-NOTHING, lihat
- * docs/todos/plan/retailku-cashflow-sync.md bagian "Keterkaitan dengan
- * sync utang-piutang". Kalau salah satu gagal, SEMUANYA di-rollback —
- * tidak ada `source_ref` baru yang tersimpan sebagian.
+ * AR/AP, lihat docs/todos/plan/retailku-cashflow-sync.md bagian
+ * "Keterkaitan dengan sync utang-piutang".
  *
- * Data dari MCP Retailku sudah diambil lebih dulu oleh `syncCashflow`/
- * `syncArAp` masing-masing SEBELUM insert ke SQLite dimulai (bukan
- * ambil-insert-ambil-insert bergantian) — konsisten dengan keputusan
- * "SEMUA data dari MCP diambil dulu sebelum insert apa pun dimulai".
+ * ALL-OR-NOTHING VIA ROLLBACK MANUAL, BUKAN BEGIN/COMMIT/ROLLBACK SQL
+ * ASLI — `@tauri-apps/plugin-sql` memakai connection pool di balik
+ * layar (tiap `execute()`/`select()` bisa jatuh ke koneksi fisik
+ * berbeda), jadi BEGIN di satu panggilan dan INSERT berikutnya bisa
+ * beda koneksi -> "database is locked" (dikonfirmasi TERJADI nyata saat
+ * live testing, dan merupakan keterbatasan diketahui plugin ini —
+ * lihat GitHub issue tauri-apps/plugins-workspace#886, belum ada fix
+ * resmi per 2026-09). Solusinya: jalankan cashflow lalu AR/AP seperti
+ * biasa (tanpa BEGIN/COMMIT), TANGKAP siapa saja yang berhasil di-insert
+ * dari masing-masing (`insertedSourceRefs`/snapshot lama), dan kalau
+ * SALAH SATU melempar error, DELETE manual semua yang sudah ter-insert
+ * (termasuk dari jalur yang sudah sukses duluan) + restore snapshot
+ * AR/AP — mensimulasikan rollback tanpa transaction SQL asli.
  *
- * `@tauri-apps/plugin-sql` TIDAK punya API transaction bawaan (cuma
- * `execute`/`select`), jadi BEGIN/COMMIT/ROLLBACK dijalankan sebagai raw
- * SQL manual di sini — SATU-SATUNYA tempat di codebase ini yang
- * melakukannya (operasi lain, mis. applyDebtTransaction, berurutan tanpa
- * wrapping karena sebelumnya tidak pernah butuh atomicity lintas-domain
- * seperti ini).
+ * PENTING: `debts.transaction_id` pakai `ON DELETE SET NULL` (bukan
+ * CASCADE, lihat 0012_debts.sql) — DELETE `transactions` SAJA tidak
+ * ikut menghapus `debts`/`debt_payments` terkait. Rollback HARUS hapus
+ * `debts`/`debt_payments` dulu secara eksplisit sebelum `transactions`.
  */
 export async function syncAll(input: SyncAllInput): Promise<SyncAllResult> {
   const db = await getDb();
 
-  await db.execute("BEGIN");
+  let cashflowResult: SyncCashflowResult | null = null;
+  let arApResult: SyncArApResult | null = null;
+
   try {
-    const cashflowResult = await syncCashflow(db, {
+    cashflowResult = await syncCashflow(db, {
       mcpConfig: input.mcpConfig,
       dateFrom: input.dateFrom,
       dateTo: input.dateTo,
@@ -57,7 +66,7 @@ export async function syncAll(input: SyncAllInput): Promise<SyncAllResult> {
       mode: input.mode,
     });
 
-    const arApResult = await syncArAp(db, {
+    arApResult = await syncArAp(db, {
       mcpConfig: input.mcpConfig,
       localCashAccountId: input.arApCashAccountId,
       receivableDebtAccountId: input.receivableDebtAccountId,
@@ -65,15 +74,49 @@ export async function syncAll(input: SyncAllInput): Promise<SyncAllResult> {
       today: input.dateTo,
     });
 
-    await db.execute("COMMIT");
-
     return {
       cashflowInsertedCount: cashflowResult.insertedCount,
       cashflowUnmappedAccountIds: cashflowResult.unmappedAccountIds,
       arApInsertedCount: arApResult.insertedCount,
     };
   } catch (err) {
-    await db.execute("ROLLBACK");
+    await rollbackManually(db, cashflowResult, arApResult);
     throw err;
+  }
+}
+
+async function rollbackManually(
+  db: Db,
+  cashflowResult: SyncCashflowResult | null,
+  arApResult: SyncArApResult | null
+): Promise<void> {
+  const allSourceRefs = [
+    ...(cashflowResult?.insertedSourceRefs ?? []),
+    ...(arApResult?.insertedSourceRefs ?? []),
+  ];
+  if (allSourceRefs.length === 0 && arApResult == null) return;
+
+  if (allSourceRefs.length > 0) {
+    const placeholders = allSourceRefs.map((_, i) => `$${i + 1}`).join(", ");
+
+    // debts.transaction_id pakai ON DELETE SET NULL — hapus debts/
+    // debt_payments dulu secara eksplisit sebelum transactions, supaya
+    // tidak ada baris debts "yatim" tersisa dari transaksi yang
+    // dibatalkan. debt_payments punya ON DELETE CASCADE dari debts,
+    // jadi cukup hapus debts, debt_payments ikut terhapus otomatis.
+    await db.execute(
+      `DELETE FROM debts WHERE transaction_id IN (
+         SELECT id FROM transactions WHERE source = 'retailku_sync' AND source_ref IN (${placeholders})
+       )`,
+      allSourceRefs
+    );
+    await db.execute(
+      `DELETE FROM transactions WHERE source = 'retailku_sync' AND source_ref IN (${placeholders})`,
+      allSourceRefs
+    );
+  }
+
+  if (arApResult != null) {
+    await rollbackArApSnapshots(db, arApResult.touchedPartyIds, arApResult.previousSnapshotsById);
   }
 }

@@ -26,6 +26,19 @@ export type SyncArApInput = {
 
 export type SyncArApResult = {
   insertedCount: number;
+  /** `source_ref` dari SEMUA baris yang berhasil di-insert sync ini —
+   * dipakai `sync-all.ts` untuk ROLLBACK MANUAL kalau jalur lain gagal,
+   * lihat catatan di `sync-cashflow.ts` soal keterbatasan
+   * @tauri-apps/plugin-sql (tidak mendukung BEGIN/COMMIT lintas-panggilan
+   * dengan aman). */
+  insertedSourceRefs: string[];
+  /** `retailku_party_id` yang snapshot-nya SEMPAT diubah sync ini — kalau
+   * perlu rollback, snapshot-nya harus dikembalikan ke nilai SEBELUM sync
+   * ini (dilampirkan di `previousSnapshotsById`), supaya sync berikutnya
+   * menghitung selisih dari titik yang benar, bukan dari nilai yang
+   * "sudah dianggap tersinkron" padahal transaksinya sudah dihapus. */
+  touchedPartyIds: string[];
+  previousSnapshotsById: Map<string, SnapshotRow | undefined>;
 };
 
 type SnapshotRow = {
@@ -37,10 +50,14 @@ type SnapshotRow = {
 
 /**
  * Sinkronisasi piutang/utang Retailku (get_ar_ap) -> `debts` lokal.
- * SELALU dibungkus BEGIN/COMMIT/ROLLBACK oleh CALLER (`sync-all.ts`)
- * bersama jalur cashflow — lihat docs/todos/plan/retailku-cashflow-sync.md
- * bagian "Keterkaitan dengan sync utang-piutang" dan "Sync AR/AP —
- * idempotency".
+ * TIDAK dibungkus BEGIN/COMMIT SQL (lihat "Bug ditemukan live" di
+ * retailku-cashflow-sync.md — @tauri-apps/plugin-sql tidak mendukung itu
+ * dengan aman) — caller (`sync-all.ts`) melakukan rollback MANUAL kalau
+ * jalur lain gagal, memakai `insertedSourceRefs`/`touchedPartyIds`/
+ * `previousSnapshotsById` yang dikembalikan di sini beserta
+ * `rollbackArApSnapshots()` di bawah — lihat docs/todos/plan/
+ * retailku-cashflow-sync.md bagian "Keterkaitan dengan sync
+ * utang-piutang" dan "Sync AR/AP — idempotency".
  *
  * Strategi: get_ar_ap adalah SNAPSHOT (total outstanding saat ini per
  * pihak), bukan daftar transaksi baru — sync ini membandingkan snapshot
@@ -72,7 +89,10 @@ export async function syncArAp(db: Db, input: SyncArApInput): Promise<SyncArApRe
   const receivableContactId = await resolveGenericContactId(db, RECEIVABLE_CONTACT_NAME);
   const payableContactId = await resolveGenericContactId(db, PAYABLE_CONTACT_NAME);
 
-  let insertedCount = 0;
+  const insertedSourceRefs: string[] = [];
+  const touchedPartyIds: string[] = [];
+  const previousSnapshotsById = new Map<string, SnapshotRow | undefined>();
+
   for (const party of parties) {
     const previous = previousByPartyId.get(party.id);
     const receivableDelta = party.outstandingReceivable - (previous?.outstanding_receivable ?? 0);
@@ -88,7 +108,7 @@ export async function syncArAp(db: Db, input: SyncArApInput): Promise<SyncArApRe
         direction: "receivable",
         sourceRef: `${input.today}:${party.id}:receivable`,
       });
-      insertedCount += 1;
+      insertedSourceRefs.push(`${input.today}:${party.id}:receivable`);
     }
     if (payableDelta > 0) {
       await insertDebtTransaction(db, {
@@ -100,7 +120,7 @@ export async function syncArAp(db: Db, input: SyncArApInput): Promise<SyncArApRe
         direction: "payable",
         sourceRef: `${input.today}:${party.id}:payable`,
       });
-      insertedCount += 1;
+      insertedSourceRefs.push(`${input.today}:${party.id}:payable`);
     }
     // Delta NEGATIF (pelunasan/koreksi turun) SENGAJA tidak memicu
     // apa pun di sini — pelunasan piutang/utang lokal punya jalur sendiri
@@ -109,10 +129,12 @@ export async function syncArAp(db: Db, input: SyncArApInput): Promise<SyncArApRe
     // di Retailku. Snapshot tetap di-update ke nilai terbaru di bawah,
     // supaya sync berikutnya membandingkan dari titik yang benar.
 
+    touchedPartyIds.push(party.id);
+    previousSnapshotsById.set(party.id, previous);
     await upsertSnapshot(db, party);
   }
 
-  return { insertedCount };
+  return { insertedCount: insertedSourceRefs.length, insertedSourceRefs, touchedPartyIds, previousSnapshotsById };
 }
 
 async function resolveGenericContactId(db: Db, name: string): Promise<number> {
@@ -183,6 +205,34 @@ async function insertDebtTransaction(
     debtAction: isReceivable ? null : "payable",
     settleDebtIds: [],
   });
+}
+
+/**
+ * Rollback manual untuk `retailku_ar_ap_snapshot` — dipanggil `sync-all.ts`
+ * kalau salah satu jalur sync gagal, supaya snapshot kembali ke nilai
+ * SEBELUM sync yang gagal ini (bukan nilai baru yang sempat ditulis
+ * `upsertSnapshot` di atas). Party yang tadinya BELUM punya snapshot
+ * (`previous === undefined`) dihapus sepenuhnya, bukan di-set ke 0 —
+ * supaya sync berikutnya memperlakukannya seolah belum pernah disentuh.
+ */
+export async function rollbackArApSnapshots(
+  db: Db,
+  touchedPartyIds: string[],
+  previousSnapshotsById: Map<string, SnapshotRow | undefined>
+): Promise<void> {
+  for (const partyId of touchedPartyIds) {
+    const previous = previousSnapshotsById.get(partyId);
+    if (previous == null) {
+      await db.execute("DELETE FROM retailku_ar_ap_snapshot WHERE retailku_party_id = $1", [partyId]);
+      continue;
+    }
+    await db.execute(
+      `UPDATE retailku_ar_ap_snapshot
+       SET party_name = $1, outstanding_receivable = $2, outstanding_payable = $3
+       WHERE retailku_party_id = $4`,
+      [previous.party_name, previous.outstanding_receivable, previous.outstanding_payable, partyId]
+    );
+  }
 }
 
 async function upsertSnapshot(db: Db, party: RetailkuArApParty): Promise<void> {
