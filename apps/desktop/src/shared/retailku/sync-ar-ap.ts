@@ -1,7 +1,8 @@
 import { getDb } from "@/lib/db";
 import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
-import type { RetailkuMcpConfig } from "./retailku-mcp-client";
-import { connectRetailkuMcp, getArAp, type RetailkuArApParty } from "./retailku-mcp-client";
+import type { RetailkuMcpConfig } from "./mcp-connection";
+import { connectRetailkuMcp } from "./mcp-connection";
+import { getArAp, type RetailkuArApParty } from "./mcp-tools";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 

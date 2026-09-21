@@ -2,9 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { assertRetailkuConfigured, connectRetailkuMcp } from "./mcp-connection";
 import {
-  assertRetailkuConfigured,
-  connectRetailkuMcp,
   getArAp,
   getCashflowAllocation,
   getCashflowDetail,
@@ -13,7 +12,7 @@ import {
   type RetailkuCashflowAllocation,
   type RetailkuCashflowDetail,
   type RetailkuCashflowSummary,
-} from "./retailku-mcp-client";
+} from "./mcp-tools";
 import { useRetailkuSettings } from "./use-retailku-settings";
 
 export type CashflowDateRange = {
@@ -93,7 +92,7 @@ export function useRetailkuCashflowDetail(
 }
 
 /** Snapshot piutang/utang outstanding SAAT INI (bukan rentang tanggal,
- * lihat `getArAp` di retailku-mcp-client.ts) — dipakai tab "Utang
+ * lihat `getArAp` di mcp-tools.ts) — dipakai tab "Utang
  * Piutang" di /retailku/cashflow. */
 export function useRetailkuArAp() {
   const { data: settings } = useRetailkuSettings();

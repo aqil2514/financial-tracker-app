@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db";
-import type { RetailkuMcpConfig } from "./retailku-mcp-client";
-import { connectRetailkuMcp, getCashflowDetail } from "./retailku-mcp-client";
+import type { RetailkuMcpConfig } from "./mcp-connection";
+import { connectRetailkuMcp } from "./mcp-connection";
+import { getCashflowDetail } from "./mcp-tools";
 import type { RetailkuCashflowSyncMode } from "./use-retailku-cashflow-sync-settings";
 
 type Db = Awaited<ReturnType<typeof getDb>>;

@@ -6,11 +6,10 @@ export {
 export {
   connectRetailkuMcp,
   assertRetailkuConfigured,
-  getFinanceAccounts,
   RetailkuNotConfiguredError,
   type RetailkuMcpConfig,
-  type RetailkuFinanceAccount,
-} from "./retailku-mcp-client";
+} from "./mcp-connection";
+export { getFinanceAccounts, type RetailkuFinanceAccount } from "./mcp-tools";
 export {
   useRetailkuPaymentAccounts,
   retailkuPaymentAccountsQueryKey,
