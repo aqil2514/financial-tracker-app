@@ -200,9 +200,40 @@ sumber yang tepat untuk "uang yang benar-benar berpindah" — dua laporan
 lain sama-sama mengukur hal lain (akrual/breakdown akun COA), bukan
 pergerakan kas murni.
 
-**2. Akun tujuan: mapping akun Retailku HARUS konvergen ke satu akun lokal.**
+**2. Akun tujuan — REVISI TOTAL: per akun kas Retailku sendiri-sendiri, BUKAN konvergen ke satu akun lokal.**
 
-`get_cashflow_summary` mengembalikan angka GABUNGAN semua akun kas
+Keputusan lama (di bawah, dicoret) DIBATALKAN setelah ditemukan masalah
+nyata saat live testing: memaksa "Kas Tunai" + "Seabank" konvergen ke
+SATU akun lokal (mis. "Dompet Bisnis") membuat AUDIT PER AKUN FISIK
+JADI TIDAK MUNGKIN — saldo "Dompet Bisnis" di `financial-app` jadi
+campuran laci kasir + rekening bank, tidak bisa dicocokkan ke saldo
+fisik akun manapun. Ini konsekuensi serius yang sebelumnya tidak
+disadari saat keputusan lama diambil.
+
+**Solusi: sumber data cashflow DIGANTI SELURUHNYA ke `get_cashflow_detail`
+(punya `accountId` per baris), TIDAK LAGI memakai `get_cashflow_summary`
+sama sekali** — termasuk untuk apa yang sebelumnya disebut "mode
+ringkas". Kedua mode (lihat keputusan #6) sekarang SAMA-SAMA bersumber
+dari `get_cashflow_detail`, bedanya cuma level agregasi:
+- **Mode ringkas**: agregasi per `(tanggal, accountId Retailku)` — 1
+  transaksi per akun kas Retailku per hari, TAPI di-insert ke akun
+  LOKAL masing-masing sesuai `retailku_account_mapping`-nya sendiri
+  (bukan satu akun gabungan lagi).
+- **Mode detail**: agregasi per `(tanggal, accountId Retailku,
+  sourceType)` — ditambah dimensi akun dibanding desain lama yang cuma
+  per `(tanggal, sourceType)`, supaya konsisten (kalau tidak, mode
+  detail masih akan menggabungkan lintas akun kas Retailku juga).
+
+**Konsekuensi: validasi prasyarat "semua mapping harus ke akun lokal
+yang SAMA" DIHAPUS SEPENUHNYA** — tidak relevan lagi karena setiap akun
+Retailku sekarang sync ke akun lokalnya SENDIRI-SENDIRI sesuai baris
+mapping masing-masing, tidak ada lagi "satu akun tujuan gabungan".
+Prasyarat yang TETAP ada: setiap akun kas Retailku yang muncul di
+`get_cashflow_detail` HARUS punya baris mapping (kalau ada `accountId`
+yang belum dipetakan ke akun lokal manapun, baris itu di-skip dengan
+peringatan, bukan gagal total — lihat TODO).
+
+~~`get_cashflow_summary` mengembalikan angka GABUNGAN semua akun kas
 Retailku (tidak per-akun) — konsekuensinya, transaksi ringkasan harian
 ini cuma bisa dicatat ke SATU `account_id` lokal. Diputuskan: skema
 mapping (`retailku_account_mapping`, sudah ada) MEMANG mendukung
@@ -210,7 +241,7 @@ banyak akun Retailku → 1 akun lokal (pola "Kas Tunai" + "Seabank" → 1
 akun "Dompet Bisnis"), dan itu jadi PRASYARAT sync ini — semua baris
 mapping WAJIB mengarah ke akun lokal yang SAMA sebelum sync bisa
 jalan. Kalau user memetakan ke akun lokal yang berbeda-beda, sync
-ditolak dengan pesan jelas (bukan dipaksa/diam-diam pilih salah satu).
+ditolak dengan pesan jelas (bukan dipaksa/diam-diam pilih salah satu).~~
 
 ## Keterkaitan dengan sync utang-piutang (AR/AP) — dibahas di sesi terpisah
 
@@ -291,11 +322,106 @@ sebagian. Konsekuensi teknis:
   pernah boleh tidak sinkron") di atas "progres sebagian tetap
   tersimpan".
 
+## Kasus PPOB — dicek dari data nyata, BUKAN 2 baris "HPP vs Margin"
+
+Koreksi asumsi lama di `retailku-account-mapping.md` ("PPOB → satu
+transaksi asal → dua baris berbeda, HPP Harian Digital dan Margin
+Harian Digital") — dicek langsung lewat `get_sale_detail`/
+`get_journal_detail` untuk satu transaksi PPOB nyata (`SL-260914-19`,
+"Pulsa Listrik", Rp23.000, `product.type: "PPOB"`). Jurnalnya SEBENARNYA
+4 baris: debit Piutang Dagang Rp23.000, debit HPP PPOB Rp21.375, kredit
+Pendapatan PPOB Rp23.000, kredit **Seabank** (akun kas `isTrackedAsset`)
+Rp21.375 — bayar ke provider PPOB terjadi SAAT itu juga, TAPI pelunasan
+dari customer (Kas Tunai masuk Rp23.000) baru terjadi keesokan harinya
+lewat `SALE_PAYMENT` terpisah (`SP-260914-01`).
+
+**Konsekuensi yang disadari dan DITERIMA (trade-off, bukan bug)**: kalau
+cashflow sync (mode ringkas maupun detail) memproses ini apa adanya,
+hasilnya adalah DUA baris kas yang terlihat tidak berhubungan — outflow
+Rp21.375 di tanggal transaksi (akun Seabank, sourceType `SALE`) dan
+inflow Rp23.000 di tanggal lain (akun Kas Tunai, sourceType
+`SALE_PAYMENT`) — bukan "untung Rp1.625 dari jualan pulsa" yang
+tergabung jadi satu cerita. Ini BUKAN kasus khusus PPOB semata, tapi
+pola umum SETIAP penjualan yang awalnya piutang (lihat daftar sourceType
+mana yang menggerakkan kas di keputusan #1) — PPOB kebetulan jadi contoh
+paling jelas karena margin tipis (Rp1.625 dari Rp23.000) membuat jeda
+waktu & pemisahannya kontras.
+
+**DIPUTUSKAN: TIDAK "diperbaiki" pakai transfer manual atau akun virtual
+provider PPOB.** Pertimbangan: (1) provider PPOB bukan akun lokal yang
+dikenal/dipetakan `financial-app`, membuat akun virtual baru untuk ini
+menambah kompleksitas yang sengaja dihindari sejak keputusan #1; (2)
+butuh deteksi "ini PPOB, bukan penjualan biasa" di level sync — balik
+ke masalah "menebak semantik dari data mentah" yang sudah terbukti
+rapuh untuk `get_cashflow_allocation`; (3) tidak menyelesaikan jeda
+waktu itu sendiri — piutang tetap piutang, tidak bisa digabung jadi 1
+transaksi tanpa memalsukan tanggal kejadian. `financial-app` sebagai
+pencatat KAS (bukan P&L per-transaksi) memang tidak dirancang untuk
+menyatukan cerita income-expense yang berpasangan — itu levelnya
+`get_profit_loss`, sudah dibuktikan berbeda dari cashflow di keputusan
+#1. Piutang dari transaksi PPOB (mis. milik "Mang Jaja") diperlakukan
+SAMA seperti piutang penjualan retail biasa lewat sync AR/AP terpisah
+(`get_ar_ap`) — tidak ada logic khusus PPOB di `financial-app`.
+
+## Sync AR/AP — desain implementasi (DIPUTUSKAN, sudah dikodekan)
+
+Detail konkret yang sebelumnya cuma disinggung ("dua kontak lokal
+terpisah") sekarang diputuskan lengkap saat implementasi
+(`shared/retailku/sync-ar-ap.ts`):
+
+**Kontak: 2 kontak GENERIK gabungan, BUKAN per pihak Retailku.**
+Konsisten literal dengan keputusan lama di `retailku-account-mapping.md`
+("bukan dipetakan satu-satu, cukup 2 kelompok gabungan") — satu kontak
+"Piutang Retailku" menampung SEMUA piutang gabungan, satu kontak "Utang
+Retailku" menampung semua utang gabungan. TIDAK ada breakdown per
+customer/supplier individual di level kontak lokal.
+
+**Akun debt lokal: DUA field terpisah, dipilih MANUAL oleh user** (bukan
+dibuat otomatis) — satu akun `account_type='debt'` khusus piutang, satu
+khusus utang, dipilih di tab Konfigurasi (pola sama dengan
+`cash_account_id`/`debt_account_id` di `new-debt-form.tsx`). Alasan:
+`applyDebtTransaction` mewajibkan `account_id`/`transfer_account_id`
+menunjuk ke baris `accounts` (untuk cek `account_type`), BUKAN langsung
+ke `contacts` — skema debts SELALU butuh akun perantara, kontak cuma
+atribut tambahan (`debts.contact_id`), bukan pengganti akun.
+
+**Idempotency: snapshot PER PIHAK Retailku, migrasi baru
+`retailku_ar_ap_snapshot`** (`0018_retailku_ar_ap_snapshot.sql`:
+`retailku_party_id` PK, `party_name`, `outstanding_receivable`,
+`outstanding_payable`, `updated_at`). `get_ar_ap` adalah SNAPSHOT total
+outstanding saat ini (bukan daftar transaksi baru), jadi sync
+membandingkan snapshot sekarang vs snapshot TERAKHIR per pihak, insert
+`debts` HANYA untuk SELISIH POSITIF (piutang/utang baru netto sejak
+sync terakhir) — `source_ref` = `{tanggal}:{retailkuPartyId}:receivable`
+atau `:payable`. Dihitung PER PIHAK dulu (bukan langsung dari total
+gabungan `totalReceivable`/`totalPayable`) — kalau dibandingkan dari
+total gabungan saja, pelunasan satu pihak bisa "menutupi" utang baru
+pihak lain yang kebetulan terjadi di periode sync yang sama (net
+berubah jadi 0 padahal ada 2 kejadian ekonomi nyata yang seharusnya
+tercatat terpisah). Snapshot per pihak murni state internal untuk
+deteksi selisih — TIDAK jadi sumber kontak (tetap digabung ke 2 kontak
+generik di atas).
+
+**Delta NEGATIF (piutang/utang berkurang) SENGAJA tidak memicu apa
+pun** — sync ini HANYA bertanggung jawab mencatat piutang/utang BARU
+yang muncul di Retailku (`debtAction` selalu dipaksa `null` untuk
+piutang/`'payable'` untuk utang, TIDAK PERNAH `'settlement'`).
+Pelunasan piutang/utang lokal (termasuk yang asalnya dari sync ini)
+tetap lewat jalur manual yang sudah ada (tombol "Bayar" di `/debts`,
+atau form transaksi transfer debt→cash biasa) — snapshot tetap
+di-update ke nilai terbaru supaya sync berikutnya membandingkan dari
+titik yang benar, tapi TIDAK ada logic "deteksi pelunasan otomatis" di
+sync ini sendiri.
+
 ## TODO
 
-- [ ] Validasi prasyarat mapping sebelum sync bisa aktif: semua baris
-      `retailku_account_mapping` harus `local_account_id` yang SAMA.
-      Tampilkan status ini di halaman `/retailku/sync` (lihat #3).
+- [x] ~~Validasi prasyarat mapping sebelum sync bisa aktif: semua baris
+      `retailku_account_mapping` harus `local_account_id` yang SAMA.~~
+      **DIBATALKAN** — keputusan #2 DIREVISI TOTAL (lihat di atas):
+      cashflow sekarang sync per akun kas Retailku sendiri-sendiri,
+      tidak ada lagi "satu akun tujuan gabungan" untuk divalidasi
+      seragam. Tab Konfigurasi cuma menampilkan info jumlah mapping yang
+      ADA (bukan validasi keseragaman) — lihat `cashflow-config-tab.tsx`.
 - [x] Sub-tab baru "Utang Piutang" di `CashflowSyncPanel`
       (`/retailku/cashflow`) — `getArAp()` di `retailku-mcp-client.ts`
       (panggil `get_ar_ap`, TANPA `dateFrom`/`dateTo` karena snapshot,
@@ -317,77 +443,158 @@ sebagian. Konsekuensi teknis:
       `CREATE UNIQUE INDEX idx_transactions_source_ref ON
       transactions(source, source_ref) WHERE source_ref IS NOT NULL`
       untuk cek idempotency cepat sekaligus mencegah baris dobel.
-- [ ] Fungsi sync inti — DUA jalur untuk cashflow (lihat keputusan #6):
-      - Mode ringkas: panggil `get_cashflow_summary` per rentang tanggal
-        yang perlu diproses (lihat #1), `source_ref` = tanggal.
-      - Mode detail: panggil `get_cashflow_detail` (dengan pagination),
-        agregasi per `sourceType` per hari, `source_ref` = tanggal +
-        sourceType.
-      Untuk kedua mode: skip tanggal/baris yang `source_ref`-nya sudah
-      ada (idempotency). DIJALANKAN BERSAMA sync AR/AP (dokumen
-      terpisah, lihat "Keterkaitan dengan sync utang-piutang" di atas)
-      dalam satu database transaction all-or-nothing — bukan fungsi
-      yang berdiri sendiri lagi.
-- [ ] Halaman `/retailku/sync` (`features/retailku/`, mengikuti pola
-      `/retailku/mapping`) — toggle mode, status terakhir sync, tombol
-      "Sync Sekarang". Tambah item "Sync Cashflow" ke grup sidebar
-      Retailku yang sudah ada (kondisional, lihat #3).
-- [ ] Trigger sync — lihat "Pertanyaan terbuka #2" (tombol manual di
-      halaman sync sudah pasti; trigger otomatis saat app dibuka masih
-      terbuka).
-- [ ] Penanganan revisi data Retailku setelah sync (mis. transaksi
-      di-void/dikoreksi setelah tanggal itu sudah tersinkron) — lihat
-      "Pertanyaan terbuka #4".
+- [x] Fungsi sync inti — DUA jalur untuk cashflow (lihat keputusan #6
+      DAN #2 revisi): `shared/retailku/sync-cashflow.ts`. KEDUA mode
+      (ringkas & detail) sekarang SAMA-SAMA bersumber dari
+      `get_cashflow_detail` (BUKAN `get_cashflow_summary` lagi) —
+      - Mode ringkas: agregasi per `(tanggal, accountId Retailku)`,
+        `source_ref` = `{tanggal}:{accountId}`.
+      - Mode detail: agregasi per `(tanggal, accountId, sourceType)`,
+        `source_ref` = `{tanggal}:{accountId}:{sourceType}`.
+      Tiap baris di-insert ke akun LOKAL sesuai `retailku_account_mapping`
+      milik `accountId` itu sendiri (bukan satu akun gabungan) — akun
+      yang belum dipetakan di-skip + dikumpulkan di `unmappedAccountIds`
+      (dilaporkan via toast, TIDAK menggagalkan sync). Untuk kedua mode:
+      skip `source_ref` yang sudah ada (idempotency). `shared/retailku/
+      sync-ar-ap.ts` untuk AR/AP (lihat "Sync AR/AP — desain
+      implementasi"). `shared/retailku/sync-all.ts` menggabungkan
+      keduanya dalam SATU database transaction BEGIN/COMMIT/ROLLBACK
+      all-or-nothing (raw SQL manual — `@tauri-apps/plugin-sql` tidak
+      punya API transaction bawaan). Diverifikasi `tsc`/`npm test`
+      (94/94)/`npm run build` bersih.
+- [x] Isi tab "Konfigurasi" di `CashflowSyncPanel` (`/retailku/cashflow`)
+      — `features/retailku/cashflow-config-tab.tsx`: info jumlah
+      mapping (BUKAN validasi keseragaman, lihat item pertama di atas),
+      toggle mode, field "Akun Kas untuk Utang Piutang" (combobox akun
+      `cash`, independen dari mapping cashflow), dua field "Akun untuk
+      Piutang"/"Akun untuk Utang" (combobox akun `debt`), field "Titik
+      Awal Sync" (`Input type=date`, bisa diedit manual), toggle "Sync
+      Otomatis Saat App Dibuka", status sync terakhir, tombol "Sync
+      Sekarang" (`useSyncRetailkuAll`, disabled sampai semua field
+      terisi + kredensial Retailku lengkap). Trigger OTOMATIS saat app
+      dibuka BELUM diwire (perlu titik masuk terpisah, mis.
+      `AppSidebar`) — tab ini baru menyediakan pengaturannya
+      (`autoSyncEnabled`, dst), belum ada yang MEMBACA setting itu untuk
+      benar-benar memicu sync otomatis. TIDAK ada halaman/route/item
+      sidebar baru (direvisi dari rencana awal, lihat catatan revisi di
+      #3). Diverifikasi `tsc`/`npm test`/`npm run build` bersih.
+- [ ] **BELUM**: titik masuk trigger OTOMATIS saat app dibuka (baca
+      `autoSyncEnabled`/`lastAutoSyncDate` dari settings, panggil
+      `syncAll()` kalau syarat 1x/hari terpenuhi, tampilkan toast kalau
+      gagal) — lihat "Pertanyaan terbuka #2". Field-field pengaturannya
+      sudah ada (item di atas), TAPI belum ada kode yang benar-benar
+      memicunya secara otomatis.
+- [ ] **BELUM**: verifikasi LIVE di `tauri dev` — migrasi `0018` belum
+      dikonfirmasi jalan nyata, dan `syncAll()` belum pernah benar-benar
+      dieksekusi (cuma diverifikasi `tsc`/`test`/`build`, yang tidak
+      menyentuh Tauri/SQLite sungguhan). WAJIB dicoba live sebelum
+      dianggap selesai — sync ini MENULIS transaksi sungguhan, beda
+      dari fitur read-only yang sebelumnya cukup `tsc`/`test`/`build`.
+- [x] Penanganan revisi data Retailku setelah sync — DIPUTUSKAN
+      diamkan, TIDAK ADA aksi implementasi (lihat "Pertanyaan terbuka
+      #4"). Dicatat di TODO ini hanya sebagai jejak bahwa pertanyaan
+      ini SUDAH dibahas & sengaja tidak dibangun, bukan terlewat.
 
 ## Pertanyaan terbuka (BELUM diputuskan — dibahas sebelum implementasi)
 
-**#1. Bagaimana sync tahu tanggal mana yang sudah diproses?**
+**#1. Bagaimana sync tahu tanggal mana yang sudah diproses? — DIPUTUSKAN: gabungan A+B, DENGAN titik awal (B) bisa DIEDIT MANUAL oleh user.**
 
-- **Opsi A — kolom `source`/`source_ref` di `transactions`** (kolom
-  sudah masuk TODO di atas terlepas dari opsi mana yang dipilih, karena
-  berguna juga untuk pelaporan "pisahkan omzet bisnis vs personal").
-  `source_ref` = tanggal ISO (mis. `"2026-09-20"`). Sebelum insert, cek
-  `SELECT 1 FROM transactions WHERE source='retailku_sync' AND
-  source_ref=?` — kalau sudah ada, skip (atau UPDATE kalau `net`
-  ternyata berubah, lihat #4). Bisa mendeteksi & mengoreksi ulang
-  tanggal yang datanya berubah belakangan.
-- **Opsi B — "tanggal terakhir disinkron" di `settings`** (pola
-  sederhana yang sudah disinggung di `retailku-integration.md`). Sync
-  berikutnya cuma proses tanggal SETELAH nilai itu. Lebih sederhana,
-  TAPI tidak bisa mendeteksi kalau data Retailku untuk tanggal yang
-  SUDAH lewat titik itu ternyata direvisi (lihat #4) — begitu tanggal
-  itu terlewati, tidak pernah dicek ulang lagi.
-- Opsi A dan B TIDAK saling eksklusif — bisa dipakai bersama (B sebagai
-  optimisasi supaya tidak query rentang tanggal terlalu jauh ke
-  belakang tiap sync, A sebagai sumber kebenaran idempotency
-  sesungguhnya).
+- **Opsi A — kolom `source`/`source_ref` di `transactions`** (migrasi
+  `0017_transaction_source.sql`, sudah dibuat). `source_ref` = tanggal
+  ISO (mis. `"2026-09-20"`) untuk mode ringkas, tanggal+sourceType untuk
+  mode detail. Sebelum insert per tanggal/baris, cek `SELECT 1 FROM
+  transactions WHERE source='retailku_sync' AND source_ref=?` — kalau
+  sudah ada, skip. Ini SUMBER KEBENARAN idempotency yang sesungguhnya —
+  selalu dicek, apa pun nilai titik awal (B) saat itu, supaya aman
+  walau user memundurkan titik awal manual sampai overlap tanggal yang
+  sudah pernah disync.
+- **Opsi B — "titik awal sync" disimpan di tabel `settings`** (key
+  baru `retailku_cashflow_sync_from`, pola KONSISTEN dengan
+  `retailku_mcp_url`/`retailku_api_key` yang sudah ada di
+  `use-retailku-settings.ts` — key-value biasa, BUKAN tabel/kolom baru).
+  Fungsinya sebagai OPTIMISASI pencarian titik awal (supaya sync tidak
+  perlu `SELECT MAX(source_ref)` dari `transactions` tiap kali jalan),
+  BUKAN pengganti opsi A.
+  - **Default**: tanggal saat mapping akun Retailku pertama kali
+    disimpan (`retailku_account_mapping` — momen paling natural yang
+    menandai "integrasi Retailku dimulai").
+  - **BISA DIEDIT MANUAL oleh user** di tab Konfigurasi (bukan cuma
+    nilai tersembunyi yang terus maju otomatis) — untuk kasus user mau
+    mulai efektif dari tanggal lain, atau sengaja re-sync ulang dari
+    titik lebih jauh ke belakang. Field input tanggal biasa, sama pola
+    dengan input rentang tanggal di tab Ringkasan.
+  - **Maju otomatis** setelah tiap sync sukses (all-or-nothing, lihat
+    "Keterkaitan dengan sync utang-piutang" di atas) — di-set ke
+    tanggal terakhir yang berhasil diproses + 1 hari.
+- **Ini juga menjawab pertanyaan #5** (batas atas rentang re-sync saat
+  offline lama) — karena titik awal dikontrol eksplisit oleh user
+  (bukan auto-mundur tanpa batas), tidak perlu batas keras "maks 90
+  hari" sebagai pengaman otomatis. Cukup peringatan UI non-blocking
+  kalau rentang [titik awal, hari ini] sangat panjang (mis. "rentang
+  ini mencakup 120 hari, proses bisa memakan waktu").
 
-**#2. Kapan sync dipicu?**
+**#2. Kapan sync dipicu? — DIPUTUSKAN: KEDUANYA (manual + otomatis).**
 
-Belum dibahas sama sekali. Kandidat: (a) otomatis setiap kali app
-dibuka (best-effort, non-blocking, sama seperti pola prefetch mapping
-account di `AppSidebar`), (b) tombol manual "Sync Sekarang" di suatu
-halaman, (c) keduanya. Perlu diperhatikan: ini BEDA karakter dari
-prefetch mapping — prefetch cuma BACA (aman diulang), sync ini
-MENULIS transaksi baru (perlu lebih hati-hati soal "berapa kali boleh
-otomatis jalan tanpa sepengetahuan user").
+- **Manual**: tombol "Sync Sekarang" di tab Konfigurasi (sudah pasti
+  sejak awal, lihat #3).
+- **Otomatis saat app dibuka**, dengan TIGA pagar (beda karakter dari
+  prefetch mapping yang cuma baca — sync ini MENULIS transaksi baru,
+  lihat catatan lama di bawah):
+  1. **Toggle on/off di tab Konfigurasi** — "Sync otomatis saat app
+     dibuka", default menyala, user yang tidak mau kejutan transaksi
+     otomatis bisa matikan dan pakai tombol manual saja.
+  2. **Dibatasi maksimal 1x per hari** — cek dulu apakah sudah pernah
+     sync hari ini (bisa dari `settings` juga, mis.
+     `retailku_cashflow_last_auto_sync_date`, atau derivasi dari
+     `retailku_cashflow_sync_from` kalau sudah maju sampai hari ini)
+     sebelum menjalankan; kalau sudah, skip. Mencegah panggilan MCP
+     berulang kalau user buka-tutup app berkali-kali sehari.
+  3. **Kegagalan dilaporkan via notifikasi non-blocking** (toast/badge
+     di area sidebar Retailku) — BEDA dari sync manual yang errornya
+     bisa ditampilkan langsung di tab Konfigurasi tempat tombolnya
+     ditekan. Sync otomatis terjadi diam-diam di background, jadi user
+     tetap perlu tahu kalau gagal tanpa dipaksa buka tab Konfigurasi
+     sendiri — TAPI tidak boleh modal/blocking yang mengganggu alur
+     kerja (best-effort, sesuai semangat pola prefetch mapping).
 
-**#3. UI status sync — DIPUTUSKAN: halaman `/retailku/sync` tersendiri.**
+**#3. UI status sync — DIPUTUSKAN (REVISI): tab "Konfigurasi" yang
+SUDAH ADA di `/retailku/cashflow` (`CashflowSyncPanel`), BUKAN halaman
+`/retailku/sync` terpisah.**
 
-Mengikuti pola `/retailku/mapping` — grup sidebar "Retailku" (kondisional,
-cuma muncul saat terkoneksi) bertambah satu item "Sync Cashflow".
-Isinya:
+Rencana awal (halaman baru + item sidebar baru "Sync Cashflow") DIGANTI
+setelah disadari tab "Konfigurasi" sudah ada sebagai placeholder di
+`CashflowSyncPanel` sejak tab "Utang Piutang" dibangun (lihat di atas)
+— membuat halaman terpisah berarti DUA tempat navigasi untuk hal yang
+sudah saling terkait erat (lihat "Keterkaitan dengan sync utang-piutang"
+di atas: satu tombol sync menjalankan cashflow+AR/AP sekaligus, jadi
+kontrolnya pun wajar satu tempat dengan tampilan datanya). TIDAK ada
+item sidebar baru, TIDAK ada route baru — cukup isi tab yang sudah ada.
 
+Isi tab "Konfigurasi":
+
+- **Status prasyarat mapping** (lihat TODO pertama) — indikator jelas
+  kalau `retailku_account_mapping` belum konvergen ke satu
+  `local_account_id`, dengan link ke `/retailku/mapping` untuk
+  memperbaiki. Tombol "Sync Sekarang" di bawah HARUS disabled selama
+  prasyarat ini belum terpenuhi.
 - **Toggle mode**, bisa diganti kapan saja (lihat keputusan #6 di
   bawah) — "Mode ringkas" (`get_cashflow_summary`, 1 transaksi/hari)
   vs "Mode detail per kategori" (`get_cashflow_detail`, 1 transaksi per
   `sourceType`/hari). Ganti mode TIDAK mengubah transaksi yang sudah
   tersinkron dengan mode lama (histori dibiarkan apa adanya) — cuma
-  memengaruhi sync berikutnya.
+  memengaruhi sync berikutnya. Toggle ini HANYA memengaruhi jalur
+  cashflow — jalur AR/AP selalu ikut disertakan di setiap sync (lihat
+  "Keterkaitan dengan sync utang-piutang"), tidak ada toggle terpisah
+  untuk AR/AP.
 - **Status terakhir**: tanggal terakhir berhasil disinkron, kapan sync
-  terakhir dijalankan (berhasil/gagal).
+  terakhir dijalankan (berhasil/gagal). Karena mode kegagalan
+  ALL-OR-NOTHING (lihat di atas), ini SATU status gabungan
+  cashflow+AR/AP, bukan dua status terpisah.
 - **Tombol "Sync Sekarang"** (manual trigger) — lihat keputusan #2 di
   bawah, ini SATU dari kemungkinan dua trigger, bukan satu-satunya.
+  Memicu kedua jalur (cashflow + AR/AP) dalam satu database transaction
+  — pesan error harus jelas kalau all-or-nothing gagal (mis. "Sync
+  gagal, tidak ada perubahan disimpan").
 
 Pertanyaan turunan yang masih terbuka: apakah transaksi hasil sync
 perlu ditandai visual berbeda di daftar transaksi biasa (lihat
@@ -396,23 +603,29 @@ edit/hapus transaksi hasil sync secara manual, dan kalau ya, apa
 efeknya ke idempotency (akan disinkron ulang jadi dobel, atau
 `source`-nya berubah jadi manual begitu diedit)?
 
-**#4. Bagaimana kalau data Retailku untuk tanggal yang SUDAH tersinkron ternyata berubah?**
+**#4. Bagaimana kalau data Retailku untuk tanggal yang SUDAH tersinkron ternyata berubah? — DIPUTUSKAN: DIAMKAN (tidak ada logic penanganan otomatis).**
 
-Skenario nyata: transaksi hari itu di-void/dikoreksi di Retailku
-SETELAH sync sudah mencatatnya di `financial-app`. Apakah sync
-berikutnya harus mendeteksi selisih dan meng-UPDATE transaksi lama
-(butuh cek ulang tanggal yang "sudah" tersinkron, bukan cuma yang
-baru), atau dibiarkan saja (transaksi lokal jadi "stale" sampai user
-sadar dan koreksi manual)? Ini menentukan apakah opsi A di #1 perlu
-logic re-check periodik atau cukup one-shot per tanggal.
+Skenario: transaksi hari itu di-void/dikoreksi di Retailku SETELAH
+sync sudah mencatatnya di `financial-app`. Dari 3 opsi yang
+dipertimbangkan (diamkan / re-check otomatis N hari terakhir tiap sync
+jalan / tombol re-check manual terpisah), dipilih **diamkan** — sesuai
+opsi A di #1 (`source_ref` sekali tercatat = one-shot, TIDAK ada logic
+re-check periodik). Konsekuensi yang disadari dan diterima: kalau
+Retailku merevisi transaksi di tanggal yang sudah tersinkron, transaksi
+lokal jadi "stale" (tidak lagi mencerminkan angka Retailku terkini)
+sampai user sadar dan mengoreksi MANUAL (edit langsung transaksi hasil
+sync di `financial-app`, seperti transaksi manual biasa). Dipilih
+sengaja demi kesederhanaan versi awal — kalau nanti ternyata sering
+jadi masalah nyata, opsi 2/3 di atas bisa dipertimbangkan sebagai
+fitur lanjutan terpisah, BUKAN dibangun sekarang secara preventif.
 
-**#5. Rentang waktu re-sync saat offline lama?**
+**#5. Rentang waktu re-sync saat offline lama? — SUDAH DIJAWAB, lihat #1.**
 
-`retailku-integration.md` sudah menyinggung "cek gap harian... tinggal
-perbesar rentang dateFrom/dateTo saat sync berikutnya jalan" — perlu
-batas atas yang wajar (mis. maks 90 hari ke belakang) supaya tidak
-memanggil `get_cashflow_summary` dengan rentang tidak masuk akal kalau
-app tidak dibuka berbulan-bulan.
+Tidak perlu batas atas keras (mis. "maks 90 hari") — titik awal sync
+dikontrol eksplisit oleh user via `settings.retailku_cashflow_sync_from`
+(bisa diedit manual di tab Konfigurasi, lihat #1), bukan mundur otomatis
+tanpa batas. Cukup peringatan UI non-blocking kalau rentang yang akan
+diproses sangat panjang.
 
 **#6. DIPUTUSKAN: kedua mode didukung, dipilih via toggle di halaman sync (#3).**
 

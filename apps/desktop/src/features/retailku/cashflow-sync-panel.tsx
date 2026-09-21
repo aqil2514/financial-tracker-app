@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CashflowDateRange } from "@/shared/retailku";
 import { ArApTab } from "./ar-ap-tab";
 import { CashflowAllocationTab } from "./cashflow-allocation-tab";
+import { CashflowConfigTab } from "./cashflow-config-tab";
 import { CashflowDetailTab } from "./cashflow-detail-tab";
 import { CashflowSummaryTab } from "./cashflow-summary-tab";
 
@@ -23,12 +24,12 @@ function daysAgoIso(days: number) {
 
 /**
  * Panel utama /retailku/cashflow, lihat
- * docs/todos/plan/retailku-cashflow-sync.md. TAHAP INI: cuma
- * menampilkan data mentah dari ketiga tool cashflow Retailku
- * (Ringkasan/Alokasi/Pergerakan) untuk rentang tanggal yang dipilih —
- * BELUM ada logic sync (insert transaksi) sama sekali. Tab
- * "Konfigurasi" masih placeholder, menyusul setelah desain sync
- * (mode ringkas vs detail, trigger, dst) final.
+ * docs/todos/plan/retailku-cashflow-sync.md. TAHAP INI: tab "Ringkasan"
+ * menampilkan data mentah dari MCP Retailku (Ringkasan/Alokasi/
+ * Pergerakan/Utang Piutang) untuk dilihat, tab "Konfigurasi" berisi
+ * kontrol sync (prasyarat mapping, toggle mode, status, tombol "Sync
+ * Sekarang") — TAPI fungsi sync inti (yang sesungguhnya insert
+ * transaksi) BELUM dibangun, tombol masih disabled.
  */
 export function CashflowSyncPanel() {
   const [range, setRange] = useState<CashflowDateRange>({
@@ -89,10 +90,7 @@ export function CashflowSyncPanel() {
       </TabsContent>
 
       <TabsContent value="konfigurasi">
-        <p className="text-muted-foreground text-sm">
-          Konfigurasi sinkronisasi (mode ringkas/detail, jadwal, dll) —
-          segera hadir.
-        </p>
+        <CashflowConfigTab />
       </TabsContent>
     </Tabs>
   );

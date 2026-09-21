@@ -215,7 +215,19 @@ dokumen ini:
   dan utang gabungan dari Retailku memakai **dua kontak lokal
   terpisah** (bukan satu kontak generik untuk kedua arah).
 - Yang BELUM dibahas (sengaja ditunda ke dokumen sync tersendiri):
-  bagaimana `debtAction` diisi otomatis oleh proses sync, bagaimana
-  kasus khusus seperti PPOB (satu transaksi asal → dua baris berbeda,
-  HPP Harian Digital dan Margin Harian Digital) dipetakan, dan
-  bagaimana re-sync/edit ulang ditangani.
+  bagaimana `debtAction` diisi otomatis oleh proses sync, dan bagaimana
+  re-sync/edit ulang ditangani.
+- ~~Kasus khusus PPOB (satu transaksi asal → dua baris berbeda, HPP
+  Harian Digital dan Margin Harian Digital)~~ **SUDAH DICEK & DIJAWAB**
+  di `retailku-cashflow-sync.md` (bagian "Kasus PPOB") — asumsi "2 baris
+  HPP vs Margin" di atas TIDAK AKURAT, dicek dari data nyata
+  (`get_sale_detail`/`get_journal_detail` transaksi PPOB real) ternyata
+  4 baris jurnal (Piutang Dagang, HPP PPOB, Pendapatan PPOB, akun kas
+  provider keluar). Kesimpulan: PPOB TIDAK butuh penanganan khusus di
+  `financial-app` — piutangnya diperlakukan sama seperti piutang
+  penjualan retail biasa lewat `get_ar_ap`, kas-nya sudah otomatis benar
+  lewat `get_cashflow_summary`/`get_cashflow_detail` tanpa perlu tahu
+  ini PPOB. Trade-off yang diterima: cashflow & pelunasan piutang PPOB
+  bisa tercatat di tanggal berbeda sebagai dua baris kas terpisah
+  (tidak "menyatu" jadi satu cerita untung-rugi) — lihat detail lengkap
+  di dokumen sync.
