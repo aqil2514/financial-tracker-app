@@ -1,41 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
 import { FolderOpen, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useAttachmentFolder, useSetAttachmentFolder } from "./use-attachment-folder";
+import { useAttachmentFolderSetting } from "./use-attachment-folder-setting";
 
 /**
  * Pengaturan folder tempat file lampiran foto transaksi disimpan.
- * Kosong (null di database) berarti pakai folder default di app data dir,
- * yang path-nya diselesaikan di sisi Rust — diambil di sini hanya untuk
- * ditampilkan sebagai informasi.
+ * Kosong (null di database) berarti pakai folder default di app data dir.
+ * Logic ada di `useAttachmentFolderSetting` — komponen ini murni render.
  */
 export function AttachmentFolderSetting() {
-  const { data: folder, isLoading } = useAttachmentFolder();
-  const setFolder = useSetAttachmentFolder();
-  const [defaultDir, setDefaultDir] = useState<string | null>(null);
-
-  useEffect(() => {
-    invoke<string>("get_default_attachment_dir")
-      .then(setDefaultDir)
-      .catch(() => setDefaultDir(null));
-  }, []);
-
-  async function handlePickFolder() {
-    const selected = await open({ directory: true });
-    if (!selected) return;
-    setFolder.mutate(selected);
-  }
-
-  function handleReset() {
-    setFolder.mutate(null);
-  }
-
-  const activeFolder = folder ?? defaultDir;
+  const { folder, activeFolder, isLoading, isSaving, handlePickFolder, handleReset } =
+    useAttachmentFolderSetting();
 
   return (
     <div className="space-y-2">
@@ -57,7 +34,7 @@ export function AttachmentFolderSetting() {
           variant="outline"
           size="sm"
           onClick={handlePickFolder}
-          disabled={setFolder.isPending}
+          disabled={isSaving}
         >
           Pilih Folder Lain
         </Button>
@@ -67,7 +44,7 @@ export function AttachmentFolderSetting() {
             variant="ghost"
             size="sm"
             onClick={handleReset}
-            disabled={setFolder.isPending}
+            disabled={isSaving}
           >
             <RotateCcw className="size-3.5" />
             Pakai Default

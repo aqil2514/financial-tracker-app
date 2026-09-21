@@ -1,5 +1,4 @@
 export { AttachmentUploader } from "./attachment-uploader";
-export { AttachmentFolderSetting } from "./attachment-folder-setting";
 export { AttachmentThumbnail } from "./attachment-thumbnail";
 export { useAttachmentFolder, useSetAttachmentFolder } from "./use-attachment-folder";
 export {

@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { connectRetailkuMcp } from "./retailku-mcp-client";
-import { useRetailkuSettings, useSetRetailkuSettings } from "./use-retailku-settings";
+import { useRetailkuSettingsForm } from "./use-retailku-settings-form";
 
 /**
  * Kredensial untuk sinkronisasi Retailku (lihat
@@ -16,49 +13,23 @@ import { useRetailkuSettings, useSetRetailkuSettings } from "./use-retailku-sett
  * "https://api.retailku.com/warung-aqil/mcp") dan API key yang dibuat
  * di halaman yang sama. Fondasi awal — belum ada logic sync otomatis,
  * cuma penyimpanan kredensial + tombol "Tes Koneksi" untuk verifikasi
- * manual bahwa MCP client bisa terhubung.
+ * manual bahwa MCP client bisa terhubung. Logic ada di
+ * `useRetailkuSettingsForm` — komponen ini murni render.
  */
 export function RetailkuSettingsForm() {
-  const { data: settings, isLoading } = useRetailkuSettings();
-  const setSettings = useSetRetailkuSettings();
-
-  const [mcpUrl, setMcpUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [testState, setTestState] = useState<
-    { status: "idle" } | { status: "testing" } | { status: "success"; toolCount: number } | { status: "error"; message: string }
-  >({ status: "idle" });
-
-  useEffect(() => {
-    if (settings) {
-      setMcpUrl(settings.mcpUrl ?? "");
-      setApiKey(settings.apiKey ?? "");
-    }
-  }, [settings]);
-
-  function handleSave() {
-    setSettings.mutate({
-      mcpUrl: mcpUrl.trim() || null,
-      apiKey: apiKey.trim() || null,
-    });
-  }
-
-  async function handleTestConnection() {
-    setTestState({ status: "testing" });
-    let client: Awaited<ReturnType<typeof connectRetailkuMcp>> | null = null;
-    try {
-      client = await connectRetailkuMcp({ mcpUrl: mcpUrl.trim(), apiKey: apiKey.trim() });
-      const { tools } = await client.listTools();
-      setTestState({ status: "success", toolCount: tools.length });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setTestState({ status: "error", message });
-    } finally {
-      await client?.close();
-    }
-  }
-
-  const isConnected = !!settings?.mcpUrl && !!settings?.apiKey;
-  const canTest = !!mcpUrl.trim() && !!apiKey.trim();
+  const {
+    mcpUrl,
+    setMcpUrl,
+    apiKey,
+    setApiKey,
+    isLoading,
+    isConnected,
+    canTest,
+    isSaving,
+    testState,
+    handleSave,
+    handleTestConnection,
+  } = useRetailkuSettingsForm();
 
   return (
     <div className="space-y-4">
@@ -89,8 +60,8 @@ export function RetailkuSettingsForm() {
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={handleSave} disabled={isLoading || setSettings.isPending}>
-          {setSettings.isPending ? "Menyimpan..." : "Simpan"}
+        <Button onClick={handleSave} disabled={isLoading || isSaving}>
+          {isSaving ? "Menyimpan..." : "Simpan"}
         </Button>
         <Button
           type="button"

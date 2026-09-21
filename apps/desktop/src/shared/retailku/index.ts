@@ -1,4 +1,3 @@
-export { RetailkuSettingsForm } from "./retailku-settings-form";
 export {
   useRetailkuSettings,
   useSetRetailkuSettings,
