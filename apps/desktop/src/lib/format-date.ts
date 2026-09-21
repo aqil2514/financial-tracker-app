@@ -1,10 +1,11 @@
 import { APP_LOCALE } from "./locale";
 
-type DateStyle = "month-label" | "date-time";
+type DateStyle = "month-label" | "date-time" | "date-only";
 
 const DATE_STYLE_OPTIONS: Record<DateStyle, Intl.DateTimeFormatOptions> = {
   "month-label": { month: "short", year: "2-digit" },
   "date-time": { dateStyle: "medium", timeStyle: "short" },
+  "date-only": { dateStyle: "medium" },
 };
 
 // Satu fungsi format tanggal untuk semua kebutuhan tampilan — style baru
@@ -24,6 +25,6 @@ export function formatDate(value: string, style: DateStyle, locale: string = APP
 
   return new Intl.DateTimeFormat(locale, {
     dateStyle,
-    timeStyle: hasTime ? "short" : undefined,
+    timeStyle: style === "date-time" && hasTime ? "short" : undefined,
   }).format(date);
 }

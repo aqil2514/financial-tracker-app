@@ -79,7 +79,10 @@ const staticCollapsibleNavItems: CollapsibleNavGroup[] = [
 const retailkuNavGroup: CollapsibleNavGroup = {
   title: "Retailku",
   icon: Building2,
-  items: [{ title: "Mapping Akun", url: "/retailku/mapping" }],
+  items: [
+    { title: "Mapping Akun", url: "/retailku/mapping" },
+    { title: "Sync Cashflow", url: "/retailku/cashflow" },
+  ],
 };
 
 export function AppSidebar() {

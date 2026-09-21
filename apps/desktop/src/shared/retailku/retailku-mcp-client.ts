@@ -89,14 +89,85 @@ export type RetailkuFinanceAccount = {
   accountMappings: { role: string }[];
 };
 
-/** Panggil tool `get_finance_accounts` — hasilnya dikembalikan MCP
- * sebagai satu block teks berisi JSON array (bukan objek terstruktur
- * MCP sendiri), jadi perlu di-parse manual dari `content[0].text`. */
-export async function getFinanceAccounts(client: Client): Promise<RetailkuFinanceAccount[]> {
-  const result = await client.callTool({ name: "get_finance_accounts", arguments: {} });
+/** Semua tool Retailku mengembalikan hasilnya sebagai satu block teks
+ * berisi JSON (bukan objek terstruktur MCP sendiri) — helper generik
+ * untuk parse `content[0].text`, dipakai semua fungsi `callTool`
+ * di bawah supaya tidak duplikasi logic parsing. */
+async function callToolAsJson<T>(client: Client, name: string, args: Record<string, unknown> = {}): Promise<T> {
+  const result = await client.callTool({ name, arguments: args });
   const firstBlock = Array.isArray(result.content) ? result.content[0] : undefined;
   if (!firstBlock || firstBlock.type !== "text") {
-    throw new Error("Respons get_finance_accounts tidak sesuai format yang diharapkan.");
+    throw new Error(`Respons ${name} tidak sesuai format yang diharapkan.`);
   }
-  return JSON.parse(firstBlock.text) as RetailkuFinanceAccount[];
+  return JSON.parse(firstBlock.text) as T;
+}
+
+/** Panggil tool `get_finance_accounts`. */
+export async function getFinanceAccounts(client: Client): Promise<RetailkuFinanceAccount[]> {
+  return callToolAsJson<RetailkuFinanceAccount[]>(client, "get_finance_accounts");
+}
+
+export type CashflowDateRangeArgs = {
+  dateFrom?: string;
+  dateTo?: string;
+  timezone?: string;
+};
+
+export type RetailkuCashflowSummary = {
+  data: { date: string; inflow: number; outflow: number; net: number }[];
+  totals: { inflow: number; outflow: number; net: number };
+};
+
+/** Panggil tool `get_cashflow_summary` — ringkasan kas murni per hari
+ * (bersumber dari jurnal akun kas/bank terposting), lihat
+ * docs/todos/plan/retailku-cashflow-sync.md untuk alasan tool ini
+ * dipilih sebagai sumber sync "mode ringkas". */
+export async function getCashflowSummary(
+  client: Client,
+  args: CashflowDateRangeArgs
+): Promise<RetailkuCashflowSummary> {
+  return callToolAsJson<RetailkuCashflowSummary>(client, "get_cashflow_summary", args);
+}
+
+export type RetailkuCashflowAllocation = {
+  sourceType: string;
+  breakdown: { accountName: string; net: number }[];
+}[];
+
+/** Panggil tool `get_cashflow_allocation` — breakdown per sourceType,
+ * TAPI breakdown-nya sengaja MENGECUALIKAN akun kas itu sendiri (lihat
+ * "Temuan besar" di retailku-cashflow-sync.md) — jadi ini bukan sumber
+ * data buat sync, cuma ditampilkan sebagai info tambahan. */
+export async function getCashflowAllocation(
+  client: Client,
+  args: CashflowDateRangeArgs
+): Promise<RetailkuCashflowAllocation> {
+  return callToolAsJson<RetailkuCashflowAllocation>(client, "get_cashflow_allocation", args);
+}
+
+export type RetailkuCashflowDetailRow = {
+  date: string;
+  description: string | null;
+  sourceType: string | null;
+  sourceNumber: string | null;
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  debit: number;
+  credit: number;
+};
+
+export type RetailkuCashflowDetail = {
+  data: RetailkuCashflowDetailRow[];
+  meta: { pagination: { page: number; limit: number; total: number; totalPages: number } };
+};
+
+/** Panggil tool `get_cashflow_detail` (baru dibangun & didaftarkan di
+ * sisi Retailku, lihat retailku-cashflow-sync.md) — detail pergerakan
+ * kas per transaksi individual, dengan pagination. */
+export async function getCashflowDetail(
+  client: Client,
+  args: CashflowDateRangeArgs & { page?: number; limit?: number }
+): Promise<RetailkuCashflowDetail> {
+  return callToolAsJson<RetailkuCashflowDetail>(client, "get_cashflow_detail", args);
 }
