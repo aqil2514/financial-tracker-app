@@ -1,2 +1,2 @@
 export { AccountMappingList } from "./mapping/account-mapping-list";
-export { CashflowSyncPanel } from "./cashflow-sync-panel";
+export { CashflowSyncPanel } from "./sync-cashflow/cashflow-sync-panel";
