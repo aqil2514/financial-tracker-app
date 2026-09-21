@@ -1,0 +1,6 @@
+Master Data
+- Buat agar akun ini default sortnya adalah per grup header
+- Di Detail akun, tambahkan juga aksi cepat untuk tambah akun langsung di dialog detail
+
+Transaksi
+- Tambah UX yang berkaitan dengan kalender. Jadi pas tambah data dan ada filter kalender, defaultnya di tanggal yang dipilih dari filter

@@ -36,7 +36,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
-import { useRetailkuSettings } from "@/shared/retailku";
+import { useRetailkuPaymentAccounts, useRetailkuSettings } from "@/shared/retailku";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -86,6 +86,15 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { data: retailkuSettings } = useRetailkuSettings();
   const isRetailkuConnected = !!retailkuSettings?.mcpUrl && !!retailkuSettings?.apiKey;
+
+  // Best-effort, non-blocking: query ini `enabled` cuma kalau kredensial
+  // lengkap, dan react-query otomatis tidak melakukan apa pun saat
+  // offline/gagal (tidak menunda render apa pun di sini). Tujuannya
+  // supaya data akun Retailku (dipakai untuk deteksi mapping "orphan" —
+  // lihat "Stabilitas retailku_account_id" di
+  // retailku-account-mapping.md) sudah fresh di cache begitu user buka
+  // halaman mapping, bukan menunggu fetch baru saat itu juga.
+  useRetailkuPaymentAccounts();
 
   const collapsibleNavItems: CollapsibleNavGroup[] = isRetailkuConnected
     ? [...staticCollapsibleNavItems, retailkuNavGroup]

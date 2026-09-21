@@ -92,5 +92,11 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0015_account_color.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 16,
+            description: "retailku_account_mapping",
+            sql: include_str!("../migrations/0016_retailku_account_mapping.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

@@ -1,42 +1,68 @@
-# Persistensi Mapping Akun Retailku
+# Persistensi Mapping Akun Retailku (SELESAI)
 
 > Lanjutan dari `retailku-integration.md` (status: DONE untuk fondasi
 > koneksi/MCP client/UI mapping tampilan). Dokumen ini fokus HANYA pada
 > satu hal: menyimpan pilihan mapping akun Retailku → akun lokal secara
 > permanen, supaya tidak hilang tiap refresh halaman.
+>
+> **Status: SELESAI** — persistensi, badge orphan, dan prefetch
+> best-effort semuanya sudah diimplementasikan dan diverifikasi
+> (`tsc`/`npm test` 94/94/`npm run build` bersih). Satu-satunya yang
+> sengaja BELUM dikerjakan (titik 2, point-of-use) ditunda ke saat sync
+> utang-piutang/cashflow dibangun, dicatat di TODO paling bawah.
 
 ## Konteks
 
-`features/retailku/account-mapping-list.tsx` sudah menampilkan tabel
-akun Retailku (`isPaymentMethod: true`, diambil live via MCP
-`get_finance_accounts`) berdampingan dengan dropdown akun kas lokal
+`features/retailku/account-mapping-list.tsx` menampilkan tabel akun
+Retailku (`isPaymentMethod: true`, diambil live via MCP
+`get_finance_accounts`) berdampingan dengan combobox akun kas lokal
 `financial-app`. Untuk Warung Aqil, cuma 2 baris: "Kas Tunai" (code
 1101) dan "Seabank" (code 1102).
 
-Saat ini pilihan mapping cuma disimpan di `useState` React lokal —
-hilang begitu halaman di-refresh atau app ditutup. Dokumen ini membahas
-cara menyimpannya secara permanen di SQLite lokal.
-
 ## TODO
 
-- [ ] Migrasi SQL baru — tabel `retailku_account_mapping` (lihat
-      "Kebutuhan skema" di bawah, `ON DELETE RESTRICT` untuk
-      `local_account_id` — sudah diputuskan)
-      (`src-tauri/migrations/00XX_retailku_account_mapping.sql`) +
-      registrasi di `migrations.rs`.
-- [ ] Hook `useRetailkuAccountMapping()` (baca) dan
-      `useSaveRetailkuAccountMapping()` (simpan/update — `UPSERT` by
-      `retailku_account_id`, bukan insert baru tiap kali re-mapping) di
-      `shared/retailku/`.
-- [ ] Sambungkan `account-mapping-list.tsx` ke hook di atas (gantikan
-      `useState` lokal), tambah indikator sukses simpan.
-- [ ] Badge/indikator di `account-mapping-list.tsx` untuk baris yang
-      akun Retailku-nya sudah `isPaymentMethod: false` (lihat
-      "Stabilitas `retailku_account_id`" — validasi titik 1, best-effort
-      saat app dibuka).
+- [x] Migrasi SQL — tabel `retailku_account_mapping`
+      (`src-tauri/migrations/0016_retailku_account_mapping.sql`,
+      registrasi versi 16 di `migrations.rs`). Diverifikasi
+      `PRAGMA foreign_key_check` bersih terhadap salinan `finance.dev.db`.
+- [x] Hook `useRetailkuAccountMapping()` (baca) dan
+      `useSaveRetailkuAccountMapping()` (simpan — `UPSERT` by
+      `retailku_account_id` lewat `ON CONFLICT ... DO UPDATE`, bukan
+      insert baru tiap kali re-mapping) di
+      `shared/retailku/use-retailku-account-mapping.ts`, diekspor dari
+      `shared/retailku/index.ts`.
+- [x] `account-mapping-list.tsx` disambungkan ke hook di atas — draft
+      di `useState` di-hydrate SEKALI dari data tersimpan (flag
+      `hydrated`, supaya tidak tertimpa balik saat query di-invalidate
+      setelah save), tombol "Simpan Mapping" dengan indikator
+      `isPending`.
+- [x] Dropdown akun lokal diganti dari `Select` ke `Combobox` (Base UI,
+      primitif yang sama dipakai `FormFieldCombobox` di form transaksi)
+      — searchable, konsisten dengan combobox akun lain di app. Baris
+      diekstrak ke komponen `AccountMappingRow` tersendiri karena
+      `useComboboxAnchor()` (hook) tidak boleh dipanggil di dalam
+      `.map()`.
+- [x] Badge orphan di `account-mapping-list.tsx` — mapping tersimpan
+      yang akun Retailku-nya sudah tidak lagi `isPaymentMethod: true`
+      ditampilkan sebagai baris terpisah dengan badge merah "Tidak
+      aktif di Retailku" (dihitung dari selisih `savedMapping` vs
+      `retailkuAccounts`, tidak perlu request tambahan).
+- [x] Prefetch best-effort (titik 1, "saat app dibuka") — `AppSidebar`
+      memanggil `useRetailkuPaymentAccounts()` (sudah `enabled` cuma
+      saat kredensial lengkap, react-query diam saja kalau
+      offline/gagal) supaya data akun Retailku sudah fresh di cache
+      sebelum user sempat membuka halaman mapping.
+- [x] **(Tambahan di luar scope awal, diminta menyusul)** Badge koneksi
+      di halaman daftar akun (`master-data/accounts` →
+      `features/accounts/sections/list/content/item.tsx`) — akun lokal
+      yang jadi tujuan satu atau lebih mapping menampilkan badge
+      "Retailku: <nama akun Retailku>" (gabungan semua nama kalau lebih
+      dari satu akun Retailku mengarah ke akun lokal yang sama, mis.
+      "Kas Tunai" + "Seabank" → "Dompet Bisnis").
 - [ ] (Ditunda ke saat sync utang-piutang/cashflow dibangun, dicatat di
       sini supaya tidak terlupa) Validasi ulang `isPaymentMethod`
-      sebelum sync memakai suatu mapping (titik 2, point-of-use).
+      sebelum sync memakai suatu mapping (titik 2, point-of-use —
+      defense in depth, lihat "Stabilitas `retailku_account_id`").
 
 ## Kebutuhan skema
 

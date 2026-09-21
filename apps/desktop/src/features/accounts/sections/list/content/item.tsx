@@ -1,5 +1,5 @@
 import React from "react";
-import { Eye, Pencil, ScaleIcon, Trash2 } from "lucide-react";
+import { Building2, Eye, Pencil, ScaleIcon, Trash2 } from "lucide-react";
 
 import { useAccountsList } from "../context";
 import { AccountWithBalance } from "../../../calculate-balance";
@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/format-currency";
 import { ListItemActionsMenu } from "@/components/list-item-actions-menu";
 import { resolveAccountIcon } from "@/lib/account-icons";
 import { resolveAccountColorText } from "@/lib/account-colors";
+import { useRetailkuAccountMapping } from "@/shared/retailku";
 
 export function AccountListContentItem() {
   const { accounts } = useAccountsList();
@@ -27,12 +28,29 @@ const NoAccounts = () => (
 const WithAccounts: React.FC<{ accounts: AccountWithBalance[] }> = ({
   accounts,
 }) => {
-  return accounts.map((account) => (
-    <AccountListItem account={account} key={account.id} />
-  ));
+  const { data: retailkuMapping } = useRetailkuAccountMapping();
+
+  return accounts.map((account) => {
+    const linkedRetailkuAccounts = (retailkuMapping ?? []).filter(
+      (row) => row.localAccountId === account.id
+    );
+    return (
+      <AccountListItem
+        account={account}
+        linkedRetailkuAccounts={linkedRetailkuAccounts}
+        key={account.id}
+      />
+    );
+  });
 };
 
-const AccountListItem = ({ account }: { account: AccountWithBalance }) => {
+const AccountListItem = ({
+  account,
+  linkedRetailkuAccounts,
+}: {
+  account: AccountWithBalance;
+  linkedRetailkuAccounts: { retailkuAccountName: string }[];
+}) => {
   const { openDialog } = useAccountsList();
   const AccountIcon = resolveAccountIcon(account.icon);
   const colorText = resolveAccountColorText(account.color);
@@ -48,6 +66,12 @@ const AccountListItem = ({ account }: { account: AccountWithBalance }) => {
               <Badge variant="secondary">{account.group_name}</Badge>
             )}
             {!account.is_active && <Badge variant="outline">Nonaktif</Badge>}
+            {linkedRetailkuAccounts.length > 0 && (
+              <Badge variant="outline" className="gap-1">
+                <Building2 className="size-3" />
+                Retailku: {linkedRetailkuAccounts.map((row) => row.retailkuAccountName).join(", ")}
+              </Badge>
+            )}
           </div>
           <p className="text-muted-foreground text-sm">
             {formatCurrency(account.balance, "IDR")}
