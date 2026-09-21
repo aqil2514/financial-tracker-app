@@ -212,11 +212,103 @@ mapping WAJIB mengarah ke akun lokal yang SAMA sebelum sync bisa
 jalan. Kalau user memetakan ke akun lokal yang berbeda-beda, sync
 ditolak dengan pesan jelas (bukan dipaksa/diam-diam pilih salah satu).
 
+## Keterkaitan dengan sync utang-piutang (AR/AP) — dibahas di sesi terpisah
+
+Muncul dari pertanyaan: kalau `net` cashflow dicatat apa adanya (keputusan
+#1 di atas), apakah itu "bersih" secara laporan keuangan pribadi? Jawaban
+singkat: TIDAK sepenuhnya — sebagian `net` bisa jadi titipan (mis.
+penjualan produk konsinyasi, uangnya masuk kas penuh tapi sebagian WAJIB
+disetor ke penitip lewat `CONSIGNMENT_SETTLEMENT`, lihat `get_ar_ap`
+type=SUPPLIER). TAPI ini bukan alasan untuk memotong `net` — mencoba
+menghitung "porsi konsinyasi dari net hari ini" akan mengulang masalah
+yang sudah terbukti rapuh di keputusan #1 (`get_cashflow_allocation`).
+Cara yang benar: cashflow sync (dokumen ini) TETAP apa adanya, DAN
+disandingkan dengan sync utang-piutang terpisah (dokumen baru, belum
+ditulis, menyusul pola `retailku-account-mapping.md` bagian "Catatan
+eksplorasi: kaitan dengan utang-piutang") yang mengambil `get_ar_ap` →
+mencatat kewajiban/piutang gabungan sebagai `debts` lokal.
+
+**Bentuk keterhubungannya — dikonfirmasi dari skema & data nyata
+(`finance.dev.db`, tabel `debts`/`debt_payments`, lihat kolom
+`transaction_id` NOT NULL secara desain meski nullable di skema)**:
+setiap baris `debts`/`debt_payments` SELALU lahir sebagai efek samping
+dari satu `transactions` nyata lewat `applyDebtTransaction()`
+(`shared/debts/apply-debt-transaction.ts`) — TIDAK PERNAH `INSERT
+INTO debts` langsung. Konsekuensinya untuk sync:
+
+- **Sync AR/AP HARUS lewat jalur yang SAMA PERSIS dengan input manual**
+  — panggil `applyDebtTransaction()` yang sama yang dipanggil
+  `use-create-transaction.ts` sekarang, bukan menulis logic insert baru.
+  Alurnya: (1) ambil data mentah dari MCP Retailku (`get_cashflow_summary`
+  DAN `get_ar_ap`, dipanggil dulu, sebelum insert apa pun dimulai), (2)
+  hitung/susun transaksi apa saja yang perlu dibuat di sisi
+  `financial-app`, (3) panggil fungsi create-transaction yang sama
+  seperti form manual (cuma `source='retailku_sync'` alih-alih
+  `'manual'`) — sync App ini pada dasarnya "mengisi form yang sama
+  secara otomatis", bukan jalur data terpisah.
+- **Cashflow sync dan AR/AP sync tetap MENGHASILKAN BARIS TRANSAKSI
+  BERBEDA** — cashflow insert `transactions` tipe income/expense biasa
+  (akun kas lokal), AR/AP insert `transactions` tipe transfer (cash↔akun
+  `debt`) yang memicu `debts` sebagai efek samping. Bukan satu transaksi
+  gabungan — skema `transactions` tidak punya mekanisme "transaksi ini
+  terkait transaksi lain" selain `debts.transaction_id` yang satu arah.
+  Piutang gabungan dan utang gabungan dari Retailku memakai DUA kontak
+  lokal terpisah (sudah diputuskan di `retailku-account-mapping.md`).
+
+**DIPUTUSKAN: satu tombol "Sync Sekarang" menjalankan KEDUANYA (cashflow
++ AR/AP) sekaligus, bukan dua trigger terpisah** — supaya kas dan
+kewajiban selalu update bersamaan, tidak ada jeda "kas sudah naik tapi
+utang belum tercatat".
+
+**DIPUTUSKAN: tampilan read-only data AR/AP saat ini jadi SUB-TAB BARU
+di `/retailku/cashflow`** (`CashflowSyncPanel`), BUKAN halaman terpisah.
+Tujuannya murni melihat posisi utang-piutang Retailku SEKARANG (panggil
+`get_ar_ap`, tabel pihak/tipe CUSTOMER-SUPPLIER/outstanding
+receivable-payable) — sama seperti 3 sub-tab Ringkasan/Alokasi/Pergerakan
+yang sudah ada, BUKAN bagian dari kontrol sync (tombol/status/trigger,
+itu tetap di halaman `/retailku/sync` terpisah, lihat #3). `get_ar_ap`
+tidak punya filter tanggal (snapshot saat ini, bukan rentang), jadi tab
+ini TIDAK perlu ikut input rentang tanggal yang dipakai 3 tab lain.
+
+**DIPUTUSKAN: mode kegagalan ALL-OR-NOTHING** — kalau salah satu (cashflow
+ATAU AR/AP) gagal, SEMUANYA di-rollback, tidak ada yang tersimpan
+sebagian. Konsekuensi teknis:
+- SEMUA data dari MCP (cashflow + AR/AP) diambil dulu SEBELUM insert apa
+  pun ke SQLite dimulai — bukan insert-sambil-jalan lalu rollback manual
+  kalau gagal di tengah (rawan crash mid-way meninggalkan data setengah).
+- Insert ke SQLite dibungkus SATU database transaction
+  (`BEGIN`...`COMMIT`/`ROLLBACK`) yang mencakup baris cashflow DAN baris
+  AR/AP sekaligus — atomicity dijamin di level database, bukan di level
+  aplikasi.
+- Implikasi ke idempotency (`source_ref`, lihat "Pertanyaan terbuka #1"):
+  sync yang gagal TIDAK meninggalkan `source_ref` baru sama sekali —
+  sync berikutnya akan mencoba ulang rentang tanggal yang sama dari nol,
+  bukan menganggapnya "sudah dicoba, sudah gagal".
+- **Trade-off yang disadari dan diterima**: kalau cashflow untuk N hari
+  berhasil dihitung tapi AR/AP gagal di satu titik, N hari cashflow yang
+  valid itu IKUT batal (tidak tersimpan) sampai sync berikutnya berhasil
+  penuh. Dipilih sengaja demi konsistensi ("kas dan utang-piutang tidak
+  pernah boleh tidak sinkron") di atas "progres sebagian tetap
+  tersimpan".
+
 ## TODO
 
 - [ ] Validasi prasyarat mapping sebelum sync bisa aktif: semua baris
       `retailku_account_mapping` harus `local_account_id` yang SAMA.
       Tampilkan status ini di halaman `/retailku/sync` (lihat #3).
+- [x] Sub-tab baru "Utang Piutang" di `CashflowSyncPanel`
+      (`/retailku/cashflow`) — `getArAp()` di `retailku-mcp-client.ts`
+      (panggil `get_ar_ap`, TANPA `dateFrom`/`dateTo` karena snapshot,
+      bukan rentang), hook `useRetailkuArAp()` di
+      `use-retailku-cashflow.ts`, komponen `features/retailku/ar-ap-tab.tsx`
+      — tabel pihak (nama, badge tipe Pelanggan/Pemasok, outstanding
+      piutang, outstanding utang) + total piutang/utang di atas tabel.
+      Read-only murni, sama seperti 3 sub-tab lain, tidak terpengaruh
+      input rentang tanggal panel (sesuai desain). Diverifikasi
+      `tsc`/`npm test` (94/94)/`npm run build` bersih DAN dikonfirmasi
+      live di `tauri dev` — baris "Mba-mba Kado Kuning" (Pemasok, utang
+      Rp3.000) cocok persis dengan panggilan `get_ar_ap` langsung ke MCP
+      yang sudah dicek sebelumnya di sesi ini.
 - [x] Migrasi SQL: kolom `source` (`'manual' | 'retailku_sync'`,
       default `'manual'`) dan `source_ref` (nullable) di `transactions`
       — dibuat di `apps/desktop/src-tauri/migrations/0017_transaction_source.sql`
@@ -225,14 +317,17 @@ ditolak dengan pesan jelas (bukan dipaksa/diam-diam pilih salah satu).
       `CREATE UNIQUE INDEX idx_transactions_source_ref ON
       transactions(source, source_ref) WHERE source_ref IS NOT NULL`
       untuk cek idempotency cepat sekaligus mencegah baris dobel.
-- [ ] Fungsi sync inti — DUA jalur (lihat keputusan #6):
+- [ ] Fungsi sync inti — DUA jalur untuk cashflow (lihat keputusan #6):
       - Mode ringkas: panggil `get_cashflow_summary` per rentang tanggal
         yang perlu diproses (lihat #1), `source_ref` = tanggal.
       - Mode detail: panggil `get_cashflow_detail` (dengan pagination),
         agregasi per `sourceType` per hari, `source_ref` = tanggal +
         sourceType.
       Untuk kedua mode: skip tanggal/baris yang `source_ref`-nya sudah
-      ada (idempotency).
+      ada (idempotency). DIJALANKAN BERSAMA sync AR/AP (dokumen
+      terpisah, lihat "Keterkaitan dengan sync utang-piutang" di atas)
+      dalam satu database transaction all-or-nothing — bukan fungsi
+      yang berdiri sendiri lagi.
 - [ ] Halaman `/retailku/sync` (`features/retailku/`, mengikuti pola
       `/retailku/mapping`) — toggle mode, status terakhir sync, tombol
       "Sync Sekarang". Tambah item "Sync Cashflow" ke grup sidebar

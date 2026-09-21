@@ -27,5 +27,6 @@ export {
   useRetailkuCashflowSummary,
   useRetailkuCashflowAllocation,
   useRetailkuCashflowDetail,
+  useRetailkuArAp,
   type CashflowDateRange,
 } from "./use-retailku-cashflow";

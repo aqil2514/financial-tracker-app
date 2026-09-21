@@ -5,9 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import {
   assertRetailkuConfigured,
   connectRetailkuMcp,
+  getArAp,
   getCashflowAllocation,
   getCashflowDetail,
   getCashflowSummary,
+  type RetailkuArAp,
   type RetailkuCashflowAllocation,
   type RetailkuCashflowDetail,
   type RetailkuCashflowSummary,
@@ -82,6 +84,28 @@ export function useRetailkuCashflowDetail(
       const client = await connectRetailkuMcp(config);
       try {
         return await getCashflowDetail(client, { ...range, page, limit });
+      } finally {
+        await client.close();
+      }
+    },
+    enabled: isConfigured,
+  });
+}
+
+/** Snapshot piutang/utang outstanding SAAT INI (bukan rentang tanggal,
+ * lihat `getArAp` di retailku-mcp-client.ts) — dipakai tab "Utang
+ * Piutang" di /retailku/cashflow. */
+export function useRetailkuArAp() {
+  const { data: settings } = useRetailkuSettings();
+  const isConfigured = !!settings?.mcpUrl && !!settings?.apiKey;
+
+  return useQuery({
+    queryKey: ["retailku", "ar-ap"],
+    queryFn: async (): Promise<RetailkuArAp> => {
+      const config = assertRetailkuConfigured(settings!);
+      const client = await connectRetailkuMcp(config);
+      try {
+        return await getArAp(client);
       } finally {
         await client.close();
       }

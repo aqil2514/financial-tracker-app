@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CashflowDateRange } from "@/shared/retailku";
+import { ArApTab } from "./ar-ap-tab";
 import { CashflowAllocationTab } from "./cashflow-allocation-tab";
 import { CashflowDetailTab } from "./cashflow-detail-tab";
 import { CashflowSummaryTab } from "./cashflow-summary-tab";
@@ -70,6 +71,7 @@ export function CashflowSyncPanel() {
             <TabsTrigger value="summary">Ringkasan</TabsTrigger>
             <TabsTrigger value="allocation">Alokasi</TabsTrigger>
             <TabsTrigger value="detail">Pergerakan</TabsTrigger>
+            <TabsTrigger value="ar-ap">Utang Piutang</TabsTrigger>
           </TabsList>
           <TabsContent value="summary">
             <CashflowSummaryTab range={range} />
@@ -79,6 +81,9 @@ export function CashflowSyncPanel() {
           </TabsContent>
           <TabsContent value="detail">
             <CashflowDetailTab range={range} />
+          </TabsContent>
+          <TabsContent value="ar-ap">
+            <ArApTab />
           </TabsContent>
         </Tabs>
       </TabsContent>
