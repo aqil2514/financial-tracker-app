@@ -1,5 +1,6 @@
 import React from "react";
 import { Building2, Eye, Pencil, ScaleIcon, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { useAccountsList } from "../context";
 import { AccountWithBalance } from "../../../calculate-balance";
@@ -51,12 +52,24 @@ const AccountListItem = ({
   account: AccountWithBalance;
   linkedRetailkuAccounts: { retailkuAccountName: string }[];
 }) => {
+  const router = useRouter();
   const { openDialog } = useAccountsList();
   const AccountIcon = resolveAccountIcon(account.icon);
   const colorText = resolveAccountColorText(account.color);
 
   return (
-    <div className="flex items-center justify-between rounded-lg border p-4">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => router.push(`/accounts/detail?id=${account.id}`)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          router.push(`/accounts/detail?id=${account.id}`);
+        }
+      }}
+      className="hover:bg-accent/50 flex cursor-pointer items-center justify-between rounded-lg border p-4"
+    >
       <div className="flex items-start gap-3">
         <AccountIcon className={`size-5 shrink-0 ${colorText}`} />
         <div className="space-y-1">
@@ -81,19 +94,24 @@ const AccountListItem = ({
           )}
         </div>
       </div>
-      <ListItemActionsMenu
-        actions={[
-          { label: "Lihat Detail", icon: Eye, onClick: () => openDialog(account, "detail") },
-          { label: "Koreksi Saldo", icon: ScaleIcon, onClick: () => openDialog(account, "correction") },
-          { label: "Edit", icon: Pencil, onClick: () => openDialog(account, "edit") },
-          {
-            label: "Hapus",
-            icon: Trash2,
-            variant: "destructive",
-            onClick: () => openDialog(account, "delete"),
-          },
-        ]}
-      />
+      {/* stopPropagation: menu aksi (Lihat Detail/Koreksi/Edit/Hapus) buka
+       * dialog masing-masing, TIDAK boleh ikut men-trigger navigasi klik
+       * card di baliknya. */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <ListItemActionsMenu
+          actions={[
+            { label: "Lihat Detail", icon: Eye, onClick: () => openDialog(account, "detail") },
+            { label: "Koreksi Saldo", icon: ScaleIcon, onClick: () => openDialog(account, "correction") },
+            { label: "Edit", icon: Pencil, onClick: () => openDialog(account, "edit") },
+            {
+              label: "Hapus",
+              icon: Trash2,
+              variant: "destructive",
+              onClick: () => openDialog(account, "delete"),
+            },
+          ]}
+        />
+      </div>
     </div>
   );
 };

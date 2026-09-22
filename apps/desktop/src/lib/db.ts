@@ -65,7 +65,7 @@ export type Transaction = {
   category_id: number | null;
   account_id: number | null;
   transfer_account_id: number | null;
-  note: string | null;
+  note: string;
   /** JSON dokumen Tiptap terserialisasi (`JSON.stringify`), atau `null`
    * kalau belum diisi — deskripsi detail, terpisah dari `note`. */
   description: string | null;

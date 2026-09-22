@@ -27,8 +27,8 @@ export const ItemInfo = ({ tx }: { tx: TransactionListRow }) => {
     <div className="flex items-center gap-3">
       <Icon className={`size-5 shrink-0 ${config.className}`} />
       <div className="space-y-1">
+        <p className="font-medium">{tx.note}</p>
         <div className="flex items-center gap-2">
-          <p className="font-medium">{transactionType}</p>
           {categoryName(tx.category_id) && (
             <Badge variant="secondary">{categoryName(tx.category_id)}</Badge>
           )}
@@ -49,10 +49,10 @@ export const ItemInfo = ({ tx }: { tx: TransactionListRow }) => {
             </TooltipProvider>
           )}
         </div>
+        <p className="text-muted-foreground text-sm">{transactionType}</p>
         <p className="text-muted-foreground text-sm">
           {formatDate(tx.date, "date-time")}
         </p>
-        {tx.note && <p className="text-muted-foreground text-xs">{tx.note}</p>}
       </div>
     </div>
   );

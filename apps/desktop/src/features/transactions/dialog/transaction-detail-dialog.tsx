@@ -15,6 +15,8 @@ import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
 import { typeConfig } from "../shared/constants";
 import { useTransactionById } from "../shared/hooks/use-transaction-by-id";
+import { accountName } from "../shared/utils/account-name";
+import { categoryName } from "../shared/utils/category-name";
 import { useTransactionsDialog } from "./context";
 
 export function TransactionDetailDialog() {
@@ -57,14 +59,6 @@ function TransactionDetailDialogContent({
   const { data: categories } = useCategories();
   const { data: attachments } = useTransactionAttachments(transaction.id);
 
-  function accountName(id: number | null) {
-    return accounts?.find((account) => account.id === id)?.name ?? "-";
-  }
-
-  function categoryName(id: number | null) {
-    return categories?.find((category) => category.id === id)?.name ?? null;
-  }
-
   const description = transaction.description
     ? JSON.parse(transaction.description)
     : null;
@@ -74,8 +68,8 @@ function TransactionDetailDialogContent({
 
   const transactionType =
     transaction.type === "transfer"
-      ? `${accountName(transaction.account_id)} → ${accountName(transaction.transfer_account_id)}`
-      : accountName(transaction.account_id);
+      ? `${accountName(accounts, transaction.account_id)} → ${accountName(accounts, transaction.transfer_account_id)}`
+      : accountName(accounts, transaction.account_id);
 
   return (
     <Dialog open={true} onOpenChange={onOpenChange}>
@@ -109,10 +103,10 @@ function TransactionDetailDialogContent({
               <span className="text-muted-foreground">Akun</span>
               <span className="font-medium">{transactionType}</span>
             </div>
-            {categoryName(transaction.category_id) && (
+            {categoryName(categories, transaction.category_id) && (
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Kategori</span>
-                <Badge variant="secondary">{categoryName(transaction.category_id)}</Badge>
+                <Badge variant="secondary">{categoryName(categories, transaction.category_id)}</Badge>
               </div>
             )}
             <div className="flex items-center justify-between">
