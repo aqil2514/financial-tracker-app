@@ -157,7 +157,12 @@ export async function syncArAp(db: Db, input: SyncArApInput): Promise<SyncArApRe
       cashAccountId: input.localCashAccountId,
       debtAccountId: isReceivable ? input.receivableDebtAccountId : input.payableDebtAccountId,
       amount: planRow.amount,
-      date: input.today,
+      // `input.today` cuma "YYYY-MM-DD" (dipertahankan APA ADANYA untuk
+      // sourceRef di atas, key idempotency HARUS stabil) — kolom
+      // `transactions.date`/`debts.date` HARUS "YYYY-MM-DDTHH:mm" (lihat
+      // catatan sama di sync-cashflow.ts insertCashflowTransaction, bug
+      // ditemukan live: field Tanggal kosong di form Edit Transaksi).
+      date: `${input.today}T00:00`,
       direction: planRow.direction,
       sourceRef,
     });
