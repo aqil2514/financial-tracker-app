@@ -8,7 +8,7 @@ import { useContacts } from "@/shared/contacts/use-contacts";
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { useTransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
 import { applyDebtTransactionEdit } from "@/shared/debts/apply-debt-transaction";
-import { transactionSchema, type TransactionFormOutput } from "../transaction.schema";
+import { transactionSchema, type TransactionFormOutput } from "../schema";
 
 type UseUpdateTransactionOptions = {
   /** Dialog terbuka atau tidak — datang dari context, dipakai untuk

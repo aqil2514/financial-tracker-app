@@ -8,7 +8,7 @@ import {
   revokePendingAttachment,
   type PendingAttachment,
 } from "@/shared/attachments/pending-attachment";
-import { TransactionForm } from "../form/transaction-form";
+import { TransactionForm } from "../form/add-edit/form";
 import { useCreateTransaction } from "../form/add-edit/hooks/use-create-transaction";
 import { useTransactionsDialog } from "./context";
 

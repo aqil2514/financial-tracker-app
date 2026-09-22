@@ -10,7 +10,7 @@ import { formatDate } from "@/lib/format-date";
 import { useContacts } from "@/shared/contacts/use-contacts";
 import { useOngoingDebts } from "@/shared/debts/use-ongoing-debts";
 import type { TransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
-import type { TransactionFormValues } from "./add-edit/transaction.schema";
+import { TransactionFormValues } from "../schema";
 
 type DebtActionFieldProps = {
   control: Control<TransactionFormValues>;

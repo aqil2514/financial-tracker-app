@@ -6,7 +6,7 @@ import { Pencil } from "lucide-react";
 import type { Transaction } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
-import { TransactionForm } from "./transaction-form";
+import { TransactionForm } from "./add-edit/form";
 import { useUpdateTransaction } from "./use-update-transaction";
 
 export function TransactionEditDialog({

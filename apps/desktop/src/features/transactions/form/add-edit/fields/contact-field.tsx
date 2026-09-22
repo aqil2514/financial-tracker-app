@@ -117,6 +117,13 @@ export function ContactField<TFieldValues extends ContactFormValues>({
                 bukan typo sebelum menyimpan.
               </p>
             )}
+            {disabled && (
+              <p className="text-muted-foreground text-sm">
+                Piutang ini sudah menerima cicilan dari transaksi lain — kontak,
+                nominal, dan akun tidak bisa diubah dari sini supaya riwayat
+                cicilannya tidak hilang.
+              </p>
+            )}
             {fieldState.error && (
               <p className="text-destructive text-sm">{fieldState.error.message}</p>
             )}

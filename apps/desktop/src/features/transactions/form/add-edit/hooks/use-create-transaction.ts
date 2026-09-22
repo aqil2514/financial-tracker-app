@@ -10,7 +10,7 @@ import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
-import { transactionSchema, type TransactionFormOutput } from "../transaction.schema";
+import { transactionSchema, type TransactionFormOutput } from "../schema";
 
 function now() {
   const date = new Date();
