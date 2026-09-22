@@ -12,7 +12,7 @@ export function ListCardContent() {
   return (
     <CardContent>
       <QueryState isLoading={isLoading} error={error} />
-      <ScrollArea className="h-[480px]">
+      <ScrollArea className="h-120">
         <div className="space-y-3 pr-4">
           {transactions?.map((tx) => (
             <TransactionListItem key={tx.id} tx={tx} />

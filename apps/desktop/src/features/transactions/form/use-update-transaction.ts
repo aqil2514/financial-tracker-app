@@ -11,7 +11,7 @@ import { applyDebtTransactionEdit } from "@/shared/debts/apply-debt-transaction"
 import {
   transactionSchema,
   type TransactionFormOutput,
-} from "./transaction.schema";
+} from "./add-edit/transaction.schema";
 
 export function useUpdateTransaction(transaction: Transaction, onSuccess?: () => void) {
   const { data: contacts } = useContacts();

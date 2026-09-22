@@ -11,7 +11,6 @@ import type { Category } from "@/lib/db";
 import type { Pagination } from "@/lib/pagination";
 import { useTransactionsPage } from "../../page/transactions-page-context";
 import { useTransactions, type TransactionListRow } from "./use-transactions";
-import { useDeleteTransaction } from "./use-delete-transaction";
 
 const STATIC_FILTER_SELECT_OPTIONS: SelectOptionsMap = {
   type: [
@@ -41,8 +40,6 @@ interface ListContextType {
   setSorts: (sorts: SortConfig[]) => void;
   accountName: (id: number | null) => string;
   categoryName: (id: number | null) => string | null;
-  deleteTransaction: (id: number) => void;
-  isDeletingTransaction: boolean;
 }
 
 const ListContext = createContext<ListContextType | undefined>(undefined);
@@ -69,7 +66,6 @@ export function ListProvider({ children }: { children: React.ReactNode }) {
 
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
-  const deleteTransaction = useDeleteTransaction();
 
   const filterSelectOptions = useMemo<SelectOptionsMap>(
     () => ({
@@ -112,8 +108,6 @@ export function ListProvider({ children }: { children: React.ReactNode }) {
         setSorts,
         accountName,
         categoryName,
-        deleteTransaction: deleteTransaction.mutate,
-        isDeletingTransaction: deleteTransaction.isPending,
       }}
     >
       {children}

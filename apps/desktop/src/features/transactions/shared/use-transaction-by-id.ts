@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getDb, type Transaction } from "@/lib/db";
-import { transactionsQueryKey } from "./use-transactions";
+import { transactionsQueryKey } from "../content/list/use-transactions";
 
 /** Ambil 1 transaksi by id — dipakai untuk buka TransactionEditDialog
  * dari luar list (mis. deep-link ?edit=123 dari dialog detail akun),

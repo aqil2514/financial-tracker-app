@@ -5,4 +5,4 @@ export {
   transactionSchema,
   type TransactionFormValues,
   type TransactionFormOutput,
-} from "./transaction.schema";
+} from "./add-edit/transaction.schema";

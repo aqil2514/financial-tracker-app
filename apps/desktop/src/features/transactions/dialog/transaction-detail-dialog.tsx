@@ -13,7 +13,7 @@ import { AttachmentThumbnail } from "@/shared/attachments/attachment-thumbnail";
 import { useTransactionAttachments } from "@/shared/attachments/use-transaction-attachments";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
-import { useTransactionById } from "../content/list/use-transaction-by-id";
+import { useTransactionById } from "../shared/use-transaction-by-id";
 import { useTransactionsDialog } from "./context";
 
 const typeConfig = {

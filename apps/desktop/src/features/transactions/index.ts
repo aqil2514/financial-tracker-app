@@ -4,7 +4,7 @@ export {
   transactionsQueryKey,
   useDeleteTransaction,
 } from "./content/list";
-export { useTransactionById } from "./content/list/use-transaction-by-id";
+export { useTransactionById } from "./shared/use-transaction-by-id";
 export {
   TransactionCalendarPanel,
   useTransactionDays,

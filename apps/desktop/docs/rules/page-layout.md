@@ -89,8 +89,8 @@ komponen feature yang relevan, bukan naik ke `page.tsx`.
 Setiap `features/<nama-fitur>/` yang dipanggil langsung dari sebuah
 `page.tsx` WAJIB punya struktur folder yang seragam — `header/` dan
 `content/` selalu ada sebagai folder (bukan opsional strukturnya);
-`footer/`, `dialog/`, `page/`, `form/` ditambahkan kalau fitur itu memang
-punya bagian tersebut:
+`footer/`, `dialog/`, `page/`, `form/`, `shared/` ditambahkan kalau fitur
+itu memang punya bagian tersebut:
 
 ```
 features/<nama-fitur>/
@@ -103,6 +103,8 @@ features/<nama-fitur>/
 │                 dalam content/ (lihat "Folder page/" di bawah)
 ├── form/       — kalau ada — schema/fields/hooks form yang dibagi
 │                 lintas dialog (lihat "Folder form/" di bawah)
+├── shared/     — kalau ada — hook/helper/konstanta murni yang dibagi
+│                 lintas section/dialog (lihat "Folder shared/" di bawah)
 └── index.ts    — barrel: re-export publik fitur ini (Header/Content/
                   Dialogs/dst), TIDAK berisi JSX ATAU logic. Orkestrasi
                   JSX sesungguhnya (susun Header+Content+Footer+Dialogs
@@ -118,11 +120,11 @@ Keseragaman ini soal STRUKTUR FILE, bukan soal seberapa rumit isinya —
 tanpa folder `content/` pembungkus — lihat "`page.tsx` sebagai orkestrator"
 di atas untuk alasannya.
 
-`footer/`/`dialog/`/`page/`/`form/` TETAP opsional secara STRUKTUR (jangan
-buat folder kosong kalau fitur itu memang tidak punya salah satunya) —
-bedanya dengan `header/`/`content/` yang selalu ada karena setiap halaman
-pasti punya judul dan konten, sedangkan keempat folder lainnya memang
-tidak selalu relevan.
+`footer/`/`dialog/`/`page/`/`form/`/`shared/` TETAP opsional secara
+STRUKTUR (jangan buat folder kosong kalau fitur itu memang tidak punya
+salah satunya) — bedanya dengan `header/`/`content/` yang selalu ada
+karena setiap halaman pasti punya judul dan konten, sedangkan kelima
+folder lainnya memang tidak selalu relevan.
 
 ## Kapan TIDAK perlu dipecah lebih jauh — level WIDGET DI DALAM content/
 
@@ -144,6 +146,131 @@ Barulah kalau satu widget itu sendiri mulai punya beberapa bagian nyata
 (mis. perlu dipecah jadi beberapa sub-tampilan, atau menambahkan dialog),
 pecah SAAT itu terjadi — bukan disiapkan strukturnya lebih dulu sebelum
 ada isi untuk mengisinya.
+
+## Pola yang sama berulang di level SECTION — bukan cuma level fitur
+
+Kebalikan dari widget kecil di atas: kalau sebuah section DI DALAM
+`content/` sudah cukup besar (state/context sendiri, DAN sudah kelihatan
+setidaknya 2 dari 3 bagian header/content/footer), section itu ikut
+pola header/content/footer yang sama seperti level fitur — bukan cuma
+level `features/<fitur>/`. Ini rekursi dari aturan yang sama, bukan
+aturan baru.
+
+Contoh nyata — `content/list/` di `features/transactions/` (isinya
+`TransactionList`, ditampilkan sebagai satu `Card` di dalam
+`TransactionsContent`):
+
+```
+content/list/
+├── list-card-header.tsx    — ListCardHeader: judul "Daftar Transaksi" + filter/sort
+├── list-card-content.tsx   — ListCardContent: badan tabel/list transaksi
+├── list-card-footer.tsx    — ListCardFooter: pagination
+├── list-context.tsx        — ListProvider/useList — context KHUSUS section ini
+├── transaction-list-item.tsx
+├── use-transactions.ts
+└── index.tsx                — TransactionList: orkestrator section
+```
+
+`index.tsx`-nya:
+
+```tsx
+export function TransactionList() {
+  return (
+    <ListProvider>
+      <Card>
+        <ListCardHeader />
+        <ListCardContent />
+        <ListCardFooter />
+      </Card>
+    </ListProvider>
+  );
+}
+```
+
+Beda dengan level fitur (yang pakai folder eksplisit `header/`/`content/`/
+`footer/`), section BOLEH tetap pakai konvensi PENAMAAN FILE datar
+(`list-card-header.tsx`, bukan `header/index.tsx`) selama section itu
+tidak sebesar/serumit fitur penuh — folder eksplisit per-bagian baru
+perlu kalau salah satu bagiannya sendiri mulai punya banyak sub-file.
+Yang WAJIB sama persis dengan level fitur:
+
+- `index.tsx` section = orkestrator murni (susun header+content+footer,
+  pasang provider-nya), TIDAK ada state/query/logic langsung di situ.
+- Context yang dipakai section ini SENDIRI (bukan dibagi ke section lain)
+  tinggal di section itu juga (`list-context.tsx`) — TIDAK naik ke `page/`
+  fitur. `page/` cuma untuk context yang dibagi LINTAS SECTION (lihat
+  "Folder `page/`" di bawah) — `dateFilter` dari `TransactionsPageProvider`
+  dikonsumsi `list-context.tsx`, tapi state list itu sendiri
+  (filter/sort/pagination) tetap lokal ke `list/`.
+
+Section kecil yang cuma 1-2 bagian (mis. cuma content, tanpa
+header/footer terpisah) TIDAK perlu dipaksa punya ketiganya — sama seperti
+`footer/`/`dialog/` opsional di level fitur.
+
+## Rekursi yang sama berlaku juga untuk `dialog/`
+
+Bukan cuma section di `content/` — satu dialog INDIVIDUAL di `dialog/`
+(mis. `transaction-detail-dialog.tsx`) juga boleh direkursi jadi folder
+sendiri begitu dia sendiri mulai punya beberapa bagian nyata (mis. data-
+fetching wrapper + presentational besar tercampur dalam 1 file, atau mulai
+butuh sub-komponen sendiri) — kriterianya sama dengan section: bukan lagi
+"satu hal sederhana", tapi sudah beberapa tanggung jawab berbeda dalam
+satu file.
+
+```
+dialog/
+├── transaction-create-dialog.tsx   — masih sederhana, tetap 1 file
+├── transaction-edit-dialog.tsx     — masih sederhana, tetap 1 file
+├── detail/                         — kalau transaction-detail-dialog.tsx
+│   ├── index.tsx                     sudah cukup kompleks untuk direkursi
+│   ├── content.tsx
+│   └── use-transaction-detail.ts
+└── transaction-delete-confirm-dialog.tsx
+```
+
+Jangan direkursi lebih dulu "untuk jaga-jaga" — sama seperti section,
+pecah SAAT kompleksitasnya benar-benar terasa, bukan disiapkan strukturnya
+sebelum ada isi yang butuh dipecah.
+
+## Folder `shared/` — hook/helper/konstanta MURNI yang dipakai lintas bagian
+
+Beda dari `form/` (isinya KOMPONEN form + schema + mutation hooks) dan
+`page/` (isinya PROVIDER React context): `shared/` untuk hook/helper/
+konstanta murni (bukan komponen React) yang dipakai berulang di lebih
+dari satu bagian — bisa lintas section (`content/list/` dan
+`content/calendar/`), lintas dialog (beberapa file di `dialog/`), atau
+campuran section+dialog+`page/`.
+
+Contoh nyata di `features/transactions/`:
+
+- `useTransactionById` — query 1 transaksi by id, dipakai
+  `dialog/transaction-edit-dialog.tsx`, `dialog/transaction-detail-dialog.tsx`,
+  DAN `page/deep-link-edit-dialog.tsx`. Sebelum dipindah ke `shared/`, dia
+  "menumpang" di `content/list/` padahal tidak dipakai section manapun,
+  cuma numpang karena dulu ditulis berdekatan dengan `use-transactions.ts`.
+- `typeConfig` (ikon/label/warna per tipe transaksi) — kalau ditemukan
+  terduplikasi persis di `content/list/transaction-list-item.tsx` DAN
+  `dialog/transaction-detail-dialog.tsx`, itu tandanya harus diekstrak ke
+  `shared/`, bukan dibiarkan didefinisikan ulang di tiap tempat.
+
+Tanda sesuatu HARUS pindah ke `shared/`: dipakai lebih dari satu bagian
+(section/dialog/page berbeda) DAN bukan komponen React. Tanda TIDAK perlu
+pindah: cuma dipakai SATU bagian — tetap tinggal di situ, jangan
+dipindah "untuk jaga-jaga" duluan.
+
+**Struktur folder `shared/` sendiri** — flat dulu (`shared/use-transaction-by-id.ts`
+langsung), pecah per JENIS (bukan per section/dialog, karena `shared/`
+sudah netral dari kepemilikan) begitu isinya beragam:
+
+```
+shared/
+├── hooks/           — query/mutation hooks
+├── utils/           — pure function (accountName, categoryName, dst)
+└── constants.ts      — data statis (typeConfig, dst)
+```
+
+Sama seperti bagian lain: jangan siapkan `hooks/`/`utils/` sebelum ada
+lebih dari satu file per jenis yang butuh dikelompokkan.
 
 ## State dan context ikut pembagian ini
 

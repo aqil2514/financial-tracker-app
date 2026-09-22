@@ -28,7 +28,7 @@ import { DebtActionField } from "./debt-action-field";
 import type {
   TransactionFormOutput,
   TransactionFormValues,
-} from "./transaction.schema";
+} from "./add-edit/transaction.schema";
 
 type TransactionFormProps = {
   form: UseFormReturn<TransactionFormValues, unknown, TransactionFormOutput>;
