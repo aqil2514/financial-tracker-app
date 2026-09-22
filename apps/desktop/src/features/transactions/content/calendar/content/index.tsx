@@ -6,7 +6,7 @@ import { id } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { CardContent } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useCalendar } from "./calendar-context";
+import { useCalendar } from "../context";
 import { CalendarSummaryHeader } from "./calendar-summary-header";
 import { DayButtonWithSummary } from "./calendar-day-button";
 

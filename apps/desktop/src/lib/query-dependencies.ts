@@ -13,8 +13,8 @@ import { monthlySummaryQueryKey } from "@/features/reports/use-monthly-summary";
 import { categoryBreakdownQueryKey } from "@/features/reports/use-category-breakdown";
 import { accountBalancesQueryKey } from "@/features/reports/use-account-balances";
 import { accountGroupBalancesQueryKey } from "@/features/accounts/sections/balance-pie-chart/use-account-group-balances";
-import { transactionDaysQueryKey } from "@/features/transactions/content/calendar/use-transaction-days";
-import { monthSummaryQueryKey } from "@/features/transactions/content/calendar/use-month-summary";
+import { transactionDaysQueryKey } from "@/features/transactions/shared/hooks/use-transaction-days";
+import { monthSummaryQueryKey } from "@/features/transactions/shared/hooks/use-month-summary";
 
 // Peta ketergantungan query key lintas fitur: kalau data sebuah DOMAIN
 // berubah (mis. transaksi ditambah/diedit/dihapus), semua query key di

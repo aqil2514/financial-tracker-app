@@ -3,9 +3,9 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import { format } from "date-fns";
 
-import { useTransactionsPage } from "../../page/transactions-page-context";
-import { useTransactionDays, type DaySummary } from "./use-transaction-days";
-import { useMonthSummary, type MonthSummary } from "./use-month-summary";
+import { useTransactionsPage } from "../../../page/transactions-page-context";
+import { useTransactionDays, type DaySummary } from "../../../shared/hooks/use-transaction-days";
+import { useMonthSummary, type MonthSummary } from "../../../shared/hooks/use-month-summary";
 
 interface CalendarContextType {
   selectedDate: Date | undefined;

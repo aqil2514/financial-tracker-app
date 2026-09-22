@@ -4,3 +4,6 @@ Master Data
 
 Transaksi
 - Tambah UX yang berkaitan dengan kalender. Jadi pas tambah data dan ada filter kalender, defaultnya di tanggal yang dipilih dari filter
+
+- Investasi jadi PR
+- Pembelian Stok juga sama

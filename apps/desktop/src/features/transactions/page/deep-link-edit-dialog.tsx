@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { TransactionEditDialog } from "../form";
-import { useTransactionById } from "../shared/use-transaction-by-id";
+import { useTransactionById } from "../shared/hooks/use-transaction-by-id";
 
 /** Buka TransactionEditDialog otomatis kalau halaman diakses dengan
  * ?edit=<id> di URL — dipakai untuk navigasi "Edit" dari tempat lain

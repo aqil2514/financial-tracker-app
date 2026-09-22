@@ -2,7 +2,7 @@
 
 import { CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useCalendar } from "./calendar-context";
+import { useCalendar } from "../context";
 
 export function CalendarCardHeader() {
   const { selectedDate, onSelectedDateChange } = useCalendar();

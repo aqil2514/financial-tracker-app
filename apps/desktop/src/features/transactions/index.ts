@@ -1,10 +1,6 @@
-export {
-  TransactionList,
-  useTransactions,
-  transactionsQueryKey,
-  useDeleteTransaction,
-} from "./content/list";
-export { useTransactionById } from "./shared/use-transaction-by-id";
+export { TransactionList, useTransactions, transactionsQueryKey } from "./content/list";
+export { useTransactionById } from "./shared/hooks/use-transaction-by-id";
+export { useDeleteTransaction } from "./shared/hooks/use-delete-transaction";
 export {
   TransactionCalendarPanel,
   useTransactionDays,

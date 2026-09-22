@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -13,14 +13,9 @@ import { AttachmentThumbnail } from "@/shared/attachments/attachment-thumbnail";
 import { useTransactionAttachments } from "@/shared/attachments/use-transaction-attachments";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
-import { useTransactionById } from "../shared/use-transaction-by-id";
+import { typeConfig } from "../shared/constants";
+import { useTransactionById } from "../shared/hooks/use-transaction-by-id";
 import { useTransactionsDialog } from "./context";
-
-const typeConfig = {
-  income: { icon: ArrowUpCircle, label: "Pemasukan", className: "text-green-600" },
-  expense: { icon: ArrowDownCircle, label: "Pengeluaran", className: "text-red-600" },
-  transfer: { icon: ArrowLeftRight, label: "Transfer", className: "text-blue-600" },
-};
 
 export function TransactionDetailDialog() {
   const { dialog, closeDialog, openDialog } = useTransactionsDialog();

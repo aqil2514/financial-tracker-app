@@ -3,11 +3,11 @@
 import { QueryState } from "@/components/query-state";
 import { CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useList } from "./list-context";
-import { TransactionListItem } from "./transaction-list-item";
+import { useList } from "../context";
+import { TransactionListItem } from "./item";
 
 export function ListCardContent() {
-  const { transactions, isLoading, error } = useList();
+  const { transactions, isLoading, error } = useList().data;
 
   return (
     <CardContent>

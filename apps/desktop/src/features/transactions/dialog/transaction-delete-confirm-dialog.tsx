@@ -1,7 +1,7 @@
 "use client";
 
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
-import { useDeleteTransaction } from "../content/list/use-delete-transaction";
+import { useDeleteTransaction } from "../shared/hooks/use-delete-transaction";
 import { useTransactionsDialog } from "./context";
 
 export function TransactionDeleteConfirmDialog() {

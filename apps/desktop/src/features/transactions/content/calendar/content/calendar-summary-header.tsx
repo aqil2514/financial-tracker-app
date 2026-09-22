@@ -1,7 +1,7 @@
 "use client";
 
 import { formatNumberCompact } from "@/lib/format";
-import { useCalendar } from "./calendar-context";
+import { useCalendar } from "../context";
 
 export function CalendarSummaryHeader() {
   const { monthSummary, net } = useCalendar();

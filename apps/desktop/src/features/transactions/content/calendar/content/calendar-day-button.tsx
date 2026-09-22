@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatNumberCompact } from "@/lib/format";
 import { formatCurrency } from "@/lib/format-currency";
-import { useCalendar } from "./calendar-context";
+import { useCalendar } from "../context";
 
 export function DayButtonWithSummary(props: DayButtonProps) {
   const { transactionDays } = useCalendar();

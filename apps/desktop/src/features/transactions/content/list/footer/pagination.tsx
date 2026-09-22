@@ -1,10 +1,11 @@
 "use client";
 
 import { TablePagination } from "@/components/query/pagination";
-import { useList } from "./list-context";
+import { useList } from "../context";
 
-export function ListCardFooter() {
-  const { pagination, setPage, setLimit } = useList();
+export function ListCardPagination() {
+  const { pagination } = useList().data;
+  const { setPage, setLimit } = useList().pageControl;
 
   if (!pagination || pagination.total === 0) return null;
 

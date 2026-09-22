@@ -3,7 +3,7 @@
 import type { Transaction } from "@/lib/db";
 import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { TransactionForm } from "../form/transaction-form";
-import { useTransactionById } from "../shared/use-transaction-by-id";
+import { useTransactionById } from "../shared/hooks/use-transaction-by-id";
 import { useUpdateTransaction } from "../form/add-edit/hooks/use-update-transaction";
 import { useTransactionsDialog } from "./context";
 

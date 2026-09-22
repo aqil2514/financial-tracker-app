@@ -1,9 +1,9 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
-import { CalendarProvider } from "./calendar-context";
-import { CalendarCardHeader } from "./calendar-card-header";
-import { CalendarCardContent } from "./calendar-card-content";
+import { CalendarProvider } from "./context";
+import { CalendarCardHeader } from "./header";
+import { CalendarCardContent } from "./content";
 
 export function TransactionCalendarPanel() {
   return (
@@ -16,5 +16,5 @@ export function TransactionCalendarPanel() {
   );
 }
 
-export { useTransactionDays, transactionDaysQueryKey } from "./use-transaction-days";
-export { useMonthSummary, monthSummaryQueryKey } from "./use-month-summary";
+export { useTransactionDays, transactionDaysQueryKey } from "../../shared/hooks/use-transaction-days";
+export { useMonthSummary, monthSummaryQueryKey } from "../../shared/hooks/use-month-summary";
