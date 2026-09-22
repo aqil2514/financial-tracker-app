@@ -30,13 +30,19 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
-import { useRetailkuPaymentAccounts, useRetailkuSettings } from "@/shared/retailku";
+import { useRetailkuAutoSync } from "@/features/retailku";
+import {
+  useRetailkuMappingIssues,
+  useRetailkuPaymentAccounts,
+  useRetailkuSettings,
+} from "@/shared/retailku";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -98,6 +104,26 @@ export function AppSidebar() {
   // retailku-account-mapping.md) sudah fresh di cache begitu user buka
   // halaman mapping, bukan menunggu fetch baru saat itu juga.
   useRetailkuPaymentAccounts();
+
+  // Titik 1 (best-effort, deteksi dini) di "Stabilitas
+  // retailku_account_id" — retailku-account-mapping.md: kalau ada
+  // mapping tersimpan yang akunnya sudah dinonaktifkan sebagai payment
+  // method di Retailku (isPaymentMethod:false), tampilkan badge jumlah
+  // di menu "Retailku" supaya user tahu LEBIH DINI, bukan nunggu
+  // ketahuan pas sync jalan (titik 2, point-of-use — sudah ada di
+  // computeCashflowSync). Diam-diam (0 badge) kalau offline/belum ada
+  // masalah — TIDAK menunda render apa pun.
+  const { deactivatedMappings } = useRetailkuMappingIssues();
+
+  // Titik masuk trigger sync OTOMATIS saat app dibuka — "Pertanyaan
+  // terbuka #2" di retailku-cashflow-sync.md. Best-effort seperti
+  // prefetch/badge di atas: mengecek 3 pagar (toggle
+  // autoSyncEnabled/maks 1x sehari/semua field konfigurasi lengkap)
+  // sebelum benar-benar memicu `syncAll()`, diam-diam skip kalau salah
+  // satu pagar belum terpenuhi (BUKAN toast error) — kegagalan sync
+  // yang SEMPAT dicoba tetap dilaporkan non-blocking (toast warning),
+  // tidak pernah menunda render sidebar.
+  useRetailkuAutoSync();
 
   const collapsibleNavItems: CollapsibleNavGroup[] = isRetailkuConnected
     ? [...staticCollapsibleNavItems, retailkuNavGroup]
@@ -173,6 +199,11 @@ export function AppSidebar() {
                       >
                         <group.icon />
                         <span>{group.title}</span>
+                        {group.title === "Retailku" && deactivatedMappings.length > 0 && (
+                          <SidebarMenuBadge className="static ml-auto mr-1 bg-destructive/10 text-destructive">
+                            {deactivatedMappings.length}
+                          </SidebarMenuBadge>
+                        )}
                         <ChevronRight className="ml-auto transition-transform group-data-panel-open/collapsible:rotate-90" />
                       </CollapsibleTrigger>
                       <CollapsibleContent>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAccounts } from "@/features/accounts";
 import {
   useRetailkuAccountMapping,
+  useRetailkuMappingIssues,
   useRetailkuPaymentAccounts,
   useSaveRetailkuAccountMapping,
   type SaveRetailkuAccountMappingInput,
@@ -17,9 +18,10 @@ import type { LocalAccountOption } from "./account-mapping-row";
  * pertama kali datang (bukan tiap kali `savedMapping` berubah, mis.
  * setelah save sukses invalidate query, supaya draft yang sedang
  * diedit user tidak tertimpa balik), plus opsi akun lokal dan mapping
- * "orphan" (akun Retailku yang sudah tidak lagi `isPaymentMethod:true`
- * — lihat "Stabilitas retailku_account_id" di
- * retailku-account-mapping.md).
+ * "orphan" — dihitung lewat `useRetailkuMappingIssues()` (SAMA
+ * dipakai `AppSidebar` untuk badge jumlah di menu "Retailku"), akun
+ * Retailku yang sudah tidak lagi `isPaymentMethod:true` — lihat
+ * "Stabilitas retailku_account_id" di retailku-account-mapping.md.
  */
 export function useAccountMappingDraft() {
   const { data: retailkuAccounts, isLoading, isError, error } = useRetailkuPaymentAccounts();
@@ -50,10 +52,7 @@ export function useAccountMappingDraft() {
         label: account.group_name ? `${account.name} — ${account.group_name}` : account.name,
       })) ?? [];
 
-  const currentAccountIds = new Set((retailkuAccounts ?? []).map((account) => account.id));
-  const orphanMappings = (savedMapping ?? []).filter(
-    (row) => !currentAccountIds.has(row.retailkuAccountId)
-  );
+  const { deactivatedMappings: orphanMappings } = useRetailkuMappingIssues();
 
   function setAccountMapping(retailkuAccountId: string, localAccountId: string | null) {
     setMapping((prev) => ({ ...prev, [retailkuAccountId]: localAccountId ?? "" }));

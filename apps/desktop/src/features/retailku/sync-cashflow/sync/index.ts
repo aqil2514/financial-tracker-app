@@ -1,4 +1,5 @@
 export { useSyncRetailkuAll } from "./use-sync-retailku";
+export { useRetailkuAutoSync } from "./use-retailku-auto-sync";
 export {
   useRetailkuCashflowSyncSettings,
   useSetRetailkuCashflowSyncSettings,

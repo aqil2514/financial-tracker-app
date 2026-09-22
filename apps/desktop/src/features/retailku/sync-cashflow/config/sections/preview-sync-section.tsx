@@ -74,11 +74,15 @@ function PreviewContent({ result }: { result: NonNullable<ReturnType<typeof useC
 
   return (
     <div className="max-h-[70vh] space-y-4 overflow-y-auto">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <SummaryStat label="Transaksi kas baru" value={cashflowToInsert.length} />
         <SummaryStat label="Baris di-skip" value={cashflowSkipped.length} />
         <SummaryStat label="Piutang/utang baru" value={result.arAp.rows.length} />
         <SummaryStat label="Akun belum dipetakan" value={result.cashflow.unmappedAccountIds.length} />
+        <SummaryStat
+          label="Akun dinonaktifkan"
+          value={result.cashflow.deactivatedPaymentMethodAccountIds.length}
+        />
       </div>
 
       <div className="space-y-2">
@@ -106,6 +110,8 @@ function PreviewContent({ result }: { result: NonNullable<ReturnType<typeof useC
                       <Badge variant="outline">Akan dicatat</Badge>
                     ) : row.skipReason === "unmapped-account" ? (
                       <Badge variant="destructive">Belum dipetakan</Badge>
+                    ) : row.skipReason === "deactivated-payment-method" ? (
+                      <Badge variant="destructive">Dinonaktifkan di Retailku</Badge>
                     ) : (
                       <Badge variant="secondary">Sudah tersinkron</Badge>
                     )}

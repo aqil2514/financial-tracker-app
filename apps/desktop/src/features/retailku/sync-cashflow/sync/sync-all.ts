@@ -24,6 +24,7 @@ export type SyncAllInput = {
 export type SyncAllResult = {
   cashflowInsertedCount: number;
   cashflowUnmappedAccountIds: string[];
+  cashflowDeactivatedPaymentMethodAccountIds: string[];
   arApInsertedCount: number;
 };
 
@@ -77,6 +78,7 @@ export async function syncAll(input: SyncAllInput): Promise<SyncAllResult> {
     return {
       cashflowInsertedCount: cashflowResult.insertedCount,
       cashflowUnmappedAccountIds: cashflowResult.unmappedAccountIds,
+      cashflowDeactivatedPaymentMethodAccountIds: cashflowResult.deactivatedPaymentMethodAccountIds,
       arApInsertedCount: arApResult.insertedCount,
     };
   } catch (err) {

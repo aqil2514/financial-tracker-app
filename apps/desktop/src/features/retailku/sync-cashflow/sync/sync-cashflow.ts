@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { connectRetailkuMcp, getCashflowDetail, type RetailkuMcpConfig } from "@/shared/retailku";
+import { connectRetailkuMcp, getCashflowDetail, getFinanceAccounts, type RetailkuMcpConfig } from "@/shared/retailku";
 import type { RetailkuCashflowSyncMode } from "./use-retailku-cashflow-sync-settings";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
@@ -27,6 +27,10 @@ export type SyncCashflowResult = {
    * `retailku_account_mapping` untuknya — di-skip, TIDAK menggagalkan
    * seluruh sync (lihat keputusan #2 revisi). */
   unmappedAccountIds: string[];
+  /** `accountId` Retailku yang SUDAH punya mapping TAPI sudah
+   * dinonaktifkan sebagai payment method (`isPaymentMethod: false`) —
+   * lihat `CashflowSyncPlan.deactivatedPaymentMethodAccountIds`. */
+  deactivatedPaymentMethodAccountIds: string[];
 };
 
 /** Satu baris cashflow yang AKAN diproses — hasil `computeCashflowSync`,
@@ -43,22 +47,39 @@ export type CashflowSyncPlanRow = {
   note: string;
   sourceRef: string;
   willInsert: boolean;
-  skipReason: "already-synced" | "unmapped-account" | null;
+  skipReason: "already-synced" | "unmapped-account" | "deactivated-payment-method" | null;
   localAccountId: number | null;
 };
 
 export type CashflowSyncPlan = {
   rows: CashflowSyncPlanRow[];
   unmappedAccountIds: string[];
+  /** `retailkuAccountId` yang SUDAH punya mapping tersimpan TAPI
+   * `isPaymentMethod`-nya sudah `false` di sisi Retailku saat sync ini
+   * berjalan — validasi point-of-use (defense in depth), lihat
+   * "Stabilitas retailku_account_id" di retailku-account-mapping.md.
+   * Dipisah dari `unmappedAccountIds` karena akar masalah & pesan yang
+   * tepat ke user BEDA: ini bukan "belum dipetakan" (mapping-nya ADA),
+   * tapi "akun sudah dinonaktifkan sebagai payment method di Retailku". */
+  deactivatedPaymentMethodAccountIds: string[];
 };
 
 /**
  * Hitung APA yang akan disinkronkan (fetch MCP + agregasi + cek
- * mapping/idempotency) TANPA menulis apa pun ke database — dipakai
- * BAIK oleh `syncCashflow` (lanjut insert) MAUPUN oleh preview
- * (`use-preview-sync.ts`, baca-saja). Dipisah dari `syncCashflow`
- * supaya preview tidak perlu insert+rollback cuma untuk menghitung
- * hasilnya lebih dulu.
+ * mapping/idempotency/status payment method) TANPA menulis apa pun ke
+ * database — dipakai BAIK oleh `syncCashflow` (lanjut insert) MAUPUN
+ * oleh preview (`use-preview-sync.ts`, baca-saja). Dipisah dari
+ * `syncCashflow` supaya preview tidak perlu insert+rollback cuma untuk
+ * menghitung hasilnya lebih dulu.
+ *
+ * Termasuk validasi POINT-OF-USE (defense in depth, lihat
+ * "Stabilitas retailku_account_id" di retailku-account-mapping.md):
+ * mapping tersimpan bisa saja menunjuk akun yang SEJAK di-mapping sudah
+ * dinonaktifkan sebagai payment method di Retailku
+ * (`isPaymentMethod: false`, lihat `pm-deactivate.helper.ts` di
+ * retail-multitenant) — TANPA validasi ulang ini, sync akan diam-diam
+ * tetap memasukkan transaksi ke mapping yang sudah tidak valid lagi di
+ * sisi Retailku.
  */
 export async function computeCashflowSync(
   db: Db,
@@ -68,6 +89,7 @@ export async function computeCashflowSync(
   try {
     const rows = await fetchAllCashflowDetailRows(client, input);
     const accountMap = await loadAccountMapping(db);
+    const activePaymentMethodIds = await loadActivePaymentMethodIds(client);
 
     const totals =
       input.mode === "summary"
@@ -76,6 +98,7 @@ export async function computeCashflowSync(
 
     const planRows: CashflowSyncPlanRow[] = [];
     const unmappedAccountIds = new Set<string>();
+    const deactivatedPaymentMethodAccountIds = new Set<string>();
 
     for (const total of totals) {
       if (total.net === 0) continue;
@@ -84,6 +107,17 @@ export async function computeCashflowSync(
       if (localAccountId == null) {
         unmappedAccountIds.add(total.retailkuAccountId);
         planRows.push({ ...total, willInsert: false, skipReason: "unmapped-account", localAccountId: null });
+        continue;
+      }
+
+      if (!activePaymentMethodIds.has(total.retailkuAccountId)) {
+        deactivatedPaymentMethodAccountIds.add(total.retailkuAccountId);
+        planRows.push({
+          ...total,
+          willInsert: false,
+          skipReason: "deactivated-payment-method",
+          localAccountId,
+        });
         continue;
       }
 
@@ -96,7 +130,11 @@ export async function computeCashflowSync(
       planRows.push({ ...total, willInsert: true, skipReason: null, localAccountId });
     }
 
-    return { rows: planRows, unmappedAccountIds: [...unmappedAccountIds] };
+    return {
+      rows: planRows,
+      unmappedAccountIds: [...unmappedAccountIds],
+      deactivatedPaymentMethodAccountIds: [...deactivatedPaymentMethodAccountIds],
+    };
   } finally {
     await client.close();
   }
@@ -141,6 +179,7 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
     insertedCount: insertedSourceRefs.length,
     insertedSourceRefs,
     unmappedAccountIds: plan.unmappedAccountIds,
+    deactivatedPaymentMethodAccountIds: plan.deactivatedPaymentMethodAccountIds,
   };
 }
 
@@ -172,6 +211,16 @@ async function loadAccountMapping(db: Db): Promise<Map<string, number>> {
     "SELECT retailku_account_id, local_account_id FROM retailku_account_mapping"
   );
   return new Map(rows.map((row) => [row.retailku_account_id, row.local_account_id]));
+}
+
+/** `id` akun Retailku yang SAAT INI `isPaymentMethod: true` — dipakai
+ * validasi point-of-use, lihat dokumentasi lengkap di
+ * `computeCashflowSync`. */
+async function loadActivePaymentMethodIds(
+  client: Awaited<ReturnType<typeof connectRetailkuMcp>>
+): Promise<Set<string>> {
+  const accounts = await getFinanceAccounts(client);
+  return new Set(accounts.filter((account) => account.isPaymentMethod).map((account) => account.id));
 }
 
 type AggregatedTotal = {

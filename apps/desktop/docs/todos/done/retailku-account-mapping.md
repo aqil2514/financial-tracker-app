@@ -5,11 +5,12 @@
 > satu hal: menyimpan pilihan mapping akun Retailku → akun lokal secara
 > permanen, supaya tidak hilang tiap refresh halaman.
 >
-> **Status: SELESAI** — persistensi, badge orphan, dan prefetch
-> best-effort semuanya sudah diimplementasikan dan diverifikasi
-> (`tsc`/`npm test` 94/94/`npm run build` bersih). Satu-satunya yang
-> sengaja BELUM dikerjakan (titik 2, point-of-use) ditunda ke saat sync
-> utang-piutang/cashflow dibangun, dicatat di TODO paling bawah.
+> **Status: SELESAI** — persistensi, badge orphan, prefetch query, dan
+> KEDUA titik validasi `isPaymentMethod` (titik 1: badge di sidebar
+> saat app dibuka, titik 2: point-of-use saat sync) sudah
+> diimplementasikan dan diverifikasi statis (`tsc`/`npm test` 94/94/
+> `npm run build` bersih). Titik 1 belum diverifikasi VISUAL (butuh
+> skenario nyata — lihat TODO paling bawah untuk detail).
 
 ## Konteks
 
@@ -59,10 +60,44 @@ Retailku (`isPaymentMethod: true`, diambil live via MCP
       "Retailku: <nama akun Retailku>" (gabungan semua nama kalau lebih
       dari satu akun Retailku mengarah ke akun lokal yang sama, mis.
       "Kas Tunai" + "Seabank" → "Dompet Bisnis").
-- [ ] (Ditunda ke saat sync utang-piutang/cashflow dibangun, dicatat di
-      sini supaya tidak terlupa) Validasi ulang `isPaymentMethod`
-      sebelum sync memakai suatu mapping (titik 2, point-of-use —
-      defense in depth, lihat "Stabilitas `retailku_account_id`").
+- [x] Validasi ulang `isPaymentMethod` sebelum sync memakai suatu
+      mapping (titik 2, point-of-use — defense in depth, lihat
+      "Stabilitas `retailku_account_id`"). Diimplementasikan di
+      `computeCashflowSync` (`sync-cashflow.ts`): panggil
+      `getFinanceAccounts` sekali per sync, bangun set `id` yang
+      `isPaymentMethod: true`, baris cashflow yang `retailkuAccountId`-nya
+      SUDAH punya mapping TAPI tidak lagi lolos set itu di-skip dengan
+      `skipReason: "deactivated-payment-method"` — dipisah dari
+      `unmappedAccountIds` (mapping-nya ADA, cuma sudah tidak valid lagi
+      di Retailku) supaya toast (`use-sync-now.ts`) & preview
+      (`preview-sync-section.tsx`) bisa kasih pesan yang tepat
+      ("Perbarui mapping" bukan "Lengkapi mapping"). Diverifikasi
+      `tsc`/`npm test` 94/94/`npm run build` bersih.
+      **Koreksi status titik 1** (ditemukan saat mengerjakan titik 2):
+      intro dokumen ini sempat menyebut titik 1 "prefetch best-effort"
+      sudah selesai — itu BENAR untuk sekadar prefetch query
+      (`AppSidebar` memanggil `useRetailkuPaymentAccounts()`), TAPI
+      bagian "tampilkan badge/notifikasi kalau ketemu mapping yang
+      isPaymentMethod:false" dari desain titik 1 TERNYATA belum pernah
+      diimplementasikan — cuma prefetch data mentahnya, tidak ada logic
+      bandingkan dengan mapping tersimpan. Titik 1 (deteksi dini +
+      notifikasi) masih TERBUKA, dicatat sebagai TODO baru di bawah.
+- [x] Titik 1 — deteksi `isPaymentMethod:false` best-effort saat app
+      dibuka + tampilkan badge/notifikasi (BUKAN cuma prefetch data,
+      lihat koreksi di atas). Diimplementasikan:
+      `shared/retailku/mcp-hooks/use-retailku-mapping-issues.ts`
+      (`useRetailkuMappingIssues()`) — logic SAMA dengan `orphanMappings`
+      yang sudah ada di halaman Mapping Akun (`use-account-mapping-draft.ts`,
+      DIREFACTOR untuk reuse hook ini, tidak ada lagi duplikasi), dipakai
+      `AppSidebar` untuk badge angka merah di menu "Retailku" (`SidebarMenuBadge`,
+      `className="static ml-auto mr-1"` supaya jadi inline flow sebelum
+      chevron, bukan `absolute` bawaan yang akan bertumpuk dengan
+      `ChevronRight`). Best-effort murni — 0 badge kalau offline/tidak
+      ada masalah, tidak menunda render apa pun. Diverifikasi
+      `tsc`/`npm test` 94/94/`npm run build` bersih. **BELUM diverifikasi
+      visual** (butuh menonaktifkan payment method sungguhan di Retailku
+      untuk memicu badge muncul — tidak ada mapping bermasalah di data
+      dev saat ini).
 
 ## Kebutuhan skema
 

@@ -62,6 +62,11 @@ export function useSyncNow(input: SyncNowInput) {
               `${result.cashflowUnmappedAccountIds.length} akun kas Retailku belum dipetakan — baris kasnya di-skip. Lengkapi di Mapping Akun.`
             );
           }
+          if (result.cashflowDeactivatedPaymentMethodAccountIds.length > 0) {
+            toast.warning(
+              `${result.cashflowDeactivatedPaymentMethodAccountIds.length} akun kas Retailku sudah dinonaktifkan sebagai payment method — baris kasnya di-skip. Perbarui mapping di Mapping Akun.`
+            );
+          }
         },
       }
     );

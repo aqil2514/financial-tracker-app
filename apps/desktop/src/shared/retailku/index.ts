@@ -14,6 +14,7 @@ export {
   type RetailkuAccountMapping,
   type SaveRetailkuAccountMappingInput,
 } from "./mcp-hooks/use-retailku-account-mapping";
+export { useRetailkuMappingIssues } from "./mcp-hooks/use-retailku-mapping-issues";
 export {
   connectRetailkuMcp,
   assertRetailkuConfigured,

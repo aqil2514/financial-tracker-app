@@ -1,5 +1,12 @@
-# Sync Cashflow Harian dari Retailku
+# Sync Cashflow Harian dari Retailku (SELESAI)
 
+> **Status: SELESAI** — semua TODO implementasi (sync inti cashflow+AR/AP,
+> tab Konfigurasi, rollback manual, trigger otomatis saat app dibuka) sudah
+> dikerjakan DAN diverifikasi live (bukan cuma `tsc`/`test`/`build`) lewat
+> query langsung ke `finance.dev.db`/`finance.db` — lihat entri TODO paling
+> bawah untuk bukti masing-masing. Semua "Pertanyaan terbuka" (#1-#6) juga
+> sudah DIPUTUSKAN, tidak ada keputusan desain yang masih menggantung.
+>
 > Lanjutan dari `retailku-account-mapping.md` (status: SELESAI —
 > mapping akun Retailku ↔ akun lokal sudah bisa disimpan). Dokumen ini
 > fokus pada satu fitur: setiap hari, `financial-app` otomatis mencatat
@@ -532,12 +539,44 @@ benar teratasi (lihat TODO "verifikasi live" di bawah).
       benar-benar memicu sync otomatis. TIDAK ada halaman/route/item
       sidebar baru (direvisi dari rencana awal, lihat catatan revisi di
       #3). Diverifikasi `tsc`/`npm test`/`npm run build` bersih.
-- [ ] **BELUM**: titik masuk trigger OTOMATIS saat app dibuka (baca
-      `autoSyncEnabled`/`lastAutoSyncDate` dari settings, panggil
-      `syncAll()` kalau syarat 1x/hari terpenuhi, tampilkan toast kalau
-      gagal) — lihat "Pertanyaan terbuka #2". Field-field pengaturannya
-      sudah ada (item di atas), TAPI belum ada kode yang benar-benar
-      memicunya secara otomatis.
+- [x] Titik masuk trigger OTOMATIS saat app dibuka — hook baru
+      `useRetailkuAutoSync()`
+      (`features/retailku/sync-cashflow/sync/use-retailku-auto-sync.ts`),
+      dipasang di `AppSidebar` (pola sama seperti
+      `useRetailkuPaymentAccounts()`/`useRetailkuMappingIssues()` yang
+      sudah ada di situ — best-effort, tidak memblokir render). Efek
+      jalan SEKALI per mount (`useRef` guard), cek TIGA pagar sebelum
+      benar-benar memanggil `syncAll()`: (1) `autoSyncEnabled` harus
+      menyala, (2) `lastAutoSyncDate` belum hari ini (maks 1x/hari), (3)
+      kredensial + mapping + SEMUA field konfigurasi (mode, 3 akun,
+      titik awal) sudah lengkap — diam-diam SKIP (bukan toast) kalau
+      salah satu pagar belum terpenuhi, karena mengisi field itu
+      tanggung jawab tab Konfigurasi, bukan trigger ini. Setelah sukses:
+      `syncFrom` DAN `lastAutoSyncDate` maju ke hari ini, invalidate
+      query transaksi/settings, toast SUKSES ringkas + toast WARNING
+      terpisah untuk akun unmapped/dinonaktifkan (sama seperti sync
+      manual). Kegagalan: toast WARNING non-blocking (BUKAN toast error
+      keras seperti tombol manual — sync ini terjadi diam-diam di
+      background, pakai `useMutation`/`.then/.catch` manual, bukan
+      `useDbMutation`, supaya level toast bisa dibedakan). Diverifikasi
+      `tsc`/`npm test` (94/94)/`npm run build` (16 route) bersih.
+
+      **DIKONFIRMASI LIVE** (2026-09-22, `tauri dev`) — dipasang
+      `console.log` sementara di tiap titik pagar, refresh app, dicek
+      lewat DevTools console: efek jalan sekali per mount, jalur SKIP
+      pertama kali terbukti benar (field akun debt belum diisi di
+      `finance.dev.db` saat itu → log "skip: field konfigurasi belum
+      lengkap"). Setelah field diisi + disimpan lewat tab Konfigurasi
+      dan app di-refresh ulang: log menunjukkan "semua pagar lolos" →
+      "syncAll() berhasil" (`cashflowInsertedCount: 1`). Dicek ULANG ke
+      `finance.dev.db` (+ `-wal`/`-shm`) untuk konfirmasi independen dari
+      log: `retailku_cashflow_last_auto_sync_date=2026-09-22` (hari
+      sync), `retailku_cashflow_sync_from` maju ke `2026-09-22`, dan
+      baris `transactions` baru (id 5560, `source='retailku_sync'`,
+      `source_ref='2026-09-22:d254e605-...'`) benar-benar ter-insert.
+      `console.log` debug SUDAH DIHAPUS dari kode final setelah
+      verifikasi ini — diverifikasi ulang `tsc`/`npm test` (94/94)
+      bersih setelah dihapus.
 - [x] Verifikasi LIVE di `tauri dev` — DIKONFIRMASI BERHASIL (2026-09-21
       malam, database `finance.dev.db` + WAL). Migrasi `0018` jalan
       sukses (`_sqlx_migrations` versi 18, `success=1`). Tombol "Sync
@@ -601,12 +640,25 @@ benar-benar persisten) — lihat TODO.
       diamkan, TIDAK ADA aksi implementasi (lihat "Pertanyaan terbuka
       #4"). Dicatat di TODO ini hanya sebagai jejak bahwa pertanyaan
       ini SUDAH dibahas & sengaja tidak dibangun, bukan terlewat.
-- [ ] **BELUM**: verifikasi live ulang untuk "Bug ditemukan live #2" di
-      atas — pilih field akun/mode, pindah ke tab lain (mis. tab
-      Ringkasan) lalu kembali ke tab Konfigurasi, pastikan nilainya
-      TETAP terisi (tidak kembali kosong seperti sebelum diperbaiki).
+- [x] Verifikasi live ulang untuk "Bug ditemukan live #2" — dicek
+      LANGSUNG ke database (ikut `docs/rules/checking-dev-database.md`),
+      BUKAN cuma percaya UI. Cek pertama ke `finance.dev.db` (+
+      `-wal`/`-shm`) cuma menunjukkan `retailku_ar_ap_cash_account_id`
+      terisi — 3 key lain (`retailku_cashflow_sync_mode`,
+      `retailku_receivable_debt_account_id`,
+      `retailku_payable_debt_account_id`) tidak ada baris sama sekali;
+      dikonfirmasi user ini karena field-field itu MEMANG belum pernah
+      diisi/disimpan di instance dev (bukan bug). **Cek kedua ke
+      `finance.db` (production, sudah pernah di-set user)** — SEMUA 4
+      key tersimpan benar: `retailku_ar_ap_cash_account_id=51`,
+      `retailku_cashflow_sync_mode=summary`,
+      `retailku_receivable_debt_account_id=70`,
+      `retailku_payable_debt_account_id=70`. Ini bukti nyata bug #2
+      TUNTAS — field-field yang sempat hilang saat pindah tab sekarang
+      benar-benar persisten di `settings`, dikonfirmasi dari data
+      produksi asli, bukan cuma dari membaca kode.
 
-## Pertanyaan terbuka (BELUM diputuskan — dibahas sebelum implementasi)
+## Pertanyaan yang dibahas sebelum implementasi (SEMUA sudah DIPUTUSKAN)
 
 **#1. Bagaimana sync tahu tanggal mana yang sudah diproses? — DIPUTUSKAN: gabungan A+B, DENGAN titik awal (B) bisa DIEDIT MANUAL oleh user.**
 
