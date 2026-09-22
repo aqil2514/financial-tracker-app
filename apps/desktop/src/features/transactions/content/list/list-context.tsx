@@ -9,7 +9,7 @@ import { useAccounts, type AccountWithBalance } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
 import type { Category } from "@/lib/db";
 import type { Pagination } from "@/lib/pagination";
-import { useTransactionsPage } from "../page/transactions-page-context";
+import { useTransactionsPage } from "../../page/transactions-page-context";
 import { useTransactions, type TransactionListRow } from "./use-transactions";
 import { useDeleteTransaction } from "./use-delete-transaction";
 

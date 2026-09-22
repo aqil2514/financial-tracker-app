@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { EntityFormDialog } from "@/components/entity-form-dialog";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import type { DebtListRow } from "@/shared/debts/use-debts-list";
 import { PayDebtForm } from "./pay-debt-form";
 import { usePayDebt } from "./use-pay-debt";

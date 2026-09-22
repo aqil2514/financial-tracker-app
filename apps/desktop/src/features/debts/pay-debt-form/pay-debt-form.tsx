@@ -9,7 +9,7 @@ import {
   FormFieldCurrency,
   FormFieldDate,
   FormFieldText,
-} from "@/components/form-fields";
+} from "@/components/forms/form-fields";
 import { useAccounts } from "@/features/accounts";
 import { formatCurrency } from "@/lib/format-currency";
 import type { DebtListRow } from "@/shared/debts/use-debts-list";

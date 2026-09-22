@@ -12,7 +12,7 @@ import {
   FormFieldToggleGroup,
   FormFieldIconPicker,
   FormFieldColorPicker,
-} from "@/components/form-fields";
+} from "@/components/forms/form-fields";
 import { useAccountGroups } from "@/features/account-groups";
 import type { AccountFormOutput, AccountFormValues } from "./account.schema";
 

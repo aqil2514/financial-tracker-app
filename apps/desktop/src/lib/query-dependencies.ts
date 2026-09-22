@@ -6,15 +6,15 @@ import { contactsQueryKey } from "@/shared/contacts/use-contacts";
 import { ongoingDebtsQueryKey } from "@/shared/debts/use-ongoing-debts";
 import { debtsListQueryKey } from "@/shared/debts/use-debts-list";
 import { contactSummaryQueryKey } from "@/shared/debts/use-contact-summary";
-import { transactionsQueryKey } from "@/features/transactions/list/use-transactions";
-import { recentTransactionsQueryKey } from "@/features/dashboard/recent-transactions/use-recent-transactions";
-import { currentMonthSummaryQueryKey } from "@/features/dashboard/current-month-summary/use-current-month-summary";
+import { transactionsQueryKey } from "@/features/transactions/content/list/use-transactions";
+import { recentTransactionsQueryKey } from "@/features/dashboard/content/recent-transactions/use-recent-transactions";
+import { currentMonthSummaryQueryKey } from "@/features/dashboard/content/current-month-summary/use-current-month-summary";
 import { monthlySummaryQueryKey } from "@/features/reports/use-monthly-summary";
 import { categoryBreakdownQueryKey } from "@/features/reports/use-category-breakdown";
 import { accountBalancesQueryKey } from "@/features/reports/use-account-balances";
 import { accountGroupBalancesQueryKey } from "@/features/accounts/sections/balance-pie-chart/use-account-group-balances";
-import { transactionDaysQueryKey } from "@/features/transactions/calendar/use-transaction-days";
-import { monthSummaryQueryKey } from "@/features/transactions/calendar/use-month-summary";
+import { transactionDaysQueryKey } from "@/features/transactions/content/calendar/use-transaction-days";
+import { monthSummaryQueryKey } from "@/features/transactions/content/calendar/use-month-summary";
 
 // Peta ketergantungan query key lintas fitur: kalau data sebuah DOMAIN
 // berubah (mis. transaksi ditambah/diedit/dihapus), semua query key di

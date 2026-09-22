@@ -2,9 +2,8 @@
 
 import type { UseFormReturn } from "react-hook-form";
 
-import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
-import { FormFieldText } from "@/components/form-fields";
+import { EntityForm } from "@/components/forms/entity-form";
+import { FormFieldText } from "@/components/forms/form-fields";
 import type {
   AccountGroupFormOutput,
   AccountGroupFormValues,
@@ -21,21 +20,16 @@ export function AccountGroupForm({
   form,
   onSubmit,
   isPending,
-  submitLabel = "Simpan",
+  submitLabel,
 }: AccountGroupFormProps) {
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+    <EntityForm form={form} onSubmit={onSubmit} isPending={isPending} submitLabel={submitLabel}>
       <FormFieldText
         form={form}
         name="name"
         label="Nama Group"
         placeholder="Contoh: Aset Lancar"
       />
-      <DialogFooter>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Menyimpan..." : submitLabel}
-        </Button>
-      </DialogFooter>
-    </form>
+    </EntityForm>
   );
 }

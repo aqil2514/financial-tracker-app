@@ -2,34 +2,30 @@
 
 import { Suspense } from "react";
 import { PageContainer } from "@/components/page-container";
-import { PageHeader } from "@/components/page-header";
 import {
   DeepLinkEditDialog,
-  TransactionCalendarPanel,
-  TransactionFormDialog,
-  TransactionList,
+  TransactionsContent,
+  TransactionsDialogProvider,
+  TransactionsDialogs,
+  TransactionsHeader,
   TransactionsPageProvider,
 } from "@/features/transactions";
 
 export default function TransactionsPage() {
   return (
     <TransactionsPageProvider>
-      <PageContainer maxWidth="6xl">
-        <PageHeader
-          title="Transaksi"
-          description="Kelola seluruh transaksi keuangan Anda"
-          actions={<TransactionFormDialog />}
-        />
+      <TransactionsDialogProvider>
+        <PageContainer maxWidth="6xl">
+          <TransactionsHeader />
+          <TransactionsContent />
+        </PageContainer>
 
-        <div className="grid items-start gap-6 lg:grid-cols-[1fr_420px]">
-          <TransactionList />
-          <TransactionCalendarPanel />
-        </div>
-      </PageContainer>
+        <TransactionsDialogs />
 
-      <Suspense fallback={null}>
-        <DeepLinkEditDialog />
-      </Suspense>
+        <Suspense fallback={null}>
+          <DeepLinkEditDialog />
+        </Suspense>
+      </TransactionsDialogProvider>
     </TransactionsPageProvider>
   );
 }

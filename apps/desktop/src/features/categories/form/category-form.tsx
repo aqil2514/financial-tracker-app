@@ -8,7 +8,7 @@ import {
   FormFieldText,
   FormFieldSelect,
   FormFieldToggleGroup,
-} from "@/components/form-fields";
+} from "@/components/forms/form-fields";
 import { useCategories } from "@/hooks/resources/use-categories";
 import type { CategoryFormOutput, CategoryFormValues } from "./category.schema";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/entity-form-dialog";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { NewDebtForm } from "./new-debt-form";
 import { useCreateDebt } from "./use-create-debt";
 

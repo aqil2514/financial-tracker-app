@@ -10,7 +10,7 @@ import {
   FormFieldDate,
   FormFieldText,
   FormFieldToggleGroup,
-} from "@/components/form-fields";
+} from "@/components/forms/form-fields";
 import { useAccounts } from "@/features/accounts";
 import { ContactField } from "@/features/transactions/form/contact-field";
 import type { NewDebtFormOutput, NewDebtFormValues } from "./schema";

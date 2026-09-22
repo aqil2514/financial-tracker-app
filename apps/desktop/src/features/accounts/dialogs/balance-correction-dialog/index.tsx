@@ -2,8 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
-import { EntityFormDialog } from "@/components/entity-form-dialog";
-import { FormFieldCurrency } from "@/components/form-fields";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
+import { FormFieldCurrency } from "@/components/forms/form-fields";
 import type { AccountWithBalance } from "../../calculate-balance";
 import { useBalanceCorrectionForm } from "./use-balance-correction-form";
 

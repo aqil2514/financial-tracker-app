@@ -4,7 +4,7 @@ import type { UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
-import { FormFieldText, FormFieldRichText } from "@/components/form-fields";
+import { FormFieldText, FormFieldRichText } from "@/components/forms/form-fields";
 import type { ContactFormOutput, ContactFormValues } from "./contact.schema";
 
 type ContactFormProps = {

@@ -4,7 +4,7 @@ import { Pencil } from "lucide-react";
 
 import type { Contact } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/entity-form-dialog";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { ContactForm } from "./contact-form";
 import { useUpdateContact } from "./use-update-contact";
 

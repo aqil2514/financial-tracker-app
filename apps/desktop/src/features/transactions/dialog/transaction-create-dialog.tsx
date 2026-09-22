@@ -2,19 +2,20 @@
 
 import { useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/entity-form-dialog";
-import { KeyboardShortcutBadge } from "@/components/keyboard-shortcut-badge";
-import { useCreateShortcut } from "@/hooks/use-create-shortcut";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { useAttachmentFolder } from "@/shared/attachments/use-attachment-folder";
 import {
   revokePendingAttachment,
   type PendingAttachment,
 } from "@/shared/attachments/pending-attachment";
-import { TransactionForm } from "./transaction-form";
-import { useCreateTransaction } from "./use-create-transaction";
+import { TransactionForm } from "../form/transaction-form";
+import { useCreateTransaction } from "../form/add-edit/hooks/use-create-transaction";
+import { useTransactionsDialog } from "./context";
 
-export function TransactionFormDialog() {
+export function TransactionCreateDialog() {
+  const { dialog, closeDialog } = useTransactionsDialog();
+  const open = dialog?.type === "create";
+
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   // useCreateTransaction butuh data pending TERBARU saat submit terjadi,
   // bukan snapshot dari saat hook di-mount — dibaca lewat ref supaya tidak
@@ -29,29 +30,26 @@ export function TransactionFormDialog() {
     setPendingAttachments([]);
   }
 
-  const { open, setOpen, form, onSubmit, onSubmitAndContinue, isPending } =
-    useCreateTransaction({
-      getPendingAttachments: () => pendingAttachmentsRef.current,
-      attachmentFolder: attachmentFolder ?? null,
-      onAttachmentsSaved: clearPendingAttachments,
-    });
+  const { form, onSubmit, onSubmitAndContinue, isPending } = useCreateTransaction({
+    open,
+    getPendingAttachments: () => pendingAttachmentsRef.current,
+    attachmentFolder: attachmentFolder ?? null,
+    onAttachmentsSaved: clearPendingAttachments,
+    onClosed: closeDialog,
+  });
 
-  useCreateShortcut(() => setOpen(true));
+  function handleOpenChange(next: boolean) {
+    if (!next) {
+      clearPendingAttachments();
+      closeDialog();
+    }
+  }
 
   return (
     <EntityFormDialog
-      trigger={
-        <Button>
-          Tambah Transaksi
-          <KeyboardShortcutBadge shortcut="N" />
-        </Button>
-      }
       title="Tambah Transaksi"
       open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) clearPendingAttachments();
-      }}
+      onOpenChange={handleOpenChange}
       contentClassName="sm:!max-w-6xl"
     >
       <TransactionForm

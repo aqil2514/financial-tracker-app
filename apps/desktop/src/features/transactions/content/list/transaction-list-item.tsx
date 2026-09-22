@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -14,7 +13,6 @@ import {
 
 import { formatDate } from "@/lib/format-date";
 import { formatCurrency } from "@/lib/format-currency";
-import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { ListItemActionsMenu } from "@/components/list-item-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,8 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { TransactionEditDialog } from "../form/transaction-edit-dialog";
-import { TransactionDetailDialog } from "./transaction-detail-dialog";
+import { useTransactionsDialog } from "../../dialog";
 import { useList } from "./list-context";
 import type { TransactionListRow } from "./use-transactions";
 
@@ -100,11 +97,8 @@ const ItemInfo = ({ tx }: { tx: TransactionListRow }) => {
 };
 
 const ItemActions = ({ tx }: { tx: TransactionListRow }) => {
-  const { deleteTransaction, isDeletingTransaction } = useList();
+  const { openDialog } = useTransactionsDialog();
   const config = typeConfig[tx.type];
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
 
   return (
     <div className="flex items-center gap-1">
@@ -114,29 +108,15 @@ const ItemActions = ({ tx }: { tx: TransactionListRow }) => {
       </p>
       <ListItemActionsMenu
         actions={[
-          { label: "Lihat Detail", icon: Eye, onClick: () => setDetailOpen(true) },
-          { label: "Edit", icon: Pencil, onClick: () => setEditOpen(true) },
+          { label: "Lihat Detail", icon: Eye, onClick: () => openDialog("detail", String(tx.id)) },
+          { label: "Edit", icon: Pencil, onClick: () => openDialog("edit", String(tx.id)) },
           {
             label: "Hapus",
             icon: Trash2,
             variant: "destructive",
-            onClick: () => setDeleteOpen(true),
+            onClick: () => openDialog("delete-confirm", String(tx.id)),
           },
         ]}
-      />
-      <TransactionDetailDialog
-        transaction={tx}
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        onEdit={() => setEditOpen(true)}
-      />
-      <TransactionEditDialog transaction={tx} open={editOpen} onOpenChange={setEditOpen} />
-      <ConfirmDeleteDialog
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        onConfirm={() => deleteTransaction(tx.id)}
-        isPending={isDeletingTransaction}
-        title="Hapus transaksi ini?"
       />
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/entity-form-dialog";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { AccountGroupForm } from "./account-group-form";
 import { useCreateAccountGroup } from "./use-create-account-group";
 

@@ -2,12 +2,7 @@
 
 import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, Pencil } from "lucide-react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format-currency";
@@ -16,7 +11,10 @@ import type { Transaction } from "@/lib/db";
 import { RichTextViewer } from "@/components/rich-text";
 import { AttachmentThumbnail } from "@/shared/attachments/attachment-thumbnail";
 import { useTransactionAttachments } from "@/shared/attachments/use-transaction-attachments";
-import { useList } from "./list-context";
+import { useAccounts } from "@/features/accounts";
+import { useCategories } from "@/features/categories";
+import { useTransactionById } from "../content/list/use-transaction-by-id";
+import { useTransactionsDialog } from "./context";
 
 const typeConfig = {
   income: { icon: ArrowUpCircle, label: "Pemasukan", className: "text-green-600" },
@@ -24,27 +22,53 @@ const typeConfig = {
   transfer: { icon: ArrowLeftRight, label: "Transfer", className: "text-blue-600" },
 };
 
+export function TransactionDetailDialog() {
+  const { dialog, closeDialog, openDialog } = useTransactionsDialog();
+  const open = dialog?.type === "detail";
+  const transactionId = open && dialog.dataId ? Number(dialog.dataId) : null;
+
+  const { data: transaction } = useTransactionById(transactionId);
+
+  if (!open || !transaction) return null;
+
+  function handleEdit() {
+    if (!transaction) return;
+    openDialog("edit", String(transaction.id));
+  }
+
+  return (
+    <TransactionDetailDialogContent
+      transaction={transaction}
+      onOpenChange={(next) => !next && closeDialog()}
+      onEdit={handleEdit}
+    />
+  );
+}
+
 /** Tampilan read-only ringkasan transaksi — kartu visual besar (ikon +
  * nominal) di atas, lalu detail Akun/Kategori/Tanggal, lampiran foto, dan
- * deskripsi (rich text) di bawahnya. Tombol Edit menutup dialog ini dan
- * membuka TransactionEditDialog milik parent (`onEdit`), tanpa navigasi
- * halaman — beda dari pola di DetailTab dialog akun yang harus pindah
- * halaman karena dialog akun & form transaksi ada di route berbeda. */
-export function TransactionDetailDialog({
+ * deskripsi (rich text) di bawahnya. Tombol Edit membuka dialog edit
+ * (context "edit") tanpa navigasi halaman. */
+function TransactionDetailDialogContent({
   transaction,
-  open,
   onOpenChange,
   onEdit,
 }: {
   transaction: Transaction;
-  open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
 }) {
-  const { accountName, categoryName } = useList();
-  const { data: attachments } = useTransactionAttachments(
-    open ? transaction.id : null
-  );
+  const { data: accounts } = useAccounts();
+  const { data: categories } = useCategories();
+  const { data: attachments } = useTransactionAttachments(transaction.id);
+
+  function accountName(id: number | null) {
+    return accounts?.find((account) => account.id === id)?.name ?? "-";
+  }
+
+  function categoryName(id: number | null) {
+    return categories?.find((category) => category.id === id)?.name ?? null;
+  }
 
   const description = transaction.description
     ? JSON.parse(transaction.description)
@@ -58,13 +82,8 @@ export function TransactionDetailDialog({
       ? `${accountName(transaction.account_id)} → ${accountName(transaction.transfer_account_id)}`
       : accountName(transaction.account_id);
 
-  function handleEdit() {
-    onOpenChange(false);
-    onEdit();
-  }
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={true} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Detail Transaksi</DialogTitle>
@@ -76,7 +95,7 @@ export function TransactionDetailDialog({
               variant="outline"
               size="sm"
               className="absolute top-3 right-3"
-              onClick={handleEdit}
+              onClick={onEdit}
             >
               <Pencil className="size-4" />
               Edit

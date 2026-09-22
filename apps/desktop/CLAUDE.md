@@ -5,6 +5,12 @@ di `docs/rules/`. Baca folder itu sebelum menulis atau mengubah kode di sini.
 
 - [docs/rules/state-lifting-vs-context.md](docs/rules/state-lifting-vs-context.md) —
   kapan state harus diangkat ke React context, bukan diteruskan lewat props.
+- [docs/rules/page-layout.md](docs/rules/page-layout.md) — struktur wajib
+  `page.tsx` dan kapan context level-page dipakai (beda dari context level
+  section).
+- [docs/rules/dialog-pattern.md](docs/rules/dialog-pattern.md) — pemisahan
+  trigger vs dialog, dan `useDialogState` untuk state "dialog mana yang
+  aktif".
 
 <!-- BEGIN:nextjs-agent-rules -->
 

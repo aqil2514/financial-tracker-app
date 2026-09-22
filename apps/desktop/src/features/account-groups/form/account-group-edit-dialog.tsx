@@ -4,7 +4,7 @@ import { Pencil } from "lucide-react";
 
 import type { AccountGroup } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/entity-form-dialog";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { AccountGroupForm } from "./account-group-form";
 import { useUpdateAccountGroup } from "./use-update-account-group";
 

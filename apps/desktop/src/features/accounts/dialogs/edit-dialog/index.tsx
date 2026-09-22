@@ -5,7 +5,7 @@ import { Pencil } from "lucide-react";
 
 import type { Account } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/entity-form-dialog";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { AccountForm } from "../../form/account-form";
 import { useUpdateAccount } from "../../form/use-update-account";
 

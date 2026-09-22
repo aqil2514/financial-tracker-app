@@ -3,17 +3,14 @@
 import { toast } from "sonner";
 
 import { getDb } from "@/lib/db";
-import { useEntityForm } from "@/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { isEmptyDoc } from "@/components/rich-text";
 import { saveAttachmentToTransaction } from "@/shared/attachments/use-add-attachment";
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
-import {
-  transactionSchema,
-  type TransactionFormOutput,
-} from "./transaction.schema";
+import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
+import { transactionSchema, type TransactionFormOutput } from "../transaction.schema";
 
 function now() {
   const date = new Date();
@@ -22,6 +19,9 @@ function now() {
 }
 
 type UseCreateTransactionOptions = {
+  /** Dialog terbuka atau tidak — datang dari context, dipakai untuk
+   * resetOnOpen. */
+  open: boolean;
   /** Lampiran yang ditangkap sebelum transaksi tersimpan — diproses
    * (disimpan ke disk + database) setelah insert transaksi berhasil,
    * karena baru di titik itu `transaction_id`-nya diketahui. Dibaca lewat
@@ -30,10 +30,21 @@ type UseCreateTransactionOptions = {
   getPendingAttachments?: () => PendingAttachment[];
   attachmentFolder?: string | null;
   onAttachmentsSaved?: () => void;
+  /** Dipanggil setelah transaksi (dan lampirannya, kalau ada) selesai
+   * tersimpan — HANYA saat bukan "Simpan & Lanjut", supaya pemanggil bisa
+   * menutup dialog dari context. Saat "Simpan & Lanjut", dialog tetap
+   * terbuka dan ini TIDAK dipanggil. */
+  onClosed?: () => void;
 };
 
-export function useCreateTransaction(options: UseCreateTransactionOptions = {}) {
-  const { getPendingAttachments, attachmentFolder = null, onAttachmentsSaved } = options;
+export function useCreateTransaction(options: UseCreateTransactionOptions) {
+  const {
+    open,
+    getPendingAttachments,
+    attachmentFolder = null,
+    onAttachmentsSaved,
+    onClosed,
+  } = options;
 
   return useEntityForm({
     schema: transactionSchema,
@@ -50,6 +61,7 @@ export function useCreateTransaction(options: UseCreateTransactionOptions = {}) 
       debt_action: null,
       settle_debt_ids: [],
     }),
+    open,
     resetOnOpen: true,
     mutationFn: async (values: TransactionFormOutput) => {
       const contactId = await resolveContactId(values.contact_name);
@@ -95,31 +107,34 @@ export function useCreateTransaction(options: UseCreateTransactionOptions = {}) 
 
       return transactionId;
     },
-    onSuccess: async (transactionId) => {
+    onSuccess: async (transactionId, { keepOpen }) => {
       const pending = getPendingAttachments?.() ?? [];
-      if (transactionId == null || pending.length === 0) return;
 
-      // Transaksinya sendiri sudah tersimpan di titik ini — kegagalan
-      // menyimpan lampiran TIDAK boleh dilempar sebagai error mutation
-      // (useDbMutation.onError hanya menangkap error dari mutationFn,
-      // bukan dari onSuccess), jadi ditangani sendiri di sini supaya user
-      // tetap dapat feedback yang jelas alih-alih unhandled rejection.
-      try {
-        await Promise.all(
-          pending.map((attachment) =>
-            saveAttachmentToTransaction(transactionId, attachment.input, attachmentFolder)
-          )
-        );
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
-        toast.error(`Transaksi tersimpan, tapi lampiran gagal disimpan: ${detail}`);
-      } finally {
-        // Dialog/form tetap reset setelah ini (perilaku useEntityForm) —
-        // pending attachments yang gagal tidak bisa "dicoba ulang" dari
-        // form yang sudah reset, jadi tetap dibersihkan baik sukses
-        // maupun gagal supaya tidak ada state foto "hantu" yang tersisa.
-        onAttachmentsSaved?.();
+      if (transactionId != null && pending.length > 0) {
+        // Transaksinya sendiri sudah tersimpan di titik ini — kegagalan
+        // menyimpan lampiran TIDAK boleh dilempar sebagai error mutation
+        // (useDbMutation.onError hanya menangkap error dari mutationFn,
+        // bukan dari onSuccess), jadi ditangani sendiri di sini supaya user
+        // tetap dapat feedback yang jelas alih-alih unhandled rejection.
+        try {
+          await Promise.all(
+            pending.map((attachment) =>
+              saveAttachmentToTransaction(transactionId, attachment.input, attachmentFolder)
+            )
+          );
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          toast.error(`Transaksi tersimpan, tapi lampiran gagal disimpan: ${detail}`);
+        } finally {
+          // Dialog/form tetap reset setelah ini (perilaku useEntityForm) —
+          // pending attachments yang gagal tidak bisa "dicoba ulang" dari
+          // form yang sudah reset, jadi tetap dibersihkan baik sukses
+          // maupun gagal supaya tidak ada state foto "hantu" yang tersisa.
+          onAttachmentsSaved?.();
+        }
       }
+
+      if (!keepOpen) onClosed?.();
     },
     invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil ditambahkan",

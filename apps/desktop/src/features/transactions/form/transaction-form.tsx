@@ -12,7 +12,7 @@ import {
   FormFieldRichText,
   FormFieldText,
   FormFieldToggleGroup,
-} from "@/components/form-fields";
+} from "@/components/forms/form-fields";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
 import { resolveAccountIcon } from "@/lib/account-icons";

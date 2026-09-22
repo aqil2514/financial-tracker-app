@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/entity-form-dialog";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { KeyboardShortcutBadge } from "@/components/keyboard-shortcut-badge";
 import { useCreateShortcut } from "@/hooks/use-create-shortcut";
 import { AccountForm } from "../../form/account-form";

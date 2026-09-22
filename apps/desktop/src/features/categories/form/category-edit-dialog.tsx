@@ -4,7 +4,7 @@ import { Pencil } from "lucide-react";
 
 import type { Category } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/entity-form-dialog";
+import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { CategoryForm } from "./category-form";
 import { useUpdateCategory } from "./use-update-category";
 
