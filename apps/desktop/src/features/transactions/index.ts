@@ -10,8 +10,6 @@ export {
 } from "./content/calendar";
 export {
   TransactionForm,
-  TransactionEditDialog,
-  useUpdateTransaction,
   transactionSchema,
   type TransactionFormValues,
   type TransactionFormOutput,
