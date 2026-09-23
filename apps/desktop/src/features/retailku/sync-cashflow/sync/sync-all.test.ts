@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getDb } from "@/lib/db";
-import { syncCashflow, type SyncCashflowResult } from "./sync-cashflow";
+import { syncCashflow, type SyncCashflowResult } from "./cashflow";
 import { rollbackArApSnapshots, syncArAp, type SyncArApResult } from "./sync-ar-ap";
 import { syncAll, type SyncAllInput } from "./sync-all";
 
@@ -9,7 +9,7 @@ vi.mock("@/lib/db", () => ({
   getDb: vi.fn(),
 }));
 
-vi.mock("./sync-cashflow", () => ({
+vi.mock("./cashflow", () => ({
   syncCashflow: vi.fn(),
 }));
 

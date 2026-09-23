@@ -8,5 +8,5 @@ export {
   type RetailkuCashflowSyncMode,
 } from "./use-retailku-cashflow-sync-settings";
 export type { SyncAllInput, SyncAllResult } from "./sync-all";
-export { computeCashflowSync, type CashflowSyncPlan, type CashflowSyncPlanRow } from "./sync-cashflow";
+export { computeCashflowSync, type CashflowSyncPlan, type CashflowSyncPlanRow } from "./cashflow";
 export { computeArApSync, type ArApSyncPlan, type ArApSyncPlanRow } from "./sync-ar-ap";
