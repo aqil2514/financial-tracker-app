@@ -12,7 +12,8 @@ export function useListData(
   dateFilter: string | undefined,
   sorts: SortConfig[],
   filters: FilterConfig[],
-  accountId?: number
+  accountId?: number,
+  dateRange?: { from: string; to: string }
 ): ListContextData {
   const { data, isLoading, error } = useTransactions(
     page,
@@ -20,13 +21,14 @@ export function useListData(
     dateFilter,
     sorts,
     filters,
-    accountId
+    accountId,
+    dateRange
   );
 
   useEffect(() => {
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFilter, filters, sorts]);
+  }, [dateFilter, filters, sorts, dateRange]);
 
   return {
     transactions: data?.transactions,

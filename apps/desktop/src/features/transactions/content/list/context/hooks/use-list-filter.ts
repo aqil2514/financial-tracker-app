@@ -14,6 +14,7 @@ export function useListFilter(
 ): ListContextFilter {
   const [filters, setFilters] = useState<FilterConfig[]>([]);
   const [sorts, setSorts] = useState<SortConfig[]>([]);
+  const [dateRange, setDateRange] = useState<{ from: string; to: string } | undefined>();
 
   const filterSelectOptions = useMemo<SelectOptionsMap>(
     () => ({
@@ -30,5 +31,5 @@ export function useListFilter(
     [categories, accounts]
   );
 
-  return { filters, setFilters, filterSelectOptions, sorts, setSorts };
+  return { filters, setFilters, filterSelectOptions, sorts, setSorts, dateRange, setDateRange };
 }

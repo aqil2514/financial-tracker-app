@@ -36,7 +36,8 @@ export function ListProvider({
     dateFilter,
     filter.sorts,
     filter.filters,
-    accountId
+    accountId,
+    filter.dateRange
   );
   const lookup = useListLookup(accounts, categories);
 

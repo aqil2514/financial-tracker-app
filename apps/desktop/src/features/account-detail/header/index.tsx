@@ -1,19 +1,45 @@
 "use client";
 
+import { useMemo } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { formatCurrency } from "@/lib/format-currency";
-import { TransactionListFilter, TransactionListSort } from "@/features/transactions";
+import { PeriodPicker } from "@/components/query/period-picker";
+import { TransactionListFilter, TransactionListSort, useTransactionList } from "@/features/transactions";
 import { useAccountDetailPage } from "../page/account-detail-page-context";
 import { AccountSummaryStats } from "./account-summary-stats";
 
 export function AccountDetailHeader() {
   const router = useRouter();
   const { account, isLoading } = useAccountDetailPage();
+  const { dateRange, setDateRange } = useTransactionList().filter;
+
+  // `dateRange` di context bentuknya string "yyyy-MM-dd" (siap pakai SQL
+  // BETWEEN, lihat build-where-conditions.ts) — PeriodPicker sendiri
+  // bekerja dengan `Date`, jadi dikonversi di titik masuk/keluar sini,
+  // bukan mengubah bentuk context supaya query tetap terima string siap
+  // pakai tanpa parsing ulang.
+  const periodValue = useMemo<DateRange | undefined>(
+    () =>
+      dateRange
+        ? { from: new Date(`${dateRange.from}T00:00`), to: new Date(`${dateRange.to}T00:00`) }
+        : undefined,
+    [dateRange]
+  );
+
+  function handlePeriodChange(range: DateRange | undefined) {
+    if (!range?.from || !range.to) {
+      setDateRange(undefined);
+      return;
+    }
+    setDateRange({ from: format(range.from, "yyyy-MM-dd"), to: format(range.to, "yyyy-MM-dd") });
+  }
 
   if (isLoading) {
     return (
@@ -49,6 +75,7 @@ export function AccountDetailHeader() {
       <div className="flex flex-wrap items-center gap-2">
         <TransactionListSort />
         <TransactionListFilter excludeKeys={["account_id"]} />
+        <PeriodPicker value={periodValue} onChange={handlePeriodChange} />
       </div>
       <AccountSummaryStats accountId={account.id} balance={account.balance} />
     </div>

@@ -25,10 +25,11 @@ export function useTransactions(
   date?: string,
   sorts: SortConfig[] = [],
   filters: FilterConfig[] = [],
-  accountId?: number
+  accountId?: number,
+  dateRange?: { from: string; to: string }
 ) {
   return useQuery({
-    queryKey: [...transactionsQueryKey, page, limit, date, sorts, filters, accountId],
+    queryKey: [...transactionsQueryKey, page, limit, date, sorts, filters, accountId, dateRange],
     queryFn: async () => {
       // 1. Buka koneksi database.
       const db = await getDb();
@@ -42,7 +43,8 @@ export function useTransactions(
         remaining,
         date,
         extraConditions,
-        accountId
+        accountId,
+        dateRange
       );
       const orderClause = buildOrderClause(sorts, SORTABLE_COLUMNS, DEFAULT_ORDER_CLAUSE);
       const { clause: limitOffsetClause, params: limitOffsetParams } = buildLimitOffset(

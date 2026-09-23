@@ -17,6 +17,11 @@ export interface ListContextFilter {
   filterSelectOptions: SelectOptionsMap;
   sorts: SortConfig[];
   setSorts: (sorts: SortConfig[]) => void;
+  /** Rentang tanggal dari `PeriodPicker` (`components/query/period-picker`)
+   * — terpisah dari `filters` generik karena butuh `date(date) BETWEEN`,
+   * bukan operator `buildWhereClause` biasa (lihat `build-where-conditions.ts`). */
+  dateRange: { from: string; to: string } | undefined;
+  setDateRange: (range: { from: string; to: string } | undefined) => void;
 }
 
 export interface ListContextPageControl {
