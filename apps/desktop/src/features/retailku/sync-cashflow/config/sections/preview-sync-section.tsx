@@ -78,7 +78,7 @@ function PreviewContent({ result }: { result: NonNullable<ReturnType<typeof useC
         <SummaryStat label="Transaksi kas baru" value={cashflowToInsert.length} />
         <SummaryStat label="Baris di-skip" value={cashflowSkipped.length} />
         <SummaryStat label="Piutang/utang baru" value={result.arAp.rows.length} />
-        <SummaryStat label="Akun belum dipetakan" value={result.cashflow.unmappedAccountIds.length} />
+        <SummaryStat label="Akun belum dipetakan" value={result.cashflow.unmappedKeys.length} />
         <SummaryStat
           label="Akun dinonaktifkan"
           value={result.cashflow.deactivatedPaymentMethodAccountIds.length}

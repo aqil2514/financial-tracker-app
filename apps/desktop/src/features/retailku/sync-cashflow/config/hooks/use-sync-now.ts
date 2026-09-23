@@ -57,9 +57,9 @@ export function useSyncNow(input: SyncNowInput) {
       {
         onSuccess: (result) => {
           input.onSynced(todayIso());
-          if (result.cashflowUnmappedAccountIds.length > 0) {
+          if (result.cashflowUnmappedKeys.length > 0) {
             toast.warning(
-              `${result.cashflowUnmappedAccountIds.length} akun kas Retailku belum dipetakan — baris kasnya di-skip. Lengkapi di Mapping Akun.`
+              `${result.cashflowUnmappedKeys.length} jenis transaksi Retailku belum dipetakan — baris kasnya di-skip. Lengkapi di Mapping Akun.`
             );
           }
           if (result.cashflowDeactivatedPaymentMethodAccountIds.length > 0) {

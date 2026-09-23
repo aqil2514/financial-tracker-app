@@ -95,9 +95,9 @@ export function useRetailkuAutoSync() {
         queryClient.invalidateQueries({ queryKey: retailkuCashflowSyncSettingsQueryKey });
 
         toast.success("Sinkronisasi Retailku otomatis berhasil");
-        if (result.cashflowUnmappedAccountIds.length > 0) {
+        if (result.cashflowUnmappedKeys.length > 0) {
           toast.warning(
-            `${result.cashflowUnmappedAccountIds.length} akun kas Retailku belum dipetakan — baris kasnya di-skip.`
+            `${result.cashflowUnmappedKeys.length} jenis transaksi Retailku belum dipetakan — baris kasnya di-skip.`
           );
         }
         if (result.cashflowDeactivatedPaymentMethodAccountIds.length > 0) {

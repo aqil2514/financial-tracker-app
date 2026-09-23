@@ -11,6 +11,7 @@ import { CashflowAllocationTab } from "./summary/cashflow-allocation";
 import { CashflowSummaryTab } from "./summary/cashflow-summary";
 import { CashflowDetailTab } from "./summary/cashflow-detail";
 import { CashflowConfigTab } from "./config";
+import { FieldMappingTab } from "./mapping/field-mapping-tab";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -89,6 +90,7 @@ export function CashflowSyncPanel() {
         </div>
       ),
     },
+    { value: "mapping", label: "Mapping", content: <FieldMappingTab /> },
     { value: "konfigurasi", label: "Konfigurasi", content: <CashflowConfigTab /> },
   ];
 

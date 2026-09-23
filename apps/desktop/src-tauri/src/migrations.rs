@@ -116,5 +116,11 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0019_transaction_note_not_null.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 20,
+            description: "retailku_sync_field_mapping",
+            sql: include_str!("../migrations/0020_retailku_sync_field_mapping.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

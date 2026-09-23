@@ -7,12 +7,21 @@ import {
   useRetailkuAccountMapping,
   useRetailkuMappingIssues,
   useRetailkuPaymentAccounts,
-  useSaveRetailkuAccountMapping,
-  type SaveRetailkuAccountMappingInput,
 } from "@/shared/retailku";
 import type { LocalAccountOption } from "./account-mapping-row";
 
 /**
+ * SEMENTARA TIDAK DIPAKAI (2026-09-23, lihat
+ * app/(app)/retailku/mapping/page.tsx) — dipertahankan sebagai
+ * REFERENSI pola UI (dropdown akun, deteksi orphan mapping) untuk UI
+ * mapping baru yang belum dibangun, lihat
+ * docs/todos/plan/retailku-sync-field-mapping.md. `handleSave` sengaja
+ * jadi no-op: `useSaveRetailkuAccountMapping` sudah dihapus karena
+ * tabel tujuannya (`retailku_account_mapping`) sudah di-drop migrasi
+ * `0020_retailku_sync_field_mapping.sql` — UI baru akan menulis ke
+ * `retailku_sync_field_mapping` dengan bentuk field yang BEDA (per
+ * key, bukan per akun), bukan sekadar sambungkan ulang mutation ini.
+ *
  * State + logic untuk `AccountMappingList` — draft mapping di
  * `useState`, disinkronkan SEKALI dari mapping tersimpan begitu data
  * pertama kali datang (bukan tiap kali `savedMapping` berubah, mis.
@@ -27,7 +36,6 @@ export function useAccountMappingDraft() {
   const { data: retailkuAccounts, isLoading, isError, error } = useRetailkuPaymentAccounts();
   const { data: localAccounts } = useAccounts();
   const { data: savedMapping } = useRetailkuAccountMapping();
-  const saveMapping = useSaveRetailkuAccountMapping();
 
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [hydrated, setHydrated] = useState(false);
@@ -59,16 +67,9 @@ export function useAccountMappingDraft() {
   }
 
   function handleSave() {
-    if (!retailkuAccounts) return;
-    const payload: SaveRetailkuAccountMappingInput = retailkuAccounts
-      .filter((account) => mapping[account.id])
-      .map((account) => ({
-        retailkuAccountId: account.id,
-        retailkuAccountCode: account.code,
-        retailkuAccountName: account.name,
-        localAccountId: Number(mapping[account.id]),
-      }));
-    saveMapping.mutate(payload);
+    // No-op sengaja — lihat catatan di atas fungsi ini. Tidak ada
+    // mutation aktif untuk skema `retailku_sync_field_mapping` dari
+    // sini; UI baru akan punya mutation-nya sendiri.
   }
 
   return {
@@ -81,6 +82,6 @@ export function useAccountMappingDraft() {
     localAccountOptions,
     orphanMappings,
     handleSave,
-    isSaving: saveMapping.isPending,
+    isSaving: false,
   };
 }

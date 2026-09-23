@@ -79,7 +79,7 @@ export function AccountMappingList() {
           ))}
           {orphanMappings.map((row) => (
             <OrphanAccountMappingRow
-              key={row.id}
+              key={row.retailkuAccountId}
               code={row.retailkuAccountCode}
               name={row.retailkuAccountName}
               localAccountLabel={

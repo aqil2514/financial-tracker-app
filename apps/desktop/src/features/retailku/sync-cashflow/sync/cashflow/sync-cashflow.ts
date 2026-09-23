@@ -32,6 +32,8 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
       amount: row.net,
       date: row.date,
       note: row.note,
+      categoryId: row.categoryId,
+      description: row.description,
       sourceRef: row.sourceRef,
     });
     insertedSourceRefs.push(row.sourceRef);
@@ -40,7 +42,7 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
   return {
     insertedCount: insertedSourceRefs.length,
     insertedSourceRefs,
-    unmappedAccountIds: plan.unmappedAccountIds,
+    unmappedKeys: plan.unmappedKeys,
     deactivatedPaymentMethodAccountIds: plan.deactivatedPaymentMethodAccountIds,
   };
 }

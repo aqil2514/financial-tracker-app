@@ -195,6 +195,199 @@ LIABILITY), bukan nama akun spesifik — asalkan `get_journal_detail`
 menyediakan kategori akun per baris (perlu dicek field-nya lebih
 lanjut saat masuk fase desain implementasi).
 
+## Implementasi field `isProviderPayoutAccount` — SELESAI di sisi server
+
+**Diimplementasikan 2026-09-23** di `retail-multitenant` (server MCP
+"Warung Aqil"), BUKAN di `financial-app` — pendekatan yang dipilih
+setelah pertimbangan cakupan/biaya panggilan MCP (lihat bagian di
+bawah): edit tool `get_cashflow_detail` yang sudah ada, BUKAN bikin
+tool baru, karena MCP Retailku ini SATU-SATUNYA dipakai AI assistant
+(termasuk `financial-app` sebagai konsumen), tidak ada kontrak/versi
+ketat yang perlu dijaga, dan perubahan bersifat ADITIF (field baru,
+tidak mengubah/menghapus field lama).
+
+**Perubahan**:
+- `get-cfr-detail.helper.ts`: tambah `prisma.provider.findMany({
+  storeId, deletedAt: null })` PARALEL (`Promise.all`) dengan query
+  journal entries yang sudah ada — bangun `Set<accountId>` dari
+  `Provider.accountId`, lalu tiap baris hasil ditandai
+  `isProviderPayoutAccount: providerAccountIds.has(item.account.id)`.
+  **0 panggilan MCP tambahan** dari sisi konsumen — cuma 1 query Prisma
+  ekstra yang murah di server.
+- `get-cashflow-detail.ts` (registrasi tool): deskripsi tool diupdate
+  supaya AI assistant tahu makna & cara pakai flag baru.
+- `financial-app`: `RetailkuCashflowDetailRow` (`shared/retailku/mcp-tools/cashflow/get-cashflow-detail.ts`)
+  ditambah field `isProviderPayoutAccount: boolean`.
+
+**Sumber data**: `Provider.accountId` di skema `retail-multitenant`
+(`provider.prisma`) — akun kas tujuan payout provider PPOB (mis.
+Seabank) SUDAH tersimpan eksplisit per provider, TIDAK PERNAH perlu
+ditebak dari nominal/nama akun seperti heuristik awal (lihat
+"Sampling lanjutan" di atas — heuristik itu jadi TIDAK RELEVAN lagi,
+digantikan field ini yang 100% akurat by design).
+
+**Diverifikasi lewat panggilan `get_cashflow_detail` nyata**
+(2026-09-23, `dateFrom=dateTo=2026-09-21`) — hasil SL-260921-08 persis
+sesuai temuan sampling manual sebelumnya:
+- `Kas Tunai +27.000` → `isProviderPayoutAccount: false` (pendapatan asli)
+- `Seabank -21.780` → `isProviderPayoutAccount: true` (bayar provider)
+
+**TEMUAN PENTING dari verifikasi — batasan cakupan flag ini**: flag
+ini bekerja di LEVEL AKUN (`accountId ∈ Provider.accountId`), BUKAN
+level transaksi/baris. Konsekuensinya, SEMUA baris cashflow yang lewat
+akun Seabank ikut bertanda `isProviderPayoutAccount: true`, TERMASUK
+yang `sourceType`-nya BUKAN `SALE` — dibuktikan pada tanggal yang sama
+ada baris `INVESTMENT_TRANSACTION -10.000` dan `PURCHASE_ORDER
+-39.679` di Seabank, KEDUANYA ikut `true` walau bukan pembayaran
+provider PPOB sama sekali (kebetulan toko ini pakai Seabank juga untuk
+investasi & pembayaran supplier).
+
+**Implikasi untuk implementasi sync nanti**: flag ini HANYA valid
+diandalkan dalam KONTEKS `sourceType: "SALE"` (untuk membedakan baris
+pendapatan asli vs bayar-provider DALAM SATU transaksi SALE yang
+sama) — TIDAK BOLEH dipakai sebagai penanda umum "exclude dari
+kategori apa pun" di seluruh sourceType. Logic mode baru
+("detail per transaksi", lihat pembahasan mode sync di bawah) WAJIB
+mengecek `row.sourceType === "SALE"` DULU sebelum membaca
+`isProviderPayoutAccount`, bukan langsung filter berdasar flag itu
+saja.
+
+## Implementasi field `productTypes` — SELESAI di sisi server (jawab Consignment)
+
+**Diimplementasikan 2026-09-23**, menyusul `isProviderPayoutAccount` di
+file/tool yang SAMA (`get-cfr-detail.helper.ts` +
+`get-cashflow-detail.ts`). Field ini BEDA tujuan dari
+`isProviderPayoutAccount` — bukan mengganti, melainkan melengkapi:
+`isProviderPayoutAccount` khusus bantu PPOB (level akun), `productTypes`
+GENERIK untuk semua `ProductType` (`MERCHANDISE`, `MANUFACTURE`,
+`DIGITAL`, `PPOB`, `SERVICE`, `CONSIGNMENT`) yang terlibat di transaksi
+sumber — konsumen yang memfilter tipe mana yang relevan untuk
+kebutuhannya.
+
+**Sebelum implementasi, diverifikasi dulu jalur relasinya ada**: cek
+skema `retail-multitenant` — `JournalEntry` (sourceType SALE) punya
+relasi 1:1 ke `SaleTransaction` (`journalEntryId`), yang punya relasi
+1:N ke `SaleTransactionItem`, yang punya relasi N:1 ke `Product`
+(field `type: ProductType`). Jalur relasi LENGKAP tersedia lewat
+Prisma nested `select` — TIDAK PERNAH perlu panggilan MCP terpisah ke
+`get_sale_detail` sama sekali.
+
+**Dampak performa DIUKUR NYATA** (bukan cuma estimasi) sebelum
+implementasi — `EXPLAIN ANALYZE` langsung ke `multi_retail_db`
+(docker, storeId Warung Aqil, ~1.723 transaksi SALE riwayat penuh):
+- Query baseline (tanpa join produk), rentang 9 bulan: **~5.1ms**
+- Query + join `saleTransaction→items→product.type`, rentang SAMA:
+  **~11-15ms**
+- Semua join pakai INDEX SCAN (`sale_transactions_journalEntryId_key`
+  unique index, `sale_transaction_items_saleTransactionId_idx`) — TIDAK
+  ADA sequential scan tambahan pada tabel besar. Overhead ~7-10ms untuk
+  SELURUH riwayat toko dianggap AMAN untuk dilanjutkan.
+
+**Perubahan**:
+- `get-cfr-detail.helper.ts`: tambah `saleTransaction: { select: {
+  items: { select: { product: { select: { type: true } } } } } }` ke
+  `select` query `journalEntry.findMany` yang sudah ada (bukan query
+  terpisah) — lalu per entry, bangun `productTypes` dari
+  `[...new Set(...)]` (dedupe tipe produk yang sama), `null` kalau
+  `entry.saleTransaction` kosong (sourceType bukan SALE).
+- `get-cashflow-detail.ts`: deskripsi tool diupdate lagi, jelaskan
+  `productTypes` DAN batasannya untuk Consignment (baris "Hutang ke
+  Penitip" tetap TIDAK PERNAH muncul di sini, `productTypes` cuma kasih
+  SINYAL "transaksi ini ada CONSIGNMENT", bukan pemisahan nilai
+  otomatis).
+- `financial-app`: `RetailkuCashflowDetailRow` ditambah
+  `productTypes: string[] | null`.
+
+**Diverifikasi lewat panggilan `get_cashflow_detail` nyata**
+(2026-09-23, `dateFrom=dateTo=2026-09-21`, SETELAH restart server) —
+SL-260921-08 (sample PPOB+MERCHANDISE campuran):
+- Kedua baris (Kas Tunai +27.000 DAN Seabank -21.780) sama-sama
+  `productTypes: ["PPOB", "MERCHANDISE"]` — BENAR, karena keduanya dari
+  `sourceNumber` yang sama, field ini level TRANSAKSI bukan level
+  baris/akun (beda dari `isProviderPayoutAccount` yang level akun).
+- Baris non-SALE (`INVESTMENT_TRANSACTION`, `CASH_OPNAME`,
+  `PURCHASE_ORDER`) semuanya `productTypes: null` — SESUAI ekspektasi,
+  karena field ini baru join ke `saleTransaction` (PURCHASE/investasi
+  belum digarap, di luar cakupan sesi ini).
+
+**Status pertanyaan #2 lama (Consignment) — REVISI, awalnya dianggap
+TIDAK BISA, ternyata BISA**: field `productTypes` di atas cuma
+sinyal keberadaan, TAPI kemudian ditemukan (lihat bagian
+`nonRevenuePortion` di bawah) bahwa pemisahan NILAI presisi (bukan
+cuma sinyal) TERNYATA MEMUNGKINKAN — `unitCost`/`totalCost` yang
+SUDAH tersimpan permanen di `SaleTransactionItem` untuk item
+CONSIGNMENT sama persis dengan nilai "Hutang ke Penitip" di jurnal,
+TIDAK PERLU `commissionAmountPerBase` dari tabel consignment terpisah
+seperti dugaan awal di sini.
+
+## Implementasi field `nonRevenuePortion` — SELESAI (jawab TUNTAS pertanyaan #2)
+
+**Diimplementasikan 2026-09-23**, di file/tool yang SAMA. Dipicu dari
+pertanyaan user: "misal ada lebih dari 1 item transaksi dan tercampur,
+ini belum bisa dihandle?" — jawabannya: untuk PPOB SUDAH aman (nilai
+sudah terpisah alami di jurnal per akun provider, tidak peduli
+campuran), tapi untuk CONSIGNMENT awalnya memang belum (cuma sinyal
+`productTypes`, bukan nilai). Digali lebih lanjut apakah PEMISAHAN
+NILAI Consignment memungkinkan dari sisi Retailku.
+
+**Temuan kunci** (`create-validate-items.ts` baris 122-129,
+`create-journal.ts` baris 260-278): untuk item CONSIGNMENT,
+`unitCost = unitPrice - commissionAmountPerBase` — ARTINYA
+`commissionAmountPerBase` (dan karenanya nilai "Hutang ke Penitip")
+BISA DIREKONSTRUKSI BALIK dari `unitPrice`/`unitCost` yang SUDAH
+tersimpan permanen di `SaleTransactionItem`, TANPA perlu tabel
+`ConsignmentReceivingItem`/`ConsignmentStockLog` sama sekali. Pola
+yang SAMA berlaku untuk PPOB (`unitCost` = harga beli dari provider).
+
+**Diverifikasi lewat query nyata ke `multi_retail_db`** (docker,
+storeId Warung Aqil) — transaksi `SL-260904-14` (Consignment, qty 6,
+unitPrice 2000, unitCost 1500): `totalCost` tersimpan = **9000**,
+dicocokkan ke `get_journal_detail` transaksi yang sama → baris
+"Hutang ke Penitip" = **9000 persis**. `totalPrice - totalCost` = 3000
+= persis nilai "Pendapatan Komisi Konsinyasi" di jurnal yang sama.
+Rumus: **`hutangPenitip = totalCost`**, **`komisiKonsinyasi =
+totalPrice - totalCost`** — akurat 100%, bukan estimasi.
+
+**Perubahan**:
+- `get-cfr-detail.helper.ts`: `select` pada `saleTransaction.items`
+  diperluas ikut ambil `totalPrice`+`totalCost` (sebelumnya cuma
+  `product.type`). Field baru `nonRevenuePortion`: jumlah `totalCost`
+  KHUSUS item ber-`productType` PPOB atau CONSIGNMENT (`NON_REVENUE_
+  PRODUCT_TYPES` — sengaja TIDAK termasuk MERCHANDISE/MANUFACTURE/dst,
+  karena `totalCost` tipe itu berarti HPP toko sendiri, BUKAN "mengalir
+  ke pihak ketiga" — beda makna, tidak boleh digabung dalam jumlah
+  yang sama). `null` kalau bukan SALE atau tidak ada item PPOB/
+  CONSIGNMENT sama sekali (dibedakan dari `0` yang berarti "dicek,
+  memang nihil"). Tetap TIDAK ADA query/panggilan MCP tambahan — cuma
+  memperluas `select` yang sudah ada.
+- `get-cashflow-detail.ts`: deskripsi tool diupdate, SEKALIGUS
+  mengoreksi klaim lama yang bilang Consignment "tidak bisa dipisah
+  dari data cashflow" (sekarang BISA, lewat field ini).
+- `financial-app`: `RetailkuCashflowDetailRow` ditambah
+  `nonRevenuePortion: number | null`.
+
+**Diverifikasi lewat panggilan `get_cashflow_detail` nyata**
+(2026-09-23, setelah restart server):
+- `SL-260921-08` (PPOB, kedua baris Kas Tunai & Seabank):
+  `nonRevenuePortion: 21780` — PERSIS sama dengan nilai baris jurnal
+  "Seabank -21.780" yang sudah diverifikasi sebelumnya.
+- `SL-260904-16` (Consignment, `productTypes: ["CONSIGNMENT"]`,
+  `debit: 4000`): `nonRevenuePortion: 3000` — cocok dengan sample
+  perhitungan manual (`totalCost` tersimpan = 3000).
+- Pendapatan bersih toko per baris = `debit`/`credit` **dikurangi**
+  `nonRevenuePortion` — utk SL-260904-16: 4000 - 3000 = **1000**
+  (murni komisi konsinyasi toko, BUKAN termasuk nilai barang penitip).
+- Baris non-SALE tetap `nonRevenuePortion: null`, TIDAK ADA regresi.
+
+**KESIMPULAN — pertanyaan terbuka #1 DAN #2 (versi lama, di bawah)
+SUDAH TERJAWAB TUNTAS** oleh 3 field ini
+(`isProviderPayoutAccount`+`productTypes`+`nonRevenuePortion`), TANPA
+panggilan MCP tambahan sama sekali, TANPA heuristik berbasis nominal/
+nama akun yang rapuh. Yang BELUM diputuskan sekarang murni soal
+PEMANFAATAN di sisi `financial-app` (pertanyaan #3/#4 lama: prioritas
+dikerjakan sekarang vs nanti, desain skema mapping category_id kalau
+jadi — BUKAN LAGI soal "bisa/tidak bisa" secara teknis).
+
 ### Lampiran — data mentah sample (dicatat supaya tidak perlu query ulang MCP)
 
 Semua dicek lewat `get_sale_detail` + `get_journal_detail`, MCP "Warung

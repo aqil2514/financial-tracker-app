@@ -9,12 +9,17 @@ export {
 } from "./mcp-hooks/use-retailku-payment-accounts";
 export {
   useRetailkuAccountMapping,
-  useSaveRetailkuAccountMapping,
   retailkuAccountMappingQueryKey,
   type RetailkuAccountMapping,
-  type SaveRetailkuAccountMappingInput,
 } from "./mcp-hooks/use-retailku-account-mapping";
 export { useRetailkuMappingIssues } from "./mcp-hooks/use-retailku-mapping-issues";
+export {
+  useFieldMapping,
+  useSaveFieldMapping,
+  fieldMappingQueryKey,
+  type FieldMapping,
+  type SaveFieldMappingInput,
+} from "./mcp-hooks/use-field-mapping";
 export {
   connectRetailkuMcp,
   assertRetailkuConfigured,

@@ -43,7 +43,7 @@ const baseInput: SyncAllInput = {
 const emptyCashflowResult: SyncCashflowResult = {
   insertedCount: 0,
   insertedSourceRefs: [],
-  unmappedAccountIds: [],
+  unmappedKeys: [],
   deactivatedPaymentMethodAccountIds: [],
 };
 
@@ -96,7 +96,7 @@ describe("syncAll", () => {
     expect(order).toEqual(["cashflow", "ar-ap"]);
     expect(result).toEqual({
       cashflowInsertedCount: 2,
-      cashflowUnmappedAccountIds: [],
+      cashflowUnmappedKeys: [],
       cashflowDeactivatedPaymentMethodAccountIds: [],
       arApInsertedCount: 1,
     });

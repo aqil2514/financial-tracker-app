@@ -4,20 +4,30 @@ import type { AggregatedTotal } from "../types";
 export function aggregateByDateAndAccount(
   rows: Awaited<ReturnType<typeof getCashflowDetail>>["data"]
 ): AggregatedTotal[] {
-  const totals = new Map<string, AggregatedTotal>();
+  const totals = new Map<string, Omit<AggregatedTotal, "key">>();
   for (const row of rows) {
     const date = row.date.slice(0, 10);
-    const key = `${date}:${row.accountId}`;
-    const existing = totals.get(key);
+    const sourceRef = `${date}:${row.accountId}`;
+    const existing = totals.get(sourceRef);
     const net = row.debit - row.credit;
-    totals.set(key, {
+    totals.set(sourceRef, {
       date,
       retailkuAccountId: row.accountId,
+      retailkuAccountCode: row.accountCode,
       accountName: row.accountName,
       net: (existing?.net ?? 0) + net,
       note: `Ringkasan Kas Harian Retailku — ${row.accountName}`,
-      sourceRef: key,
+      sourceRef,
     });
   }
-  return [...totals.values()];
+  // Arah (inflow/outflow) HANYA bisa ditentukan setelah net FINAL
+  // dihitung (bukan per baris mentah) — satu akun bisa berganti arah
+  // hari ke hari (dibuktikan lewat data nyata, lihat
+  // docs/todos/plan/retailku-sync-field-mapping.md), jadi key mapping
+  // HARUS menyertakan arah supaya user bisa atur note/kategori BEDA
+  // untuk "akun ini net masuk" vs "akun ini net keluar".
+  return [...totals.values()].map((total) => ({
+    ...total,
+    key: `summary:${total.net >= 0 ? "inflow" : "outflow"}:${total.retailkuAccountId}`,
+  }));
 }

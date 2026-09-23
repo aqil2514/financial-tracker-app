@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
-
-import { Button } from "@/components/ui/button";
 import { useCashflowConfigContext } from "../config-context";
 
-/** Section "Mapping Akun" — status mapping akun Retailku (ada/belum),
- * link ke halaman Mapping Akun kalau belum ada satu pun. */
+/** Section "Mapping Akun" — status mapping akun Retailku (ada/belum).
+ * Pengaturan mapping sendiri sekarang di tab "Mapping" (sejajar tab ini
+ * di halaman yang sama), BUKAN lagi halaman /retailku/mapping terpisah
+ * — lihat docs/todos/plan/retailku-sync-field-mapping.md. */
 export function MappingStatusSection() {
   const { prerequisites } = useCashflowConfigContext();
   const { mappingsLoading, hasMappings, mappingCount } = prerequisites;
@@ -22,12 +21,9 @@ export function MappingStatusSection() {
           lokalnya masing-masing.
         </p>
       ) : (
-        <p className="text-destructive text-sm">Belum ada mapping akun Retailku. Lengkapi dulu di Mapping Akun.</p>
-      )}
-      {!hasMappings && !mappingsLoading && (
-        <Button variant="outline" size="sm" render={<Link href="/retailku/mapping" />}>
-          Buka Mapping Akun
-        </Button>
+        <p className="text-destructive text-sm">
+          Belum ada mapping akun Retailku. Lengkapi dulu di tab &quot;Mapping&quot;.
+        </p>
       )}
     </div>
   );

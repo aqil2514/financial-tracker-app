@@ -3,8 +3,8 @@ import { aggregateByDateAccountAndSourceType } from "./helpers/aggregate-by-date
 import { aggregateByDateAndAccount } from "./helpers/aggregate-by-date-and-account";
 import { fetchAllCashflowDetailRows } from "./helpers/fetch-all-cashflow-detail-rows";
 import { isPeriodSynced } from "./helpers/is-period-synced";
-import { loadAccountMapping } from "./helpers/load-account-mapping";
 import { loadActivePaymentMethodIds } from "./helpers/load-active-payment-method-ids";
+import { loadFieldMapping } from "./helpers/load-field-mapping";
 import type { CashflowSyncPlan, CashflowSyncPlanRow, Db, SyncCashflowInput } from "./types";
 
 /**
@@ -23,6 +23,13 @@ import type { CashflowSyncPlan, CashflowSyncPlanRow, Db, SyncCashflowInput } fro
  * retail-multitenant) — TANPA validasi ulang ini, sync akan diam-diam
  * tetap memasukkan transaksi ke mapping yang sudah tidak valid lagi di
  * sisi Retailku.
+ *
+ * Lookup akun tujuan DAN field non-fakta (note/category_id/description)
+ * SEKARANG lewat SATU tabel `retailku_sync_field_mapping`, keyed by
+ * `total.key` (identitas "jenis" baris, BUKAN `retailkuAccountId`
+ * mentah) — lihat docs/todos/plan/retailku-sync-field-mapping.md untuk
+ * kenapa `retailku_account_mapping` lama diganti, bukan ditambah tabel
+ * terpisah.
  */
 export async function computeCashflowSync(
   db: Db,
@@ -31,7 +38,7 @@ export async function computeCashflowSync(
   const client = await connectRetailkuMcp(input.mcpConfig);
   try {
     const rows = await fetchAllCashflowDetailRows(client, input);
-    const accountMap = await loadAccountMapping(db);
+    const fieldMapping = await loadFieldMapping(db);
     const activePaymentMethodIds = await loadActivePaymentMethodIds(client);
 
     const totals =
@@ -40,42 +47,69 @@ export async function computeCashflowSync(
         : aggregateByDateAccountAndSourceType(rows);
 
     const planRows: CashflowSyncPlanRow[] = [];
-    const unmappedAccountIds = new Set<string>();
+    const unmappedKeys = new Set<string>();
     const deactivatedPaymentMethodAccountIds = new Set<string>();
 
     for (const total of totals) {
       if (total.net === 0) continue;
 
-      const localAccountId = accountMap.get(total.retailkuAccountId) ?? null;
-      if (localAccountId == null) {
-        unmappedAccountIds.add(total.retailkuAccountId);
-        planRows.push({ ...total, willInsert: false, skipReason: "unmapped-account", localAccountId: null });
+      const mapping = fieldMapping.get(total.key) ?? null;
+      if (mapping == null) {
+        unmappedKeys.add(total.key);
+        planRows.push({
+          ...total,
+          categoryId: null,
+          description: null,
+          willInsert: false,
+          skipReason: "unmapped-account",
+          localAccountId: null,
+        });
         continue;
       }
+
+      // `note` fallback ke template default (dari fungsi agregasi) kalau
+      // user belum atur mapping-nya — fallback PER KOLOM, bukan per
+      // baris, lihat "Field fallback default" di dokumen plan.
+      const resolved = {
+        ...total,
+        note: mapping.note ?? total.note,
+        categoryId: mapping.categoryId,
+        description: mapping.description,
+      };
 
       if (!activePaymentMethodIds.has(total.retailkuAccountId)) {
         deactivatedPaymentMethodAccountIds.add(total.retailkuAccountId);
         planRows.push({
-          ...total,
+          ...resolved,
           willInsert: false,
           skipReason: "deactivated-payment-method",
-          localAccountId,
+          localAccountId: mapping.localAccountId,
         });
         continue;
       }
 
       const alreadySynced = await isPeriodSynced(db, total.date, total.retailkuAccountId);
       if (alreadySynced) {
-        planRows.push({ ...total, willInsert: false, skipReason: "already-synced", localAccountId });
+        planRows.push({
+          ...resolved,
+          willInsert: false,
+          skipReason: "already-synced",
+          localAccountId: mapping.localAccountId,
+        });
         continue;
       }
 
-      planRows.push({ ...total, willInsert: true, skipReason: null, localAccountId });
+      planRows.push({
+        ...resolved,
+        willInsert: true,
+        skipReason: null,
+        localAccountId: mapping.localAccountId,
+      });
     }
 
     return {
       rows: planRows,
-      unmappedAccountIds: [...unmappedAccountIds],
+      unmappedKeys: [...unmappedKeys],
       deactivatedPaymentMethodAccountIds: [...deactivatedPaymentMethodAccountIds],
     };
   } finally {
