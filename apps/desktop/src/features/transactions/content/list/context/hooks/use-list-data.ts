@@ -11,14 +11,16 @@ export function useListData(
   setPage: (page: number) => void,
   dateFilter: string | undefined,
   sorts: SortConfig[],
-  filters: FilterConfig[]
+  filters: FilterConfig[],
+  accountId?: number
 ): ListContextData {
   const { data, isLoading, error } = useTransactions(
     page,
     limit,
     dateFilter,
     sorts,
-    filters
+    filters,
+    accountId
   );
 
   useEffect(() => {

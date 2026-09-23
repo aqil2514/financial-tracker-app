@@ -35,6 +35,10 @@ type UseCreateTransactionOptions = {
    * menutup dialog dari context. Saat "Simpan & Lanjut", dialog tetap
    * terbuka dan ini TIDAK dipanggil. */
   onClosed?: () => void;
+  /** Akun yang otomatis dipilih saat form dibuka — dipakai halaman detail
+   * akun supaya transaksi baru langsung ter-scope ke akun yang sedang
+   * dilihat, tanpa user perlu memilih lagi. */
+  defaultAccountId?: number;
 };
 
 export function useCreateTransaction(options: UseCreateTransactionOptions) {
@@ -44,6 +48,7 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
     attachmentFolder = null,
     onAttachmentsSaved,
     onClosed,
+    defaultAccountId,
   } = options;
 
   return useEntityForm({
@@ -51,7 +56,7 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
     defaultValues: () => ({
       type: "expense" as const,
       amount: 0,
-      account_id: "",
+      account_id: defaultAccountId != null ? String(defaultAccountId) : "",
       category_id: null,
       transfer_account_id: null,
       note: "",

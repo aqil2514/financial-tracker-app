@@ -28,6 +28,21 @@ export type SyncAllResult = {
   arApInsertedCount: number;
 };
 
+// Lock in-memory MODUL-LEVEL (bukan per-komponen) — `syncAll` dipanggil
+// dari DUA sumber independen yang tidak saling tahu satu sama lain:
+// `useRetailkuAutoSync` (otomatis saat app dibuka) dan `useSyncRetailkuAll`
+// (tombol "Sync Sekarang" manual). Tanpa lock ini, keduanya bisa berjalan
+// BERSAMAAN (mis. user klik "Sync Sekarang" tepat saat auto-sync baru
+// mulai) — masing-masing memanggil `computeCashflowSync` secara
+// independen, membaca state "belum tersinkron" di titik yang sama
+// (belum ada yang commit), lalu KEDUANYA insert baris dengan
+// `source_ref` yang sama -> yang kedua gagal `UNIQUE constraint failed:
+// transactions.source, transactions.source_ref` (bug ditemukan live,
+// lihat handover 2026-09-23). `isPeriodSynced` di `sync-cashflow.ts`
+// TIDAK cukup untuk mencegah ini karena dia cuma efektif ANTAR
+// pemanggilan yang berurutan, bukan yang overlap secara konkuren.
+let syncInFlight: Promise<SyncAllResult> | null = null;
+
 /**
  * Titik masuk tunggal sinkronisasi Retailku — menjalankan cashflow DAN
  * AR/AP, lihat docs/todos/plan/retailku-cashflow-sync.md bagian
@@ -51,8 +66,30 @@ export type SyncAllResult = {
  * CASCADE, lihat 0012_debts.sql) — DELETE `transactions` SAJA tidak
  * ikut menghapus `debts`/`debt_payments` terkait. Rollback HARUS hapus
  * `debts`/`debt_payments` dulu secara eksplisit sebelum `transactions`.
+ *
+ * Kalau ada sync lain sedang berjalan, panggilan ini MENUNGGU sync itu
+ * selesai lebih dulu (bukan ditolak) — supaya baik auto-sync maupun
+ * manual sync tetap dapat hasilnya sendiri-sendiri, cuma dijalankan
+ * berurutan (serialized), bukan konkuren.
  */
-export async function syncAll(input: SyncAllInput): Promise<SyncAllResult> {
+export function syncAll(input: SyncAllInput): Promise<SyncAllResult> {
+  // `previous` ditangkap SEBELUM `syncInFlight` ditimpa (masih sinkron,
+  // tidak ada `await` di antaranya) supaya dua panggilan `syncAll()`
+  // yang datang berdekatan tetap saling ber-chain dengan benar, bukan
+  // sama-sama menunggu Promise yang sama lalu jalan bersamaan.
+  const previous = syncInFlight;
+  const result = (async () => {
+    if (previous) await previous.catch(() => {});
+    return syncAllInternal(input);
+  })();
+
+  syncInFlight = result.finally(() => {
+    if (syncInFlight === result) syncInFlight = null;
+  });
+  return result;
+}
+
+async function syncAllInternal(input: SyncAllInput): Promise<SyncAllResult> {
   const db = await getDb();
 
   let cashflowResult: SyncCashflowResult | null = null;

@@ -12,11 +12,22 @@ const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "has_attachment", label: "Gambar", type: "select" },
 ];
 
-export function TransactionListFilter() {
+export function TransactionListFilter({
+  excludeKeys,
+}: {
+  /** Sembunyikan opsi filter tertentu dari key selector — dipakai halaman
+   * detail akun untuk menyembunyikan filter "Akun" karena scope-nya
+   * sudah otomatis dibatasi ke satu akun lewat `accountId`. */
+  excludeKeys?: string[];
+} = {}) {
   const { filters, setFilters, filterSelectOptions } = useList().filter;
+  const config = excludeKeys
+    ? FILTER_CONFIG.filter((option) => !excludeKeys.includes(option.key))
+    : FILTER_CONFIG;
+
   return (
     <FilterPanel
-      config={FILTER_CONFIG}
+      config={config}
       selectOptions={filterSelectOptions}
       initialValue={filters}
       onApplyFilter={setFilters}

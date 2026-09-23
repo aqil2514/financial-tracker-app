@@ -24,10 +24,11 @@ export function useTransactions(
   limit: number,
   date?: string,
   sorts: SortConfig[] = [],
-  filters: FilterConfig[] = []
+  filters: FilterConfig[] = [],
+  accountId?: number
 ) {
   return useQuery({
-    queryKey: [...transactionsQueryKey, page, limit, date, sorts, filters],
+    queryKey: [...transactionsQueryKey, page, limit, date, sorts, filters, accountId],
     queryFn: async () => {
       // 1. Buka koneksi database.
       const db = await getDb();
@@ -37,7 +38,12 @@ export function useTransactions(
       const { remaining, extraConditions } = extractAttachmentCondition(filters);
 
       // 3. Bangun klausa WHERE/ORDER BY/LIMIT OFFSET beserta parameternya.
-      const { whereClause, params } = buildWhereConditions(remaining, date, extraConditions);
+      const { whereClause, params } = buildWhereConditions(
+        remaining,
+        date,
+        extraConditions,
+        accountId
+      );
       const orderClause = buildOrderClause(sorts, SORTABLE_COLUMNS, DEFAULT_ORDER_CLAUSE);
       const { clause: limitOffsetClause, params: limitOffsetParams } = buildLimitOffset(
         page,

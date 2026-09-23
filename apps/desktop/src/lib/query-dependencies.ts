@@ -15,6 +15,7 @@ import { accountBalancesQueryKey } from "@/features/reports/use-account-balances
 import { accountGroupBalancesQueryKey } from "@/features/accounts/sections/balance-pie-chart/use-account-group-balances";
 import { transactionDaysQueryKey } from "@/features/transactions/shared/hooks/use-transaction-days";
 import { monthSummaryQueryKey } from "@/features/transactions/shared/hooks/use-month-summary";
+import { accountSummaryQueryKey } from "@/features/account-detail/header/use-account-summary";
 
 // Peta ketergantungan query key lintas fitur: kalau data sebuah DOMAIN
 // berubah (mis. transaksi ditambah/diedit/dihapus), semua query key di
@@ -37,6 +38,7 @@ export const QUERY_DEPENDENCIES = {
     accountGroupBalancesQueryKey,
     transactionDaysQueryKey,
     monthSummaryQueryKey,
+    accountSummaryQueryKey,
     ongoingDebtsQueryKey, // transaksi transfer bisa membuat/melunasi debts
     debtsListQueryKey,
     contactSummaryQueryKey,

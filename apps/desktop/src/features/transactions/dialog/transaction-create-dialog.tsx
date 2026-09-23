@@ -12,7 +12,13 @@ import { TransactionForm } from "../form/add-edit/form";
 import { useCreateTransaction } from "../form/add-edit/hooks/use-create-transaction";
 import { useTransactionsDialog } from "./context";
 
-export function TransactionCreateDialog() {
+export function TransactionCreateDialog({
+  defaultAccountId,
+}: {
+  /** Akun yang otomatis dipilih saat form dibuka — lihat
+   * `useCreateTransaction`. */
+  defaultAccountId?: number;
+} = {}) {
   const { dialog, closeDialog } = useTransactionsDialog();
   const open = dialog?.type === "create";
 
@@ -36,6 +42,7 @@ export function TransactionCreateDialog() {
     attachmentFolder: attachmentFolder ?? null,
     onAttachmentsSaved: clearPendingAttachments,
     onClosed: closeDialog,
+    defaultAccountId,
   });
 
   function handleOpenChange(next: boolean) {

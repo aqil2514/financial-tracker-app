@@ -13,14 +13,31 @@ import type { ListContextType } from "./interface";
 
 const ListContext = createContext<ListContextType | undefined>(undefined);
 
-export function ListProvider({ children }: { children: React.ReactNode }) {
+export function ListProvider({
+  children,
+  accountId,
+}: {
+  children: React.ReactNode;
+  /** Scoped ke satu akun (dipakai halaman detail akun) — dicocokkan baik
+   * sebagai akun utama maupun akun tujuan transfer. Tanpa ini, list
+   * menampilkan semua transaksi seperti biasa. */
+  accountId?: number;
+}) {
   const { dateFilter } = useTransactionsPage();
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
 
   const { page, setPage, limit, setLimit } = useListPageControl();
   const filter = useListFilter(categories, accounts);
-  const data = useListData(page, limit, setPage, dateFilter, filter.sorts, filter.filters);
+  const data = useListData(
+    page,
+    limit,
+    setPage,
+    dateFilter,
+    filter.sorts,
+    filter.filters,
+    accountId
+  );
   const lookup = useListLookup(accounts, categories);
 
   return (
