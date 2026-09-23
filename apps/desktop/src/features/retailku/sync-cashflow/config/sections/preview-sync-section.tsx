@@ -23,8 +23,7 @@ export function PreviewSyncSection() {
   const { prerequisites, fields, syncFrom, preview } = useCashflowConfigContext();
   const [open, setOpen] = useState(false);
 
-  const canPreview =
-    prerequisites.hasCredentials && prerequisites.hasMappings && syncFrom.syncFromValue !== "";
+  const canPreview = prerequisites.hasCredentials && syncFrom.syncFromValue !== "";
 
   function handlePreview() {
     setOpen(true);

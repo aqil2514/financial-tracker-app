@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { JSONContent } from "@tiptap/react";
 
+import { isEmptyDoc } from "@/components/rich-text";
 import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useCategories } from "@/hooks/resources/use-categories";
 import {
@@ -25,8 +27,24 @@ export type MappingRowDraft = {
   localAccountId: number | null;
   note: string;
   categoryId: number | null;
-  description: string;
+  /** Dokumen Tiptap JSON (SAMA seperti `description` di form transaksi,
+   * lihat schema.ts/use-create-transaction.ts) — disimpan di DB sebagai
+   * JSON string di kolom `retailku_sync_field_mapping.description`
+   * (TEXT), di-parse jadi objek di level draft supaya bisa dipakai
+   * langsung oleh RichTextEditor tanpa parse berulang tiap render. */
+  description: JSONContent | null;
 };
+
+/** `FieldMapping.description` mentah dari DB berupa JSON string (atau
+ * `null`) — parse sekali di sini, BUKAN di tiap pemakaian. */
+function parseDescription(raw: string | null): JSONContent | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as JSONContent;
+  } catch {
+    return null;
+  }
+}
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -86,7 +104,12 @@ export function useMappingDraft() {
   // Baris yang ditampilkan: gabungan candidate (dari MCP) + mapping
   // tersimpan (kalau ADA tapi TIDAK muncul di candidate rentang
   // tanggal ini — tetap ditampilkan supaya user tidak kehilangan
-  // akses edit ke mapping lama yang sudah pernah diatur).
+  // akses edit ke mapping lama yang sudah pernah diatur). Mapping
+  // tersimpan DIFILTER by prefix `key` sesuai `mode` aktif (`summary:`
+  // vs `detail:`) — TANPA filter ini, mapping lama dari mode LAIN ikut
+  // muncul terlepas mode yang dipilih (bug ditemukan live: pilih mode
+  // "detail" tapi daftar tetap menampilkan key `summary:*` lama yang
+  // sudah tersimpan).
   const rows: MappingRowDraft[] = useMemo(() => {
     const byKey = new Map<string, MappingRowDraft>();
 
@@ -100,12 +123,13 @@ export function useMappingDraft() {
         localAccountId: saved?.localAccountId ?? null,
         note: saved?.note ?? "",
         categoryId: saved?.categoryId ?? null,
-        description: saved?.description ?? "",
+        description: parseDescription(saved?.description ?? null),
       });
     }
 
     for (const saved of savedMapping ?? []) {
       if (byKey.has(saved.key)) continue;
+      if (!saved.key.startsWith(`${mode}:`)) continue;
       byKey.set(saved.key, {
         key: saved.key,
         retailkuAccountId: saved.retailkuAccountId,
@@ -114,12 +138,12 @@ export function useMappingDraft() {
         localAccountId: saved.localAccountId,
         note: saved.note ?? "",
         categoryId: saved.categoryId,
-        description: saved.description ?? "",
+        description: parseDescription(saved.description),
       });
     }
 
     return [...byKey.values()].map((row) => ({ ...row, ...drafts[row.key] }));
-  }, [candidates, savedByKey, savedMapping, drafts]);
+  }, [candidates, savedByKey, savedMapping, drafts, mode]);
 
   function updateDraft(key: string, patch: Partial<MappingRowDraft>) {
     setDrafts((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
@@ -138,7 +162,7 @@ export function useMappingDraft() {
         localAccountId: row.localAccountId!,
         note: row.note.trim() === "" ? null : row.note,
         categoryId: row.categoryId,
-        description: row.description.trim() === "" ? null : row.description,
+        description: isEmptyDoc(row.description) ? null : JSON.stringify(row.description),
       }));
     if (payload.length === 0) return;
     saveMapping.mutate(payload, { onSuccess: () => setDrafts({}) });

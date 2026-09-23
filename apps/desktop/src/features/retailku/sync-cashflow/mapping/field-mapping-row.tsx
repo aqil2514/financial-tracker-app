@@ -1,20 +1,31 @@
 "use client";
 
+import { RichTextEditor } from "@/components/rich-text";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TableCell, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 import type { AccountWithBalance } from "@/hooks/resources/use-accounts";
 import type { Category } from "@/lib/db";
-import { formatMappingKeyLabel } from "./format-mapping-key";
 import type { MappingRowDraft } from "./hooks/use-mapping-draft";
 
-const NO_CATEGORY_VALUE = "__none__";
+type ComboboxOption = { value: string; label: string };
 
-/** Satu baris form mapping — akun (dropdown, WAJIB), note/category/
+const NO_CATEGORY_OPTION: ComboboxOption = { value: "__none__", label: "Tanpa kategori" };
+
+/** Form satu `key` mapping — akun (combobox, WAJIB), note/category/
  * description (semua OPSIONAL, kosong = fallback default saat sync,
  * lihat "Field fallback default" di
- * docs/todos/plan/retailku-sync-field-mapping.md). */
+ * docs/todos/plan/retailku-sync-field-mapping.md). Dulu satu baris
+ * tabel, sekarang isi satu tab (lihat field-mapping-tab.tsx) — makin
+ * banyak key yang di-mapping TIDAK lagi menambah tinggi halaman. */
 export function FieldMappingRow({
   row,
   localAccountOptions,
@@ -26,67 +37,103 @@ export function FieldMappingRow({
   categoryOptions: Category[];
   onChange: (patch: Partial<MappingRowDraft>) => void;
 }) {
+  const accountAnchor = useComboboxAnchor();
+  const categoryAnchor = useComboboxAnchor();
+
+  // Label menyertakan induk (grup akun / kategori induk) — beberapa
+  // akun/kategori berbeda memakai nama yang sama persis, lihat pola
+  // sama di use-account-category-options.tsx (form transaksi).
+  const accountItems: ComboboxOption[] = localAccountOptions.map((account) => ({
+    value: String(account.id),
+    label: account.group_name ? `${account.name} — ${account.group_name}` : account.name,
+  }));
+  const selectedAccount = accountItems.find((item) => item.value === row.localAccountId?.toString()) ?? null;
+
+  const categoryItems: ComboboxOption[] = [
+    NO_CATEGORY_OPTION,
+    ...categoryOptions.map((category) => {
+      const parentName = categoryOptions.find((parent) => parent.id === category.parent_id)?.name;
+      return {
+        value: String(category.id),
+        label: parentName ? `${category.name} — ${parentName}` : category.name,
+      };
+    }),
+  ];
+  const selectedCategory =
+    categoryItems.find((item) => item.value === (row.categoryId?.toString() ?? NO_CATEGORY_OPTION.value)) ??
+    NO_CATEGORY_OPTION;
+
   return (
-    <TableRow>
-      <TableCell className="align-top">
-        <p className="font-medium">{row.accountName}</p>
-        <p className="text-muted-foreground text-xs">{row.retailkuAccountCode}</p>
-      </TableCell>
-      <TableCell className="align-top">
-        <p className="text-sm">{formatMappingKeyLabel(row.key)}</p>
-      </TableCell>
-      <TableCell className="align-top">
-        <Select
-          value={row.localAccountId?.toString() ?? ""}
-          onValueChange={(value) => onChange({ localAccountId: value ? Number(value) : null })}
-        >
-          <SelectTrigger className="w-full min-w-40">
-            <SelectValue placeholder="Pilih akun..." />
-          </SelectTrigger>
-          <SelectContent>
-            {localAccountOptions.map((account) => (
-              <SelectItem key={account.id} value={String(account.id)}>
-                {account.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TableCell>
-      <TableCell className="align-top">
+    <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+      <div className="min-w-0 space-y-1.5">
+        <Label>Akun Tujuan</Label>
+        <div ref={accountAnchor} className="min-w-0">
+          <Combobox
+            items={accountItems}
+            value={selectedAccount}
+            onValueChange={(item: ComboboxOption | null) =>
+              onChange({ localAccountId: item ? Number(item.value) : null })
+            }
+          >
+            <ComboboxInput placeholder="Pilih akun..." showClear className="w-full" />
+            <ComboboxContent anchor={accountAnchor}>
+              <ComboboxEmpty>Tidak ditemukan</ComboboxEmpty>
+              <ComboboxList>
+                {(item: ComboboxOption) => (
+                  <ComboboxItem key={item.value} value={item}>
+                    {item.label}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        </div>
+      </div>
+
+      <div className="min-w-0 space-y-1.5">
+        <Label>Kategori</Label>
+        <div ref={categoryAnchor} className="min-w-0">
+          <Combobox
+            items={categoryItems}
+            value={selectedCategory}
+            onValueChange={(item: ComboboxOption | null) =>
+              onChange({
+                categoryId:
+                  !item || item.value === NO_CATEGORY_OPTION.value ? null : Number(item.value),
+              })
+            }
+          >
+            <ComboboxInput placeholder="Tanpa kategori" className="w-full" />
+            <ComboboxContent anchor={categoryAnchor}>
+              <ComboboxEmpty>Tidak ditemukan</ComboboxEmpty>
+              <ComboboxList>
+                {(item: ComboboxOption) => (
+                  <ComboboxItem key={item.value} value={item}>
+                    {item.label}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        </div>
+      </div>
+
+      <div className="min-w-0 space-y-1.5 sm:col-span-2">
+        <Label>Judul</Label>
         <Input
           value={row.note}
           placeholder="Judul default"
           onChange={(e) => onChange({ note: e.target.value })}
         />
-      </TableCell>
-      <TableCell className="align-top">
-        <Select
-          value={row.categoryId?.toString() ?? NO_CATEGORY_VALUE}
-          onValueChange={(value) =>
-            onChange({ categoryId: value === NO_CATEGORY_VALUE ? null : Number(value) })
-          }
-        >
-          <SelectTrigger className="w-full min-w-40">
-            <SelectValue placeholder="Tanpa kategori" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NO_CATEGORY_VALUE}>Tanpa kategori</SelectItem>
-            {categoryOptions.map((category) => (
-              <SelectItem key={category.id} value={String(category.id)}>
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TableCell>
-      <TableCell className="align-top">
-        <Textarea
+      </div>
+
+      <div className="min-w-0 space-y-1.5 sm:col-span-2">
+        <Label>Deskripsi</Label>
+        <RichTextEditor
           value={row.description}
-          placeholder="Opsional"
-          className="min-h-9"
-          onChange={(e) => onChange({ description: e.target.value })}
+          onChange={(value) => onChange({ description: value })}
         />
-      </TableCell>
-    </TableRow>
+      </div>
+    </div>
   );
 }

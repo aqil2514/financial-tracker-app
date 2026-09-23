@@ -10,7 +10,6 @@ function todayIso() {
 }
 
 export type SyncNowInput = {
-  hasMappings: boolean;
   hasCredentials: boolean;
   retailkuSettings: RetailkuSettings | undefined;
   mode: RetailkuCashflowSyncMode;
@@ -27,12 +26,19 @@ export type SyncNowInput = {
  * akun, titik awal), panggil `syncAll`, lalu efek samping (maju
  * `syncFrom` ke hari ini via `onSynced`, toast peringatan akun yang
  * belum dipetakan).
+ *
+ * SENGAJA TIDAK mewajibkan mapping sudah ada (`hasMappings`, dihapus
+ * dari syarat) — sync per baris SUDAH skip sendiri key yang belum
+ * dipetakan (`skipReason: "unmapped-account"`, toast peringatan di
+ * bawah), jadi mewajibkannya sebagai gate KESELURUHAN tombol cuma
+ * memblokir sync yang justru valid buat baris lain yang SUDAH
+ * dipetakan. User diarahkan melengkapi mapping di tab Mapping, bukan
+ * diblokir total di sini.
  */
 export function useSyncNow(input: SyncNowInput) {
   const syncAll = useSyncRetailkuAll();
 
   const canSync =
-    input.hasMappings &&
     input.hasCredentials &&
     input.arApCashAccountId !== "" &&
     input.receivableDebtAccountId !== "" &&
@@ -59,12 +65,12 @@ export function useSyncNow(input: SyncNowInput) {
           input.onSynced(todayIso());
           if (result.cashflowUnmappedKeys.length > 0) {
             toast.warning(
-              `${result.cashflowUnmappedKeys.length} jenis transaksi Retailku belum dipetakan — baris kasnya di-skip. Lengkapi di Mapping Akun.`
+              `${result.cashflowUnmappedKeys.length} jenis transaksi Retailku belum dipetakan — baris kasnya di-skip. Lengkapi di tab Mapping.`
             );
           }
           if (result.cashflowDeactivatedPaymentMethodAccountIds.length > 0) {
             toast.warning(
-              `${result.cashflowDeactivatedPaymentMethodAccountIds.length} akun kas Retailku sudah dinonaktifkan sebagai payment method — baris kasnya di-skip. Perbarui mapping di Mapping Akun.`
+              `${result.cashflowDeactivatedPaymentMethodAccountIds.length} akun kas Retailku sudah dinonaktifkan sebagai payment method — baris kasnya di-skip. Perbarui mapping di tab Mapping.`
             );
           }
         },

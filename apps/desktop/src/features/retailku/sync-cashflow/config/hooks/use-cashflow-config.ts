@@ -17,8 +17,9 @@ import { usePreviewSync } from "./use-preview-sync";
  * Digabung dari 5 hook fokus terpisah di folder ini, dikembalikan
  * APA ADANYA per-namespace (bukan di-flatten) supaya return type di
  * sini tetap pendek — caller men-destructure tiap namespace sendiri:
- * - `prerequisites` (`useSyncPrerequisites`) — mapping akun, kredensial,
- *   opsi akun lokal
+ * - `prerequisites` (`useSyncPrerequisites`) — kredensial, opsi akun
+ *   lokal (mapping akun dipindah ke tab "Mapping", TIDAK lagi jadi
+ *   syarat di sini — lihat catatan di bawah)
  * - `fields` (`useCashflowSyncFields`) — mode, akun kas AR/AP,
  *   auto-sync — MASING-MASING draft+tombol Simpan sendiri (via
  *   `useSettingsDraft`), bukan auto-mutate maupun `useState` lokal
@@ -35,9 +36,18 @@ import { usePreviewSync } from "./use-preview-sync";
 
  * CATATAN keputusan #2 revisi: TIDAK ADA LAGI validasi "semua mapping
  * harus ke akun lokal yang sama" — cashflow sekarang sync per akun kas
- * Retailku sendiri-sendiri (lihat sync-cashflow.ts), jadi mapping akun
- * cuma perlu ADA (bukan seragam) supaya tidak ada baris di-skip sebagai
- * "belum dipetakan".
+ * Retailku sendiri-sendiri (lihat sync-cashflow.ts).
+ *
+ * CATATAN (2026-09-24): `hasMappings` SUDAH DIHAPUS sebagai syarat
+ * `canSync`/`canPreview` — mewajibkan mapping ADA sebagai gate
+ * KESELURUHAN tombol tidak lagi masuk akal begitu key mapping jadi
+ * granular per mode+sourceType+arah (bisa ADA sebagian, belum sebagian
+ * lain, lihat docs/todos/plan/retailku-sync-field-mapping.md); sync per
+ * baris SUDAH skip sendiri key yang belum dipetakan (toast peringatan
+ * "Lengkapi di tab Mapping", lihat use-sync-now.ts) — gate keras di sini
+ * cuma memblokir baris LAIN yang justru sudah valid. Section "Mapping
+ * Akun" (`mapping-status-section.tsx`) yang menampilkan status ini juga
+ * SUDAH DIHAPUS dari tab Konfigurasi karena alasan sama.
  */
 export function useCashflowConfig() {
   const prerequisites = useSyncPrerequisites();
@@ -49,7 +59,6 @@ export function useCashflowConfig() {
   );
   const syncFrom = useSyncFromDraft(fields.syncSettings?.syncFrom ?? null, fields.setSyncSettings);
   const syncNow = useSyncNow({
-    hasMappings: prerequisites.hasMappings,
     hasCredentials: prerequisites.hasCredentials,
     retailkuSettings: prerequisites.retailkuSettings,
     mode: fields.mode.value,
