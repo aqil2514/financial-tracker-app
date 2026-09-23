@@ -3,6 +3,15 @@ import { callToolAsJson } from "../call-tool-as-json";
 import type { CashflowDateRangeArgs } from "./shared";
 
 export type RetailkuCashflowDetailRow = {
+  /** ID jurnal item INDIVIDUAL (unik selamanya di sisi Retailku,
+   * SATU baris kas/bank/piutang/utang per entri jurnal) — dipakai
+   * sebagai identitas idempotency baris piutang/utang (lihat
+   * extract-ar-ap-rows.ts). Field ini SUDAH ADA di response server
+   * sejak awal (`get-cfr-detail.helper.ts`: `id: item.id`), baru
+   * dideklarasikan di sini saat kebutuhan AR/AP granular muncul —
+   * TIDAK PERNAH relevan untuk cashflow biasa (agregasi per hari,
+   * bukan per baris jurnal), makanya belum dipakai sebelumnya. */
+  id: string;
   date: string;
   description: string | null;
   sourceType: string | null;
@@ -40,6 +49,19 @@ export type RetailkuCashflowDetailRow = {
    * ini dengan `nonRevenuePortion` untuk dapat pendapatan bersih toko.
    * Lihat docs/todos/plan/retailku-sale-category-mapping.md. */
   nonRevenuePortion: number | null;
+  /** `true` kalau akun baris ini akun piutang/utang toko (kode
+   * 1500/1700/1800/2100/2200/2300 di Retailku, ditandai via
+   * `AccountMapping.role`), BUKAN akun kas/bank biasa — lihat
+   * docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md. Baris ini
+   * TIDAK boleh diagregasi sebagai net kas akun biasa (beda akun,
+   * beda arti ekonomi) — konsumen HARUS proses lewat jalur AR/AP
+   * terpisah (lihat extract-ar-ap-rows.ts). */
+  isReceivablePayableAccount: boolean;
+  /** `null` kalau `isReceivablePayableAccount` false. `"receivable"` =
+   * akun piutang (debit menambah piutang/piutang baru, kredit
+   * mengurangi/pelunasan) — `"payable"` = akun utang (kredit menambah
+   * utang baru, debit mengurangi/pelunasan). */
+  receivablePayableDirection: "receivable" | "payable" | null;
   debit: number;
   credit: number;
 };

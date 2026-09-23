@@ -47,12 +47,19 @@ export function useLoadMappingKeys() {
       const config = assertRetailkuConfigured(input.retailkuSettings!);
       const db = await getDb();
 
+      // Field AR/AP sengaja `null` — tab Mapping cuma butuh DAFTAR key
+      // cashflow biasa (`plan.rows`), tidak insert apa pun (baca-saja).
+      // `computeCashflowSync` menangani `null` sebagai "skip AR/AP,
+      // debt-account-not-configured", TIDAK memengaruhi `plan.rows`.
       const plan = await computeCashflowSync(db, {
         mcpConfig: config,
         dateFrom: input.dateFrom,
         dateTo: input.dateTo,
         timezone: "Asia/Jakarta",
         mode: input.mode,
+        receivableDebtAccountId: null,
+        payableDebtAccountId: null,
+        arApCashAccountId: null,
       });
 
       const byKey = new Map<string, MappingKeyCandidate>();

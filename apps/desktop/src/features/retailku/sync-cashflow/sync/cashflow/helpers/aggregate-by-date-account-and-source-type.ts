@@ -6,6 +6,8 @@ export function aggregateByDateAccountAndSourceType(
 ): AggregatedTotal[] {
   const totals = new Map<string, Omit<AggregatedTotal, "key"> & { sourceType: string }>();
   for (const row of rows) {
+    // Lihat catatan sama di aggregate-by-date-and-account.ts.
+    if (row.isReceivablePayableAccount) continue;
     const date = row.date.slice(0, 10);
     const sourceType = row.sourceType ?? "LAINNYA";
     const sourceRef = `${date}:${row.accountId}:${sourceType}`;

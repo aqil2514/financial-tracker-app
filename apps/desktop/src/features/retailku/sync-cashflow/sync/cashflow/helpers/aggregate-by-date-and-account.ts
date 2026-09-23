@@ -6,6 +6,11 @@ export function aggregateByDateAndAccount(
 ): AggregatedTotal[] {
   const totals = new Map<string, Omit<AggregatedTotal, "key">>();
   for (const row of rows) {
+    // Baris piutang/utang (akun neraca, BUKAN kas/bank) diproses jalur
+    // TERPISAH (lihat extract-ar-ap-rows.ts) — ikut campur ke net akun
+    // biasa di sini akan salah (piutang baru bukan "uang masuk" akun
+    // kas), lihat docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md.
+    if (row.isReceivablePayableAccount) continue;
     const date = row.date.slice(0, 10);
     const sourceRef = `${date}:${row.accountId}`;
     const existing = totals.get(sourceRef);

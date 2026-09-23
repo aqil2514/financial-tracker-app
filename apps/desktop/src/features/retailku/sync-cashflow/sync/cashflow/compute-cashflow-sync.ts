@@ -1,11 +1,13 @@
 import { connectRetailkuMcp } from "@/shared/retailku";
 import { aggregateByDateAccountAndSourceType } from "./helpers/aggregate-by-date-account-and-source-type";
 import { aggregateByDateAndAccount } from "./helpers/aggregate-by-date-and-account";
+import { extractArApRows } from "./helpers/extract-ar-ap-rows";
 import { fetchAllCashflowDetailRows } from "./helpers/fetch-all-cashflow-detail-rows";
+import { isArApRowSynced } from "./helpers/is-ar-ap-row-synced";
 import { isPeriodSynced } from "./helpers/is-period-synced";
 import { loadActivePaymentMethodIds } from "./helpers/load-active-payment-method-ids";
 import { loadFieldMapping } from "./helpers/load-field-mapping";
-import type { CashflowSyncPlan, CashflowSyncPlanRow, Db, SyncCashflowInput } from "./types";
+import type { ArApSyncPlanRow, CashflowSyncPlan, CashflowSyncPlanRow, Db, SyncCashflowInput } from "./types";
 
 /**
  * Hitung APA yang akan disinkronkan (fetch MCP + agregasi + cek
@@ -33,7 +35,17 @@ import type { CashflowSyncPlan, CashflowSyncPlanRow, Db, SyncCashflowInput } fro
  */
 export async function computeCashflowSync(
   db: Db,
-  input: Pick<SyncCashflowInput, "mcpConfig" | "dateFrom" | "dateTo" | "timezone" | "mode">
+  input: Pick<
+    SyncCashflowInput,
+    | "mcpConfig"
+    | "dateFrom"
+    | "dateTo"
+    | "timezone"
+    | "mode"
+    | "receivableDebtAccountId"
+    | "payableDebtAccountId"
+    | "arApCashAccountId"
+  >
 ): Promise<CashflowSyncPlan> {
   const client = await connectRetailkuMcp(input.mcpConfig);
   try {
@@ -107,10 +119,32 @@ export async function computeCashflowSync(
       });
     }
 
+    // Piutang/utang: akun tujuan dari 2 field existing (BUKAN
+    // `retailku_sync_field_mapping`, lihat catatan `SyncCashflowInput`)
+    // — kalau salah satu belum diisi user, SEMUA baris arah itu di-skip
+    // `debt-account-not-configured` (TIDAK menggagalkan sync cashflow).
+    const arApPlanRows: ArApSyncPlanRow[] = [];
+    for (const arApRow of extractArApRows(rows)) {
+      const debtAccountId =
+        arApRow.direction === "receivable" ? input.receivableDebtAccountId : input.payableDebtAccountId;
+      if (debtAccountId == null || input.arApCashAccountId == null) {
+        arApPlanRows.push({ ...arApRow, willInsert: false, skipReason: "debt-account-not-configured" });
+        continue;
+      }
+
+      const alreadySynced = await isArApRowSynced(db, arApRow.sourceRef);
+      arApPlanRows.push({
+        ...arApRow,
+        willInsert: !alreadySynced,
+        skipReason: alreadySynced ? "already-synced" : null,
+      });
+    }
+
     return {
       rows: planRows,
       unmappedKeys: [...unmappedKeys],
       deactivatedPaymentMethodAccountIds: [...deactivatedPaymentMethodAccountIds],
+      arApRows: arApPlanRows,
     };
   } finally {
     await client.close();

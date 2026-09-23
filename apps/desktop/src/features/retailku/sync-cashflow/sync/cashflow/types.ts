@@ -11,6 +11,20 @@ export type SyncCashflowInput = {
   dateTo: string;
   timezone: string;
   mode: RetailkuCashflowSyncMode;
+  /** Akun `debt` lokal untuk piutang/utang baru (field "Akun untuk
+   * Piutang"/"Akun untuk Utang" yang SUDAH ADA di tab Konfigurasi,
+   * `debt-accounts-section.tsx`) — dipakai jalur AR/AP baru (lihat
+   * `ArApSyncPlanRow`), MENGGANTIKAN `SyncArApInput` lama
+   * (`sync-ar-ap.ts`, DIHAPUS). `null` kalau belum dikonfigurasi user —
+   * baris AR/AP di-skip `debt-account-not-configured`, TIDAK
+   * menggagalkan seluruh sync cashflow. */
+  receivableDebtAccountId: number | null;
+  payableDebtAccountId: number | null;
+  /** Akun kas lokal sisi kas dari transfer piutang/utang (field "Akun
+   * Kas untuk Utang Piutang" yang SUDAH ADA, `ar-ap-cash-account-
+   * section.tsx`) — SAMA seperti `SyncArApInput.localCashAccountId`
+   * lama, cuma pindah ke sini. */
+  arApCashAccountId: number | null;
 };
 
 export type SyncCashflowResult = {
@@ -36,6 +50,16 @@ export type SyncCashflowResult = {
    * dinonaktifkan sebagai payment method (`isPaymentMethod: false`) —
    * lihat `CashflowSyncPlan.deactivatedPaymentMethodAccountIds`. */
   deactivatedPaymentMethodAccountIds: string[];
+  /** Berapa baris piutang/utang baru yang berhasil di-insert — SATU
+   * alur sekarang dengan cashflow biasa (BUKAN lagi `SyncArApResult`
+   * terpisah dari `sync-ar-ap.ts`, DIHAPUS), lihat
+   * docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md. */
+  arApInsertedCount: number;
+  /** `true` kalau ADA baris AR/AP yang di-skip karena akun debt lokal
+   * belum dikonfigurasi (`receivableDebtAccountId`/`payableDebtAccountId`
+   * null) — dipakai toast peringatan di `use-sync-now.ts`, BEDA pesan
+   * dari `unmappedKeys` (itu utk cashflow biasa). */
+  arApAccountNotConfigured: boolean;
 };
 
 /** Satu baris cashflow yang AKAN diproses — hasil `computeCashflowSync`,
@@ -81,6 +105,33 @@ export type CashflowSyncPlan = {
    * tepat ke user BEDA: ini bukan "belum dipetakan" (mapping-nya ADA),
    * tapi "akun sudah dinonaktifkan sebagai payment method di Retailku". */
   deactivatedPaymentMethodAccountIds: string[];
+  /** Baris piutang/utang (dari `extractArApRows`) — TERPISAH dari
+   * `rows` (bukan digabung ke satu struktur) karena bentuknya beda
+   * cukup jauh: idempotency PER JURNAL ITEM (bukan per tanggal+akun),
+   * akun tujuan dari 2 field existing "Akun untuk Piutang"/"Akun untuk
+   * Utang" (BUKAN `retailku_sync_field_mapping`), TIDAK ada
+   * note/category/description untuk di-mapping. Lihat
+   * docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md — menggantikan
+   * `ArApSyncPlan`/`computeArApSync` lama (`sync-ar-ap.ts`, DIHAPUS). */
+  arApRows: ArApSyncPlanRow[];
+};
+
+/** Satu baris piutang/utang yang AKAN diproses — hasil `extractArApRows`
+ * + cek idempotency/prasyarat akun, dipakai baik insert sungguhan
+ * maupun preview. Beda dari `ArApSyncPlanRow` lama (snapshot-diff,
+ * DIHAPUS): di sini SATU baris = SATU jurnal item Retailku individual
+ * (bisa piutang/utang BARU atau PELUNASAN, dibedakan tanda `amount`),
+ * bukan agregat delta snapshot. */
+export type ArApSyncPlanRow = {
+  journalItemId: string;
+  date: string;
+  direction: "receivable" | "payable";
+  /** Positif = piutang/utang baru, negatif = pelunasan — lihat
+   * `ArApRow.amount` di extract-ar-ap-rows.ts untuk normalisasi tanda. */
+  amount: number;
+  sourceRef: string;
+  willInsert: boolean;
+  skipReason: "already-synced" | "debt-account-not-configured" | null;
 };
 
 export type AggregatedTotal = {

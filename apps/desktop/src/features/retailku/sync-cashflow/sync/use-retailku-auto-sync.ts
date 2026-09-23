@@ -105,6 +105,11 @@ export function useRetailkuAutoSync() {
             `${result.cashflowDeactivatedPaymentMethodAccountIds.length} akun kas Retailku sudah dinonaktifkan sebagai payment method — baris kasnya di-skip.`
           );
         }
+        if (result.arApAccountNotConfigured) {
+          toast.warning(
+            "Ada piutang/utang baru dari Retailku yang belum tersinkron — akun Utang Piutang belum lengkap."
+          );
+        }
       })
       .catch((err) => {
         const detail = err instanceof Error ? err.message : String(err);

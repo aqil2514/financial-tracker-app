@@ -1,32 +1,39 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getDb } from "@/lib/db";
-import { syncCashflow, type SyncCashflowResult } from "./cashflow";
-import { rollbackArApSnapshots, syncArAp, type SyncArApResult } from "./sync-ar-ap";
+import { syncCashflow, SyncCashflowPartialError, type SyncCashflowResult } from "./cashflow";
 import { syncAll, type SyncAllInput } from "./sync-all";
 
 vi.mock("@/lib/db", () => ({
   getDb: vi.fn(),
 }));
 
-vi.mock("./cashflow", () => ({
-  syncCashflow: vi.fn(),
-}));
-
-vi.mock("./sync-ar-ap", () => ({
-  syncArAp: vi.fn(),
-  rollbackArApSnapshots: vi.fn(),
-}));
+vi.mock("./cashflow", async () => {
+  const actual = await vi.importActual<typeof import("./cashflow")>("./cashflow");
+  return {
+    ...actual,
+    syncCashflow: vi.fn(),
+  };
+});
 
 /**
  * `syncAll` diuji lewat mock modul (bukan fake DB in-memory seperti
  * `apply-debt-transaction.test.ts`) karena yang diuji di sini BUKAN SQL
  * `syncAll` sendiri (dia tidak menulis apa pun langsung), tapi
- * ORKESTRASI-nya: urutan cashflow->AR/AP, rollback all-or-nothing saat
- * salah satu gagal, dan yang terpenting — LOCK in-memory yang mencegah
- * dua panggilan `syncAll()` konkuren saling menimpa (root cause bug live
- * "UNIQUE constraint failed: transactions.source, transactions.source_ref",
- * lihat handover 2026-09-23).
+ * ORKESTRASI-nya: rollback saat `syncCashflow` gagal di tengah jalan
+ * (lewat `SyncCashflowPartialError`), dan yang terpenting — LOCK
+ * in-memory yang mencegah dua panggilan `syncAll()` konkuren saling
+ * menimpa (root cause bug live "UNIQUE constraint failed:
+ * transactions.source, transactions.source_ref", lihat handover
+ * 2026-09-23).
+ *
+ * BEDA dari versi lama (`syncCashflow` + `syncArAp` dua panggilan
+ * terpisah, `sync-ar-ap.ts` DIHAPUS): sekarang `syncCashflow` SATU-
+ * SATUNYA panggilan (mencakup cashflow DAN AR/AP sekaligus, lihat
+ * docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md), jadi test
+ * rollback di sini menguji `SyncCashflowPartialError` (dilempar
+ * `syncCashflow` sendiri saat insert gagal di tengah loop), bukan lagi
+ * "AR/AP gagal setelah cashflow sukses" seperti sebelumnya.
  */
 
 const baseInput: SyncAllInput = {
@@ -45,13 +52,8 @@ const emptyCashflowResult: SyncCashflowResult = {
   insertedSourceRefs: [],
   unmappedKeys: [],
   deactivatedPaymentMethodAccountIds: [],
-};
-
-const emptyArApResult: SyncArApResult = {
-  insertedCount: 0,
-  insertedSourceRefs: [],
-  touchedPartyIds: [],
-  previousSnapshotsById: new Map(),
+  arApInsertedCount: 0,
+  arApAccountNotConfigured: false,
 };
 
 /** Promise yang bisa "ditahan" lalu diselesaikan manual dari test —
@@ -72,43 +74,35 @@ describe("syncAll", () => {
   beforeEach(() => {
     vi.mocked(getDb).mockResolvedValue({} as Awaited<ReturnType<typeof getDb>>);
     vi.mocked(syncCashflow).mockReset();
-    vi.mocked(syncArAp).mockReset();
-    vi.mocked(rollbackArApSnapshots).mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("menjalankan cashflow lalu AR/AP secara berurutan dan mengembalikan hasil gabungan", async () => {
-    const order: string[] = [];
-    vi.mocked(syncCashflow).mockImplementation(async () => {
-      order.push("cashflow");
-      return { ...emptyCashflowResult, insertedCount: 2, insertedSourceRefs: ["a", "b"] };
-    });
-    vi.mocked(syncArAp).mockImplementation(async () => {
-      order.push("ar-ap");
-      return { ...emptyArApResult, insertedCount: 1, insertedSourceRefs: ["c"] };
+  it("menjalankan syncCashflow dan mengembalikan hasil gabungan cashflow+AR/AP", async () => {
+    vi.mocked(syncCashflow).mockResolvedValue({
+      ...emptyCashflowResult,
+      insertedCount: 3,
+      arApInsertedCount: 1,
+      insertedSourceRefs: ["a", "b", "c"],
     });
 
     const result = await syncAll(baseInput);
 
-    expect(order).toEqual(["cashflow", "ar-ap"]);
     expect(result).toEqual({
       cashflowInsertedCount: 2,
       cashflowUnmappedKeys: [],
       cashflowDeactivatedPaymentMethodAccountIds: [],
       arApInsertedCount: 1,
+      arApAccountNotConfigured: false,
     });
   });
 
-  it("rollback manual (DELETE source_ref + restore snapshot) saat AR/AP gagal setelah cashflow sukses", async () => {
-    vi.mocked(syncCashflow).mockResolvedValue({
-      ...emptyCashflowResult,
-      insertedCount: 1,
-      insertedSourceRefs: ["2026-01-01:acc1"],
-    });
-    vi.mocked(syncArAp).mockRejectedValue(new Error("MCP timeout"));
+  it("rollback manual (DELETE debts+transactions) saat syncCashflow gagal di tengah jalan", async () => {
+    vi.mocked(syncCashflow).mockRejectedValue(
+      new SyncCashflowPartialError(["2026-01-01:acc1"], new Error("MCP timeout"))
+    );
 
     const db = { execute: vi.fn().mockResolvedValue({}), select: vi.fn() };
     vi.mocked(getDb).mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDb>>);
@@ -116,7 +110,7 @@ describe("syncAll", () => {
     await expect(syncAll(baseInput)).rejects.toThrow("MCP timeout");
 
     // DELETE debts lalu DELETE transactions untuk source_ref yang sudah
-    // sempat ter-insert oleh cashflow, meski AR/AP-nya sendiri gagal.
+    // sempat ter-insert sebelum kegagalan.
     expect(db.execute).toHaveBeenCalledWith(
       expect.stringContaining("DELETE FROM debts"),
       ["2026-01-01:acc1"]
@@ -125,6 +119,17 @@ describe("syncAll", () => {
       expect.stringContaining("DELETE FROM transactions"),
       ["2026-01-01:acc1"]
     );
+  });
+
+  it("TIDAK rollback (tidak ada DELETE) kalau error BUKAN SyncCashflowPartialError (gagal sebelum insert apa pun)", async () => {
+    vi.mocked(syncCashflow).mockRejectedValue(new Error("gagal konek MCP"));
+
+    const db = { execute: vi.fn().mockResolvedValue({}), select: vi.fn() };
+    vi.mocked(getDb).mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDb>>);
+
+    await expect(syncAll(baseInput)).rejects.toThrow("gagal konek MCP");
+
+    expect(db.execute).not.toHaveBeenCalled();
   });
 
   it("DUA panggilan konkuren TIDAK saling overlap — panggilan kedua menunggu yang pertama selesai (regresi race condition)", async () => {
@@ -149,7 +154,6 @@ describe("syncAll", () => {
       concurrentCount--;
       return { ...emptyCashflowResult };
     });
-    vi.mocked(syncArAp).mockResolvedValue({ ...emptyArApResult });
 
     const call1 = syncAll(baseInput);
     // Beri microtask queue kesempatan jalan supaya call1 sungguh masuk
@@ -182,7 +186,6 @@ describe("syncAll", () => {
     vi.mocked(syncCashflow)
       .mockRejectedValueOnce(new Error("sync pertama gagal"))
       .mockResolvedValueOnce({ ...emptyCashflowResult, insertedCount: 5, insertedSourceRefs: [] });
-    vi.mocked(syncArAp).mockResolvedValue({ ...emptyArApResult });
 
     const db = { execute: vi.fn().mockResolvedValue({}), select: vi.fn() };
     vi.mocked(getDb).mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDb>>);

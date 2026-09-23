@@ -73,6 +73,11 @@ export function useSyncNow(input: SyncNowInput) {
               `${result.cashflowDeactivatedPaymentMethodAccountIds.length} akun kas Retailku sudah dinonaktifkan sebagai payment method — baris kasnya di-skip. Perbarui mapping di tab Mapping.`
             );
           }
+          if (result.arApAccountNotConfigured) {
+            toast.warning(
+              "Ada piutang/utang baru dari Retailku yang belum tersinkron — akun Utang Piutang belum lengkap."
+            );
+          }
         },
       }
     );

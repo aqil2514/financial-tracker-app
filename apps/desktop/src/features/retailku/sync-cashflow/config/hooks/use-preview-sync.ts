@@ -4,13 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { getDb } from "@/lib/db";
 import { assertRetailkuConfigured, type RetailkuSettings } from "@/shared/retailku";
-import {
-  computeCashflowSync,
-  computeArApSync,
-  type CashflowSyncPlan,
-  type ArApSyncPlan,
-  type RetailkuCashflowSyncMode,
-} from "../../sync";
+import { computeCashflowSync, type CashflowSyncPlan, type RetailkuCashflowSyncMode } from "../../sync";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -20,20 +14,26 @@ export type PreviewSyncInput = {
   retailkuSettings: RetailkuSettings | undefined;
   mode: RetailkuCashflowSyncMode;
   syncFromValue: string;
+  arApCashAccountId: number | null;
+  receivableDebtAccountId: number | null;
+  payableDebtAccountId: number | null;
 };
 
 export type PreviewSyncResult = {
   cashflow: CashflowSyncPlan;
-  arAp: ArApSyncPlan;
 };
 
 /**
  * Preview "APA yang akan disinkronkan" TANPA menulis apa pun ke
- * database — memanggil `computeCashflowSync`/`computeArApSync` (fungsi
- * murni baca-saja yang di-EXTRACT dari `syncCashflow`/`syncArAp`,
- * dipakai ULANG oleh keduanya) alih-alih `syncAll` yang benar-benar
- * insert. `useMutation` polos (BUKAN `useDbMutation`) karena preview
- * tidak menyimpan apa pun — tidak perlu toast sukses "tersimpan" atau
+ * database — memanggil `computeCashflowSync` (fungsi murni baca-saja,
+ * dipakai ULANG oleh `syncCashflow`) alih-alih `syncAll` yang benar-benar
+ * insert. `computeCashflowSync` SEKARANG SUDAH mencakup `arApRows` di
+ * dalam `CashflowSyncPlan`-nya (lihat
+ * docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md) — TIDAK perlu
+ * lagi `computeArApSync` terpisah (`sync-ar-ap.ts`, DIHAPUS).
+ *
+ * `useMutation` polos (BUKAN `useDbMutation`) karena preview tidak
+ * menyimpan apa pun — tidak perlu toast sukses "tersimpan" atau
  * invalidate query, cuma trigger manual saat tombol "Lihat Preview"
  * diklik (bukan `useQuery` otomatis, supaya tidak memanggil MCP tiap
  * render tab Konfigurasi).
@@ -45,18 +45,18 @@ export function usePreviewSync() {
       const db = await getDb();
       const dateTo = todayIso();
 
-      const [cashflow, arAp] = await Promise.all([
-        computeCashflowSync(db, {
-          mcpConfig: config,
-          dateFrom: input.syncFromValue,
-          dateTo,
-          timezone: "Asia/Jakarta",
-          mode: input.mode,
-        }),
-        computeArApSync(db, config),
-      ]);
+      const cashflow = await computeCashflowSync(db, {
+        mcpConfig: config,
+        dateFrom: input.syncFromValue,
+        dateTo,
+        timezone: "Asia/Jakarta",
+        mode: input.mode,
+        receivableDebtAccountId: input.receivableDebtAccountId,
+        payableDebtAccountId: input.payableDebtAccountId,
+        arApCashAccountId: input.arApCashAccountId,
+      });
 
-      return { cashflow, arAp };
+      return { cashflow };
     },
   });
 }

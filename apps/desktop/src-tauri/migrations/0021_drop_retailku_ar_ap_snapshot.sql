@@ -1,0 +1,21 @@
+-- `retailku_ar_ap_snapshot` (0018) DIPENSIUNKAN sepenuhnya, lihat
+-- docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md. Mekanisme
+-- snapshot-diff (bandingkan total outstanding SEKARANG vs snapshot
+-- TERAKHIR untuk hitung delta) diganti insert PER JURNAL ITEM
+-- individual dari `get_cashflow_detail` yang diperluas (Retailku SUDAH
+-- mencatat piutang/utang sebagai jurnal per-transaksi, bukan cuma
+-- total berjalan) — idempotency-nya jadi PER BARIS (source_ref =
+-- journalItemId), TIDAK BUTUH snapshot state terpisah sama sekali.
+--
+-- Bug ditemukan (2026-09-24) di database prod yang JADI MOTIVASI
+-- penggantian ini: snapshot sempat maju (4 pihak ter-update) TAPI
+-- transaksi `debts`/`transactions` yang seharusnya menyertainya TIDAK
+-- PERNAH permanen tersimpan (kemungkinan ke-rollback oleh error di
+-- percobaan sync berikutnya) — seluruh kelas bug "dua state terpisah
+-- yang harus dijaga konsisten manual" ini TIDAK ADA LAGI setelah
+-- snapshot dihapus, bukan diperbaiki.
+--
+-- Baris `debts`/`transactions` yang SUDAH ter-insert dari alur lama
+-- (di dev.db, TERBUKTI berhasil, lihat dokumen plan) TETAP VALID, TIDAK
+-- perlu migrasi/rollback data apa pun.
+DROP TABLE retailku_ar_ap_snapshot;
