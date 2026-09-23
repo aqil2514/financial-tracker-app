@@ -60,6 +60,7 @@ export function useTransactions(
         orderClause,
         limitOffsetClause,
         limitOffsetParams,
+        accountId,
       });
 
       // 5. Bentuk hasil: baris transaksi + info pagination dari total.

@@ -6,5 +6,10 @@ export const HAS_ATTACHMENT_SUBQUERY =
 /** Transaction hasil query list — punya `has_attachment` tambahan (dari
  * subquery EXISTS) supaya card list bisa menampilkan indikator lampiran
  * tanpa query terpisah per-item (hindari N+1). SQLite mengembalikan hasil
- * EXISTS sebagai 0/1, bukan boolean. */
-export type TransactionListRow = Transaction & { has_attachment: number };
+ * EXISTS sebagai 0/1, bukan boolean. `running_balance` cuma terisi kalau
+ * query di-scope ke satu akun (`accountId` diberikan ke `useTransactions`)
+ * — lihat `run-transactions-queries.ts`. */
+export type TransactionListRow = Transaction & {
+  has_attachment: number;
+  running_balance?: number;
+};

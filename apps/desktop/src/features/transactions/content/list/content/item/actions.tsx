@@ -14,10 +14,17 @@ export const ItemActions = ({ tx }: { tx: TransactionListRow }) => {
 
   return (
     <div className="flex items-center gap-1">
-      <p className={`mr-2 font-medium ${config.className}`}>
-        {tx.type === "expense" ? "-" : tx.type === "income" ? "+" : ""}
-        {formatCurrency(tx.amount, "IDR")}
-      </p>
+      <div className="mr-2 text-right">
+        <p className={`font-medium ${config.className}`}>
+          {tx.type === "expense" ? "-" : tx.type === "income" ? "+" : ""}
+          {formatCurrency(tx.amount, "IDR")}
+        </p>
+        {tx.running_balance != null && (
+          <p className="text-muted-foreground text-xs">
+            Saldo {formatCurrency(tx.running_balance, "IDR")}
+          </p>
+        )}
+      </div>
       <ListItemActionsMenu
         actions={[
           { label: "Lihat Detail", icon: Eye, onClick: () => openDialog("detail", String(tx.id)) },

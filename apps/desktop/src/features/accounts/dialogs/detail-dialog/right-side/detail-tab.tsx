@@ -105,9 +105,9 @@ export function DetailTab() {
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">Akun</span>
-          <span className="font-medium">{transactionType}</span>
+        <div className="flex items-start justify-between gap-4">
+          <span className="text-muted-foreground shrink-0">Akun</span>
+          <span className="font-medium text-right">{transactionType}</span>
         </div>
         {categoryName(transaction.category_id) && (
           <div className="flex items-center justify-between">
