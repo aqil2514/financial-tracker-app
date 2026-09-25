@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
-import { ArrayFieldTabs } from "@/components/array-field-tabs";
+import { ArrayFieldTabs } from "@/components/pattern/array-field-tabs";
 import { PeriodPicker } from "@/components/query/period-picker";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";

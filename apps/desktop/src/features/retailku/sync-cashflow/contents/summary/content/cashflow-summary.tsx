@@ -1,18 +1,27 @@
 "use client";
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatCurrency } from "@/lib/format-currency";
-import { useRetailkuCashflowSummary, type CashflowDateRange } from "../use-retailku-cashflow";
+import { useRetailkuSyncCashflowSummary } from "../summary-context";
+import { useRetailkuCashflowSummary } from "../hooks/use-retailku-cashflow-summary";
 
-/** Tab "Ringkasan" — persis data get_cashflow_summary: total periode +
- * rincian per hari, mirip kartu ringkasan di halaman Cashflow Retailku
- * (lihat docs/todos/plan/retailku-cashflow-sync.md). Ini SUMBER DATA
- * yang dipakai mode ringkas untuk sync nanti. */
-export function CashflowSummaryTab({ range }: { range: CashflowDateRange }) {
+export function CashflowSummaryTab() {
+  const { range } = useRetailkuSyncCashflowSummary();
   const { data, isLoading, isError, error } = useRetailkuCashflowSummary(range);
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">Memuat ringkasan cashflow...</p>;
+    return (
+      <p className="text-muted-foreground text-sm">
+        Memuat ringkasan cashflow...
+      </p>
+    );
   }
 
   if (isError) {
@@ -24,14 +33,26 @@ export function CashflowSummaryTab({ range }: { range: CashflowDateRange }) {
   }
 
   if (!data || data.data.length === 0) {
-    return <p className="text-muted-foreground text-sm">Tidak ada data untuk rentang ini.</p>;
+    return (
+      <p className="text-muted-foreground text-sm">
+        Tidak ada data untuk rentang ini.
+      </p>
+    );
   }
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-4">
-        <SummaryCard label="Total Pemasukan" value={data.totals.inflow} tone="income" />
-        <SummaryCard label="Total Pengeluaran" value={data.totals.outflow} tone="expense" />
+        <SummaryCard
+          label="Total Pemasukan"
+          value={data.totals.inflow}
+          tone="income"
+        />
+        <SummaryCard
+          label="Total Pengeluaran"
+          value={data.totals.outflow}
+          tone="expense"
+        />
         <SummaryCard label="Net Periode" value={data.totals.net} tone="net" />
       </div>
       <Table>
@@ -74,11 +95,17 @@ function SummaryCard({
   tone: "income" | "expense" | "net";
 }) {
   const toneClass =
-    tone === "income" ? "text-green-600" : tone === "expense" ? "text-red-600" : "text-blue-600";
+    tone === "income"
+      ? "text-green-600"
+      : tone === "expense"
+        ? "text-red-600"
+        : "text-blue-600";
   return (
     <div className="rounded-lg border p-4">
       <p className="text-muted-foreground text-sm">{label}</p>
-      <p className={`text-lg font-semibold ${toneClass}`}>{formatCurrency(value, "IDR")}</p>
+      <p className={`text-lg font-semibold ${toneClass}`}>
+        {formatCurrency(value, "IDR")}
+      </p>
     </div>
   );
 }

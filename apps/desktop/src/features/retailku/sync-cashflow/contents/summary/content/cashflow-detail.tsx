@@ -3,21 +3,33 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
-import { useRetailkuCashflowDetail, type CashflowDateRange } from "../use-retailku-cashflow";
+import { useRetailkuSyncCashflowSummary } from "../summary-context";
+import { useRetailkuCashflowDetail } from "../hooks/use-retailku-cashflow-detail";
 
-/** Tab "Pergerakan" — data get_cashflow_detail (tool baru, lihat
- * retailku-cashflow-sync.md), pergerakan kas per transaksi individual
- * dengan pagination. Ini SUMBER DATA yang dipakai mode detail untuk
- * sync nanti. */
-export function CashflowDetailTab({ range }: { range: CashflowDateRange }) {
+export function CashflowDetailTab() {
+  const { range } = useRetailkuSyncCashflowSummary();
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError, error } = useRetailkuCashflowDetail(range, page);
+  const { data, isLoading, isError, error } = useRetailkuCashflowDetail(
+    range,
+    page,
+  );
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">Memuat pergerakan cashflow...</p>;
+    return (
+      <p className="text-muted-foreground text-sm">
+        Memuat pergerakan cashflow...
+      </p>
+    );
   }
 
   if (isError) {
@@ -29,7 +41,11 @@ export function CashflowDetailTab({ range }: { range: CashflowDateRange }) {
   }
 
   if (!data || data.data.length === 0) {
-    return <p className="text-muted-foreground text-sm">Tidak ada data untuk rentang ini.</p>;
+    return (
+      <p className="text-muted-foreground text-sm">
+        Tidak ada data untuk rentang ini.
+      </p>
+    );
   }
 
   const { pagination } = data.meta;
@@ -55,7 +71,9 @@ export function CashflowDetailTab({ range }: { range: CashflowDateRange }) {
               <TableCell className="text-muted-foreground">
                 {row.accountCode} - {row.accountName}
               </TableCell>
-              <TableCell className="text-muted-foreground">{row.sourceNumber ?? "—"}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {row.sourceNumber ?? "—"}
+              </TableCell>
               <TableCell className="text-right text-green-600">
                 {row.debit > 0 ? formatCurrency(row.debit, "IDR") : "-"}
               </TableCell>
@@ -68,7 +86,8 @@ export function CashflowDetailTab({ range }: { range: CashflowDateRange }) {
       </Table>
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-sm">
-          Halaman {pagination.page} dari {pagination.totalPages} ({pagination.total} baris)
+          Halaman {pagination.page} dari {pagination.totalPages} (
+          {pagination.total} baris)
         </p>
         <div className="flex gap-2">
           <Button
