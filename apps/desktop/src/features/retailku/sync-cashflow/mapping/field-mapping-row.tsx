@@ -16,6 +16,7 @@ import type { AccountWithBalance } from "@/hooks/resources/use-accounts";
 import type { Category } from "@/lib/db";
 import type { MappingRowDraft } from "./hooks/use-mapping-draft";
 
+// NEXT INI REFACTOR
 type ComboboxOption = { value: string; label: string };
 
 const NO_CATEGORY_OPTION: ComboboxOption = { value: "__none__", label: "Tanpa kategori" };

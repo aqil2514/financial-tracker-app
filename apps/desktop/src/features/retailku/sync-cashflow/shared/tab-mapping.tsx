@@ -4,15 +4,19 @@ import { CashflowSummaryTab } from "../contents/summary/content/cashflow-summary
 import { CashflowAllocationTab } from "../contents/summary/content/cashflow-allocation";
 import { CashflowDetailTab } from "../contents/summary/content/cashflow-detail";
 import { ArApTab } from "../contents/summary/content/ar-ap";
-
+import { RetailkuSyncCashflowContentMapping } from "../contents/mapping";
 
 export const mainTabs: BaseTabItems[] = [
   {
     value: "ringkasan",
     label: "Ringkasan",
-    content: <RetailkuSyncCashflowContentSummary />
+    content: <RetailkuSyncCashflowContentSummary />,
   },
-  { value: "mapping", label: "Mapping", content: <p>Mapping</p> },
+  {
+    value: "mapping",
+    label: "Mapping",
+    content: <RetailkuSyncCashflowContentMapping />,
+  },
   {
     value: "konfigurasi",
     label: "Konfigurasi",
