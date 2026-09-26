@@ -3,12 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useCashflowConfigContext } from "../config-context";
+import { useRetailkuSyncCashflowConfig } from "../context";
 
 /** Section "Sync Otomatis Saat App Dibuka" — toggle auto-sync,
  * draft+tombol "Simpan" sendiri (fokus section ini). */
 export function AutoSyncToggleSection() {
-  const { fields } = useCashflowConfigContext();
+  const { fields } = useRetailkuSyncCashflowConfig();
   const { value: autoSyncEnabled, setDraft, isDirty, handleSave, isSaving } = fields.autoSyncEnabled;
 
   return (

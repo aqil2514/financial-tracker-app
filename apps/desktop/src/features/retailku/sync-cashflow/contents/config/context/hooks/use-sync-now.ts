@@ -2,23 +2,13 @@
 
 import { toast } from "sonner";
 
-import { assertRetailkuConfigured, type RetailkuSettings } from "@/shared/retailku";
-import { useSyncRetailkuAll, type RetailkuCashflowSyncMode } from "../../sync";
+import { assertRetailkuConfigured } from "@/shared/retailku";
+import { useSyncRetailkuAll } from "../../../../sync";
+import type { UseSyncNowInput, UseSyncNowOutput } from "../interfaces";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
-
-export type SyncNowInput = {
-  hasCredentials: boolean;
-  retailkuSettings: RetailkuSettings | undefined;
-  mode: RetailkuCashflowSyncMode;
-  arApCashAccountId: string;
-  receivableDebtAccountId: string;
-  payableDebtAccountId: string;
-  syncFromValue: string;
-  onSynced: (today: string) => void;
-};
 
 /**
  * Aksi "Sync Sekarang" — orkestrasi: validasi semua prasyarat
@@ -35,7 +25,7 @@ export type SyncNowInput = {
  * dipetakan. User diarahkan melengkapi mapping di tab Mapping, bukan
  * diblokir total di sini.
  */
-export function useSyncNow(input: SyncNowInput) {
+export function useSyncNow(input: UseSyncNowInput): UseSyncNowOutput {
   const syncAll = useSyncRetailkuAll();
 
   const canSync =

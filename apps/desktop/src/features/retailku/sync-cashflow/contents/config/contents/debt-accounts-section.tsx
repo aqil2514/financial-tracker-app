@@ -3,13 +3,13 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCashflowConfigContext } from "../config-context";
+import { useRetailkuSyncCashflowConfig } from "../context";
 
 /** Section "Akun Utang Piutang" — 2 field akun debt lokal terpisah
  * (piutang & utang), draft GABUNGAN dengan SATU tombol "Simpan" untuk
  * keduanya (fokus section ini). */
 export function DebtAccountsSection() {
-  const { prerequisites, debtAccounts } = useCashflowConfigContext();
+  const { prerequisites, debtAccounts } = useRetailkuSyncCashflowConfig();
   const { debtAccountOptions } = prerequisites;
   const { receivableDebtAccountId, setReceivableDraft, payableDebtAccountId, setPayableDraft, isDirty, handleSave, isSaving } =
     debtAccounts;

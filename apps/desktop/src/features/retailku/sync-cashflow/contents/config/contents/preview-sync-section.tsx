@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/format-currency";
-import { useCashflowConfigContext } from "../config-context";
+import { useRetailkuSyncCashflowConfig } from "../context";
 
 /** Section "Preview Data" — tombol yang menghitung APA yang akan
  * disinkronkan (via `computeCashflowSync`, baca-saja, TIDAK insert apa
@@ -22,12 +22,12 @@ import { useCashflowConfigContext } from "../config-context";
  * menampilkannya di dialog sebelum user menekan "Sync Sekarang"
  * sungguhan. */
 export function PreviewSyncSection() {
-  const { prerequisites, fields, debtAccounts, syncFrom, preview } = useCashflowConfigContext();
+  const { prerequisites, fields, debtAccounts, syncFrom, preview } = useRetailkuSyncCashflowConfig();
   const [open, setOpen] = useState(false);
 
   const canPreview = prerequisites.hasCredentials && syncFrom.syncFromValue !== "";
 
-  function handlePreview() {
+  const handlePreview = () => {
     setOpen(true);
     preview.mutate({
       retailkuSettings: prerequisites.retailkuSettings,
@@ -37,7 +37,7 @@ export function PreviewSyncSection() {
       receivableDebtAccountId: debtAccounts.receivableDebtAccountId,
       payableDebtAccountId: debtAccounts.payableDebtAccountId,
     });
-  }
+  };
 
   return (
     <div className="space-y-2">
@@ -72,7 +72,7 @@ export function PreviewSyncSection() {
   );
 }
 
-function PreviewContent({ result }: { result: NonNullable<ReturnType<typeof useCashflowConfigContext>["preview"]["data"]> }) {
+function PreviewContent({ result }: { result: NonNullable<ReturnType<typeof useRetailkuSyncCashflowConfig>["preview"]["data"]> }) {
   const cashflowToInsert = result.cashflow.rows.filter((row) => row.willInsert);
   const cashflowSkipped = result.cashflow.rows.filter((row) => !row.willInsert);
   const arApToInsert = result.cashflow.arApRows.filter((row) => row.willInsert);

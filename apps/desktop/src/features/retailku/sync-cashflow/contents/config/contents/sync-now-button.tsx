@@ -1,11 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useCashflowConfigContext } from "../config-context";
+import { useRetailkuSyncCashflowConfig } from "../context";
 
 /** Tombol aksi utama "Sync Sekarang". */
 export function SyncNowButton() {
-  const { syncNow } = useCashflowConfigContext();
+  const { syncNow } = useRetailkuSyncCashflowConfig();
   const { canSync, handleSyncNow, isSyncing } = syncNow;
 
   return (

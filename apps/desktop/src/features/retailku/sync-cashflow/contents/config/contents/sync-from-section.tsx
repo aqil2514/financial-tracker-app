@@ -2,12 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCashflowConfigContext } from "../config-context";
+import { useRetailkuSyncCashflowConfig } from "../context";
 
 /** Section "Titik Awal Sync" — draft tanggal + tombol "Simpan"
  * sendiri (fokus section ini). */
 export function SyncFromSection() {
-  const { fields, syncFrom } = useCashflowConfigContext();
+  const { fields, syncFrom } = useRetailkuSyncCashflowConfig();
   const { syncSettingsLoading } = fields;
   const { syncFromValue, savedSyncFrom, syncFromDraft, setSyncFromDraft, handleSaveSyncFrom, isSaving } =
     syncFrom;

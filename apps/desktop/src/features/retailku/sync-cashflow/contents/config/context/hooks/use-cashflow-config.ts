@@ -6,6 +6,7 @@ import { useDebtAccountsDraft } from "./use-debt-accounts-draft";
 import { useSyncFromDraft } from "./use-sync-from-draft";
 import { useSyncNow } from "./use-sync-now";
 import { usePreviewSync } from "./use-preview-sync";
+import { UseCashflowConfigOutput } from "../interfaces";
 
 /**
  * Orkestrator state + logic untuk tab "Konfigurasi", lihat
@@ -31,7 +32,7 @@ import { usePreviewSync } from "./use-preview-sync";
  * - `syncNow` (`useSyncNow`) — orkestrasi aksi "Sync Sekarang", pakai
  *   NILAI EFEKTIF (draft ?? saved) dari semua field di atas
  * - `preview` (`usePreviewSync`) — hitung APA yang akan disinkronkan
- *   TANPA insert, dipakai dialog preview di sections/preview-sync-section.tsx
+ *   TANPA insert, dipakai dialog preview di contents/preview-sync-section.tsx
  *
 
  * CATATAN keputusan #2 revisi: TIDAK ADA LAGI validasi "semua mapping
@@ -49,7 +50,7 @@ import { usePreviewSync } from "./use-preview-sync";
  * Akun" (`mapping-status-section.tsx`) yang menampilkan status ini juga
  * SUDAH DIHAPUS dari tab Konfigurasi karena alasan sama.
  */
-export function useCashflowConfig() {
+export function useCashflowConfig(): UseCashflowConfigOutput {
   const prerequisites = useSyncPrerequisites();
   const fields = useCashflowSyncFields();
   const debtAccounts = useDebtAccountsDraft(

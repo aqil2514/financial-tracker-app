@@ -1,7 +1,8 @@
 "use client";
 
-import { useRetailkuCashflowSyncSettings, useSetRetailkuCashflowSyncSettings } from "../../sync";
+import { useRetailkuCashflowSyncSettings, useSetRetailkuCashflowSyncSettings } from "../../../../sync";
 import { useSettingsDraft } from "./use-settings-draft";
+import { UseCashflowSyncFieldsOutput } from "../interfaces";
 
 /**
  * Field-field pengaturan sync — SEMUA pakai pola draft+tombol "Simpan"
@@ -18,7 +19,7 @@ import { useSettingsDraft } from "./use-settings-draft";
  * lama), tapi user eksplisit menekan "Simpan" per section (tiap
  * section fokus berbeda), bukan auto-save sunyi per klik.
  */
-export function useCashflowSyncFields() {
+export function useCashflowSyncFields(): UseCashflowSyncFieldsOutput {
   const { data: syncSettings, isLoading: syncSettingsLoading } = useRetailkuCashflowSyncSettings();
   const setSyncSettings = useSetRetailkuCashflowSyncSettings();
 

@@ -2,13 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCashflowConfigContext } from "../config-context";
+import { useRetailkuSyncCashflowConfig } from "../context";
 
 /** Section "Akun Kas untuk Utang Piutang" — sisi kas dari transaksi
  * transfer piutang/utang baru, independen dari mapping cashflow.
  * Draft+tombol "Simpan" sendiri (fokus section ini). */
 export function ArApCashAccountSection() {
-  const { prerequisites, fields } = useCashflowConfigContext();
+  const { prerequisites, fields } = useRetailkuSyncCashflowConfig();
   const { cashAccountOptions } = prerequisites;
   const { value: arApCashAccountId, setDraft, isDirty, handleSave, isSaving } = fields.arApCashAccountId;
 

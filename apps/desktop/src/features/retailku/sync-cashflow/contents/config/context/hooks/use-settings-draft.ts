@@ -2,15 +2,8 @@
 
 import { useState } from "react";
 
-import type { RetailkuCashflowSyncSettings } from "../../sync";
-
-type SetSyncSettings = {
-  mutate: (
-    settings: Partial<RetailkuCashflowSyncSettings>,
-    options?: { onSuccess?: () => void }
-  ) => void;
-  isPending: boolean;
-};
+import type { RetailkuCashflowSyncSettings } from "../../../../sync";
+import type { SetSyncSettings, UseSettingsDraftOutput } from "../interfaces";
 
 /**
  * Generalisasi pola draft+tombol "Simpan" per section — dipakai tiap
@@ -23,7 +16,7 @@ export function useSettingsDraft<K extends keyof RetailkuCashflowSyncSettings>(
   key: K,
   savedValue: RetailkuCashflowSyncSettings[K],
   setSyncSettings: SetSyncSettings
-) {
+): UseSettingsDraftOutput<K> {
   const [draft, setDraft] = useState<RetailkuCashflowSyncSettings[K] | null>(null);
 
   const value = draft ?? savedValue;

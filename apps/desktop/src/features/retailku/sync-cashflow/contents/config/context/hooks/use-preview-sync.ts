@@ -3,25 +3,13 @@
 import { useMutation } from "@tanstack/react-query";
 
 import { getDb } from "@/lib/db";
-import { assertRetailkuConfigured, type RetailkuSettings } from "@/shared/retailku";
-import { computeCashflowSync, type CashflowSyncPlan, type RetailkuCashflowSyncMode } from "../../sync";
+import { assertRetailkuConfigured } from "@/shared/retailku";
+import { computeCashflowSync } from "../../../../sync";
+import type { PreviewSyncResult, UsePreviewSyncInput, UsePreviewSyncOutput } from "../interfaces";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
-
-export type PreviewSyncInput = {
-  retailkuSettings: RetailkuSettings | undefined;
-  mode: RetailkuCashflowSyncMode;
-  syncFromValue: string;
-  arApCashAccountId: number | null;
-  receivableDebtAccountId: number | null;
-  payableDebtAccountId: number | null;
-};
-
-export type PreviewSyncResult = {
-  cashflow: CashflowSyncPlan;
-};
 
 /**
  * Preview "APA yang akan disinkronkan" TANPA menulis apa pun ke
@@ -38,8 +26,8 @@ export type PreviewSyncResult = {
  * diklik (bukan `useQuery` otomatis, supaya tidak memanggil MCP tiap
  * render tab Konfigurasi).
  */
-export function usePreviewSync() {
-  return useMutation<PreviewSyncResult, Error, PreviewSyncInput>({
+export function usePreviewSync(): UsePreviewSyncOutput {
+  return useMutation<PreviewSyncResult, Error, UsePreviewSyncInput>({
     mutationFn: async (input) => {
       const config = assertRetailkuConfigured(input.retailkuSettings!);
       const db = await getDb();

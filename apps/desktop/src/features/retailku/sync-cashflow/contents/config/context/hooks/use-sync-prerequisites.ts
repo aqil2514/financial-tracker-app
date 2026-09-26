@@ -2,6 +2,7 @@
 
 import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useRetailkuSettings } from "@/shared/retailku";
+import { UseSyncPrerequisitesOutput } from "../interfaces";
 
 /**
  * Prasyarat sync: kredensial Retailku tersimpan, dan daftar akun
@@ -12,7 +13,7 @@ import { useRetailkuSettings } from "@/shared/retailku";
  * lihat catatan di use-cashflow-config.ts kenapa itu bukan lagi syarat
  * KESELURUHAN sync.
  */
-export function useSyncPrerequisites() {
+export function useSyncPrerequisites(): UseSyncPrerequisitesOutput {
   const { data: accounts } = useAccounts();
   const { data: retailkuSettings } = useRetailkuSettings();
 

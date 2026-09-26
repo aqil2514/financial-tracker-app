@@ -5,6 +5,7 @@ import { CashflowAllocationTab } from "../contents/summary/content/cashflow-allo
 import { CashflowDetailTab } from "../contents/summary/content/cashflow-detail";
 import { ArApTab } from "../contents/summary/content/ar-ap";
 import { RetailkuSyncCashflowContentMapping } from "../contents/mapping";
+import { CashflowConfigTab } from "../contents/config";
 
 export const mainTabs: BaseTabItems[] = [
   {
@@ -20,7 +21,7 @@ export const mainTabs: BaseTabItems[] = [
   {
     value: "konfigurasi",
     label: "Konfigurasi",
-    content: <p>Konfigurasi</p>,
+    content: <CashflowConfigTab />,
   },
 ];
 

@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 
-import type { RetailkuCashflowSyncSettings } from "../../sync";
-
-type SetSyncSettings = {
-  mutate: (
-    settings: Partial<RetailkuCashflowSyncSettings>,
-    options?: { onSuccess?: () => void }
-  ) => void;
-  isPending: boolean;
-};
+import type { SetSyncSettings, UseSyncFromDraftOutput } from "../interfaces";
 
 /**
  * Draft "Titik Awal Sync" — SATU-SATUNYA field di tab Konfigurasi yang
@@ -23,7 +15,7 @@ type SetSyncSettings = {
 export function useSyncFromDraft(
   savedSyncFrom: string | null,
   setSyncSettings: SetSyncSettings
-) {
+): UseSyncFromDraftOutput {
   const [syncFromDraft, setSyncFromDraft] = useState<string | null>(null);
 
   const syncFromValue = syncFromDraft ?? savedSyncFrom ?? "";

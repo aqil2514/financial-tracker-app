@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 
-import type { RetailkuCashflowSyncSettings } from "../../sync";
-
-type SetSyncSettings = {
-  mutate: (
-    settings: Partial<RetailkuCashflowSyncSettings>,
-    options?: { onSuccess?: () => void }
-  ) => void;
-  isPending: boolean;
-};
+import type { SetSyncSettings, UseDebtAccountsDraftOutput } from "../interfaces";
 
 /**
  * Draft GABUNGAN untuk 2 field akun debt (piutang & utang) — satu
@@ -21,7 +13,7 @@ export function useDebtAccountsDraft(
   savedReceivableId: number | null,
   savedPayableId: number | null,
   setSyncSettings: SetSyncSettings
-) {
+): UseDebtAccountsDraftOutput {
   const [receivableDraft, setReceivableDraft] = useState<number | null | undefined>(undefined);
   const [payableDraft, setPayableDraft] = useState<number | null | undefined>(undefined);
 

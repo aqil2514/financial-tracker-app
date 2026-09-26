@@ -1,10 +1,10 @@
 "use client";
 
-import { useCashflowConfigContext } from "../config-context";
+import { useRetailkuSyncCashflowConfig } from "../context";
 
 /** Section "Status Sinkronisasi" — tanggal sync otomatis terakhir. */
 export function SyncStatusSection() {
-  const { fields } = useCashflowConfigContext();
+  const { fields } = useRetailkuSyncCashflowConfig();
   const { lastAutoSyncDate } = fields;
 
   return (

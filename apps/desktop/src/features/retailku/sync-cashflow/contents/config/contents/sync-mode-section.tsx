@@ -2,13 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { RetailkuCashflowSyncMode } from "../../sync";
-import { useCashflowConfigContext } from "../config-context";
+import type { RetailkuCashflowSyncMode } from "../../../sync";
+import { useRetailkuSyncCashflowConfig } from "../context";
 
 /** Section "Mode Sync Cashflow" — toggle ringkas/detail per kategori,
  * draft+tombol "Simpan" sendiri (fokus section ini). */
 export function SyncModeSection() {
-  const { fields } = useCashflowConfigContext();
+  const { fields } = useRetailkuSyncCashflowConfig();
   const { value: mode, setDraft, isDirty, handleSave, isSaving } = fields.mode;
 
   return (
