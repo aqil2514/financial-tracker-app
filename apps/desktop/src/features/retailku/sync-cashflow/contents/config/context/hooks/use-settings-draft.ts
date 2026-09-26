@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { RetailkuCashflowSyncSettings } from "../../../../sync";
+import type { RetailkuCashflowSyncSettings } from "../../../../shared/sync";
 import type { SetSyncSettings, UseSettingsDraftOutput } from "../interfaces";
 
 /**

@@ -1,4 +1,4 @@
-import { RetailkuCashflowSyncMode } from "@/features/retailku/sync-cashflow/sync";
+import { RetailkuCashflowSyncMode } from "@/features/retailku/sync-cashflow/shared/sync";
 import { useState } from "react";
 import { UseFilterContextOutput } from "../interfaces";
 

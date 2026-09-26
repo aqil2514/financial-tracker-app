@@ -1,6 +1,6 @@
 "use client";
 
-import { useRetailkuCashflowSyncSettings, useSetRetailkuCashflowSyncSettings } from "../../../../sync";
+import { useRetailkuCashflowSyncSettings, useSetRetailkuCashflowSyncSettings } from "../../../../shared/sync";
 import { useSettingsDraft } from "./use-settings-draft";
 import { UseCashflowSyncFieldsOutput } from "../interfaces";
 

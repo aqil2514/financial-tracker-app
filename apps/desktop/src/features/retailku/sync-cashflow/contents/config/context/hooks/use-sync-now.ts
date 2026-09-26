@@ -3,7 +3,7 @@
 import { toast } from "sonner";
 
 import { assertRetailkuConfigured } from "@/shared/retailku";
-import { useSyncRetailkuAll } from "../../../../sync";
+import { useSyncRetailkuAll } from "../../../../shared/sync";
 import type { UseSyncNowInput, UseSyncNowOutput } from "../interfaces";
 
 function todayIso() {

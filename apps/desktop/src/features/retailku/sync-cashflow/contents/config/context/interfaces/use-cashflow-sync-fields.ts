@@ -1,4 +1,4 @@
-import type { RetailkuCashflowSyncSettings } from "../../../../sync";
+import type { RetailkuCashflowSyncSettings } from "../../../../shared/sync";
 import type { SetSyncSettings, UseSettingsDraftOutput } from "./use-settings-draft";
 
 export interface UseCashflowSyncFieldsOutput {

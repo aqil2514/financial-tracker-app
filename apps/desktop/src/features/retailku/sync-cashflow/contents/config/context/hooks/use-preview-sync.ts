@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { getDb } from "@/lib/db";
 import { assertRetailkuConfigured } from "@/shared/retailku";
-import { computeCashflowSync } from "../../../../sync";
+import { computeCashflowSync } from "../../../../shared/sync";
 import type { PreviewSyncResult, UsePreviewSyncInput, UsePreviewSyncOutput } from "../interfaces";
 
 function todayIso() {

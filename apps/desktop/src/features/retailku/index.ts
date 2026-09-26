@@ -1,1 +1,1 @@
-export { useRetailkuAutoSync } from "./sync-cashflow/sync";
+export { useRetailkuAutoSync } from "./sync-cashflow/shared/sync";

@@ -1,5 +1,5 @@
 import type { RetailkuSettings } from "@/shared/retailku";
-import type { RetailkuCashflowSyncMode } from "../../../../sync";
+import type { RetailkuCashflowSyncMode } from "../../../../shared/sync";
 
 export interface UseSyncNowInput {
   hasCredentials: boolean;

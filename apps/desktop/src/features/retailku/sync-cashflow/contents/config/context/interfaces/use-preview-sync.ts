@@ -1,6 +1,6 @@
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { RetailkuSettings } from "@/shared/retailku";
-import type { CashflowSyncPlan, RetailkuCashflowSyncMode } from "../../../../sync";
+import type { CashflowSyncPlan, RetailkuCashflowSyncMode } from "../../../../shared/sync";
 
 export interface UsePreviewSyncInput {
   retailkuSettings: RetailkuSettings | undefined;

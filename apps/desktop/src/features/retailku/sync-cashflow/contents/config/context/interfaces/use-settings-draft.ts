@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction } from "react";
-import type { RetailkuCashflowSyncSettings } from "../../../../sync";
+import type { RetailkuCashflowSyncSettings } from "../../../../shared/sync";
 
 export type SetSyncSettings = {
   mutate: (

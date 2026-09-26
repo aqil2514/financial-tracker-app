@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { RetailkuCashflowSyncMode } from "../../../sync";
+import type { RetailkuCashflowSyncMode } from "../../../shared/sync";
 import { useRetailkuSyncCashflowConfig } from "../context";
 
 /** Section "Mode Sync Cashflow" — toggle ringkas/detail per kategori,

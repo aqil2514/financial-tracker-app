@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { getDb } from "@/lib/db";
 import { assertRetailkuConfigured, type RetailkuSettings } from "@/shared/retailku";
 import { RetailkuCashflowSyncMode } from "../interfaces";
-import { computeCashflowSync } from "@/features/retailku/sync-cashflow/sync";
+import { computeCashflowSync } from "@/features/retailku/sync-cashflow/shared/sync";
 
 export type MappingKeyCandidate = {
   key: string;
