@@ -9,46 +9,14 @@ import { usePreviewSync } from "./use-preview-sync";
 import { UseCashflowConfigOutput } from "../interfaces";
 
 /**
- * Orkestrator state + logic untuk tab "Konfigurasi", lihat
- * docs/todos/plan/retailku-cashflow-sync.md keputusan #1/#2 (REVISI)/#3.
- * Trigger otomatis saat app dibuka BELUM diwire di sini — itu titik
- * masuk terpisah (mis. AppSidebar), hook ini baru menyediakan
- * pengaturannya.
+ * Orkestrator tab "Konfigurasi" — gabungan 6 hook fokus di folder ini,
+ * dikembalikan per-namespace (bukan di-flatten) supaya caller
+ * men-destructure sendiri bagian yang relevan.
  *
- * Digabung dari 5 hook fokus terpisah di folder ini, dikembalikan
- * APA ADANYA per-namespace (bukan di-flatten) supaya return type di
- * sini tetap pendek — caller men-destructure tiap namespace sendiri:
- * - `prerequisites` (`useSyncPrerequisites`) — kredensial, opsi akun
- *   lokal (mapping akun dipindah ke tab "Mapping", TIDAK lagi jadi
- *   syarat di sini — lihat catatan di bawah)
- * - `fields` (`useCashflowSyncFields`) — mode, akun kas AR/AP,
- *   auto-sync — MASING-MASING draft+tombol Simpan sendiri (via
- *   `useSettingsDraft`), bukan auto-mutate maupun `useState` lokal
- *   murni. Riwayat lengkap di use-cashflow-sync-fields.ts.
- * - `debtAccounts` (`useDebtAccountsDraft`) — 2 field akun debt
- *   (piutang & utang), draft GABUNGAN dengan SATU tombol Simpan untuk
- *   keduanya (beda dari `fields` yang satu tombol per field)
- * - `syncFrom` (`useSyncFromDraft`) — draft "Titik Awal Sync"
- * - `syncNow` (`useSyncNow`) — orkestrasi aksi "Sync Sekarang", pakai
- *   NILAI EFEKTIF (draft ?? saved) dari semua field di atas
- * - `preview` (`usePreviewSync`) — hitung APA yang akan disinkronkan
- *   TANPA insert, dipakai dialog preview di contents/preview-sync-section.tsx
- *
-
- * CATATAN keputusan #2 revisi: TIDAK ADA LAGI validasi "semua mapping
- * harus ke akun lokal yang sama" — cashflow sekarang sync per akun kas
- * Retailku sendiri-sendiri (lihat sync-cashflow.ts).
- *
- * CATATAN (2026-09-24): `hasMappings` SUDAH DIHAPUS sebagai syarat
- * `canSync`/`canPreview` — mewajibkan mapping ADA sebagai gate
- * KESELURUHAN tombol tidak lagi masuk akal begitu key mapping jadi
- * granular per mode+sourceType+arah (bisa ADA sebagian, belum sebagian
- * lain, lihat docs/todos/plan/retailku-sync-field-mapping.md); sync per
- * baris SUDAH skip sendiri key yang belum dipetakan (toast peringatan
- * "Lengkapi di tab Mapping", lihat use-sync-now.ts) — gate keras di sini
- * cuma memblokir baris LAIN yang justru sudah valid. Section "Mapping
- * Akun" (`mapping-status-section.tsx`) yang menampilkan status ini juga
- * SUDAH DIHAPUS dari tab Konfigurasi karena alasan sama.
+ * `canSync`/`canPreview` (di `useSyncNow`) TIDAK mensyaratkan mapping
+ * sudah lengkap — sync per baris skip sendiri key yang belum dipetakan
+ * (toast "Lengkapi di tab Mapping"), jadi gate di sini cuma akan
+ * memblokir baris lain yang justru valid.
  */
 export function useCashflowConfig(): UseCashflowConfigOutput {
   const prerequisites = useSyncPrerequisites();

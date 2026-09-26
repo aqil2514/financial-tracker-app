@@ -15,10 +15,7 @@ function todayIso() {
  * Preview "APA yang akan disinkronkan" TANPA menulis apa pun ke
  * database — memanggil `computeCashflowSync` (fungsi murni baca-saja,
  * dipakai ULANG oleh `syncCashflow`) alih-alih `syncAll` yang benar-benar
- * insert. `computeCashflowSync` SEKARANG SUDAH mencakup `arApRows` di
- * dalam `CashflowSyncPlan`-nya (lihat
- * docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md) — TIDAK perlu
- * lagi `computeArApSync` terpisah (`sync-ar-ap.ts`, DIHAPUS).
+ * insert.
  *
  * `useMutation` polos (BUKAN `useDbMutation`) karena preview tidak
  * menyimpan apa pun — tidak perlu toast sukses "tersimpan" atau

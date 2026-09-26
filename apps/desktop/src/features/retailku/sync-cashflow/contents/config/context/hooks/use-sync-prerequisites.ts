@@ -7,11 +7,8 @@ import { UseSyncPrerequisitesOutput } from "../interfaces";
 /**
  * Prasyarat sync: kredensial Retailku tersimpan, dan daftar akun
  * kas/debt lokal untuk dipilih di field-field konfigurasi. Murni derived
- * dari query, tidak ada mutation di sini.
- *
- * TIDAK LAGI mengecek mapping akun (`hasMappings` dihapus 2026-09-24) —
- * lihat catatan di use-cashflow-config.ts kenapa itu bukan lagi syarat
- * KESELURUHAN sync.
+ * dari query, tidak ada mutation di sini — TIDAK mengecek mapping akun
+ * (lihat `useCashflowConfig` kenapa itu bukan syarat keseluruhan sync).
  */
 export function useSyncPrerequisites(): UseSyncPrerequisitesOutput {
   const { data: accounts } = useAccounts();

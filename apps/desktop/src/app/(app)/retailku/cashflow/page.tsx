@@ -1,8 +1,7 @@
 "use client";
 
 import { PageContainer } from "@/components/page-container";
-import { RetailkuSyncCashflowContent } from "@/features/retailku/sync-cashflow/contents";
-import { RetailkuSyncCashflowHeader } from "@/features/retailku/sync-cashflow/header";
+import { RetailkuSyncCashflowContent, RetailkuSyncCashflowHeader } from "@/features/retailku/sync-cashflow";
 
 export default function RetailkuCashflowPage() {
   return (
