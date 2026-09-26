@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   MappingRowDraft,
   UseMappingCandidatesInput,
@@ -13,11 +13,9 @@ import { JSONContent } from "@tiptap/react";
 export function useMappingCandidates({
   loadKeys,
   mode,
+  drafts,
 }: UseMappingCandidatesInput): UseMappingCandidatesOutput {
   const { data: savedMapping } = useFieldMapping();
-  const [drafts, setDrafts] = useState<
-    Record<string, Partial<MappingRowDraft>>
-  >({});
 
   const candidates: MappingKeyCandidate[] = loadKeys.data ?? [];
 

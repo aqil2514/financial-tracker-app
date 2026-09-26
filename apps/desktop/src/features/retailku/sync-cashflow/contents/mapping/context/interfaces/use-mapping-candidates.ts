@@ -1,13 +1,12 @@
-import { useLoadMappingKeys } from "@/features/retailku/sync-cashflow/mapping/hooks/use-load-mapping-keys";
+import { useLoadMappingKeys } from "../hooks/use-load-mapping-keys";
 import { RetailkuCashflowSyncMode } from ".";
 
 import { JSONContent } from "@tiptap/react";
 
-// apps\desktop\src\features\retailku\sync-cashflow\contents\mapping\context\hooks\use-mapping-candidates.ts
-
 export interface UseMappingCandidatesInput {
   loadKeys: ReturnType<typeof useLoadMappingKeys>;
   mode: RetailkuCashflowSyncMode;
+  drafts: Record<string, Partial<MappingRowDraft>>;
 }
 
 export interface UseMappingCandidatesOutput {

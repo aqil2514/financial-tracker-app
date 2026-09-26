@@ -1,10 +1,17 @@
 import { createContext, useContext } from "react";
-import { UseMappingCandidatesOutput, UseResourcesOutput } from "./interfaces";
 import {
+  UseDraftStateOutput,
+  UseMappingCandidatesOutput,
+  UseMappingDraftSaveOutput,
+  UseResourcesOutput,
+} from "./interfaces";
+import {
+  useDraftState,
   useFilterContext,
   useFilterContextLoad,
   useLoadMappingKeys,
   useMappingCandidates,
+  useMappingDraftSave,
   useResources,
 } from "./hooks";
 import {
@@ -16,6 +23,8 @@ interface RetailkuSyncCashflowMappingContextType {
   filter: UseFilterContextOutput;
   loads: UseFilterContextLoadOutput;
   candidates: UseMappingCandidatesOutput;
+  draftState: UseDraftStateOutput;
+  save: UseMappingDraftSaveOutput;
   resources: UseResourcesOutput;
 }
 
@@ -33,12 +42,24 @@ export function RetailkuSyncCashflowMappingProvider({ children }: Props) {
   const resources = useResources();
   const loadKeys = useLoadMappingKeys();
   const loads = useFilterContextLoad({ filter, loadKeys });
-  const candidates = useMappingCandidates({ loadKeys, mode: filter.mode });
+  const draftState = useDraftState();
+  const candidates = useMappingCandidates({
+    loadKeys,
+    mode: filter.mode,
+    drafts: draftState.drafts,
+  });
+  const save = useMappingDraftSave({
+    rows: candidates.rows,
+    drafts: draftState.drafts,
+    setDrafts: draftState.setDrafts,
+  });
 
   const values: RetailkuSyncCashflowMappingContextType = {
     filter,
     loads,
     candidates,
+    draftState,
+    save,
     resources,
   };
 

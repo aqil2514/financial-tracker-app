@@ -14,9 +14,8 @@ import {
 } from "@/components/ui/combobox";
 import type { AccountWithBalance } from "@/hooks/resources/use-accounts";
 import type { Category } from "@/lib/db";
-import type { MappingRowDraft } from "./hooks/use-mapping-draft";
+import type { MappingRowDraft } from "../context/interfaces";
 
-// NEXT INI REFACTOR
 type ComboboxOption = { value: string; label: string };
 
 const NO_CATEGORY_OPTION: ComboboxOption = { value: "__none__", label: "Tanpa kategori" };
@@ -24,9 +23,9 @@ const NO_CATEGORY_OPTION: ComboboxOption = { value: "__none__", label: "Tanpa ka
 /** Form satu `key` mapping — akun (combobox, WAJIB), note/category/
  * description (semua OPSIONAL, kosong = fallback default saat sync,
  * lihat "Field fallback default" di
- * docs/todos/plan/retailku-sync-field-mapping.md). Dulu satu baris
- * tabel, sekarang isi satu tab (lihat field-mapping-tab.tsx) — makin
- * banyak key yang di-mapping TIDAK lagi menambah tinggi halaman. */
+ * docs/todos/plan/retailku-sync-field-mapping.md). Satu `key` mengisi
+ * satu tab (lihat mapping-field.tsx) — makin banyak key yang di-mapping
+ * TIDAK lagi menambah tinggi halaman. */
 export function FieldMappingRow({
   row,
   localAccountOptions,

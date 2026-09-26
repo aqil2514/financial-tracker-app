@@ -8,6 +8,11 @@ import {
   UseMappingCandidatesInput,
   UseMappingCandidatesOutput,
 } from "./use-mapping-candidates";
+import { UseDraftStateOutput } from "./use-draft-state";
+import {
+  UseMappingDraftSaveInput,
+  UseMappingDraftSaveOutput,
+} from "./use-mapping-draft-save";
 import { UseResourcesOutput } from "./use-resources";
 
 type RetailkuCashflowSyncMode = "summary" | "detail";
@@ -24,6 +29,13 @@ export type {
   MappingRowDraft,
   UseMappingCandidatesInput,
   UseMappingCandidatesOutput,
+
+  //   Draft state
+  UseDraftStateOutput,
+
+  //   Draft save
+  UseMappingDraftSaveInput,
+  UseMappingDraftSaveOutput,
 
   //   Resources
   UseResourcesOutput,

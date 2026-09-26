@@ -1,7 +1,5 @@
-import { useLoadMappingKeys } from "@/features/retailku/sync-cashflow/mapping/hooks/use-load-mapping-keys";
+import { useLoadMappingKeys } from "../hooks/use-load-mapping-keys";
 import { UseFilterContextOutput } from "./use-filter-context";
-
-// apps\desktop\src\features\retailku\sync-cashflow\contents\mapping\context\hooks\use-filter-context-load.ts
 
 export interface UseFilterContextLoadInput {
   filter: {

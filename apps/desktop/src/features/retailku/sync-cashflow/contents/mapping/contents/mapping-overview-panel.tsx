@@ -1,7 +1,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRetailkuSyncCashflowMapping } from "../context";
 import { cn } from "cn";
-import { formatMappingKeyLabel } from "../../../mapping/format-mapping-key";
+import { formatMappingKeyLabel } from "../utils";
 import {
   Tooltip,
   TooltipContent,
