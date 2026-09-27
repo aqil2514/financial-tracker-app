@@ -3,6 +3,14 @@ import { insertArApTransaction } from "./helpers/insert-ar-ap-transaction";
 import { insertCashflowTransaction } from "./helpers/insert-cashflow-transaction";
 import type { Db, SyncCashflowInput, SyncCashflowResult } from "./types";
 
+/** DEBUG SEMENTARA — set `false` lagi setelah selesai investigasi
+ * utang-piutang dagang/non-dagang. Saat `true`, TIDAK ADA insert
+ * apa pun ke database (skip `insertCashflowTransaction`/
+ * `insertArApTransaction` sepenuhnya) — cuma `console.log` tiap baris
+ * yang SEHARUSNYA di-insert, supaya "Sync Sekarang" bisa dicoba
+ * berkali-kali tanpa mengotori `finance.dev.db`. */
+const DRY_RUN = true;
+
 /** Dilempar kalau insert gagal DI TENGAH JALAN (loop cashflow ATAU
  * AR/AP) — membawa `insertedSourceRefs` yang SUDAH berhasil sejauh itu,
  * supaya `sync-all.ts` bisa rollback baris-baris itu secara spesifik
@@ -49,6 +57,16 @@ export class SyncCashflowPartialError extends Error {
 export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<SyncCashflowResult> {
   const plan = await computeCashflowSync(db, input);
 
+  if (DRY_RUN) {
+    console.log("[DRY_RUN] plan.rows (semua, termasuk skip)", plan.rows);
+    console.log("[DRY_RUN] plan.arApRows (semua, termasuk skip)", plan.arApRows);
+    console.log("[DRY_RUN] unmappedKeys", plan.unmappedKeys);
+    console.log(
+      "[DRY_RUN] deactivatedPaymentMethodAccountIds",
+      plan.deactivatedPaymentMethodAccountIds
+    );
+  }
+
   const insertedSourceRefs: string[] = [];
   let arApInsertedCount = 0;
   let arApAccountNotConfigured = false;
@@ -56,15 +74,27 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
   try {
     for (const row of plan.rows) {
       if (!row.willInsert || row.localAccountId == null) continue;
-      await insertCashflowTransaction(db, {
-        accountId: row.localAccountId,
-        amount: row.net,
-        date: row.date,
-        note: row.note,
-        categoryId: row.categoryId,
-        description: row.description,
-        sourceRef: row.sourceRef,
-      });
+      if (DRY_RUN) {
+        console.log("[DRY_RUN] cashflow row", {
+          accountId: row.localAccountId,
+          amount: row.net,
+          date: row.date,
+          note: row.note,
+          categoryId: row.categoryId,
+          description: row.description,
+          sourceRef: row.sourceRef,
+        });
+      } else {
+        await insertCashflowTransaction(db, {
+          accountId: row.localAccountId,
+          amount: row.net,
+          date: row.date,
+          note: row.note,
+          categoryId: row.categoryId,
+          description: row.description,
+          sourceRef: row.sourceRef,
+        });
+      }
       insertedSourceRefs.push(row.sourceRef);
     }
 
@@ -81,7 +111,15 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
       // non-null oleh computeCashflowSync (baris ini tidak akan
       // `willInsert: true` kalau salah satunya null) — non-null
       // assertion di sini AMAN, bukan asumsi baru.
-      await insertArApTransaction(db, arApRow, input.arApCashAccountId!, debtAccountId!);
+      if (DRY_RUN) {
+        console.log("[DRY_RUN] ar/ap row", {
+          arApRow,
+          arApCashAccountId: input.arApCashAccountId,
+          debtAccountId,
+        });
+      } else {
+        await insertArApTransaction(db, arApRow, input.arApCashAccountId!, debtAccountId!);
+      }
       insertedSourceRefs.push(arApRow.sourceRef);
       arApInsertedCount += 1;
     }

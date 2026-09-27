@@ -38,7 +38,11 @@ export function useMappingDraftSave({
         description: isEmptyDoc(row.description) ? null : JSON.stringify(row.description),
       }));
     if (payload.length === 0) return;
-    saveMapping.mutate(payload, { onSuccess: () => setDrafts({}) });
+    // SEMENTARA: console.log saja, BELUM ditulis ke DB (selaras dgn
+    // DRY_RUN=true di sync-cashflow.ts, investigasi mapping dinamis
+    // per-sourceType — lihat docs/todos/plan/retailku-dynamic-sourcetype-mapping.md).
+    // Kembalikan ke `saveMapping.mutate(payload, { onSuccess: () => setDrafts({}) });` setelah selesai.
+    console.log("[mapping] would save (DRY_RUN)", payload);
   }
 
   return { isDirty, handleSave, isSaving: saveMapping.isPending };

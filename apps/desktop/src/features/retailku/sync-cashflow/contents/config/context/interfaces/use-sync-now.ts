@@ -1,5 +1,6 @@
 import type { RetailkuSettings } from "@/shared/retailku";
 import type { RetailkuCashflowSyncMode } from "../../../../shared/sync";
+import type { SyncRange } from "./use-sync-from-draft";
 
 export interface UseSyncNowInput {
   hasCredentials: boolean;
@@ -8,8 +9,7 @@ export interface UseSyncNowInput {
   arApCashAccountId: string;
   receivableDebtAccountId: string;
   payableDebtAccountId: string;
-  syncFromValue: string;
-  onSynced: (today: string) => void;
+  syncRangeValue: SyncRange;
 }
 
 export interface UseSyncNowOutput {

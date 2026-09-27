@@ -26,7 +26,7 @@ export function useCashflowConfig(): UseCashflowConfigOutput {
     fields.syncSettings?.payableDebtAccountId ?? null,
     fields.setSyncSettings
   );
-  const syncFrom = useSyncFromDraft(fields.syncSettings?.syncFrom ?? null, fields.setSyncSettings);
+  const syncFrom = useSyncFromDraft();
   const syncNow = useSyncNow({
     hasCredentials: prerequisites.hasCredentials,
     retailkuSettings: prerequisites.retailkuSettings,
@@ -34,8 +34,7 @@ export function useCashflowConfig(): UseCashflowConfigOutput {
     arApCashAccountId: fields.arApCashAccountId.value?.toString() ?? "",
     receivableDebtAccountId: debtAccounts.receivableDebtAccountId?.toString() ?? "",
     payableDebtAccountId: debtAccounts.payableDebtAccountId?.toString() ?? "",
-    syncFromValue: syncFrom.syncFromValue,
-    onSynced: syncFrom.advanceSyncFromToToday,
+    syncRangeValue: syncFrom.range,
   });
 
   const preview = usePreviewSync();

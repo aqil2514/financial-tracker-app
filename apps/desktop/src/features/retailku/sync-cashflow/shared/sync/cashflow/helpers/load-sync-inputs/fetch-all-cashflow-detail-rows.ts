@@ -1,5 +1,5 @@
 import { getCashflowDetail, type connectRetailkuMcp } from "@/shared/retailku";
-import type { SyncCashflowInput } from "../types";
+import type { SyncCashflowInput } from "../../types";
 
 export async function fetchAllCashflowDetailRows(
   client: Awaited<ReturnType<typeof connectRetailkuMcp>>,

@@ -1,4 +1,4 @@
-import type { Db, RetailkuSyncFieldMappingRow } from "../types";
+import type { Db, RetailkuSyncFieldMappingRow } from "../../types";
 
 type FieldMappingDbRow = {
   key: string;

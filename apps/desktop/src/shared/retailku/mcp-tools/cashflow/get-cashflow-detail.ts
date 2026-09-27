@@ -49,6 +49,15 @@ export type RetailkuCashflowDetailRow = {
    * ini dengan `nonRevenuePortion` untuk dapat pendapatan bersih toko.
    * Lihat docs/todos/plan/retailku-sale-category-mapping.md. */
   nonRevenuePortion: number | null;
+  /** Pemisahan `nonRevenuePortion` KHUSUS porsi payout provider PPOB —
+   * sama aturan null/0 seperti `nonRevenuePortion`, tapi TIDAK
+   * tercampur porsi consignment kalau transaksi mengandung keduanya
+   * sekaligus. Dipakai `classify-cashflow-row.ts` supaya deteksi
+   * "baris ini payout PPOB" tidak salah tangkap consignment. */
+  providerPayoutPortion: number | null;
+  /** Pemisahan `nonRevenuePortion` KHUSUS porsi utang ke penitip
+   * consignment — lihat `providerPayoutPortion` utk alasan pemisahan. */
+  consignmentPayablePortion: number | null;
   /** `true` kalau akun baris ini akun piutang/utang toko (kode
    * 1500/1700/1800/2100/2200/2300 di Retailku, ditandai via
    * `AccountMapping.role`), BUKAN akun kas/bank biasa — lihat

@@ -37,7 +37,6 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
-import { useRetailkuAutoSync } from "@/features/retailku";
 import {
   useRetailkuMappingIssues,
   useRetailkuPaymentAccounts,
@@ -114,16 +113,6 @@ export function AppSidebar() {
   // computeCashflowSync). Diam-diam (0 badge) kalau offline/belum ada
   // masalah — TIDAK menunda render apa pun.
   const { deactivatedMappings } = useRetailkuMappingIssues();
-
-  // Titik masuk trigger sync OTOMATIS saat app dibuka — "Pertanyaan
-  // terbuka #2" di retailku-cashflow-sync.md. Best-effort seperti
-  // prefetch/badge di atas: mengecek 3 pagar (toggle
-  // autoSyncEnabled/maks 1x sehari/semua field konfigurasi lengkap)
-  // sebelum benar-benar memicu `syncAll()`, diam-diam skip kalau salah
-  // satu pagar belum terpenuhi (BUKAN toast error) — kegagalan sync
-  // yang SEMPAT dicoba tetap dilaporkan non-blocking (toast warning),
-  // tidak pernah menunda render sidebar.
-  useRetailkuAutoSync();
 
   const collapsibleNavItems: CollapsibleNavGroup[] = isRetailkuConnected
     ? [...staticCollapsibleNavItems, retailkuNavGroup]

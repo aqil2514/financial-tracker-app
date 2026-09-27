@@ -1,13 +1,26 @@
 # Sync AR/AP lewat `get_cashflow_detail` (menggantikan `get_ar_ap` + snapshot-diff)
 
+> **DITUTUP (2026-09-26) — DIGANTIKAN oleh
+> `docs/todos/plan/retailku-dynamic-sourcetype-mapping.md`.** Investigasi
+> lanjutan menemukan bahwa akun kas AR/AP generik (satu-satunya gap yang
+> tersisa di dokumen ini) adalah GEJALA dari masalah lebih umum: tiap
+> `sourceType` Retailku (SALE, FUND_TRANSFER, CONSIGNMENT_SETTLEMENT,
+> dst) butuh bentuk data/mapping BERBEDA — bukan cuma soal AR/AP.
+> Dokumen baru merancang arsitektur "key dinamis per `sourceType`" yang
+> mencakup AR/AP DAN kasus lain (FUND_TRANSFER, dst) sekaligus.
+> **JANGAN lanjutkan implementasi dari dokumen ini** — baca dokumen baru
+> untuk arah yang berlaku. Sisa isi di bawah dipertahankan APA ADANYA
+> sebagai HISTORI (kenapa AR/AP dibangun begini, apa yang sudah
+> diverifikasi bekerja teknis) — TETAP VALID sebagai catatan implementasi
+> yang SUDAH ADA di kode saat ini (belum di-rollback), cuma arah
+> pengembangan LANJUTANNYA pindah ke dokumen baru.
+>
 > **Status (2026-09-24): DIIMPLEMENTASIKAN di kedua repo, TERVERIFIKASI
 > jalan di database dev nyata (transaksi + `debts`/`debt_payments`
 > tercatat benar, termasuk FIFO otomatis) — TAPI USER BELUM MENYATAKAN
-> "OKE" untuk fitur AR/AP-nya sendiri, masih akan didiskusikan ulang
-> lebih lanjut (bukan soal bug teknis, tapi soal apakah PERILAKUNYA
-> sudah sesuai kebutuhan — lihat "Belum oke, perlu didiskusikan lagi"
-> di bagian akhir). JANGAN anggap fitur ini "selesai" sampai ada
-> konfirmasi eksplisit itu.**
+> "OKE" untuk fitur AR/AP-nya sendiri (lihat "Belum oke, perlu
+> didiskusikan lagi" di bagian akhir, SEKARANG TERJAWAB oleh dokumen
+> baru: alasannya akun kas generik, lihat dokumen baru).**
 >
 > Sisi Retailku (`retail-multitenant`): SELESAI, TIDAK ada migrasi
 > skema — cukup query tambahan ke `AccountMapping` yang sudah ada.
@@ -434,6 +447,154 @@ sesi lanjutan, JANGAN diasumsikan benar):
 - Apakah "Akun untuk Piutang"/"Akun untuk Utang" yang SAMA-SAMA
   "Bisnis" (id 70, dikonfirmasi dari data dev) itu konfigurasi yang
   diinginkan, atau sekadar nilai sementara saat testing.
+
+## Investigasi lanjutan (2026-09-26): akun kas AR/AP generik & `cashAccounts`
+
+Sesi ini MENJAWAB salah satu kandidat topik "Belum oke" di atas — user
+KONFIRMASI eksplisit alasannya: **"kalau di Retailku, pelunasan atau
+penambahan utang piutang itu tidak terpaku dari 1 akun saja"** — field
+"Akun Kas untuk Utang Piutang" (`ar-ap-cash-account-section.tsx`)
+sekarang cuma 1 akun kas GENERIK (mis. selalu "BRI"), padahal
+kenyataannya di Retailku transaksi AR/AP bisa lewat metode pembayaran
+apa pun (Kas Tunai, Seabank, dst) tergantung transaksi aslinya —
+DIVERIFIKASI nyata: journal entry `SL-260926-05` (utang consignment Rp
+6.000) pasangannya "Kas Tunai", BUKAN akun kas generik yang dikonfigurasi
+user. Ini GAP NYATA, bukan cuma dugaan — sync sekarang salah mencatat
+akun kas untuk SEMUA transaksi AR/AP kalau akun kas Retailku aslinya
+beda dari yang di-generic-kan user.
+
+### Percobaan #1 (DITOLAK): pairing otomatis dari `journal_items` mentah
+
+Rancangan awal: server (`get-cfr-detail.helper.ts`) tambah field
+`cashAccounts: {accountId, accountCode, accountName, amount}[]` per
+baris AR/AP — diisi dari `entry.items` LAIN (bukan piutang/utang) dalam
+journal entry yang SAMA (via `entry.items` yang sudah di-fetch,
+`sourceNumber`+timestamp sama, TANPA query tambahan).
+
+**DIVERIFIKASI BEKERJA untuk `sourceType` SETTLEMENT MURNI** (entry
+HANYA berisi piutang/utang + kas, tidak campur apa pun lain) — lewat
+query langsung ke `multi-retail-db` (docker, `KS-260908-01`,
+CONSIGNMENT_SETTLEMENT): entry PERSIS 2 item (2300 debit 16500, 1101
+credit 16500), pairing 1:1 akurat.
+
+**DITEMUKAN TIDAK RELIABLE untuk `sourceType: SALE`** (piutang/utang
+BARU) — DIVERIFIKASI nyata ke toko RIIL "Warung Aqil"
+(`storeId: 156510c6-4f5f-46a2-8f0a-5425e1f880e5`, journal entry
+`0807ceba-c404-4a33-86bb-2fbdb53b7f3d`, `SL-260620-01`): transaksi PPOB
+Rp 8000, jurnalnya PUNYA 5 item sekaligus — Kas Tunai (debit 5000),
+Seabank (credit 6940, ini payout ke PROVIDER PPOB, uang KELUAR bukan
+masuk), Piutang Dagang (debit 3000, sisa belum dibayar), Pendapatan
+PPOB (credit 8000), HPP PPOB (debit 6940). Pairing otomatis dari
+`entry.items` akan SALAH mengira Seabank 6940 ikut jadi "pasangan kas"
+piutang 3000 — padahal itu urusan provider yang sama sekali independen.
+SATU journal entry SALE bisa gabung piutang+revenue+HPP+PPOB sekaligus
+dalam 1 nota, jadi nilai kas TIDAK match 1:1 ke nilai piutang secara
+struktural (bukan kasus langka — DITEMUKAN di toko riil, bukan cuma
+toko "Tutorial"/demo).
+
+**Kesimpulan**: pairing dari `journal_items` mentah cuma aman untuk
+`sourceType` yang ISINYA MURNI settlement (`SALE_PAYMENT`,
+`CONSIGNMENT_SETTLEMENT`, `PURCHASE_PAYMENT`, dst) — TIDAK aman untuk
+`SALE` (piutang/utang baru).
+
+### Temuan kunci: `SalePaymentLine` — sumber akurat KHUSUS untuk `sourceType: SALE`
+
+Prisma model `SalePaymentLine` (`sale_payment_lines`,
+`sale-transaction.prisma`): `saleTransactionId` + `accountId` + `amount`
+— mencatat PERSIS metode pembayaran yang SUNGGUH diterima dari
+pelanggan per transaksi SALE, TIDAK tercampur payout provider
+PPOB/HPP/dst (itu semua di luar `SalePaymentLine`, murni soal
+metode-bayar-pelanggan).
+
+DIVERIFIKASI ke transaksi PPOB Rp 8000 di atas: `SalePaymentLine`
+CUMA 1 baris (`Kas Tunai, amount: 5000`) — PERSIS akurat, TIDAK ikut
+Seabank 6940 milik provider. `SaleTransaction.outstandingAmount`/
+`totalPaid` juga tersedia di model yang sama (walau di snapshot dev
+saat ini sudah `0`/lunas — piutang itu tampaknya sudah dilunasi
+kemudian, tidak menghalangi validitas `SalePaymentLine` sebagai sumber
+akurat SAAT transaksi terjadi).
+
+**Rencana (BELUM diimplementasikan, exploration masih berjalan saat
+handover)**: server pakai SUMBER BERBEDA tergantung `sourceType` —
+- `sourceType: SALE` (piutang/utang baru) → query `SalePaymentLine`
+  via relasi `saleTransaction` (perlu cek: journal entry AR/AP dari SALE
+  itu terhubung ke `SaleTransaction` via `journalEntryId` — field ini
+  SUDAH ADA di `SaleTransaction`, arahnya `SaleTransaction.journalEntryId
+  -> JournalEntry.id`, TINGGAL query balik).
+- `sourceType` settlement (`SALE_PAYMENT`, `CONSIGNMENT_SETTLEMENT`,
+  `PURCHASE_PAYMENT`, dst) → TETAP pairing dari `journal_items` mentah
+  (sudah terbukti reliable, TIDAK perlu diubah).
+- **BELUM DICEK**: apakah `sourceType` settlement lain (`SALE_PAYMENT`
+  khususnya — pelunasan piutang yang SUDAH ada) py tabel serupa
+  `SalePaymentLine` juga (mis. `SalePayment`/`SalePaymentLine` dipakai
+  ulang, atau entry-nya memang selalu simpel 2-item sehingga pairing
+  `journal_items` sudah cukup) — PERLU diverifikasi sebelum
+  diasumsikan "settlement selalu aman pakai journal_items mentah" utk
+  SEMUA jenis settlement, bukan cuma yang sudah dicek
+  (`CONSIGNMENT_SETTLEMENT`).
+
+### Sesi ini JUGA mengeksplorasi (belum sampai keputusan final)
+
+- **Mapping akun debt granular per `sourceType`** (bukan cuma 2 field
+  generik "Akun untuk Piutang"/"Akun untuk Utang"): usul reuse pola key
+  `retailku_sync_field_mapping` yang SUDAH ADA untuk cashflow biasa
+  (`summary:<inflow|outflow>:<accountId>`, `detail:<accountId>:
+  <sourceType>:<inflow|outflow>`) — key BARU `ar_ap:<direction>:
+  <sourceType>` (mis. `ar_ap:payable:SALE` vs `ar_ap:payable:
+  CONSIGNMENT_SETTLEMENT`), `local_account_id`-nya berarti AKUN DEBT
+  TUJUAN (bukan akun kas) — user bisa atur akun debt BEDA per jenis
+  utang/piutang (dagang vs consignment vs lain-lain), BUKAN digabung
+  generik seperti sekarang. Sisi KAS tetap dari sumber terpisah
+  (`cashAccounts`/`SalePaymentLine` di atas), lalu di-lookup ke akun
+  lokal lewat key CASHFLOW BIASA yang sudah ada (`summary:inflow:
+  <retailkuCashAccountId>`) — BUKAN bikin tabel/mapping baru untuk sisi
+  kas, reuse yang sudah ada.
+- **Ditolak**: reuse `retailku_sync_field_mapping` APA ADANYA (ambil
+  representatif `summary:inflow:%`) sebagai satu-satunya sumber mapping
+  akun kas — DITEMUKAN RAPUH: akun Retailku yang SAMA ("Kas Tunai")
+  BISA dipetakan ke akun lokal BERBEDA tergantung mode (diverifikasi ke
+  `finance.dev.db`: `summary:inflow`/`summary:outflow` "Kas Tunai" ->
+  lokal 51 "Dompet Bisnis", TAPI `detail:...:SALE:inflow` "Kas Tunai" ->
+  lokal 30, akun lokal BEDA) — tidak ada jaminan konsistensi across
+  mode, jadi TIDAK dipakai sebagai satu-satunya sumber tanpa
+  disambiguasi lebih lanjut.
+
+### Debug sementara aktif di kode (WAJIB di-nonaktifkan lagi)
+
+`shared/sync/cashflow/sync-cashflow.ts`: `const DRY_RUN = true` di
+puncak file — dipasang untuk investigasi ini (user minta bisa coba
+klik "Sync Sekarang" berkali-kali TANPA menulis apa pun ke
+`finance.dev.db`, cukup `console.log` tiap baris yang seharusnya
+di-insert). **JANGAN LUPA set `false` lagi** setelah keputusan akun
+kas granular final & diimplementasikan — kalau sesi berikutnya lupa,
+"Sync Sekarang" akan TERUS tidak menulis apa pun ke database walau
+toast "berhasil" tetap muncul (bug diam-diam kalau tidak disadari).
+
+### Lanjut sesi berikutnya (urutan disepakati: server dulu, iteratif)
+
+1. Cek apakah `sourceType` settlement selain `CONSIGNMENT_SETTLEMENT`
+   (terutama `SALE_PAYMENT`) aman pakai pairing `journal_items` mentah,
+   atau perlu sumber granular serupa `SalePaymentLine` juga.
+2. Implementasi `cashAccounts` di `get-cfr-detail.helper.ts`
+   (retail-multitenant) dengan cabang sumber per `sourceType` (SALE ->
+   `SalePaymentLine`, settlement -> `journal_items` pairing) — kode
+   PERCOBAAN PERTAMA (pairing `journal_items` polos TANPA cabang
+   `sourceType`) SUDAH DITULIS di file ini TAPI PERLU DIREVISI mengikuti
+   keputusan cabang di atas (belum direvisi saat handover ditulis).
+3. Rancang key `ar_ap:<direction>:<sourceType>` di
+   `retailku_sync_field_mapping` sisi financial-app (akun debt granular)
+   — BELUM diimplementasikan sama sekali (baru sebatas ide di atas).
+4. UI tab Mapping perlu diperluas menampilkan key `ar_ap:*` (saat ini
+   cuma render key cashflow biasa) — BELUM disentuh.
+5. `insert-ar-ap-transaction.ts`/`compute-cashflow-sync.ts` perlu
+   diperbarui pakai kedua lookup baru (debt granular + kas dari
+   `cashAccounts`) menggantikan `arApCashAccountId`/
+   `receivableDebtAccountId`/`payableDebtAccountId` generik yang
+   sekarang — BELUM disentuh, field lama MASIH dipakai apa adanya di
+   kode saat ini.
+6. Set `DRY_RUN = false` lagi di `sync-cashflow.ts` setelah semua di
+   atas selesai & diverifikasi ulang ke `finance.dev.db` sungguhan
+   (ikuti `docs/rules/checking-dev-database.md`).
 
 ## Di luar cakupan rancangan ini (masih terbuka)
 

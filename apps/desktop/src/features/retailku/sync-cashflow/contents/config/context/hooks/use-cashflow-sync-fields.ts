@@ -21,11 +21,6 @@ export function useCashflowSyncFields(): UseCashflowSyncFieldsOutput {
     syncSettings?.arApCashAccountId ?? null,
     setSyncSettings
   );
-  const autoSyncEnabledDraft = useSettingsDraft(
-    "autoSyncEnabled",
-    syncSettings?.autoSyncEnabled ?? true,
-    setSyncSettings
-  );
 
   return {
     syncSettings,
@@ -33,7 +28,5 @@ export function useCashflowSyncFields(): UseCashflowSyncFieldsOutput {
     setSyncSettings,
     mode: modeDraft,
     arApCashAccountId: arApCashAccountIdDraft,
-    autoSyncEnabled: autoSyncEnabledDraft,
-    lastAutoSyncDate: syncSettings?.lastAutoSyncDate ?? null,
   };
 }

@@ -7,6 +7,4 @@ export interface UseCashflowSyncFieldsOutput {
   setSyncSettings: SetSyncSettings;
   mode: UseSettingsDraftOutput<"syncMode">;
   arApCashAccountId: UseSettingsDraftOutput<"arApCashAccountId">;
-  autoSyncEnabled: UseSettingsDraftOutput<"autoSyncEnabled">;
-  lastAutoSyncDate: string | null;
 }

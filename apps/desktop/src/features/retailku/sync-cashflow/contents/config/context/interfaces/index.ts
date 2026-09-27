@@ -2,7 +2,7 @@ import { UseSyncPrerequisitesOutput } from "./use-sync-prerequisites";
 import { SetSyncSettings, UseSettingsDraftOutput } from "./use-settings-draft";
 import { UseCashflowSyncFieldsOutput } from "./use-cashflow-sync-fields";
 import { UseDebtAccountsDraftOutput } from "./use-debt-accounts-draft";
-import { UseSyncFromDraftOutput } from "./use-sync-from-draft";
+import { SyncRange, UseSyncFromDraftOutput } from "./use-sync-from-draft";
 import { UseSyncNowInput, UseSyncNowOutput } from "./use-sync-now";
 import {
   PreviewSyncResult,
@@ -26,6 +26,7 @@ export type {
   UseDebtAccountsDraftOutput,
 
   //   Sync from
+  SyncRange,
   UseSyncFromDraftOutput,
 
   //   Sync now

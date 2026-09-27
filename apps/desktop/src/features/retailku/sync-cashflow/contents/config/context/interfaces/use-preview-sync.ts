@@ -1,11 +1,12 @@
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { RetailkuSettings } from "@/shared/retailku";
 import type { CashflowSyncPlan, RetailkuCashflowSyncMode } from "../../../../shared/sync";
+import type { SyncRange } from "./use-sync-from-draft";
 
 export interface UsePreviewSyncInput {
   retailkuSettings: RetailkuSettings | undefined;
   mode: RetailkuCashflowSyncMode;
-  syncFromValue: string;
+  syncRangeValue: SyncRange;
   arApCashAccountId: number | null;
   receivableDebtAccountId: number | null;
   payableDebtAccountId: number | null;

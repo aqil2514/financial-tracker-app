@@ -27,20 +27,19 @@ export type SyncAllResult = {
   arApAccountNotConfigured: boolean;
 };
 
-// Lock in-memory MODUL-LEVEL (bukan per-komponen) — `syncAll` dipanggil
-// dari DUA sumber independen yang tidak saling tahu satu sama lain:
-// `useRetailkuAutoSync` (otomatis saat app dibuka) dan `useSyncRetailkuAll`
-// (tombol "Sync Sekarang" manual). Tanpa lock ini, keduanya bisa berjalan
-// BERSAMAAN (mis. user klik "Sync Sekarang" tepat saat auto-sync baru
-// mulai) — masing-masing memanggil `computeCashflowSync` secara
-// independen, membaca state "belum tersinkron" di titik yang sama
-// (belum ada yang commit), lalu KEDUANYA insert baris dengan
-// `source_ref` yang sama -> yang kedua gagal `UNIQUE constraint failed:
-// transactions.source, transactions.source_ref` (bug ditemukan live,
-// lihat handover 2026-09-23). `isPeriodSynced`/`isArApRowSynced` di
-// `compute-cashflow-sync.ts` TIDAK cukup untuk mencegah ini karena
-// keduanya cuma efektif ANTAR pemanggilan yang berurutan, bukan yang
-// overlap secara konkuren.
+// Lock in-memory MODUL-LEVEL (bukan per-komponen) — mencegah 2
+// pemanggilan `syncAll` (mis. dobel klik cepat tombol "Sync Sekarang")
+// berjalan BERSAMAAN. Tanpa lock ini, keduanya bisa memanggil
+// `computeCashflowSync` secara independen, membaca state "belum
+// tersinkron" di titik yang sama (belum ada yang commit), lalu KEDUANYA
+// insert baris dengan `source_ref` yang sama -> yang kedua gagal
+// `UNIQUE constraint failed: transactions.source, transactions.source_ref`
+// (bug ditemukan live saat masih ada auto-sync terpisah dari sync
+// manual, lihat handover 2026-09-23 — auto-sync sudah dihapus total per
+// handover 2026-09-26, TAPI lock ini tetap relevan untuk kasus dobel
+// klik). `isPeriodSynced`/`isArApRowSynced` di `compute-cashflow-sync.ts`
+// TIDAK cukup untuk mencegah ini karena keduanya cuma efektif ANTAR
+// pemanggilan yang berurutan, bukan yang overlap secara konkuren.
 let syncInFlight: Promise<SyncAllResult> | null = null;
 
 /**
@@ -70,9 +69,9 @@ let syncInFlight: Promise<SyncAllResult> | null = null;
  * `debts`/`debt_payments` dulu secara eksplisit sebelum `transactions`.
  *
  * Kalau ada sync lain sedang berjalan, panggilan ini MENUNGGU sync itu
- * selesai lebih dulu (bukan ditolak) — supaya baik auto-sync maupun
- * manual sync tetap dapat hasilnya sendiri-sendiri, cuma dijalankan
- * berurutan (serialized), bukan konkuren.
+ * selesai lebih dulu (bukan ditolak) — supaya tiap pemanggilan tetap
+ * dapat hasilnya sendiri-sendiri, cuma dijalankan berurutan
+ * (serialized), bukan konkuren.
  */
 export function syncAll(input: SyncAllInput): Promise<SyncAllResult> {
   // `previous` ditangkap SEBELUM `syncInFlight` ditimpa (masih sinkron,

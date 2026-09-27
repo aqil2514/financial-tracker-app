@@ -25,14 +25,14 @@ export function PreviewSyncSection() {
   const { prerequisites, fields, debtAccounts, syncFrom, preview } = useRetailkuSyncCashflowConfig();
   const [open, setOpen] = useState(false);
 
-  const canPreview = prerequisites.hasCredentials && syncFrom.syncFromValue !== "";
+  const canPreview = prerequisites.hasCredentials && syncFrom.range.from !== "";
 
   const handlePreview = () => {
     setOpen(true);
     preview.mutate({
       retailkuSettings: prerequisites.retailkuSettings,
       mode: fields.mode.value,
-      syncFromValue: syncFrom.syncFromValue,
+      syncRangeValue: syncFrom.range,
       arApCashAccountId: fields.arApCashAccountId.value,
       receivableDebtAccountId: debtAccounts.receivableDebtAccountId,
       payableDebtAccountId: debtAccounts.payableDebtAccountId,

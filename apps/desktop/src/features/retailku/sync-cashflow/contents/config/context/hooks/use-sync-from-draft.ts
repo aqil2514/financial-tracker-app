@@ -2,40 +2,18 @@
 
 import { useState } from "react";
 
-import type { SetSyncSettings, UseSyncFromDraftOutput } from "../interfaces";
+import type { SyncRange, UseSyncFromDraftOutput } from "../interfaces";
 
 /**
- * Draft "Titik Awal Sync" — SATU-SATUNYA field di tab Konfigurasi yang
- * pakai pola draft+tombol "Simpan" eksplisit (`useState` lokal), beda
- * dari field lain di use-cashflow-sync-fields.ts yang langsung
- * ter-mutate saat dipilih. Menerima `syncSettings`/`setSyncSettings`
- * dari caller (bukan query sendiri) supaya tidak ada 2 sumber data
- * untuk `settings` yang sama.
+ * State "Periode Sync" — murni `useState` lokal, TIDAK persisten
+ * (tidak disimpan ke `settings`, hilang tiap pindah tab/tutup app).
+ * Sync satu-satunya adalah MANUAL: user isi rentang setiap kali mau
+ * sync/preview, tidak ada titik lanjut otomatis yang perlu diingat
+ * lintas sesi (beda dari auto-sync lama yang sudah dihapus total,
+ * lihat handover 2026-09-26).
  */
-export function useSyncFromDraft(
-  savedSyncFrom: string | null,
-  setSyncSettings: SetSyncSettings
-): UseSyncFromDraftOutput {
-  const [syncFromDraft, setSyncFromDraft] = useState<string | null>(null);
+export function useSyncFromDraft(): UseSyncFromDraftOutput {
+  const [range, setRange] = useState<SyncRange>({ from: "", to: null });
 
-  const syncFromValue = syncFromDraft ?? savedSyncFrom ?? "";
-
-  function handleSaveSyncFrom() {
-    if (syncFromDraft == null) return;
-    setSyncSettings.mutate({ syncFrom: syncFromDraft }, { onSuccess: () => setSyncFromDraft(null) });
-  }
-
-  function advanceSyncFromToToday(today: string) {
-    setSyncSettings.mutate({ syncFrom: today });
-  }
-
-  return {
-    syncFromValue,
-    savedSyncFrom,
-    syncFromDraft,
-    setSyncFromDraft,
-    handleSaveSyncFrom,
-    advanceSyncFromToToday,
-    isSaving: setSyncSettings.isPending,
-  };
+  return { range, setRange };
 }

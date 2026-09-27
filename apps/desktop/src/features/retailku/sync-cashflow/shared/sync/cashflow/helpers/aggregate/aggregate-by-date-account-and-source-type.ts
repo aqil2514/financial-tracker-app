@@ -1,5 +1,6 @@
 import type { getCashflowDetail } from "@/shared/retailku";
-import type { AggregatedTotal } from "../types";
+import { classifyCashflowRow } from "../classify-cashflow-row";
+import type { AggregatedTotal } from "../../types";
 
 export function aggregateByDateAccountAndSourceType(
   rows: Awaited<ReturnType<typeof getCashflowDetail>>["data"]
@@ -7,7 +8,7 @@ export function aggregateByDateAccountAndSourceType(
   const totals = new Map<string, Omit<AggregatedTotal, "key"> & { sourceType: string }>();
   for (const row of rows) {
     // Lihat catatan sama di aggregate-by-date-and-account.ts.
-    if (row.isReceivablePayableAccount) continue;
+    if (classifyCashflowRow(row) !== "generic") continue;
     const date = row.date.slice(0, 10);
     const sourceType = row.sourceType ?? "LAINNYA";
     const sourceRef = `${date}:${row.accountId}:${sourceType}`;

@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 
 export interface ArrayFieldTabItem {
   id: string;
@@ -21,18 +20,8 @@ interface ArrayFieldTabsProps<T extends ArrayFieldTabItem> {
   onActiveChange?: (id: string) => void;
 }
 
-/**
- * Versi generik `array-field-tabs.tsx` (retail-multitenant) TANPA
- * ketergantungan react-hook-form/useFieldArray — dipakai untuk daftar
- * yang sumbernya BUKAN array yang user tambah/hapus manual (di sini:
- * `key` mapping yang datang dari hasil MCP), jadi tidak ada
- * append/remove/defaultItem. Label tab SELALU nomor urut (`index + 1`),
- * sama seperti `ScrollableTabsTrigger` asli — detail "jenis apa" ada di
- * panel overview di luar komponen ini (lihat mapping-preview-panel.tsx),
- * bukan di label tab, supaya tab tetap ringkas walau daftarnya panjang.
- * Versi berbasis react-hook-form (kalau dibutuhkan alur append/remove
- * sungguhan) menyusul terpisah nanti.
- */
+/** Tampilkan satu item aktif dari sebuah daftar, tanpa navigasi tab
+ * sendiri — navigasinya dikontrol dari luar via `activeId`/`onActiveChange`. */
 export function ArrayFieldTabs<T extends ArrayFieldTabItem>({
   items,
   renderContent,
@@ -62,16 +51,6 @@ export function ArrayFieldTabs<T extends ArrayFieldTabItem>({
 
   return (
     <Tabs value={activeTabValue} onValueChange={handleActiveChange} className="w-full min-w-0">
-      <ScrollArea className="w-full min-w-0 whitespace-nowrap rounded-md">
-        <TabsList className="w-max">
-          {items.map((item, index) => (
-            <TabsTrigger key={item.id} value={item.id} className="px-3">
-              {index + 1}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
       {items.map((item, index) => (
         <TabsContent key={item.id} value={item.id} className="space-y-4">
           {renderContent(item, index)}

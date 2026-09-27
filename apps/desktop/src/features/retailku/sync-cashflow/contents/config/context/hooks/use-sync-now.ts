@@ -6,16 +6,13 @@ import { assertRetailkuConfigured } from "@/shared/retailku";
 import { useSyncRetailkuAll } from "../../../../shared/sync";
 import type { UseSyncNowInput, UseSyncNowOutput } from "../interfaces";
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /**
  * Aksi "Sync Sekarang" — orkestrasi: validasi semua prasyarat
  * (`canSync`), rakit payload dari field-field konfigurasi (mode, 3
- * akun, titik awal), panggil `syncAll`, lalu efek samping (maju
- * `syncFrom` ke hari ini via `onSynced`, toast peringatan akun yang
- * belum dipetakan).
+ * akun, rentang periode draft — TIDAK persisten, murni input tiap
+ * kali mau sync, lihat handover 2026-09-26), panggil `syncAll`, lalu
+ * toast peringatan akun yang belum dipetakan. `syncRangeValue.to ==
+ * null` berarti sync HANYA untuk tanggal `from` itu sendiri (1 hari).
  *
  * SENGAJA TIDAK mewajibkan mapping sudah ada (`hasMappings`, dihapus
  * dari syarat) — sync per baris SUDAH skip sendiri key yang belum
@@ -33,11 +30,12 @@ export function useSyncNow(input: UseSyncNowInput): UseSyncNowOutput {
     input.arApCashAccountId !== "" &&
     input.receivableDebtAccountId !== "" &&
     input.payableDebtAccountId !== "" &&
-    input.syncFromValue !== "";
+    input.syncRangeValue.from !== "";
 
   function handleSyncNow() {
     if (!canSync) return;
     const config = assertRetailkuConfigured(input.retailkuSettings!);
+    const dateTo = input.syncRangeValue.to ?? input.syncRangeValue.from;
 
     syncAll.mutate(
       {
@@ -45,14 +43,13 @@ export function useSyncNow(input: UseSyncNowInput): UseSyncNowOutput {
         arApCashAccountId: Number(input.arApCashAccountId),
         receivableDebtAccountId: Number(input.receivableDebtAccountId),
         payableDebtAccountId: Number(input.payableDebtAccountId),
-        dateFrom: input.syncFromValue,
-        dateTo: todayIso(),
+        dateFrom: input.syncRangeValue.from,
+        dateTo,
         timezone: "Asia/Jakarta",
         mode: input.mode,
       },
       {
         onSuccess: (result) => {
-          input.onSynced(todayIso());
           if (result.cashflowUnmappedKeys.length > 0) {
             toast.warning(
               `${result.cashflowUnmappedKeys.length} jenis transaksi Retailku belum dipetakan — baris kasnya di-skip. Lengkapi di tab Mapping.`
