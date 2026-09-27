@@ -1,5 +1,6 @@
 import { useFilterContext } from "./use-filter-context";
 import { useLoadMappingKeys } from "./use-load-mapping-keys";
+import { useLoadTransferMappingKeys } from "./use-load-transfer-mapping-keys";
 import { useFilterContextLoad } from "./use-filter-context-load";
 import { useMappingCandidates } from "./use-mapping-candidates";
 import { useDraftState } from "./use-draft-state";
@@ -9,6 +10,7 @@ import { useResources } from "./use-resources";
 export {
   useFilterContext,
   useLoadMappingKeys,
+  useLoadTransferMappingKeys,
   useFilterContextLoad,
   useMappingCandidates,
   useDraftState,

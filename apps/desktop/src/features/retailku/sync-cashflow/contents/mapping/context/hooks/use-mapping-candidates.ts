@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import {
+  GenericMappingRowDraft,
   MappingRowDraft,
+  TransferMappingRowDraft,
   UseMappingCandidatesInput,
   UseMappingCandidatesOutput,
 } from "../interfaces";
@@ -8,16 +10,16 @@ import { FieldMapping, useFieldMapping } from "@/shared/retailku";
 import {
   MappingKeyCandidate,
 } from "./use-load-mapping-keys";
+import { TransferMappingKeyCandidate } from "./use-load-transfer-mapping-keys";
 import { JSONContent } from "@tiptap/react";
 
 export function useMappingCandidates({
   loadKeys,
+  loadTransferKeys,
   mode,
   drafts,
 }: UseMappingCandidatesInput): UseMappingCandidatesOutput {
   const { data: savedMapping } = useFieldMapping();
-
-  const candidates: MappingKeyCandidate[] = loadKeys.data ?? [];
 
   const savedByKey = useMemo(() => {
     const map = new Map<string, FieldMapping>();
@@ -25,13 +27,15 @@ export function useMappingCandidates({
     return map;
   }, [savedMapping]);
 
-  const rows: MappingRowDraft[] = useMemo(() => {
-    const byKey = new Map<string, MappingRowDraft>();
+  const genericRows: GenericMappingRowDraft[] = useMemo(() => {
+    const candidates: MappingKeyCandidate[] = loadKeys.data ?? [];
+    const byKey = new Map<string, GenericMappingRowDraft>();
 
     for (const candidate of candidates) {
       const saved = savedByKey.get(candidate.key);
       byKey.set(candidate.key, {
         key: candidate.key,
+        sourceType: "generic",
         retailkuAccountId: candidate.retailkuAccountId,
         retailkuAccountCode: candidate.retailkuAccountCode,
         accountName: candidate.accountName,
@@ -39,6 +43,8 @@ export function useMappingCandidates({
         note: saved?.note ?? "",
         categoryId: saved?.categoryId ?? null,
         description: parseDescription(saved?.description ?? null),
+        noteFollowSource: saved?.extraFields.noteFollowSource ?? false,
+        descriptionFollowSource: saved?.extraFields.descriptionFollowSource ?? false,
       });
     }
 
@@ -47,6 +53,7 @@ export function useMappingCandidates({
       if (!saved.key.startsWith(`${mode}:`)) continue;
       byKey.set(saved.key, {
         key: saved.key,
+        sourceType: "generic",
         retailkuAccountId: saved.retailkuAccountId,
         retailkuAccountCode: saved.retailkuAccountCode,
         accountName: saved.retailkuAccountName,
@@ -54,11 +61,49 @@ export function useMappingCandidates({
         note: saved.note ?? "",
         categoryId: saved.categoryId,
         description: parseDescription(saved.description),
+        noteFollowSource: saved.extraFields.noteFollowSource ?? false,
+        descriptionFollowSource: saved.extraFields.descriptionFollowSource ?? false,
       });
     }
 
-    return [...byKey.values()].map((row) => ({ ...row, ...drafts[row.key] }));
-  }, [candidates, savedByKey, savedMapping, drafts, mode]);
+    return [...byKey.values()].map((row) => ({
+      ...row,
+      ...(drafts[row.key] as Partial<GenericMappingRowDraft> | undefined),
+    }));
+  }, [loadKeys.data, savedByKey, savedMapping, drafts, mode]);
+
+  const transferRows: TransferMappingRowDraft[] = useMemo(() => {
+    const candidates: TransferMappingKeyCandidate[] = loadTransferKeys.data ?? [];
+    const byKey = new Map<string, TransferMappingRowDraft>();
+
+    for (const candidate of candidates) {
+      const saved = savedByKey.get(candidate.key);
+      byKey.set(candidate.key, {
+        key: candidate.key,
+        sourceType: "FUND_TRANSFER",
+        fromAccountName: candidate.fromAccountName,
+        toAccountName: candidate.toAccountName,
+        transactionCount: candidate.transactionCount,
+        localAccountId: saved?.localAccountId ?? null,
+        secondaryAccountId: saved?.secondaryAccountId ?? null,
+        note: saved?.note ?? "",
+        categoryId: saved?.categoryId ?? null,
+        description: parseDescription(saved?.description ?? null),
+        noteFollowSource: saved?.extraFields.noteFollowSource ?? false,
+        descriptionFollowSource: saved?.extraFields.descriptionFollowSource ?? false,
+      });
+    }
+
+    return [...byKey.values()].map((row) => ({
+      ...row,
+      ...(drafts[row.key] as Partial<TransferMappingRowDraft> | undefined),
+    }));
+  }, [loadTransferKeys.data, savedByKey, drafts]);
+
+  const rows: MappingRowDraft[] = useMemo(
+    () => [...genericRows, ...transferRows],
+    [genericRows, transferRows]
+  );
 
   return { rows };
 }

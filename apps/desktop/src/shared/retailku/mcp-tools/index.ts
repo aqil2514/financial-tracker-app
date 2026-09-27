@@ -6,6 +6,11 @@ export {
   type RetailkuFundTransferAccount,
 } from "./get-fund-transfer-detail";
 export {
+  getFundTransferList,
+  type RetailkuFundTransferList,
+  type RetailkuFundTransferListItem,
+} from "./get-fund-transfer-list";
+export {
   getCashflowSummary,
   type RetailkuCashflowSummary,
   getCashflowAllocation,

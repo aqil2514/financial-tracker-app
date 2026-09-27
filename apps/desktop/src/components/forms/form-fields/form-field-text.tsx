@@ -14,6 +14,7 @@ type FormFieldTextProps<TFieldValues extends FieldValues> = {
   label: string;
   placeholder?: string;
   type?: "text" | "email" | "password";
+  disabled?: boolean;
 };
 
 export function FormFieldText<TFieldValues extends FieldValues>({
@@ -22,6 +23,7 @@ export function FormFieldText<TFieldValues extends FieldValues>({
   label,
   placeholder,
   type = "text",
+  disabled,
 }: FormFieldTextProps<TFieldValues>) {
   return (
     <Controller
@@ -34,6 +36,7 @@ export function FormFieldText<TFieldValues extends FieldValues>({
             id={name}
             type={type}
             placeholder={placeholder}
+            disabled={disabled}
             {...field}
             value={field.value ?? ""}
           />

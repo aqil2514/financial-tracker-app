@@ -19,6 +19,7 @@ export {
   fieldMappingQueryKey,
   type FieldMapping,
   type SaveFieldMappingInput,
+  type FieldMappingExtraFields,
 } from "./mcp-hooks/use-field-mapping";
 export {
   connectRetailkuMcp,
@@ -38,4 +39,7 @@ export {
   type RetailkuCashflowAllocation,
   getCashflowDetail,
   type RetailkuCashflowDetail,
+  getFundTransferList,
+  type RetailkuFundTransferList,
+  type RetailkuFundTransferListItem,
 } from "./mcp-tools";

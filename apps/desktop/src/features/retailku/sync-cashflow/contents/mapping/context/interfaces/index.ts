@@ -4,11 +4,13 @@ import {
   UseFilterContextLoadOutput,
 } from "./use-filter-context-load";
 import {
+  GenericMappingRowDraft,
+  TransferMappingRowDraft,
   MappingRowDraft,
   UseMappingCandidatesInput,
   UseMappingCandidatesOutput,
 } from "./use-mapping-candidates";
-import { UseDraftStateOutput } from "./use-draft-state";
+import { UseDraftStateOutput, MappingRowDraftPatch } from "./use-draft-state";
 import {
   UseMappingDraftSaveInput,
   UseMappingDraftSaveOutput,
@@ -26,12 +28,15 @@ export type {
   UseFilterContextLoadOutput,
 
   //   Candidates
+  GenericMappingRowDraft,
+  TransferMappingRowDraft,
   MappingRowDraft,
   UseMappingCandidatesInput,
   UseMappingCandidatesOutput,
 
   //   Draft state
   UseDraftStateOutput,
+  MappingRowDraftPatch,
 
   //   Draft save
   UseMappingDraftSaveInput,

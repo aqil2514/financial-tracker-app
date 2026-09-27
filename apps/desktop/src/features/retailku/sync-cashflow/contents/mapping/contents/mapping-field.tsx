@@ -1,7 +1,7 @@
 import { ArrayFieldTabs } from "@/components/pattern/array-field-tabs";
 import { useRetailkuSyncCashflowMapping } from "../context";
 import type { MappingRowDraft } from "../context/interfaces";
-import { FieldMappingRow } from "./field-mapping-row";
+import { FlexRenderForm } from "../form";
 
 export function MappingField() {
   const { candidates, filter, draftState, resources } =
@@ -18,7 +18,7 @@ export function MappingField() {
         activeId={activeKey ?? rows[0]?.key}
         onActiveChange={setActiveKey}
         renderContent={(row: MappingRowDraft & { id: string }) => (
-          <FieldMappingRow
+          <FlexRenderForm
             row={row}
             localAccountOptions={localAccountOptions}
             categoryOptions={categoryOptions}

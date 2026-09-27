@@ -1,12 +1,29 @@
 import { isEmptyDoc } from "@/components/rich-text";
 import {
   useSaveFieldMapping,
+  type FieldMappingExtraFields,
   type SaveFieldMappingInput,
 } from "@/shared/retailku";
 import {
   UseMappingDraftSaveInput,
   UseMappingDraftSaveOutput,
 } from "../interfaces";
+
+/** Bentuk `extra_fields` SAMA di generic & transfer (toggle "Mengikuti
+ * Retailku" utk note/description, lihat `FollowSourceToggle`) — `||
+ * undefined` supaya `false` (nilai default) tidak ikut ke-serialize
+ * JSON, hasilnya `{}` (bukan `{"noteFollowSource":false,...}`) kalau
+ * keduanya OFF, konsisten dgn `useSaveFieldMapping` yg simpan `null`
+ * kalau objek kosong. */
+function toExtraFields(row: {
+  noteFollowSource: boolean;
+  descriptionFollowSource: boolean;
+}): FieldMappingExtraFields {
+  return {
+    noteFollowSource: row.noteFollowSource || undefined,
+    descriptionFollowSource: row.descriptionFollowSource || undefined,
+  };
+}
 
 /**
  * Aksi simpan mapping — porting dari `handleSave`/`isDirty`/`isSaving`
@@ -25,24 +42,64 @@ export function useMappingDraftSave({
   const isDirty = Object.keys(drafts).length > 0;
 
   function handleSave() {
-    const payload: SaveFieldMappingInput = rows
-      .filter((row) => drafts[row.key] && row.localAccountId != null)
+    const genericPayload: SaveFieldMappingInput = rows
+      .filter(
+        (row): row is (typeof rows)[number] & { sourceType: "generic" } =>
+          row.sourceType === "generic" && !!drafts[row.key] && row.localAccountId != null
+      )
       .map((row) => ({
         key: row.key,
+        sourceKind: "generic",
         retailkuAccountId: row.retailkuAccountId,
         retailkuAccountCode: row.retailkuAccountCode,
         retailkuAccountName: row.accountName,
         localAccountId: row.localAccountId!,
+        secondaryAccountId: null,
         note: row.note.trim() === "" ? null : row.note,
         categoryId: row.categoryId,
         description: isEmptyDoc(row.description) ? null : JSON.stringify(row.description),
+        extraFields: toExtraFields(row),
       }));
+
+    // Varian FUND_TRANSFER — SAMA pola live-sync dgn generic sejak
+    // 2026-09-28 (`FundTransferMappingForm` tidak lagi punya tombol
+    // submit sendiri) — digabung ke `payload` YANG SAMA (SATU tabel,
+    // SATU upsert by `key`).
+    const transferPayload: SaveFieldMappingInput = rows
+      .filter(
+        (row): row is (typeof rows)[number] & { sourceType: "FUND_TRANSFER" } =>
+          row.sourceType === "FUND_TRANSFER" &&
+          !!drafts[row.key] &&
+          row.localAccountId != null &&
+          row.secondaryAccountId != null
+      )
+      .map((row) => ({
+        key: row.key,
+        sourceKind: "FUND_TRANSFER",
+        // `retailku_account_id/code/name` DIRANCANG utk 1 akun (mapping
+        // generik, NOT NULL di skema) — transfer punya 2 akun, jadi
+        // diisi APA ADANYA dari akun ASAL (`fromAccountId`) sbg
+        // representasi, `retailkuAccountName` dibuat deskriptif
+        // "Dari → Ke" spy tetap informatif di UI lama yg baca kolom ini
+        // (mis. tab lain yg belum sempat disesuaikan). BUKAN solusi
+        // final — kalau nanti kolom ini terasa dipaksakan utk sourceType
+        // spesial lain juga, pertimbangkan pindah representasi akun
+        // sepenuhnya ke `extra_fields` drpd 3 kolom traditional ini.
+        retailkuAccountId: row.key.split(":")[1],
+        retailkuAccountCode: row.fromAccountName,
+        retailkuAccountName: `${row.fromAccountName} → ${row.toAccountName}`,
+        localAccountId: row.localAccountId!,
+        secondaryAccountId: row.secondaryAccountId!,
+        note: row.note.trim() === "" ? null : row.note,
+        categoryId: row.categoryId,
+        description: isEmptyDoc(row.description) ? null : JSON.stringify(row.description),
+        extraFields: toExtraFields(row),
+      }));
+
+    const payload = [...genericPayload, ...transferPayload];
     if (payload.length === 0) return;
-    // SEMENTARA: console.log saja, BELUM ditulis ke DB (selaras dgn
-    // DRY_RUN=true di sync-cashflow.ts, investigasi mapping dinamis
-    // per-sourceType — lihat docs/todos/plan/retailku-dynamic-sourcetype-mapping.md).
-    // Kembalikan ke `saveMapping.mutate(payload, { onSuccess: () => setDrafts({}) });` setelah selesai.
-    console.log("[mapping] would save (DRY_RUN)", payload);
+
+    saveMapping.mutate(payload, { onSuccess: () => setDrafts({}) });
   }
 
   return { isDirty, handleSave, isSaving: saveMapping.isPending };

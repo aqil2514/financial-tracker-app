@@ -10,6 +10,7 @@ import {
   useFilterContext,
   useFilterContextLoad,
   useLoadMappingKeys,
+  useLoadTransferMappingKeys,
   useMappingCandidates,
   useMappingDraftSave,
   useResources,
@@ -41,10 +42,12 @@ export function RetailkuSyncCashflowMappingProvider({ children }: Props) {
   const filter = useFilterContext();
   const resources = useResources();
   const loadKeys = useLoadMappingKeys();
-  const loads = useFilterContextLoad({ filter, loadKeys });
+  const loadTransferKeys = useLoadTransferMappingKeys();
+  const loads = useFilterContextLoad({ filter, loadKeys, loadTransferKeys });
   const draftState = useDraftState();
   const candidates = useMappingCandidates({
     loadKeys,
+    loadTransferKeys,
     mode: filter.mode,
     drafts: draftState.drafts,
   });

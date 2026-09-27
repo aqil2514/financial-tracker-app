@@ -9,6 +9,9 @@ import {
 } from "@/components/ui/tooltip";
 import { InfoIcon } from "lucide-react";
 import { isEmptyDoc, RichTextViewer } from "@/components/rich-text";
+import type { AccountWithBalance } from "@/hooks/resources/use-accounts";
+import type { Category } from "@/lib/db";
+import type { GenericMappingRowDraft, TransferMappingRowDraft } from "../context/interfaces";
 
 export function MappingOverviewPanel() {
   const { rows } = useRetailkuSyncCashflowMapping().candidates;
@@ -23,13 +26,14 @@ export function MappingOverviewPanel() {
       <ScrollArea className="h-96">
         <ul className="divide-y">
           {rows.map((row, index) => {
-            const isMapped = row.localAccountId != null;
-            const accountName = localAccountOptions.find(
-              (account) => account.id === row.localAccountId,
-            )?.name;
-            const categoryName = categoryOptions.find(
-              (category) => category.id === row.categoryId,
-            )?.name;
+            const isMapped =
+              row.sourceType === "generic"
+                ? row.localAccountId != null
+                : row.localAccountId != null && row.secondaryAccountId != null;
+            const title =
+              row.sourceType === "generic"
+                ? row.accountName
+                : `${row.fromAccountName} → ${row.toAccountName}`;
 
             return (
               <li key={row.key} className="flex items-stretch">
@@ -45,9 +49,7 @@ export function MappingOverviewPanel() {
                     {index + 1}.
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">
-                      {row.accountName}
-                    </span>
+                    <span className="block truncate font-medium">{title}</span>
                     <span className="text-muted-foreground block truncate text-xs">
                       {formatMappingKeyLabel(row.key)}
                     </span>
@@ -77,35 +79,19 @@ export function MappingOverviewPanel() {
                     <InfoIcon className="size-4" />
                   </TooltipTrigger>
                   <TooltipContent side="left" className="max-w-sm">
-                    <dl className="space-y-1 text-xs">
-                      <div className="flex gap-1.5">
-                        <dt className="opacity-70">Akun tujuan:</dt>
-                        <dd className="font-medium">
-                          {accountName ?? "Belum dipilih"}
-                        </dd>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <dt className="opacity-70">Judul:</dt>
-                        <dd>{row.note.trim() || "(judul default)"}</dd>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <dt className="opacity-70">Kategori:</dt>
-                        <dd>{categoryName ?? "Tanpa kategori"}</dd>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <dt className="shrink-0 opacity-70">Deskripsi:</dt>
-                        <dd className="min-w-0">
-                          {isEmptyDoc(row.description) ? (
-                            "(kosong)"
-                          ) : (
-                            <RichTextViewer
-                              value={row.description!}
-                              className="prose-invert text-background"
-                            />
-                          )}
-                        </dd>
-                      </div>
-                    </dl>
+                    {row.sourceType === "generic" ? (
+                      <GenericRowTooltipBody
+                        row={row}
+                        localAccountOptions={localAccountOptions}
+                        categoryOptions={categoryOptions}
+                      />
+                    ) : (
+                      <TransferRowTooltipBody
+                        row={row}
+                        localAccountOptions={localAccountOptions}
+                        categoryOptions={categoryOptions}
+                      />
+                    )}
                   </TooltipContent>
                 </Tooltip>
               </li>
@@ -114,5 +100,104 @@ export function MappingOverviewPanel() {
         </ul>
       </ScrollArea>
     </div>
+  );
+}
+
+function GenericRowTooltipBody({
+  row,
+  localAccountOptions,
+  categoryOptions,
+}: {
+  row: GenericMappingRowDraft;
+  localAccountOptions: AccountWithBalance[];
+  categoryOptions: Category[];
+}) {
+  const accountName = localAccountOptions.find((account) => account.id === row.localAccountId)?.name;
+  const categoryName = categoryOptions.find((category) => category.id === row.categoryId)?.name;
+
+  return (
+    <dl className="space-y-1 text-xs">
+      <div className="flex gap-1.5">
+        <dt className="opacity-70">Akun tujuan:</dt>
+        <dd className="font-medium">{accountName ?? "Belum dipilih"}</dd>
+      </div>
+      <div className="flex gap-1.5">
+        <dt className="opacity-70">Judul:</dt>
+        <dd>{row.noteFollowSource ? "(mengikuti Retailku)" : row.note.trim() || "(judul default)"}</dd>
+      </div>
+      <div className="flex gap-1.5">
+        <dt className="opacity-70">Kategori:</dt>
+        <dd>{categoryName ?? "Tanpa kategori"}</dd>
+      </div>
+      <div className="flex gap-1.5">
+        <dt className="shrink-0 opacity-70">Deskripsi:</dt>
+        <dd className="min-w-0">
+          {row.descriptionFollowSource ? (
+            "(mengikuti Retailku)"
+          ) : isEmptyDoc(row.description) ? (
+            "(kosong)"
+          ) : (
+            <RichTextViewer value={row.description!} className="prose-invert text-background" />
+          )}
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+/** Ringkasan varian FUND_TRANSFER — SAMA field non-fakta (judul/
+ * kategori/deskripsi) dgn `GenericRowTooltipBody`, lihat JSDoc
+ * `TransferMappingRowDraft`, DITAMBAH ringkasan 2 akun lokal + jumlah
+ * transaksi Retailku yg berbagi key ini. */
+function TransferRowTooltipBody({
+  row,
+  localAccountOptions,
+  categoryOptions,
+}: {
+  row: TransferMappingRowDraft;
+  localAccountOptions: AccountWithBalance[];
+  categoryOptions: Category[];
+}) {
+  const fromAccountName = localAccountOptions.find((account) => account.id === row.localAccountId)?.name;
+  const toAccountName = localAccountOptions.find((account) => account.id === row.secondaryAccountId)?.name;
+  const categoryName = categoryOptions.find((category) => category.id === row.categoryId)?.name;
+
+  return (
+    <dl className="space-y-1 text-xs">
+      <div className="flex gap-1.5">
+        <dt className="opacity-70">Dari akun (lokal):</dt>
+        <dd className="font-medium">{fromAccountName ?? "Belum dipilih"}</dd>
+      </div>
+      <div className="flex gap-1.5">
+        <dt className="opacity-70">Ke akun (lokal):</dt>
+        <dd className="font-medium">{toAccountName ?? "Belum dipilih"}</dd>
+      </div>
+      <div className="flex gap-1.5">
+        <dt className="opacity-70">Judul:</dt>
+        <dd>{row.noteFollowSource ? "(mengikuti Retailku)" : row.note.trim() || "(judul default)"}</dd>
+      </div>
+      <div className="flex gap-1.5">
+        <dt className="opacity-70">Kategori:</dt>
+        <dd>{categoryName ?? "Tanpa kategori"}</dd>
+      </div>
+      <div className="flex gap-1.5">
+        <dt className="shrink-0 opacity-70">Deskripsi:</dt>
+        <dd className="min-w-0">
+          {row.descriptionFollowSource ? (
+            "(mengikuti Retailku)"
+          ) : isEmptyDoc(row.description) ? (
+            "(kosong)"
+          ) : (
+            <RichTextViewer value={row.description!} className="prose-invert text-background" />
+          )}
+        </dd>
+      </div>
+      <div className="flex gap-1.5">
+        <dt className="opacity-70">Transfer Retailku:</dt>
+        <dd>
+          {row.fromAccountName} → {row.toAccountName} ({row.transactionCount} transaksi)
+        </dd>
+      </div>
+    </dl>
   );
 }
