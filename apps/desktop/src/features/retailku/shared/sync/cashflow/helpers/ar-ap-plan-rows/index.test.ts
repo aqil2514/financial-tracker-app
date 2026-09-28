@@ -62,7 +62,7 @@ function createFakeDb(syncedSourceRefIds: Record<string, number> = {}) {
 describe("buildArApPlanRows", () => {
   it("amount === 0 -> skipReason zero-amount, tidak cek mapping/idempotency", async () => {
     const db = createFakeDb();
-    const result = await buildArApPlanRows(db as any, [arApRow({ amount: 0 })], mapping([]), "skip");
+    const result = await buildArApPlanRows(db as any, [arApRow({ amount: 0 })], mapping([]), "skip", "detail");
 
     expect(result.planRows[0].skipReason).toBe("zero-amount");
     expect(result.planRows[0].willInsert).toBe(false);
@@ -75,7 +75,8 @@ describe("buildArApPlanRows", () => {
       db as any,
       [arApRow({ amount: -500, isReversed: true })],
       mapping([]),
-      "skip"
+      "skip",
+      "detail"
     );
 
     expect(result.planRows[0].skipReason).toBe("reversal");
@@ -88,7 +89,8 @@ describe("buildArApPlanRows", () => {
       db as any,
       [arApRow({ amount: -500, isReversed: false, settledReceivablePayableJournalItemId: null })],
       mapping([]),
-      "skip"
+      "skip",
+      "detail"
     );
 
     expect(result.planRows[0].skipReason).toBe("settlement-not-supported");
@@ -107,7 +109,8 @@ describe("buildArApPlanRows", () => {
         }),
       ],
       mapping([]),
-      "skip"
+      "skip",
+      "detail"
     );
 
     expect(result.planRows[0].skipReason).toBe("settled-debt-not-found");
@@ -127,15 +130,67 @@ describe("buildArApPlanRows", () => {
         }),
       ],
       mapping([]),
-      "skip"
+      "skip",
+      "detail"
     );
 
     expect(result.planRows[0]).toMatchObject({
       willInsert: false,
       willInsertPayment: true,
       paymentDebtId: 77,
+      paymentAccountId: null,
       skipReason: null,
     });
+  });
+
+  it("pelunasan dgn tepat 1 cashAccount yang sudah dipetakan -> paymentAccountId terisi", async () => {
+    const db = createFakeDb({ "orig-item:ar_ap": 77 });
+    const fieldMapping = mapping([["detail:kas-tunai:SALE_PAYMENT:inflow", { localAccountId: 9 }]]);
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: -500,
+          isReversed: false,
+          sourceType: "SALE_PAYMENT",
+          settledReceivablePayableJournalItemId: "orig-item",
+          cashAccounts: [{ accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 500 }],
+        }),
+      ],
+      fieldMapping,
+      "skip",
+      "detail"
+    );
+
+    expect(result.planRows[0]).toMatchObject({ willInsertPayment: true, paymentAccountId: 9 });
+  });
+
+  it("pelunasan dgn cashAccounts >1 (belum pernah terjadi di data nyata) -> paymentAccountId NULL, pelunasan tetap tercatat", async () => {
+    const db = createFakeDb({ "orig-item:ar_ap": 77 });
+    const fieldMapping = mapping([
+      ["detail:kas-tunai:SALE_PAYMENT:inflow", { localAccountId: 9 }],
+      ["detail:seabank:SALE_PAYMENT:inflow", { localAccountId: 11 }],
+    ]);
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: -500,
+          isReversed: false,
+          sourceType: "SALE_PAYMENT",
+          settledReceivablePayableJournalItemId: "orig-item",
+          cashAccounts: [
+            { accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 200 },
+            { accountId: "seabank", accountCode: "1102", accountName: "Seabank", amount: 300 },
+          ],
+        }),
+      ],
+      fieldMapping,
+      "skip",
+      "detail"
+    );
+
+    expect(result.planRows[0]).toMatchObject({ willInsertPayment: true, paymentAccountId: null });
   });
 
   it("consignment settlement: SEMUA debtId di array ketemu -> willInsertPayments terisi semua alokasi", async () => {
@@ -153,7 +208,8 @@ describe("buildArApPlanRows", () => {
         }),
       ],
       mapping([]),
-      "skip"
+      "skip",
+      "detail"
     );
 
     expect(result.planRows[0]).toMatchObject({
@@ -164,7 +220,35 @@ describe("buildArApPlanRows", () => {
         { debtId: 10, amount: 1500 },
         { debtId: 20, amount: 3000 },
       ],
+      paymentAccountId: null,
     });
+  });
+
+  it("consignment settlement dgn tepat 1 cashAccount terpetakan -> paymentAccountId terisi, SAMA utk semua alokasi", async () => {
+    const db = createFakeDb({ "item-a:ar_ap": 10, "item-b:ar_ap": 20 });
+    const fieldMapping = mapping([
+      ["detail:seabank:CONSIGNMENT_SETTLEMENT:inflow", { localAccountId: 13 }],
+    ]);
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: -4500,
+          isReversed: false,
+          sourceType: "CONSIGNMENT_SETTLEMENT",
+          settledReceivablePayableJournalItemIds: [
+            { journalItemId: "item-a", amount: 1500 },
+            { journalItemId: "item-b", amount: 3000 },
+          ],
+          cashAccounts: [{ accountId: "seabank", accountCode: "1102", accountName: "Seabank", amount: 4500 }],
+        }),
+      ],
+      fieldMapping,
+      "skip",
+      "detail"
+    );
+
+    expect(result.planRows[0].paymentAccountId).toBe(13);
   });
 
   it("consignment settlement: SATU SAJA debtId tidak ketemu -> all-or-nothing, skipReason settlement-partially-not-found, willInsertPayments kosong", async () => {
@@ -182,7 +266,8 @@ describe("buildArApPlanRows", () => {
         }),
       ],
       mapping([]),
-      "skip"
+      "skip",
+      "detail"
     );
 
     expect(result.planRows[0].skipReason).toBe("settlement-partially-not-found");
@@ -191,7 +276,7 @@ describe("buildArApPlanRows", () => {
 
   it("akun debt unmapped -> skipReason unmapped-debt-account, masuk unmappedDebtKeys", async () => {
     const db = createFakeDb();
-    const result = await buildArApPlanRows(db as any, [arApRow()], mapping([]), "skip");
+    const result = await buildArApPlanRows(db as any, [arApRow()], mapping([]), "skip", "detail");
 
     expect(result.planRows[0].skipReason).toBe("unmapped-debt-account");
     expect(result.unmappedDebtKeys).toEqual(["ar_ap:acc-1:receivable"]);
@@ -200,7 +285,7 @@ describe("buildArApPlanRows", () => {
   it("sudah pernah sync, mode skip (default) -> skipReason already-synced", async () => {
     const db = createFakeDb({ "j1:ar_ap": 100 });
     const fieldMapping = mapping([["ar_ap:acc-1:receivable", {}]]);
-    const result = await buildArApPlanRows(db as any, [arApRow()], fieldMapping, "skip");
+    const result = await buildArApPlanRows(db as any, [arApRow()], fieldMapping, "skip", "detail");
 
     expect(result.planRows[0].skipReason).toBe("already-synced");
     expect(result.planRows[0].willInsert).toBe(false);
@@ -212,7 +297,7 @@ describe("buildArApPlanRows", () => {
     const fieldMapping = mapping([
       ["ar_ap:acc-1:receivable", { localAccountId: 55, extraFields: { contactId: 8 } }],
     ]);
-    const result = await buildArApPlanRows(db as any, [arApRow()], fieldMapping, "overwrite");
+    const result = await buildArApPlanRows(db as any, [arApRow()], fieldMapping, "overwrite", "detail");
 
     expect(result.planRows[0]).toMatchObject({
       willInsert: false,
@@ -227,7 +312,7 @@ describe("buildArApPlanRows", () => {
   it("belum pernah sync, mode overwrite -> tetap insert biasa (willInsert true)", async () => {
     const db = createFakeDb();
     const fieldMapping = mapping([["ar_ap:acc-1:receivable", {}]]);
-    const result = await buildArApPlanRows(db as any, [arApRow()], fieldMapping, "overwrite");
+    const result = await buildArApPlanRows(db as any, [arApRow()], fieldMapping, "overwrite", "detail");
 
     expect(result.planRows[0]).toMatchObject({ willInsert: true, willUpdate: false });
   });
@@ -240,7 +325,7 @@ describe("buildArApPlanRows", () => {
         { localAccountId: 55, extraFields: { contactId: 8, contactFollowSource: true } },
       ],
     ]);
-    const result = await buildArApPlanRows(db as any, [arApRow()], fieldMapping, "skip");
+    const result = await buildArApPlanRows(db as any, [arApRow()], fieldMapping, "skip", "detail");
 
     expect(result.planRows[0]).toMatchObject({
       willInsert: true,
@@ -249,5 +334,86 @@ describe("buildArApPlanRows", () => {
       contactId: 8,
       contactFollowSource: true,
     });
+  });
+
+  it("piutang baru dgn DP (cashAccounts tepat 1, positif, dipetakan) -> willInsert true, downPayment terisi", async () => {
+    const db = createFakeDb();
+    const fieldMapping = mapping([
+      ["ar_ap:acc-1:receivable", { localAccountId: 55 }],
+      ["detail:kas-tunai:SALE:inflow", { localAccountId: 30 }],
+    ]);
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: 9000,
+          cashAccounts: [{ accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 18000 }],
+        }),
+      ],
+      fieldMapping,
+      "skip",
+      "detail"
+    );
+
+    expect(result.planRows[0]).toMatchObject({
+      willInsert: true,
+      downPayment: { amount: 18000, localAccountId: 30 },
+    });
+  });
+
+  it("piutang baru TANPA DP (cashAccounts kosong) -> downPayment null", async () => {
+    const db = createFakeDb();
+    const fieldMapping = mapping([["ar_ap:acc-1:receivable", { localAccountId: 55 }]]);
+    const result = await buildArApPlanRows(db as any, [arApRow({ cashAccounts: [] })], fieldMapping, "skip", "detail");
+
+    expect(result.planRows[0]).toMatchObject({ willInsert: true, downPayment: null });
+  });
+
+  it("mode overwrite dgn DP -> willUpdate true, downPayment TETAP terisi", async () => {
+    const db = createFakeDb({ "j1:ar_ap": 100 });
+    const fieldMapping = mapping([
+      ["ar_ap:acc-1:receivable", { localAccountId: 55 }],
+      ["detail:kas-tunai:SALE:inflow", { localAccountId: 30 }],
+    ]);
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: 9000,
+          cashAccounts: [{ accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 18000 }],
+        }),
+      ],
+      fieldMapping,
+      "overwrite",
+      "detail"
+    );
+
+    expect(result.planRows[0]).toMatchObject({
+      willUpdate: true,
+      existingDebtId: 100,
+      downPayment: { amount: 18000, localAccountId: 30 },
+    });
+  });
+
+  it("sudah pernah sync, mode skip -> downPayment TIDAK diproses (null), TIDAK insert dobel", async () => {
+    const db = createFakeDb({ "j1:ar_ap": 100 });
+    const fieldMapping = mapping([
+      ["ar_ap:acc-1:receivable", { localAccountId: 55 }],
+      ["detail:kas-tunai:SALE:inflow", { localAccountId: 30 }],
+    ]);
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: 9000,
+          cashAccounts: [{ accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 18000 }],
+        }),
+      ],
+      fieldMapping,
+      "skip",
+      "detail"
+    );
+
+    expect(result.planRows[0]).toMatchObject({ skipReason: "already-synced", downPayment: null });
   });
 });

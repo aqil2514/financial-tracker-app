@@ -21,6 +21,7 @@ export type SyncAllResult = {
   arApInsertedCount: number;
   arApUpdatedCount: number;
   arApPaymentInsertedCount: number;
+  arApDownPaymentInsertedCount: number;
   arApUnmappedDebtKeys: string[];
 };
 
@@ -60,6 +61,7 @@ async function syncAllInternal(input: SyncAllInput): Promise<SyncAllResult> {
       arApInsertedCount: result.arApInsertedCount,
       arApUpdatedCount: result.arApUpdatedCount,
       arApPaymentInsertedCount: result.arApPaymentInsertedCount,
+      arApDownPaymentInsertedCount: result.arApDownPaymentInsertedCount,
       arApUnmappedDebtKeys: result.arApUnmappedDebtKeys,
     };
   } catch (err) {
@@ -83,6 +85,9 @@ async function rollbackManually(db: Db, insertedSourceRefs: string[]): Promise<v
   // DELETE CASCADE — TAPI debt_payments dari sync PELUNASAN (piutangnya
   // SUDAH ADA sebelum sync ini, source_ref SENDIRI beda dari debts manapun
   // di daftar ini) TIDAK ikut ter-cascade, jadi dihapus eksplisit di bawah.
+  // DELETE transactions di bawah JUGA menjangkau baris DP AR/AP
+  // (source_ref `{journalItemId}:ar_ap_dp`, lihat insert-ar-ap-down-payment.ts)
+  // karena masuk insertedSourceRefs gabungan yang sama, tidak perlu query terpisah.
   await db.execute(
     `DELETE FROM debts WHERE source_ref IN (${placeholders})`,
     insertedSourceRefs

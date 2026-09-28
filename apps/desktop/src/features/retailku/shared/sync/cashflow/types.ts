@@ -1,5 +1,6 @@
 import type { getDb } from "@/lib/db";
 import type { FieldMappingExtraFields, RetailkuMcpConfig } from "@/shared/retailku";
+import type { ResolvedDownPayment } from "./helpers/ar-ap-plan-rows/resolve-down-payment";
 import type { RetailkuArApExistingMode, RetailkuCashflowSyncMode } from "../use-retailku-cashflow-sync-settings";
 
 export type Db = Awaited<ReturnType<typeof getDb>>;
@@ -23,6 +24,8 @@ export type SyncCashflowResult = {
   arApUpdatedCount: number;
   arApPaymentInsertedCount: number;
   arApPaymentInsertedSourceRefs: string[];
+  arApDownPaymentInsertedCount: number;
+  arApDownPaymentInsertedSourceRefs: string[];
   arApUnmappedDebtKeys: string[];
 };
 
@@ -96,6 +99,25 @@ export type ArApSyncPlanRow = {
    * lokal, array ini TETAP `[]` dan skipReason jadi
    * "settlement-partially-not-found" — TIDAK proses partial. */
   willInsertPayments: { debtId: number; amount: number }[];
+  /** Akun kas lokal yang menerima pelunasan ini — hasil resolve
+   * row.cashAccounts via resolveArApCashAccounts. Cuma terisi kalau
+   * baris pelunasan (willInsertPayment atau willInsertPayments) PERSIS
+   * punya 1 cashAccount di sisi Retailku DAN sudah dipetakan ke akun
+   * lokal (localAccountId != null) — data nyata Warung Aqil (26 baris
+   * pelunasan tersedia, semua sourceType) selalu tepat 1 akun kas per
+   * pelunasan, split ke >1 akun kas belum pernah terjadi. NULL untuk
+   * kasus lain (0 atau >1 cashAccount, atau belum dipetakan) — akun
+   * kas tetap tidak terisi, tapi pelunasan itu sendiri tetap tercatat. */
+  paymentAccountId: number | null;
+  /** DP/uang muka yang diterima BERSAMAAN piutang/utang baru tercipta
+   * (row.willInsert atau row.willUpdate true, row.amount SUDAH net
+   * setelah DP dikurangi) — hasil resolve row.cashAccounts via
+   * resolveDownPayment. `null` kalau tidak ada DP (cashAccounts kosong)
+   * ATAU polanya bukan DP murni (>1 cashAccount, amount negatif/campuran
+   * — kasus talangan/PPOB, sengaja diabaikan) ATAU akun kasnya belum
+   * dipetakan. Diinsert sebagai baris `transactions` BIASA (BUKAN
+   * debt_payments) — debts.amount TETAP row.amount, tidak disentuh. */
+  downPayment: ResolvedDownPayment | null;
   skipReason: ArApSkipReason | null;
   debtLocalAccountId: number | null;
   contactId: number | null;

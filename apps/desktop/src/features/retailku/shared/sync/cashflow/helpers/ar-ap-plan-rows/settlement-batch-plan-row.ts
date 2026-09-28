@@ -5,10 +5,19 @@ import type { ArApSyncPlanRow } from "../../types";
 // SEMUA debts di row.settledReceivablePayableJournalItemIds SUDAH
 // ketemu di lokal (all-or-nothing, dicek di index.ts) — siap dicatat
 // sebagai BANYAK debt_payments sekaligus, TIDAK menyentuh debts.amount.
+// paymentAccountId SAMA untuk semua alokasi (satu settlement, satu akun
+// kas — split kas belum pernah terjadi di data nyata, lihat handover).
 export function settlementBatchPlanRow(
   row: ArApRow,
   key: string,
-  allocations: { debtId: number; amount: number }[]
+  allocations: { debtId: number; amount: number }[],
+  paymentAccountId: number | null
 ): ArApSyncPlanRow {
-  return { ...basePlanRow(row, key), willInsert: false, willInsertPayments: allocations, skipReason: null };
+  return {
+    ...basePlanRow(row, key),
+    willInsert: false,
+    willInsertPayments: allocations,
+    paymentAccountId,
+    skipReason: null,
+  };
 }

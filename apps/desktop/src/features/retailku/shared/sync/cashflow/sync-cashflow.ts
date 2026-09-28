@@ -1,4 +1,5 @@
 import { computeCashflowSync } from "./compute-cashflow-sync";
+import { downPaymentSourceRef, insertArApDownPayment } from "./helpers/insert-ar-ap-down-payment";
 import { insertArApPayment } from "./helpers/insert-ar-ap-payment";
 import { insertArApPaymentsBatch } from "./helpers/insert-ar-ap-payments-batch";
 import { insertArApTransaction } from "./helpers/insert-ar-ap-transaction";
@@ -35,6 +36,7 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
   const insertedSourceRefs: string[] = [];
   const arApInsertedSourceRefs: string[] = [];
   const arApPaymentInsertedSourceRefs: string[] = [];
+  const arApDownPaymentInsertedSourceRefs: string[] = [];
   let arApUpdatedCount = 0;
 
   try {
@@ -90,10 +92,27 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
     }
 
     for (const row of plan.arAp.rows) {
+      if (row.downPayment == null) continue;
+      if (DRY_RUN) {
+        console.log("[DRY_RUN] ar-ap down payment row (insert, cashflow biasa)", {
+          accountId: row.downPayment.localAccountId,
+          amount: row.downPayment.amount,
+          date: row.date,
+          note: row.downPayment.note,
+          sourceRef: downPaymentSourceRef(row),
+        });
+      } else {
+        await insertArApDownPayment(db, row);
+      }
+      arApDownPaymentInsertedSourceRefs.push(downPaymentSourceRef(row));
+    }
+
+    for (const row of plan.arAp.rows) {
       if (!row.willInsertPayment) continue;
       if (DRY_RUN) {
         console.log("[DRY_RUN] ar-ap payment row (insert)", {
           paymentDebtId: row.paymentDebtId,
+          paymentAccountId: row.paymentAccountId,
           amount: Math.abs(row.amount),
           date: row.date,
           sourceRef: row.sourceRef,
@@ -109,6 +128,7 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
       if (DRY_RUN) {
         console.log("[DRY_RUN] ar-ap payments batch row (insert, consignment)", {
           allocations: row.willInsertPayments,
+          paymentAccountId: row.paymentAccountId,
           date: row.date,
           sourceRef: row.sourceRef,
         });
@@ -121,7 +141,12 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
     }
   } catch (err) {
     throw new SyncCashflowPartialError(
-      [...insertedSourceRefs, ...arApInsertedSourceRefs, ...arApPaymentInsertedSourceRefs],
+      [
+        ...insertedSourceRefs,
+        ...arApInsertedSourceRefs,
+        ...arApPaymentInsertedSourceRefs,
+        ...arApDownPaymentInsertedSourceRefs,
+      ],
       err
     );
   }
@@ -136,6 +161,8 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
     arApUpdatedCount,
     arApPaymentInsertedCount: arApPaymentInsertedSourceRefs.length,
     arApPaymentInsertedSourceRefs,
+    arApDownPaymentInsertedCount: arApDownPaymentInsertedSourceRefs.length,
+    arApDownPaymentInsertedSourceRefs,
     arApUnmappedDebtKeys: plan.arAp.unmappedDebtKeys,
   };
 }

@@ -1,6 +1,8 @@
 import { alreadySyncedPlanRow } from "./already-synced-plan-row";
 import { insertablePlanRow } from "./insertable-plan-row";
 import { negativeAmountPlanRow } from "./negative-amount-plan-row";
+import { resolveDownPayment } from "./resolve-down-payment";
+import { resolvePaymentAccountId } from "./resolve-payment-account-id";
 import { settledDebtNotFoundPlanRow } from "./settled-debt-not-found-plan-row";
 import { settlementBatchPlanRow } from "./settlement-batch-plan-row";
 import { settlementPartiallyNotFoundPlanRow } from "./settlement-partially-not-found-plan-row";
@@ -12,23 +14,27 @@ import { findSyncedArApDebtId } from "../is-ar-ap-row-synced";
 import { buildArApMappingKey } from "../extract-ar-ap-rows";
 import type { ArApRow } from "../extract-ar-ap-rows";
 import type { ArApSyncPlanRow, Db, RetailkuSyncFieldMappingRow } from "../../types";
-import type { RetailkuArApExistingMode } from "../../../use-retailku-cashflow-sync-settings";
+import type {
+  RetailkuArApExistingMode,
+  RetailkuCashflowSyncMode,
+} from "../../../use-retailku-cashflow-sync-settings";
 
 export type BuildArApPlanRowsResult = {
   planRows: ArApSyncPlanRow[];
   unmappedDebtKeys: string[];
 };
 
-// Scope sesi ini: cuma penciptaan piutang/utang baru (amount > 0), lihat
-// handover 2026-09-28 sesi 3 — amount<=0 dan cashAccounts sengaja
-// belum ditangani. existingMode menentukan perlakuan baris yang SUDAH
-// pernah sync sebelumnya: "skip" (default) atau "overwrite" (UPDATE
-// debts yang ada, bukan buat baru).
+// existingMode menentukan perlakuan baris yang SUDAH pernah sync
+// sebelumnya: "skip" (default) atau "overwrite" (UPDATE debts yang
+// ada, bukan buat baru). mode dipakai resolveDownPayment/
+// resolvePaymentAccountId (key resolusi akun kas SAMA dengan cashflow
+// biasa, tergantung "summary"/"detail").
 export async function buildArApPlanRows(
   db: Db,
   arApRows: ArApRow[],
   fieldMapping: Map<string, RetailkuSyncFieldMappingRow>,
-  existingMode: RetailkuArApExistingMode
+  existingMode: RetailkuArApExistingMode,
+  mode: RetailkuCashflowSyncMode
 ): Promise<BuildArApPlanRowsResult> {
   const planRows: ArApSyncPlanRow[] = [];
   const unmappedDebtKeys = new Set<string>();
@@ -55,7 +61,7 @@ export async function buildArApPlanRows(
         }
         planRows.push(
           allFound
-            ? settlementBatchPlanRow(row, key, allocations)
+            ? settlementBatchPlanRow(row, key, allocations, resolvePaymentAccountId(row, fieldMapping, mode))
             : settlementPartiallyNotFoundPlanRow(row, key)
         );
         continue;
@@ -66,7 +72,7 @@ export async function buildArApPlanRows(
         const paymentDebtId = await findSyncedArApDebtId(db, settledSourceRef);
         planRows.push(
           paymentDebtId != null
-            ? settlementPlanRow(row, key, paymentDebtId)
+            ? settlementPlanRow(row, key, paymentDebtId, resolvePaymentAccountId(row, fieldMapping, mode))
             : settledDebtNotFoundPlanRow(row, key)
         );
         continue;
@@ -85,14 +91,16 @@ export async function buildArApPlanRows(
     const existingDebtId = await findSyncedArApDebtId(db, row.sourceRef);
     if (existingDebtId != null) {
       if (existingMode === "overwrite") {
-        planRows.push(updatablePlanRow(row, key, mapping, existingDebtId));
+        planRows.push(
+          updatablePlanRow(row, key, mapping, existingDebtId, resolveDownPayment(row, fieldMapping, mode))
+        );
       } else {
         planRows.push(alreadySyncedPlanRow(row, key, mapping));
       }
       continue;
     }
 
-    planRows.push(insertablePlanRow(row, key, mapping));
+    planRows.push(insertablePlanRow(row, key, mapping, resolveDownPayment(row, fieldMapping, mode)));
   }
 
   return { planRows, unmappedDebtKeys: [...unmappedDebtKeys] };

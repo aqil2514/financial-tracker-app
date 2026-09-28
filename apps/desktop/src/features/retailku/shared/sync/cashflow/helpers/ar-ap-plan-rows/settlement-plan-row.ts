@@ -5,6 +5,18 @@ import type { ArApSyncPlanRow } from "../../types";
 // Piutang aslinya (source_ref = row.settledReceivablePayableJournalItemId)
 // SUDAH ketemu di debts lokal (paymentDebtId) — baris ini siap dicatat
 // sebagai debt_payments baru, TIDAK menyentuh debts.amount.
-export function settlementPlanRow(row: ArApRow, key: string, paymentDebtId: number): ArApSyncPlanRow {
-  return { ...basePlanRow(row, key), willInsert: false, willInsertPayment: true, paymentDebtId, skipReason: null };
+export function settlementPlanRow(
+  row: ArApRow,
+  key: string,
+  paymentDebtId: number,
+  paymentAccountId: number | null
+): ArApSyncPlanRow {
+  return {
+    ...basePlanRow(row, key),
+    willInsert: false,
+    willInsertPayment: true,
+    paymentDebtId,
+    paymentAccountId,
+    skipReason: null,
+  };
 }

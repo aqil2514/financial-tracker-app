@@ -333,15 +333,135 @@ lihat item terpisah di bawah.**
     `settlement-not-supported`) di percobaan pertama karena cache
     dev server belum reload kode terbaru — refresh manual oleh user
     memperbaikinya, BUKAN bug kode.
-- [ ] **Representasi kas dari pelunasan** — `debt_payments.account_id`
-  NULL sengaja untuk semua baris hasil sync (termasuk SALE_PAYMENT yang
-  SUDAH diimplementasikan) — Retailku expose `cashAccounts` di baris
-  pelunasan, tapi resolusi ke akun lokal butuh mapping terpisah dari
-  mapping AR/AP yang ada sekarang (yang cuma untuk akun piutang/utang,
-  bukan akun kas). BELUM didesain.
-- [ ] Representasi kas dari DP/split payment (`cashAccounts`) — gap
-  lama, TIDAK terkait langsung dengan dokumen ini, tetap seperti
-  tercatat di handover sesi 3.
+- [x] **Representasi kas dari pelunasan** — `debt_payments.account_id`
+  sekarang diisi hasil resolusi `row.cashAccounts`, BUKAN NULL sengaja
+  lagi (berlaku utk semua 4 sourceType, TIDAK perlu perubahan sisi
+  `retail-multitenant` — `cashAccounts` sudah di-expose sebelumnya).
+  - Ditemukan `resolveArApCashAccounts` (`resolve-ar-ap-cash-account.ts`)
+    SUDAH diimplementasikan di sesi/percobaan sebelumnya (mapping key
+    format SAMA dengan cashflow biasa: `detail:{accountId}:{sourceType}:
+    {inflow|outflow}` atau `summary:{inflow|outflow}:{accountId}`),
+    TAPI belum pernah dipanggil di luar test-nya sendiri — gap-nya
+    murni "belum disambungkan", bukan "belum didesain".
+  - **Riset data nyata dulu (Warung Aqil, MCP `get_cashflow_detail`,
+    26 baris pelunasan tersedia across SALE_PAYMENT/PURCHASE_PAYMENT/
+    LEDGER_ENTRY_PAYMENT — CONSIGNMENT_SETTLEMENT tidak ada di rentang
+    yg dicek)** sebelum desain: split 1 pelunasan ke >1 akun kas
+    **TIDAK PERNAH terjadi** — SELALU tepat 1 `cashAccounts` per baris,
+    termasuk pelunasan bertahap/multi-cicilan (Adel dicicil 3x, tiap
+    cicilan tetap 1 akun kas). Keputusan scope (dikonfirmasi user):
+    TANGANI cuma kasus 1 akun kas sekarang, JANGAN bangun heuristik
+    alokasi proporsional N debt x M akun kas yang belum terbukti
+    dibutuhkan data nyata.
+  - Helper baru `resolvePaymentAccountId` (folder `ar-ap-plan-rows/`) —
+    NULL kalau `cashAccounts.length !== 1` (0 atau >1) ATAU akun kas
+    itu belum dipetakan (`localAccountId` null dari resolver); kalau
+    persis 1 DAN sudah dipetakan → isi `localAccountId`nya. Pelunasan
+    itu sendiri TETAP tercatat walau akun kasnya NULL (mengurangi sisa
+    piutang/utang tetap penting, representasi kas cuma pelengkap) —
+    keputusan dikonfirmasi user, konsisten dgn perlakuan
+    `unmapped-account` di cashflow biasa (bukan `unmapped-debt-account`
+    yang skip total).
+  - `ArApSyncPlanRow` tambah field `paymentAccountId: number | null`.
+    `settlementPlanRow`/`settlementBatchPlanRow` terima parameter baru
+    ini (utk batch consignment: SATU nilai dipakai utk SEMUA alokasi,
+    karena satu settlement = satu akun kas menurut temuan riset data).
+    `buildArApPlanRows` sekarang terima parameter baru `mode:
+    RetailkuCashflowSyncMode` (dibutuhkan resolver, sama seperti
+    `aggregateTotals`) — disalurkan dari `input.mode` di
+    `compute-cashflow-sync.ts`. `insertArApPayment`/
+    `insertArApPaymentsBatch` — `account_id` di query INSERT sekarang
+    `$3`/param dari `row.paymentAccountId`, bukan literal `NULL` lagi.
+  - Verifikasi: `npx tsc --noEmit` bersih, `cargo check` sukses (tidak
+    ada migrasi baru, kolom `account_id` sudah ada dari 0026), `npx
+    vitest run` 139/139 lulus (naik dari 129 — 10 test baru: unit test
+    `resolvePaymentAccountId` + skenario resolusi di `buildArApPlanRows`
+    utk kasus 1-akun-kas/unmapped/>1-akun-kas, ditambah assertion
+    `paymentAccountId` di test `insertArApPayment`/
+    `insertArApPaymentsBatch`).
+  - **BELUM** diverifikasi end-to-end via `tauri dev`/data live untuk
+    perubahan spesifik ini (DRY_RUN masih aktif, dan cabang "ketemu"
+    pelunasan tetap belum bisa dites live seperti disebut di gap
+    terpisah di atas) — sejauh ini cuma tervalidasi lewat unit test.
+- [x] **Representasi kas dari DP/split payment** (`cashAccounts` pada
+  piutang/utang BARU, BEDA dari gap "representasi kas dari pelunasan"
+  di atas yang soal `cashAccounts` pada baris PELUNASAN) — awalnya gap
+  lama sesi 2026-09-28-3, DIKERJAKAN sesi ini setelah user minta
+  "handle" secara eksplisit.
+  - **Riset data nyata dulu (Warung Aqil, 73 baris piutang/utang baru
+    tersedia, Jan-Sep 2026)** sebelum desain — ditemukan `cashAccounts`
+    pada piutang baru BUKAN representasi "DP" sederhana, melainkan
+    agregasi SEMUA baris kas/bank di jurnal yang sama, 3 pola berbeda
+    ditemukan: (A) **DP SALE murni** — semua `cashAccounts` positif,
+    `row.amount + SUM(cashAccounts) = total transaksi bulat` (30
+    baris/41%, row.amount SUDAH net setelah DP dikurangi — dibuktikan
+    lewat beberapa contoh nilai bulat, mis. Adel 9000+18000=27000); (B)
+    **LEDGER_ENTRY non-trade dgn cashAccounts NEGATIF** (7 baris) —
+    BUKAN pelunasan/reversal (`settledReceivablePayableJournalItemId:
+    null`, `isReversed: false` semua) — investigasi lanjutan (baca
+    jurnal LENGKAP per contoh) membuktikan ini adalah **kas
+    DIKELUARKAN/dipinjamkan** bersamaan piutang tercipta (mis. "Piutang
+    Non-Dagang: Minjem" — toko meminjamkan uang tunai, kas turun DAN
+    piutang naik dalam 1 peristiwa), bukan DP diterima; (C) **SALE
+    dgn cashAccounts campuran +/-** (2 baris) — artefak agregasi payout
+    provider PPOB (`isProviderPayoutAccount: true` di baris kas lain
+    pada jurnal yang sama), TIDAK murni terkait piutang.
+  - Keputusan scope (dikonfirmasi user via pertanyaan eksplisit):
+    **TANGANI CUMA pola A** (DP SALE murni, semua `cashAccounts`
+    positif). Pola B dan C **SENGAJA DIABAIKAN** — lebih jarang, lebih
+    rumit secara akuntansi (B butuh baris PENGELUARAN bukan pemasukan,
+    C tumpang tindih dgn modul PPOB yg sudah punya
+    `nonRevenuePortion`/`providerPayoutPortion` sendiri).
+  - Keputusan bentuk representasi (dikonfirmasi user): DP diinsert
+    sebagai **1 baris `transactions` BIASA** (SAMA seperti cashflow
+    non-AR/AP lain), **BUKAN** `debt_payments` yang mencicil `debts`
+    baru itu sendiri — opsi itu ditolak karena beberapa contoh nyata
+    justru DP > sisa piutang (mis. Adel: piutang net 9000, DP 18000),
+    yang akan menghasilkan "cicilan lebih besar dari pokok" pada model
+    `debt_payments` yang tidak masuk akal. `debts.amount` TETAP
+    `row.amount` (net), TIDAK disentuh sama sekali oleh DP.
+  - Riset lanjutan: cek 37 contoh cache — SEMUA baris pola A cuma
+    punya tepat 1 `cashAccounts` (0 kasus split ke >1 akun kas
+    berbeda) — konsisten dgn temuan sisi pelunasan sebelumnya, scope
+    "cuma 1 akun kas" aman dipakai lagi di sini.
+  - Helper baru `resolveDownPayment` (folder `ar-ap-plan-rows/`) — NULL
+    kalau `cashAccounts.length !== 1` ATAU elemen itu negatif/nol ATAU
+    belum dipetakan; kalau lolos semua, resolve ke `{amount,
+    localAccountId, note, categoryId, description}` lewat `key`
+    SAMA format dgn cashflow biasa (`detail:{accountId}:{sourceType}:
+    inflow` / `summary:inflow:{accountId}`) — reuse mapping yang SUDAH
+    diatur user utk cashflow biasa, tidak perlu UI mapping baru.
+  - `ArApSyncPlanRow` tambah field `downPayment: ResolvedDownPayment |
+    null`. `insertablePlanRow`/`updatablePlanRow` (folder
+    `ar-ap-plan-rows/`, BUKAN `plan-rows/` biasa) terima parameter baru
+    ini dari `buildArApPlanRows`. `alreadySyncedPlanRow` SENGAJA TIDAK
+    diberi `downPayment` (tetap `null` dari `basePlanRow`) — DP piutang
+    yang sudah pernah sync seharusnya sudah tercatat di sync
+    sebelumnya, jangan insert dobel.
+  - Helper baru `insertArApDownPayment` — INSERT `transactions` (reuse
+    `insertCashflowTransaction` yang sudah ada), `source_ref` diturunkan
+    dari `row.journalItemId` (BUKAN `row.sourceRef` yang dipakai
+    `debts`) format `{journalItemId}:ar_ap_dp` — unik & idempotent per
+    journal item, tidak bentrok dgn source_ref manapun. `sync-cashflow.ts`
+    loop baru (sebelum loop pelunasan) + `SyncCashflowResult` tambah
+    `arApDownPaymentInsertedCount`/`arApDownPaymentInsertedSourceRefs`.
+    Rollback (`sync-all.ts`) TIDAK perlu query baru — source_ref DP
+    otomatis masuk `DELETE FROM transactions` yang sudah ada (list
+    gabungan `insertedSourceRefs`).
+  - Preview UI: summary stat baru "DP akan tercatat", badge tambahan
+    "+DP" di samping badge status utama (DP BUKAN status eksklusif —
+    bisa muncul bersamaan `willInsert`/`willUpdate`).
+  - Verifikasi: `npx tsc --noEmit` bersih, `cargo check` sukses (tidak
+    ada migrasi baru, reuse tabel `transactions`), `npx vitest run`
+    153/153 lulus (naik dari 139 — 14 test baru: unit test
+    `resolveDownPayment` (7 skenario: kosong/positif/unmapped/negatif/
+    campuran/note-fallback/mode-summary), `insertArApDownPayment` (2),
+    skenario resolusi DP di `buildArApPlanRows` (4: insert/update/tanpa-
+    DP/already-synced-tidak-dobel)).
+  - **BELUM** diverifikasi end-to-end via `tauri dev`/data live untuk
+    perubahan spesifik ini (DRY_RUN masih aktif) — sejauh ini cuma
+    tervalidasi lewat unit test, SAMA seperti gap "representasi kas
+    dari pelunasan" di atas.
 - [ ] `account_type: advance` — masih rencana dokumen terpisah
   (`docs/todos/plan/account-type.md`).
 - [ ] DRY_RUN belum dinonaktifkan — semua di atas baru actionable

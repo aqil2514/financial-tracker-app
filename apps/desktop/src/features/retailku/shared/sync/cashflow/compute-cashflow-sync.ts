@@ -27,7 +27,8 @@ export async function computeCashflowSync(
       db,
       arApRows,
       fieldMapping,
-      input.arApExistingMode
+      input.arApExistingMode,
+      input.mode
     );
 
     return {

@@ -21,6 +21,8 @@ function baseRow(overrides: Partial<ArApSyncPlanRow> = {}): ArApSyncPlanRow {
     willInsertPayment: true,
     paymentDebtId: 77,
     willInsertPayments: [],
+    paymentAccountId: null,
+    downPayment: null,
     skipReason: null,
     debtLocalAccountId: null,
     contactId: null,
@@ -44,16 +46,36 @@ function createFakeDb() {
 }
 
 describe("insertArApPayment", () => {
-  it("insert debt_payments dengan amount dibalik jadi positif, account_id NULL, source retailku_sync", async () => {
+  it("insert debt_payments dengan amount dibalik jadi positif, account_id NULL (belum dipetakan), source retailku_sync", async () => {
     const { db, inserted } = createFakeDb();
-    const row = baseRow({ amount: -3000, paymentDebtId: 77, date: "2026-08-09", sourceRef: "j1:ar_ap" });
+    const row = baseRow({
+      amount: -3000,
+      paymentDebtId: 77,
+      paymentAccountId: null,
+      date: "2026-08-09",
+      sourceRef: "j1:ar_ap",
+    });
 
     await insertArApPayment(db as any, row);
 
     expect(inserted).toHaveLength(1);
     expect(inserted[0].sql).toContain("INSERT INTO debt_payments");
-    expect(inserted[0].sql).toContain("NULL");
     expect(inserted[0].sql).toContain("'retailku_sync'");
-    expect(inserted[0].params).toEqual([77, 3000, "2026-08-09", "j1:ar_ap"]);
+    expect(inserted[0].params).toEqual([77, 3000, null, "2026-08-09", "j1:ar_ap"]);
+  });
+
+  it("paymentAccountId terisi -> account_id ikut terisi di params", async () => {
+    const { db, inserted } = createFakeDb();
+    const row = baseRow({
+      amount: -3000,
+      paymentDebtId: 77,
+      paymentAccountId: 5,
+      date: "2026-08-09",
+      sourceRef: "j1:ar_ap",
+    });
+
+    await insertArApPayment(db as any, row);
+
+    expect(inserted[0].params).toEqual([77, 3000, 5, "2026-08-09", "j1:ar_ap"]);
   });
 });

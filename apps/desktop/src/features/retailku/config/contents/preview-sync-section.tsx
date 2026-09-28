@@ -43,7 +43,7 @@ export function PreviewSyncSection() {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Preview Sinkronisasi</DialogTitle>
             <DialogDescription>
@@ -129,6 +129,7 @@ function ArApPreview({ arAp }: { arAp: ArApSyncPlan }) {
   const toUpdate = arAp.rows.filter((row) => row.willUpdate);
   const toInsertPayment = arAp.rows.filter((row) => row.willInsertPayment);
   const toInsertPaymentsBatch = arAp.rows.filter((row) => row.willInsertPayments.length > 0);
+  const toInsertDownPayment = arAp.rows.filter((row) => row.downPayment != null);
   const skipped = arAp.rows.filter(
     (row) =>
       !row.willInsert && !row.willUpdate && !row.willInsertPayment && row.willInsertPayments.length === 0
@@ -136,11 +137,12 @@ function ArApPreview({ arAp }: { arAp: ArApSyncPlan }) {
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-7">
         <SummaryStat label="Piutang/utang baru" value={toInsert.length} />
         <SummaryStat label="Akan ditimpa ulang" value={toUpdate.length} />
         <SummaryStat label="Pelunasan tercatat" value={toInsertPayment.length} />
         <SummaryStat label="Pelunasan konsinyasi" value={toInsertPaymentsBatch.length} />
+        <SummaryStat label="DP akan tercatat" value={toInsertDownPayment.length} />
         <SummaryStat label="Baris di-skip" value={skipped.length} />
         <SummaryStat label="Akun belum dipetakan" value={arAp.unmappedDebtKeys.length} />
       </div>
@@ -167,8 +169,11 @@ function ArApPreview({ arAp }: { arAp: ArApSyncPlan }) {
                   <TableCell className="text-muted-foreground">{row.accountName}</TableCell>
                   <TableCell className="text-muted-foreground">{row.partyName ?? "—"}</TableCell>
                   <TableCell className="text-right">{formatCurrency(row.amount, "IDR")}</TableCell>
-                  <TableCell>
-                    <ArApStatusBadge row={row} />
+                  <TableCell className="whitespace-normal">
+                    <div className="flex flex-wrap gap-1">
+                      <ArApStatusBadge row={row} />
+                      {row.downPayment != null && <Badge variant="outline">+DP</Badge>}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

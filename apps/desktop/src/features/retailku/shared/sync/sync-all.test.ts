@@ -40,6 +40,8 @@ const emptyCashflowResult: SyncCashflowResult = {
   arApUpdatedCount: 0,
   arApPaymentInsertedCount: 0,
   arApPaymentInsertedSourceRefs: [],
+  arApDownPaymentInsertedCount: 0,
+  arApDownPaymentInsertedSourceRefs: [],
   arApUnmappedDebtKeys: [],
 };
 
@@ -83,6 +85,7 @@ describe("syncAll", () => {
       arApInsertedCount: 0,
       arApUpdatedCount: 0,
       arApPaymentInsertedCount: 0,
+      arApDownPaymentInsertedCount: 0,
       arApUnmappedDebtKeys: [],
     });
   });

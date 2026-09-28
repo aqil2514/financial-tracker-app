@@ -1,4 +1,5 @@
 import { basePlanRow } from "./base-plan-row";
+import type { ResolvedDownPayment } from "./resolve-down-payment";
 import type { ArApRow } from "../extract-ar-ap-rows";
 import type { ArApSyncPlanRow, RetailkuSyncFieldMappingRow } from "../../types";
 
@@ -6,7 +7,8 @@ export function updatablePlanRow(
   row: ArApRow,
   key: string,
   mapping: RetailkuSyncFieldMappingRow,
-  existingDebtId: number
+  existingDebtId: number,
+  downPayment: ResolvedDownPayment | null
 ): ArApSyncPlanRow {
   return {
     ...basePlanRow(row, key),
@@ -17,5 +19,6 @@ export function updatablePlanRow(
     debtLocalAccountId: mapping.localAccountId,
     contactId: mapping.extraFields.contactId ?? null,
     contactFollowSource: mapping.extraFields.contactFollowSource ?? false,
+    downPayment,
   };
 }
