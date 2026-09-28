@@ -1,11 +1,5 @@
 import { getFundTransferList, type connectRetailkuMcp } from "@/shared/retailku";
 
-/** Loop pagination `get_fund_transfer_list` sampai semua halaman
- * terambil — pola sama `fetch-all-cashflow-detail-rows.ts`, TAPI
- * kondisi berhenti beda (`{ total, page, limit }` langsung di
- * top-level, BUKAN `meta.pagination.totalPages`, lihat
- * `get-fund-transfer-list.ts`). Hanya `status: "POSTED"` yang diminta
- * ke server (transfer DRAFT/CANCELLED tidak relevan utk mapping/sync). */
 export async function fetchAllTransferListItems(
   client: Awaited<ReturnType<typeof connectRetailkuMcp>>,
   input: { dateFrom: string; dateTo: string; timezone: string }
