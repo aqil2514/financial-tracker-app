@@ -30,13 +30,15 @@ type RetailkuSyncFieldMappingRow = {
  * di-mapping") — dipakai badge/deteksi orphan (`useRetailkuMappingIssues`,
  * `AppSidebar`) yang levelnya masih PER AKUN, bukan per key detail.
  *
- * Halaman `/retailku/mapping` terpisah (`AccountMappingList`,
+ * Halaman `/retailku/mapping` LAMA (`AccountMappingList`,
  * `use-account-mapping-draft.ts`) SUDAH DIHAPUS (2026-09-24) — diganti
- * tab "Mapping" di halaman Sync Cashflow (`field-mapping-tab.tsx`), lihat
+ * tab "Mapping" di halaman Sync Cashflow, lalu (2026-09-28) tab itu
+ * sendiri dipecah lagi jadi halaman `/retailku/mapping` yang BARU
+ * (`features/retailku/mapping/`, bukan kode lama yang sama), lihat
  * docs/todos/plan/retailku-sync-field-mapping.md. Hook ini TETAP
  * dipertahankan aktif karena dipakai badge sidebar & deteksi orphan
- * mapping yang jalan GLOBAL (bukan cuma di tab mapping), TIDAK boleh
- * crash gara-gara tabel lama sudah di-drop.
+ * mapping yang jalan GLOBAL (bukan cuma di halaman mapping), TIDAK
+ * boleh crash gara-gara tabel lama sudah di-drop.
  */
 export function useRetailkuAccountMapping() {
   return useQuery({

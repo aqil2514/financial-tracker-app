@@ -80,14 +80,18 @@ const staticCollapsibleNavItems: CollapsibleNavGroup[] = [
 /** Grup "Retailku" cuma disisipkan begitu kredensial (URL MCP + API
  * Key) sudah tersimpan — menu setup mapping akun tidak ada gunanya
  * sebelum terkoneksi, lihat "Status implementasi" di
- * retailku-integration.md. Halaman /retailku/mapping terpisah (menu
- * "Mapping Akun") sudah DIHAPUS — pengaturan mapping sekarang di tab
- * "Mapping" pada halaman "Sync Cashflow" itu sendiri, lihat
- * docs/todos/plan/retailku-sync-field-mapping.md. */
+ * retailku-integration.md. Sebelumnya "Sync Cashflow" adalah SATU
+ * halaman dengan 3 tab (Ringkasan/Mapping/Konfigurasi) — dipecah jadi
+ * 3 route terpisah supaya tiap bagian bisa langsung diakses/di-bookmark
+ * lewat URL-nya sendiri, lihat docs/rules/page-layout.md. */
 const retailkuNavGroup: CollapsibleNavGroup = {
   title: "Retailku",
   icon: Building2,
-  items: [{ title: "Sync Cashflow", url: "/retailku/cashflow" }],
+  items: [
+    { title: "Ringkasan", url: "/retailku/cashflow" },
+    { title: "Mapping", url: "/retailku/mapping" },
+    { title: "Konfigurasi", url: "/retailku/config" },
+  ],
 };
 
 export function AppSidebar() {
