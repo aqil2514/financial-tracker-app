@@ -9,7 +9,24 @@ import type { getCashflowDetail } from "@/shared/retailku";
 export type ArApRow = {
   journalItemId: string;
   date: string;
+  /** Akun jurnal piutang/utang Retailku ("Piutang Dagang"/"Hutang ke
+   * Penitip") — dasar `key` mapping (lihat di bawah), SAMA pola dgn key
+   * generic (`detail:<accountId>:...`). Data nyata (Warung Aqil,
+   * 2026-09): cuma 1-2 akun total per toko, jadi mapping AR/AP HANYA
+   * 1-2 baris (bukan per pihak). */
+  accountId: string;
+  accountCode: string;
+  accountName: string;
   direction: "receivable" | "payable";
+  /** Identitas PIHAK Retailku (customer/supplier) baris ini — BUKAN
+   * bagian `key` (lihat di bawah), dipakai HANYA sbg sumber toggle
+   * "Mengikuti Retailku" (kontak per transaksi), SAMA konsep
+   * `noteFollowSource` di varian lain. `null` kalau sisi Retailku belum
+   * bisa resolve pihaknya — toggle tetap bisa ON, TAPI transaksi baris
+   * ini akan fallback ke kontak statis mapping (tidak ada partyName
+   * utk diikuti). */
+  partyId: string | null;
+  partyName: string | null;
   /** Piutang baru = akun piutang DEBIT (net positif), pelunasan = akun
    * piutang KREDIT (net negatif) — arahnya BERLAWANAN untuk utang
    * (`payable`): utang baru = KREDIT, pelunasan = DEBIT. Sudah
@@ -18,6 +35,19 @@ export type ArApRow = {
   amount: number;
   sourceRef: string;
 };
+
+/** `key` mapping AR/AP — PER AKUN JURNAL Retailku ("Piutang Dagang"/
+ * "Hutang ke Penitip") + arah, SAMA pola persis dgn key generic
+ * (`detail:<accountId>:<sourceType>:<arah>`) — BUKAN per pihak (dicoba
+ * 2026-09-28, DIBATALKAN: pihak berpindah metode bayar bebas kapan saja
+ * — mis. hari ini Kas Tunai besok Transfer Bank utk pihak yang SAMA —
+ * beda sifat dari pasangan akun transfer yang memang STABIL selamanya,
+ * jadi tidak cocok jadi identitas key). Identitas pihak (`partyName`)
+ * tetap dipakai TAPI cuma sbg sumber toggle "Mengikuti Retailku" (lihat
+ * `ArApRow.partyId`), bukan pemisah key. */
+export function buildArApMappingKey(accountId: string, direction: "receivable" | "payable"): string {
+  return `ar_ap:${accountId}:${direction}`;
+}
 
 /** Pisahkan baris `isReceivablePayableAccount: true` dari hasil mentah
  * `get_cashflow_detail` — DIPANGGIL SEBELUM `aggregate-by-*.ts` (yang
@@ -43,6 +73,11 @@ export function extractArApRows(
       return {
         journalItemId: row.id,
         date: row.date.slice(0, 10),
+        accountId: row.accountId,
+        accountCode: row.accountCode,
+        accountName: row.accountName,
+        partyId: row.partyId,
+        partyName: row.partyName,
         direction,
         amount,
         sourceRef: `${row.id}:ar_ap`,

@@ -6,9 +6,6 @@ export interface UseSyncNowInput {
   hasCredentials: boolean;
   retailkuSettings: RetailkuSettings | undefined;
   mode: RetailkuCashflowSyncMode;
-  arApCashAccountId: string;
-  receivableDebtAccountId: string;
-  payableDebtAccountId: string;
   syncRangeValue: SyncRange;
 }
 

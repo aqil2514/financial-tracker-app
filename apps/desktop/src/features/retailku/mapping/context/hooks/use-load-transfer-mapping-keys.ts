@@ -10,10 +10,6 @@ export type TransferMappingKeyCandidate = {
   key: string;
   fromAccountName: string;
   toAccountName: string;
-  /** Berapa transaksi transfer dgn PASANGAN akun ini muncul di rentang
-   * tanggal yg dimuat — MURNI informasi tampilan (bukan bagian `key`,
-   * lihat `extract-transfer-rows.ts`), supaya user tahu key ini
-   * mewakili banyak transaksi, bukan satu. */
   transactionCount: number;
 };
 
@@ -23,17 +19,6 @@ export type LoadTransferMappingKeysInput = {
   dateTo: string;
 };
 
-/** Cari SEMUA `key` transfer (`transfer:<fromAccountId>:<toAccountId>`,
- * per PASANGAN akun — lihat `extract-transfer-rows.ts`) yang muncul di
- * rentang tanggal tertentu — SEJAJAR `useLoadMappingKeys` (generic),
- * TAPI TIDAK lewat `computeCashflowSync`/`aggregate-by-*.ts` sama
- * sekali (lihat `extract-transfer-rows.ts`: `fromAccountId`/
- * `toAccountId` sudah eksplisit dari sumbernya sendiri, tidak perlu
- * agregasi net kas). Sumber: `get_fund_transfer_list` LANGSUNG,
- * connect+fetch+close sendiri (pola sama `use-retailku-cashflow-detail.ts`),
- * BUKAN diperluas dari `computeCashflowSync` — menjaga jalur transfer
- * tetap terpisah dari mesin agregasi generik, lihat diskusi handover
- * "gambaran kode" 2026-09-28. */
 export function useLoadTransferMappingKeys() {
   return useMutation<TransferMappingKeyCandidate[], Error, LoadTransferMappingKeysInput>({
     mutationFn: async (input) => {

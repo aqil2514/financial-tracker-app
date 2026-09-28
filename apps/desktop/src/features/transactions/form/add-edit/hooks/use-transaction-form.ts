@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 
 import { useAccounts } from "@/features/accounts";
@@ -52,6 +53,33 @@ export function useTransactionForm({
   );
   const sourceIsDebt = sourceAccount?.account_type === "debt";
   const destinationIsDebt = destinationAccount?.account_type === "debt";
+
+  // Akun `debt` cuma bisa disentuh lewat transfer (lihat
+  // apply-debt-transaction.ts — dipilih di income/expense akan
+  // "tersimpan" tapi TIDAK PERNAH tercatat sebagai piutang/utang, bug
+  // senyap). Dua aturan UX saling melengkapi:
+  // 1. Pilih akun debt sbg "Akun" -> tipe otomatis dipaksa ke transfer.
+  // 2. User ganti tipe MENJAUH dari transfer sementara akun yang
+  //    sedang terpilih bertipe debt -> akun itu dikosongkan lagi
+  //    (bukan reset SETIAP kali tipe berubah, supaya efek 1 tidak
+  //    saling menganulir efek ini di render yang sama).
+  const previousTypeRef = useRef(type);
+
+  useEffect(() => {
+    if (sourceIsDebt && type !== "transfer") {
+      form.setValue("type", "transfer", { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reaksi ke accountId (via sourceIsDebt), `type`/`form` sengaja tidak di deps supaya tidak retrigger tiap render
+  }, [sourceIsDebt]);
+
+  useEffect(() => {
+    const typeChanged = previousTypeRef.current !== type;
+    previousTypeRef.current = type;
+    if (typeChanged && type !== "transfer" && sourceIsDebt) {
+      form.setValue("account_id", "", { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reaksi ke perubahan `type` saja, `sourceIsDebt`/`form` dibaca dari closure terbaru tanpa perlu retrigger sendiri
+  }, [type]);
 
   const { debtStatus, involvesDebtAccount, debtFieldsLocked, needsDebtAction, validateDebtFields } =
     useTransactionDebtFields({

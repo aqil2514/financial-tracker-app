@@ -9,7 +9,7 @@ export function MappingField() {
   const { rows } = candidates;
   const { activeKey, setActiveKey } = filter;
   const { updateDraft } = draftState;
-  const { localAccountOptions, categoryOptions } = resources;
+  const { localAccountOptions, debtAccountOptions, contactOptions, categoryOptions } = resources;
 
   return (
     <div className="min-w-0 space-y-3">
@@ -21,6 +21,8 @@ export function MappingField() {
           <FlexRenderForm
             row={row}
             localAccountOptions={localAccountOptions}
+            debtAccountOptions={debtAccountOptions}
+            contactOptions={contactOptions}
             categoryOptions={categoryOptions}
             onChange={(patch) => updateDraft(row.key, patch)}
           />

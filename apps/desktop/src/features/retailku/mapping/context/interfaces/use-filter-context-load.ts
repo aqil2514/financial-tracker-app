@@ -1,5 +1,6 @@
 import { useLoadMappingKeys } from "../hooks/use-load-mapping-keys";
 import { useLoadTransferMappingKeys } from "../hooks/use-load-transfer-mapping-keys";
+import { useLoadArApMappingKeys } from "../hooks/use-load-ar-ap-mapping-keys";
 import { UseFilterContextOutput } from "./use-filter-context";
 
 export interface UseFilterContextLoadInput {
@@ -13,6 +14,9 @@ export interface UseFilterContextLoadInput {
    * `header/filter.tsx`) — jalur transfer TIDAK punya filter mode
    * (summary/detail) sendiri, TIDAK terpengaruh `mode`. */
   loadTransferKeys: ReturnType<typeof useLoadTransferMappingKeys>;
+  /** SAMA pola `loadTransferKeys` — jalur AR/AP juga TIDAK terpengaruh
+   * `mode`, dimuat bersamaan dari 1 tombol yang sama. */
+  loadArApKeys: ReturnType<typeof useLoadArApMappingKeys>;
 }
 
 export interface UseFilterContextLoadOutput {

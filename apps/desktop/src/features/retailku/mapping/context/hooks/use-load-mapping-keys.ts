@@ -12,11 +12,6 @@ export type MappingKeyCandidate = {
   retailkuAccountId: string;
   retailkuAccountCode: string;
   accountName: string;
-  /** `true` kalau key ini SUDAH ada baris `retailku_sync_field_mapping`
-   * (dicek dari `skipReason !== "unmapped-account"` hasil
-   * `computeCashflowSync`) — dipakai urutan tampilan (belum dipetakan
-   * duluan), BUKAN sumber kebenaran akhir (itu tetap `useFieldMapping`,
-   * di-gabung terpisah oleh `use-mapping-draft.ts`). */
   alreadyMapped: boolean;
 };
 
@@ -27,39 +22,18 @@ export type LoadMappingKeysInput = {
   dateTo: string;
 };
 
-/**
- * Cari SEMUA `key` (lihat `CashflowSyncPlanRow.key`) yang muncul di
- * rentang tanggal tertentu — key baru cuma "ada" setelah sync (atau
- * preview-nya) menjumpai kombinasi itu, jadi UI tab Mapping TIDAK bisa
- * cukup baca `retailku_sync_field_mapping` (isinya cuma yang SUDAH
- * di-mapping) — perlu jalan `computeCashflowSync` (baca-saja, SAMA
- * dipakai Preview Sync di tab Konfigurasi) untuk tahu key APA SAJA yang
- * relevan, lihat docs/todos/plan/retailku-sync-field-mapping.md.
- *
- * Dedupe per `key` (satu rentang tanggal bisa punya banyak baris
- * dengan `key` sama, mis. tiap hari) — cukup simpan SATU representative
- * (`accountName` dkk sama untuk key yang sama, jadi baris pertama yang
- * ditemukan cukup).
- */
 export function useLoadMappingKeys() {
   return useMutation<MappingKeyCandidate[], Error, LoadMappingKeysInput>({
     mutationFn: async (input) => {
       const config = assertRetailkuConfigured(input.retailkuSettings!);
       const db = await getDb();
 
-      // Field AR/AP sengaja `null` — tab Mapping cuma butuh DAFTAR key
-      // cashflow biasa (`plan.rows`), tidak insert apa pun (baca-saja).
-      // `computeCashflowSync` menangani `null` sebagai "skip AR/AP,
-      // debt-account-not-configured", TIDAK memengaruhi `plan.rows`.
       const plan = await computeCashflowSync(db, {
         mcpConfig: config,
         dateFrom: input.dateFrom,
         dateTo: input.dateTo,
         timezone: "Asia/Jakarta",
         mode: input.mode,
-        receivableDebtAccountId: null,
-        payableDebtAccountId: null,
-        arApCashAccountId: null,
       });
 
       const byKey = new Map<string, MappingKeyCandidate>();

@@ -71,6 +71,19 @@ export type RetailkuCashflowDetailRow = {
    * mengurangi/pelunasan) — `"payable"` = akun utang (kredit menambah
    * utang baru, debit mengurangi/pelunasan). */
   receivablePayableDirection: "receivable" | "payable" | null;
+  /** Identitas PIHAK (customer/supplier) piutang/utang ini — `null`
+   * kalau baris ini BUKAN piutang/utang, atau pihaknya belum bisa
+   * ditentukan sisi Retailku (jalur join belum lengkap utk role
+   * tertentu). Ditambahkan 2026-09-28 di `get-cfr-detail.helper.ts`
+   * (repo retail-multitenant) — jalur join BEDA-BEDA tergantung
+   * `sourceType` (SALE->customer, DIRECT_PURCHASE->supplier,
+   * CONSIGNMENT_PAYABLE->consignmentStockLogs.supplier BUKAN customer,
+   * ledger manual->ledgerEntry.party), diverifikasi ke data nyata
+   * Warung Aqil (14/14 baris AR/AP September 2026 resolve benar).
+   * Dipakai sbg identitas KEY mapping AR/AP granular per pihak (lihat
+   * extract-ar-ap-rows.ts), BUKAN cuma tampilan. */
+  partyId: string | null;
+  partyName: string | null;
   debit: number;
   credit: number;
 };

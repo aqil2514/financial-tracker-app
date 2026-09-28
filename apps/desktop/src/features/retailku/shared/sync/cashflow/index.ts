@@ -5,5 +5,4 @@ export type {
   SyncCashflowResult,
   CashflowSyncPlan,
   CashflowSyncPlanRow,
-  ArApSyncPlanRow,
 } from "./types";

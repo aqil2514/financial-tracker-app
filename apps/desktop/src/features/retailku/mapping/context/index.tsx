@@ -11,6 +11,7 @@ import {
   useFilterContextLoad,
   useLoadMappingKeys,
   useLoadTransferMappingKeys,
+  useLoadArApMappingKeys,
   useMappingCandidates,
   useMappingDraftSave,
   useResources,
@@ -43,11 +44,13 @@ export function RetailkuSyncCashflowMappingProvider({ children }: Props) {
   const resources = useResources();
   const loadKeys = useLoadMappingKeys();
   const loadTransferKeys = useLoadTransferMappingKeys();
-  const loads = useFilterContextLoad({ filter, loadKeys, loadTransferKeys });
+  const loadArApKeys = useLoadArApMappingKeys();
+  const loads = useFilterContextLoad({ filter, loadKeys, loadTransferKeys, loadArApKeys });
   const draftState = useDraftState();
   const candidates = useMappingCandidates({
     loadKeys,
     loadTransferKeys,
+    loadArApKeys,
     mode: filter.mode,
     drafts: draftState.drafts,
   });

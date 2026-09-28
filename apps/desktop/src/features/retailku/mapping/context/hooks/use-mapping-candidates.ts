@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import {
+  ArApMappingRowDraft,
   GenericMappingRowDraft,
   MappingRowDraft,
   TransferMappingRowDraft,
@@ -11,11 +12,13 @@ import {
   MappingKeyCandidate,
 } from "./use-load-mapping-keys";
 import { TransferMappingKeyCandidate } from "./use-load-transfer-mapping-keys";
+import { ArApMappingKeyCandidate } from "./use-load-ar-ap-mapping-keys";
 import { JSONContent } from "@tiptap/react";
 
 export function useMappingCandidates({
   loadKeys,
   loadTransferKeys,
+  loadArApKeys,
   mode,
   drafts,
 }: UseMappingCandidatesInput): UseMappingCandidatesOutput {
@@ -100,9 +103,36 @@ export function useMappingCandidates({
     }));
   }, [loadTransferKeys.data, savedByKey, drafts]);
 
+  const arApRows: ArApMappingRowDraft[] = useMemo(() => {
+    const candidates: ArApMappingKeyCandidate[] = loadArApKeys.data ?? [];
+    const byKey = new Map<string, ArApMappingRowDraft>();
+
+    for (const candidate of candidates) {
+      const saved = savedByKey.get(candidate.key);
+      byKey.set(candidate.key, {
+        key: candidate.key,
+        sourceType: "AR_AP",
+        accountName: candidate.accountName,
+        direction: candidate.direction,
+        transactionCount: candidate.transactionCount,
+        partyNames: candidate.partyNames,
+        localAccountId: saved?.localAccountId ?? null,
+        contactId: saved?.extraFields.contactId ?? null,
+        contactFollowSource: saved?.extraFields.contactFollowSource ?? false,
+        note: saved?.note ?? "",
+        description: parseDescription(saved?.description ?? null),
+      });
+    }
+
+    return [...byKey.values()].map((row) => ({
+      ...row,
+      ...(drafts[row.key] as Partial<ArApMappingRowDraft> | undefined),
+    }));
+  }, [loadArApKeys.data, savedByKey, drafts]);
+
   const rows: MappingRowDraft[] = useMemo(
-    () => [...genericRows, ...transferRows],
-    [genericRows, transferRows]
+    () => [...genericRows, ...transferRows, ...arApRows],
+    [genericRows, transferRows, arApRows]
   );
 
   return { rows };

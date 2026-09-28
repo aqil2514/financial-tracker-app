@@ -16,31 +16,13 @@ vi.mock("./cashflow", async () => {
   };
 });
 
-/**
- * `syncAll` diuji lewat mock modul (bukan fake DB in-memory seperti
- * `apply-debt-transaction.test.ts`) karena yang diuji di sini BUKAN SQL
- * `syncAll` sendiri (dia tidak menulis apa pun langsung), tapi
- * ORKESTRASI-nya: rollback saat `syncCashflow` gagal di tengah jalan
- * (lewat `SyncCashflowPartialError`), dan yang terpenting — LOCK
- * in-memory yang mencegah dua panggilan `syncAll()` konkuren saling
- * menimpa (root cause bug live "UNIQUE constraint failed:
- * transactions.source, transactions.source_ref", lihat handover
- * 2026-09-23).
- *
- * BEDA dari versi lama (`syncCashflow` + `syncArAp` dua panggilan
- * terpisah, `sync-ar-ap.ts` DIHAPUS): sekarang `syncCashflow` SATU-
- * SATUNYA panggilan (mencakup cashflow DAN AR/AP sekaligus, lihat
- * docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md), jadi test
- * rollback di sini menguji `SyncCashflowPartialError` (dilempar
- * `syncCashflow` sendiri saat insert gagal di tengah loop), bukan lagi
- * "AR/AP gagal setelah cashflow sukses" seperti sebelumnya.
- */
+// syncAll diuji lewat mock modul (bukan fake DB in-memory) karena yang diuji
+// bukan SQL syncAll sendiri, tapi orkestrasinya: rollback saat syncCashflow
+// gagal di tengah jalan, dan lock in-memory yang mencegah dua panggilan
+// syncAll() konkuren saling menimpa.
 
 const baseInput: SyncAllInput = {
   mcpConfig: { mcpUrl: "https://mcp.example", apiKey: "key" } as SyncAllInput["mcpConfig"],
-  arApCashAccountId: 1,
-  receivableDebtAccountId: 2,
-  payableDebtAccountId: 3,
   dateFrom: "2026-01-01",
   dateTo: "2026-01-31",
   timezone: "Asia/Jakarta",
@@ -52,8 +34,6 @@ const emptyCashflowResult: SyncCashflowResult = {
   insertedSourceRefs: [],
   unmappedKeys: [],
   deactivatedPaymentMethodAccountIds: [],
-  arApInsertedCount: 0,
-  arApAccountNotConfigured: false,
 };
 
 /** Promise yang bisa "ditahan" lalu diselesaikan manual dari test —
@@ -80,22 +60,19 @@ describe("syncAll", () => {
     vi.restoreAllMocks();
   });
 
-  it("menjalankan syncCashflow dan mengembalikan hasil gabungan cashflow+AR/AP", async () => {
+  it("menjalankan syncCashflow dan mengembalikan hasilnya", async () => {
     vi.mocked(syncCashflow).mockResolvedValue({
       ...emptyCashflowResult,
       insertedCount: 3,
-      arApInsertedCount: 1,
       insertedSourceRefs: ["a", "b", "c"],
     });
 
     const result = await syncAll(baseInput);
 
     expect(result).toEqual({
-      cashflowInsertedCount: 2,
+      cashflowInsertedCount: 3,
       cashflowUnmappedKeys: [],
       cashflowDeactivatedPaymentMethodAccountIds: [],
-      arApInsertedCount: 1,
-      arApAccountNotConfigured: false,
     });
   });
 

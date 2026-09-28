@@ -6,6 +6,7 @@ import {
 import {
   GenericMappingRowDraft,
   TransferMappingRowDraft,
+  ArApMappingRowDraft,
   MappingRowDraft,
   UseMappingCandidatesInput,
   UseMappingCandidatesOutput,
@@ -30,6 +31,7 @@ export type {
   //   Candidates
   GenericMappingRowDraft,
   TransferMappingRowDraft,
+  ArApMappingRowDraft,
   MappingRowDraft,
   UseMappingCandidatesInput,
   UseMappingCandidatesOutput,

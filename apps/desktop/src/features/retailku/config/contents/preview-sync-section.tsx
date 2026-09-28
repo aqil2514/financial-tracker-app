@@ -15,14 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency } from "@/lib/format-currency";
 import { useRetailkuSyncCashflowConfig } from "../context";
 
-/** Section "Preview Data" — tombol yang menghitung APA yang akan
- * disinkronkan (via `computeCashflowSync`, baca-saja, TIDAK insert apa
- * pun — SEKARANG sudah mencakup piutang/utang juga, lihat
- * docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md) lalu
- * menampilkannya di dialog sebelum user menekan "Sync Sekarang"
- * sungguhan. */
 export function PreviewSyncSection() {
-  const { prerequisites, fields, debtAccounts, syncFrom, preview } = useRetailkuSyncCashflowConfig();
+  const { prerequisites, fields, syncFrom, preview } = useRetailkuSyncCashflowConfig();
   const [open, setOpen] = useState(false);
 
   const canPreview = prerequisites.hasCredentials && syncFrom.range.from !== "";
@@ -33,9 +27,6 @@ export function PreviewSyncSection() {
       retailkuSettings: prerequisites.retailkuSettings,
       mode: fields.mode.value,
       syncRangeValue: syncFrom.range,
-      arApCashAccountId: fields.arApCashAccountId.value,
-      receivableDebtAccountId: debtAccounts.receivableDebtAccountId,
-      payableDebtAccountId: debtAccounts.payableDebtAccountId,
     });
   };
 
@@ -75,14 +66,12 @@ export function PreviewSyncSection() {
 function PreviewContent({ result }: { result: NonNullable<ReturnType<typeof useRetailkuSyncCashflowConfig>["preview"]["data"]> }) {
   const cashflowToInsert = result.cashflow.rows.filter((row) => row.willInsert);
   const cashflowSkipped = result.cashflow.rows.filter((row) => !row.willInsert);
-  const arApToInsert = result.cashflow.arApRows.filter((row) => row.willInsert);
 
   return (
     <div className="max-h-[70vh] space-y-4 overflow-y-auto">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SummaryStat label="Transaksi kas baru" value={cashflowToInsert.length} />
         <SummaryStat label="Baris di-skip" value={cashflowSkipped.length} />
-        <SummaryStat label="Piutang/utang baru" value={arApToInsert.length} />
         <SummaryStat label="Akun belum dipetakan" value={result.cashflow.unmappedKeys.length} />
         <SummaryStat
           label="Akun dinonaktifkan"
@@ -117,47 +106,6 @@ function PreviewContent({ result }: { result: NonNullable<ReturnType<typeof useR
                       <Badge variant="destructive">Belum dipetakan</Badge>
                     ) : row.skipReason === "deactivated-payment-method" ? (
                       <Badge variant="destructive">Dinonaktifkan di Retailku</Badge>
-                    ) : (
-                      <Badge variant="secondary">Sudah tersinkron</Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <h4 className="text-sm font-medium">Piutang/Utang</h4>
-        {result.cashflow.arApRows.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Tidak ada pergerakan piutang/utang pada rentang ini.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tanggal</TableHead>
-                <TableHead>Jenis</TableHead>
-                <TableHead className="text-right">Nominal</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {result.cashflow.arApRows.map((row) => (
-                <TableRow key={row.sourceRef}>
-                  <TableCell>{row.date}</TableCell>
-                  <TableCell>
-                    {row.direction === "receivable" ? "Piutang" : "Utang"}
-                    {row.amount < 0 ? " (pelunasan)" : " (baru)"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(Math.abs(row.amount), "IDR")}
-                  </TableCell>
-                  <TableCell>
-                    {row.willInsert ? (
-                      <Badge variant="outline">Akan dicatat</Badge>
-                    ) : row.skipReason === "debt-account-not-configured" ? (
-                      <Badge variant="destructive">Akun belum diatur</Badge>
                     ) : (
                       <Badge variant="secondary">Sudah tersinkron</Badge>
                     )}

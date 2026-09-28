@@ -7,9 +7,6 @@ export interface UsePreviewSyncInput {
   retailkuSettings: RetailkuSettings | undefined;
   mode: RetailkuCashflowSyncMode;
   syncRangeValue: SyncRange;
-  arApCashAccountId: number | null;
-  receivableDebtAccountId: number | null;
-  payableDebtAccountId: number | null;
 }
 
 export interface PreviewSyncResult {

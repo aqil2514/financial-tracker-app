@@ -96,7 +96,47 @@ export function useMappingDraftSave({
         extraFields: toExtraFields(row),
       }));
 
-    const payload = [...genericPayload, ...transferPayload];
+    // Varian AR_AP — SAMA pola live-sync, digabung ke `payload` yang
+    // SAMA. BEDA dari transfer: HANYA 1 akun lokal (`localAccountId`,
+    // akun DEBT — lihat `ArApMappingRowDraft`), `secondaryAccountId`
+    // SELALU `null` (kolom itu cuma relevan utk transfer). `contactId`
+    // WAJIB hanya kalau `contactFollowSource` OFF (fallback statis) —
+    // kalau ON, kontak diambil OTOMATIS dari `partyName` per transaksi
+    // saat sync nanti (belum diimplementasikan, di luar scope mapping
+    // ini), jadi `contactId` boleh kosong. `categoryId` SELALU `null`
+    // (BUKAN dari form, field itu TIDAK ADA di `ArApMappingRowDraft`) —
+    // kategori tidak applicable utk transaksi AR/AP, lihat JSDoc
+    // `ArApMappingRowDraft`.
+    const arApPayload: SaveFieldMappingInput = rows
+      .filter(
+        (row): row is (typeof rows)[number] & { sourceType: "AR_AP" } =>
+          row.sourceType === "AR_AP" &&
+          !!drafts[row.key] &&
+          row.localAccountId != null &&
+          (row.contactFollowSource || row.contactId != null)
+      )
+      .map((row) => ({
+        key: row.key,
+        sourceKind: "AR_AP",
+        // key `ar_ap:<accountId>:<direction>` — `accountId` SAMA persis
+        // dgn `retailkuAccountId` (BUKAN "ditambal" seperti transfer,
+        // karena AR/AP SEKARANG per akun jurnal SUNGGUHAN, bukan per
+        // pihak — lihat `extract-ar-ap-rows.ts`).
+        retailkuAccountId: row.key.split(":")[1],
+        retailkuAccountCode: row.direction,
+        retailkuAccountName: row.accountName,
+        localAccountId: row.localAccountId!,
+        secondaryAccountId: null,
+        note: row.note.trim() === "" ? null : row.note,
+        categoryId: null,
+        description: isEmptyDoc(row.description) ? null : JSON.stringify(row.description),
+        extraFields: {
+          contactId: row.contactId ?? undefined,
+          contactFollowSource: row.contactFollowSource || undefined,
+        },
+      }));
+
+    const payload = [...genericPayload, ...transferPayload, ...arApPayload];
     if (payload.length === 0) return;
 
     saveMapping.mutate(payload, { onSuccess: () => setDrafts({}) });

@@ -11,5 +11,4 @@ export {
   computeCashflowSync,
   type CashflowSyncPlan,
   type CashflowSyncPlanRow,
-  type ArApSyncPlanRow,
 } from "./cashflow";

@@ -7,12 +7,6 @@ type Db = Awaited<ReturnType<typeof getDb>>;
 
 export type SyncAllInput = {
   mcpConfig: RetailkuMcpConfig;
-  /** Akun kas lokal khusus untuk sisi AR/AP (transfer piutang/utang) —
-   * TIDAK dipakai cashflow biasa (tiap akun kas Retailku sync ke akun
-   * lokalnya sendiri via `retailku_sync_field_mapping`). */
-  arApCashAccountId: number | null;
-  receivableDebtAccountId: number | null;
-  payableDebtAccountId: number | null;
   dateFrom: string;
   dateTo: string;
   timezone: string;
@@ -23,61 +17,12 @@ export type SyncAllResult = {
   cashflowInsertedCount: number;
   cashflowUnmappedKeys: string[];
   cashflowDeactivatedPaymentMethodAccountIds: string[];
-  arApInsertedCount: number;
-  arApAccountNotConfigured: boolean;
 };
 
-// Lock in-memory MODUL-LEVEL (bukan per-komponen) — mencegah 2
-// pemanggilan `syncAll` (mis. dobel klik cepat tombol "Sync Sekarang")
-// berjalan BERSAMAAN. Tanpa lock ini, keduanya bisa memanggil
-// `computeCashflowSync` secara independen, membaca state "belum
-// tersinkron" di titik yang sama (belum ada yang commit), lalu KEDUANYA
-// insert baris dengan `source_ref` yang sama -> yang kedua gagal
-// `UNIQUE constraint failed: transactions.source, transactions.source_ref`
-// (bug ditemukan live saat masih ada auto-sync terpisah dari sync
-// manual, lihat handover 2026-09-23 — auto-sync sudah dihapus total per
-// handover 2026-09-26, TAPI lock ini tetap relevan untuk kasus dobel
-// klik). `isPeriodSynced`/`isArApRowSynced` di `compute-cashflow-sync.ts`
-// TIDAK cukup untuk mencegah ini karena keduanya cuma efektif ANTAR
-// pemanggilan yang berurutan, bukan yang overlap secara konkuren.
+// Lock in-memory modul-level — mencegah 2 panggilan syncAll (mis. dobel klik) berjalan bersamaan.
 let syncInFlight: Promise<SyncAllResult> | null = null;
 
-/**
- * Titik masuk tunggal sinkronisasi Retailku — cashflow DAN AR/AP
- * SEKARANG SATU ALUR (`syncCashflow` mencakup keduanya, lihat
- * docs/todos/plan/retailku-ar-ap-via-cashflow-detail.md), BUKAN lagi
- * dua panggilan terpisah (`syncCashflow` + `syncArAp` lama yang
- * DIHAPUS) — rollback jadi lebih sederhana juga (SATU set
- * `insertedSourceRefs`, tidak ada lagi snapshot AR/AP terpisah untuk
- * di-restore).
- *
- * ALL-OR-NOTHING VIA ROLLBACK MANUAL, BUKAN BEGIN/COMMIT/ROLLBACK SQL
- * ASLI — `@tauri-apps/plugin-sql` memakai connection pool di balik
- * layar (tiap `execute()`/`select()` bisa jatuh ke koneksi fisik
- * berbeda), jadi BEGIN di satu panggilan dan INSERT berikutnya bisa
- * beda koneksi -> "database is locked" (dikonfirmasi TERJADI nyata saat
- * live testing, dan merupakan keterbatasan diketahui plugin ini —
- * lihat GitHub issue tauri-apps/plugins-workspace#886, belum ada fix
- * resmi per 2026-09). Solusinya: jalankan `syncCashflow`, TANGKAP
- * `insertedSourceRefs`-nya, dan kalau sync ini sendiri melempar error DI
- * TENGAH JALAN, DELETE manual semua yang sudah ter-insert — mensimulasikan
- * rollback tanpa transaction SQL asli.
- *
- * PENTING: `debts.transaction_id` pakai `ON DELETE SET NULL` (bukan
- * CASCADE, lihat 0012_debts.sql) — DELETE `transactions` SAJA tidak
- * ikut menghapus `debts`/`debt_payments` terkait. Rollback HARUS hapus
- * `debts`/`debt_payments` dulu secara eksplisit sebelum `transactions`.
- *
- * Kalau ada sync lain sedang berjalan, panggilan ini MENUNGGU sync itu
- * selesai lebih dulu (bukan ditolak) — supaya tiap pemanggilan tetap
- * dapat hasilnya sendiri-sendiri, cuma dijalankan berurutan
- * (serialized), bukan konkuren.
- */
 export function syncAll(input: SyncAllInput): Promise<SyncAllResult> {
-  // `previous` ditangkap SEBELUM `syncInFlight` ditimpa (masih sinkron,
-  // tidak ada `await` di antaranya) supaya dua panggilan `syncAll()`
-  // yang datang berdekatan tetap saling ber-chain dengan benar, bukan
-  // sama-sama menunggu Promise yang sama lalu jalan bersamaan.
   const previous = syncInFlight;
   const result = (async () => {
     if (previous) await previous.catch(() => {});
@@ -100,17 +45,12 @@ async function syncAllInternal(input: SyncAllInput): Promise<SyncAllResult> {
       dateTo: input.dateTo,
       timezone: input.timezone,
       mode: input.mode,
-      receivableDebtAccountId: input.receivableDebtAccountId,
-      payableDebtAccountId: input.payableDebtAccountId,
-      arApCashAccountId: input.arApCashAccountId,
     });
 
     return {
-      cashflowInsertedCount: result.insertedCount - result.arApInsertedCount,
+      cashflowInsertedCount: result.insertedCount,
       cashflowUnmappedKeys: result.unmappedKeys,
       cashflowDeactivatedPaymentMethodAccountIds: result.deactivatedPaymentMethodAccountIds,
-      arApInsertedCount: result.arApInsertedCount,
-      arApAccountNotConfigured: result.arApAccountNotConfigured,
     };
   } catch (err) {
     if (err instanceof SyncCashflowPartialError) {
@@ -126,11 +66,6 @@ async function rollbackManually(db: Db, insertedSourceRefs: string[]): Promise<v
 
   const placeholders = insertedSourceRefs.map((_, i) => `$${i + 1}`).join(", ");
 
-  // debts.transaction_id pakai ON DELETE SET NULL — hapus debts/
-  // debt_payments dulu secara eksplisit sebelum transactions, supaya
-  // tidak ada baris debts "yatim" tersisa dari transaksi yang
-  // dibatalkan. debt_payments punya ON DELETE CASCADE dari debts,
-  // jadi cukup hapus debts, debt_payments ikut terhapus otomatis.
   await db.execute(
     `DELETE FROM debts WHERE transaction_id IN (
        SELECT id FROM transactions WHERE source = 'retailku_sync' AND source_ref IN (${placeholders})

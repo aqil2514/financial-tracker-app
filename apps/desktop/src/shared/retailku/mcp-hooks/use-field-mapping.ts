@@ -19,6 +19,20 @@ export type FieldMappingExtraFields = {
   noteFollowSource?: boolean;
   /** Sama seperti `noteFollowSource`, utk field `description`. */
   descriptionFollowSource?: boolean;
+  /** Kontak LOKAL FALLBACK — cuma relevan `source_kind: "AR_AP"`,
+   * dipakai HANYA saat `contactFollowSource` OFF. Bukan kolom eksplisit
+   * (`contacts.id` bukan akun, jadi tidak cocok di
+   * `local_account_id`/`secondary_account_id`) — keputusan SADAR
+   * 2026-09-28, konsisten dgn alasan JSON dipakai utk `noteFollowSource`
+   * dkk: makin banyak field spesifik per `sourceKind`, kolom eksplisit
+   * akan TERUS MENUMPUK. */
+  contactId?: number;
+  /** `true` = kontak transaksi hasil sync IKUT nama PIHAK ASLI Retailku
+   * PER TRANSAKSI (bukan `contactId` statis di atas) — cuma relevan
+   * `source_kind: "AR_AP"`. SAMA konsep `noteFollowSource`/
+   * `descriptionFollowSource`, tapi utk kontak — relevan KHUSUS AR_AP
+   * karena 1 key di sana BISA mewakili BANYAK pihak berbeda sekaligus. */
+  contactFollowSource?: boolean;
 };
 
 export type FieldMapping = {
