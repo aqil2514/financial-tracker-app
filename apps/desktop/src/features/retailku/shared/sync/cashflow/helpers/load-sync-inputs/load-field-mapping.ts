@@ -1,3 +1,4 @@
+import type { FieldMappingExtraFields } from "@/shared/retailku";
 import type { Db, RetailkuSyncFieldMappingRow } from "../../types";
 
 type FieldMappingDbRow = {
@@ -6,7 +7,17 @@ type FieldMappingDbRow = {
   note: string | null;
   category_id: number | null;
   description: string | null;
+  extra_fields: string | null;
 };
+
+function parseExtraFields(raw: string | null): FieldMappingExtraFields {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as FieldMappingExtraFields;
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Mapping field non-fakta (`local_account_id` WAJIB + `note`/
@@ -19,7 +30,7 @@ type FieldMappingDbRow = {
  */
 export async function loadFieldMapping(db: Db): Promise<Map<string, RetailkuSyncFieldMappingRow>> {
   const rows = await db.select<FieldMappingDbRow[]>(
-    "SELECT key, local_account_id, note, category_id, description FROM retailku_sync_field_mapping"
+    "SELECT key, local_account_id, note, category_id, description, extra_fields FROM retailku_sync_field_mapping"
   );
   return new Map(
     rows.map((row) => [
@@ -30,6 +41,7 @@ export async function loadFieldMapping(db: Db): Promise<Map<string, RetailkuSync
         note: row.note,
         categoryId: row.category_id,
         description: row.description,
+        extraFields: parseExtraFields(row.extra_fields),
       },
     ])
   );

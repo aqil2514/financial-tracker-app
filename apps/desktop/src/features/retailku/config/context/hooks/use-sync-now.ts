@@ -23,6 +23,7 @@ export function useSyncNow(input: UseSyncNowInput): UseSyncNowOutput {
         dateTo,
         timezone: "Asia/Jakarta",
         mode: input.mode,
+        arApExistingMode: input.arApExistingMode,
       },
       {
         onSuccess: (result) => {
@@ -35,6 +36,14 @@ export function useSyncNow(input: UseSyncNowInput): UseSyncNowOutput {
             toast.warning(
               `${result.cashflowDeactivatedPaymentMethodAccountIds.length} akun kas Retailku sudah dinonaktifkan sebagai payment method — baris kasnya di-skip. Perbarui mapping di tab Mapping.`
             );
+          }
+          if (result.arApUnmappedDebtKeys.length > 0) {
+            toast.warning(
+              `${result.arApUnmappedDebtKeys.length} akun piutang/utang Retailku belum dipetakan — barisnya di-skip. Lengkapi di tab Mapping.`
+            );
+          }
+          if (result.arApUpdatedCount > 0) {
+            toast.info(`${result.arApUpdatedCount} piutang/utang yang sudah tersinkron diperbarui.`);
           }
         },
       }

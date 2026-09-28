@@ -26,6 +26,7 @@ export function PreviewSyncSection() {
     preview.mutate({
       retailkuSettings: prerequisites.retailkuSettings,
       mode: fields.mode.value,
+      arApExistingMode: fields.arApExistingMode.value,
       syncRangeValue: syncFrom.range,
     });
   };

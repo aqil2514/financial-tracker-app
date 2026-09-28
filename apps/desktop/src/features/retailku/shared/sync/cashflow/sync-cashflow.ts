@@ -1,4 +1,5 @@
 import { computeCashflowSync } from "./compute-cashflow-sync";
+import { insertArApTransaction } from "./helpers/insert-ar-ap-transaction";
 import { insertCashflowTransaction } from "./helpers/insert-cashflow-transaction";
 import type { Db, SyncCashflowInput, SyncCashflowResult } from "./types";
 
@@ -25,9 +26,13 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
       "[DRY_RUN] deactivatedPaymentMethodAccountIds",
       plan.deactivatedPaymentMethodAccountIds
     );
+    console.log("[DRY_RUN] plan.arAp.rows (semua, termasuk skip)", plan.arAp.rows);
+    console.log("[DRY_RUN] arApUnmappedDebtKeys", plan.arAp.unmappedDebtKeys);
   }
 
   const insertedSourceRefs: string[] = [];
+  const arApInsertedSourceRefs: string[] = [];
+  let arApUpdatedCount = 0;
 
   try {
     for (const row of plan.rows) {
@@ -55,8 +60,33 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
       }
       insertedSourceRefs.push(row.sourceRef);
     }
+
+    for (const row of plan.arAp.rows) {
+      if (!row.willInsert && !row.willUpdate) continue;
+      if (DRY_RUN) {
+        console.log(`[DRY_RUN] ar-ap row (${row.willUpdate ? "update" : "insert"})`, {
+          debtLocalAccountId: row.debtLocalAccountId,
+          direction: row.direction,
+          amount: row.amount,
+          contactId: row.contactId,
+          contactFollowSource: row.contactFollowSource,
+          sourceRef: row.sourceRef,
+          existingDebtId: row.existingDebtId,
+        });
+      } else {
+        await insertArApTransaction(db, row);
+      }
+      // Rollback (SyncCashflowPartialError) cuma DELETE by source_ref —
+      // baris willUpdate BUKAN insert baru, jangan ikut masuk daftar itu
+      // supaya rollback tidak menghapus debts yang sudah ada sebelumnya.
+      if (row.willUpdate) {
+        arApUpdatedCount++;
+      } else {
+        arApInsertedSourceRefs.push(row.sourceRef);
+      }
+    }
   } catch (err) {
-    throw new SyncCashflowPartialError(insertedSourceRefs, err);
+    throw new SyncCashflowPartialError([...insertedSourceRefs, ...arApInsertedSourceRefs], err);
   }
 
   return {
@@ -64,5 +94,9 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
     insertedSourceRefs,
     unmappedKeys: plan.unmappedKeys,
     deactivatedPaymentMethodAccountIds: plan.deactivatedPaymentMethodAccountIds,
+    arApInsertedCount: arApInsertedSourceRefs.length,
+    arApInsertedSourceRefs,
+    arApUpdatedCount,
+    arApUnmappedDebtKeys: plan.arAp.unmappedDebtKeys,
   };
 }

@@ -1,14 +1,24 @@
 import type { getCashflowDetail } from "@/shared/retailku";
 
+export type ArApCashAccount = {
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  amount: number;
+};
+
 export type ArApRow = {
   journalItemId: string;
   date: string;
   accountId: string;
   accountCode: string;
   accountName: string;
+  sourceType: string | null;
   direction: "receivable" | "payable";
   partyId: string | null;
   partyName: string | null;
+  kind: "trade" | "non-trade" | null;
+  cashAccounts: ArApCashAccount[];
   amount: number;
   sourceRef: string;
 };
@@ -31,8 +41,11 @@ export function extractArApRows(
         accountId: row.accountId,
         accountCode: row.accountCode,
         accountName: row.accountName,
+        sourceType: row.sourceType,
         partyId: row.partyId,
         partyName: row.partyName,
+        kind: row.receivablePayableKind,
+        cashAccounts: row.cashAccounts,
         direction,
         amount,
         sourceRef: `${row.id}:ar_ap`,

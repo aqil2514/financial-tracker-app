@@ -20,6 +20,7 @@ export function usePreviewSync(): UsePreviewSyncOutput {
         dateTo,
         timezone: "Asia/Jakarta",
         mode: input.mode,
+        arApExistingMode: input.arApExistingMode,
       });
 
       return { cashflow };

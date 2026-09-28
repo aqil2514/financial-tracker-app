@@ -84,6 +84,9 @@ export type RetailkuCashflowDetailRow = {
    * extract-ar-ap-rows.ts), BUKAN cuma tampilan. */
   partyId: string | null;
   partyName: string | null;
+  receivablePayableRole: string | null;
+  receivablePayableKind: "trade" | "non-trade" | null;
+  cashAccounts: { accountId: string; accountCode: string; accountName: string; amount: number }[];
   debit: number;
   credit: number;
 };

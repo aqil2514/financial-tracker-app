@@ -62,6 +62,18 @@ export function MappingOverviewPanel() {
                       {formatMappingKeyLabel(row.key)}
                     </span>
                   </span>
+                  {row.sourceType === "AR_AP" && row.kind && (
+                    <span
+                      className={cn(
+                        "mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                        row.kind === "trade"
+                          ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                          : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                      )}
+                    >
+                      {row.kind === "trade" ? "Dagang" : "Non-Dagang"}
+                    </span>
+                  )}
                   <span
                     className={cn(
                       "mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
@@ -239,6 +251,7 @@ function ArApRowTooltipBody({
         <dt className="opacity-70">Akun Retailku:</dt>
         <dd className="font-medium">
           {row.accountName} ({row.direction === "receivable" ? "Piutang" : "Utang"})
+          {row.kind && ` — ${row.kind === "trade" ? "Dagang" : "Non-Dagang"}`}
         </dd>
       </div>
       {row.partyNames.length > 0 && (

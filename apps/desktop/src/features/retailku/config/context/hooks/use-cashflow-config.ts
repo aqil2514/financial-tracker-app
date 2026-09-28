@@ -15,6 +15,7 @@ export function useCashflowConfig(): UseCashflowConfigOutput {
     hasCredentials: prerequisites.hasCredentials,
     retailkuSettings: prerequisites.retailkuSettings,
     mode: fields.mode.value,
+    arApExistingMode: fields.arApExistingMode.value,
     syncRangeValue: syncFrom.range,
   });
 

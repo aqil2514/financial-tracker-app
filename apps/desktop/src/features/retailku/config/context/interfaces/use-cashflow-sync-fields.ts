@@ -6,4 +6,5 @@ export interface UseCashflowSyncFieldsOutput {
   syncSettingsLoading: boolean;
   setSyncSettings: SetSyncSettings;
   mode: UseSettingsDraftOutput<"syncMode">;
+  arApExistingMode: UseSettingsDraftOutput<"arApExistingMode">;
 }

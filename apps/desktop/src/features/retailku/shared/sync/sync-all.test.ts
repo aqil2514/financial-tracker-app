@@ -27,6 +27,7 @@ const baseInput: SyncAllInput = {
   dateTo: "2026-01-31",
   timezone: "Asia/Jakarta",
   mode: "summary",
+  arApExistingMode: "skip",
 };
 
 const emptyCashflowResult: SyncCashflowResult = {
@@ -34,6 +35,10 @@ const emptyCashflowResult: SyncCashflowResult = {
   insertedSourceRefs: [],
   unmappedKeys: [],
   deactivatedPaymentMethodAccountIds: [],
+  arApInsertedCount: 0,
+  arApInsertedSourceRefs: [],
+  arApUpdatedCount: 0,
+  arApUnmappedDebtKeys: [],
 };
 
 /** Promise yang bisa "ditahan" lalu diselesaikan manual dari test —
@@ -73,6 +78,9 @@ describe("syncAll", () => {
       cashflowInsertedCount: 3,
       cashflowUnmappedKeys: [],
       cashflowDeactivatedPaymentMethodAccountIds: [],
+      arApInsertedCount: 0,
+      arApUpdatedCount: 0,
+      arApUnmappedDebtKeys: [],
     });
   });
 

@@ -9,11 +9,17 @@ export function useCashflowSyncFields(): UseCashflowSyncFieldsOutput {
   const setSyncSettings = useSetRetailkuCashflowSyncSettings();
 
   const modeDraft = useSettingsDraft("syncMode", syncSettings?.syncMode ?? "summary", setSyncSettings);
+  const arApExistingModeDraft = useSettingsDraft(
+    "arApExistingMode",
+    syncSettings?.arApExistingMode ?? "skip",
+    setSyncSettings
+  );
 
   return {
     syncSettings,
     syncSettingsLoading,
     setSyncSettings,
     mode: modeDraft,
+    arApExistingMode: arApExistingModeDraft,
   };
 }

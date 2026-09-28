@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "cn";
 import {
   FormFieldCombobox,
   FormFieldRichText,
@@ -47,10 +48,24 @@ export function ArApMappingForm({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
-        <p className="font-medium">
-          {row.accountName} — {row.direction === "receivable" ? "Piutang" : "Utang"} (
-          {row.transactionCount} transaksi)
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium">
+            {row.accountName} — {row.direction === "receivable" ? "Piutang" : "Utang"} (
+            {row.transactionCount} transaksi)
+          </p>
+          {row.kind && (
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                row.kind === "trade"
+                  ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                  : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+              )}
+            >
+              {row.kind === "trade" ? "Dagang" : "Non-Dagang"}
+            </span>
+          )}
+        </div>
         {row.partyNames.length > 0 && (
           <p className="text-muted-foreground">Pihak: {row.partyNames.join(", ")}</p>
         )}

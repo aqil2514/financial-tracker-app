@@ -28,12 +28,15 @@ export function useLoadMappingKeys() {
       const config = assertRetailkuConfigured(input.retailkuSettings!);
       const db = await getDb();
 
+      // arApExistingMode tidak relevan di sini — halaman Mapping cuma
+      // butuh plan.rows (cashflow biasa), bukan plan.arAp.
       const plan = await computeCashflowSync(db, {
         mcpConfig: config,
         dateFrom: input.dateFrom,
         dateTo: input.dateTo,
         timezone: "Asia/Jakarta",
         mode: input.mode,
+        arApExistingMode: "skip",
       });
 
       const byKey = new Map<string, MappingKeyCandidate>();

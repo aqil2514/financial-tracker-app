@@ -5,6 +5,7 @@ export {
   retailkuCashflowSyncSettingsQueryKey,
   type RetailkuCashflowSyncSettings,
   type RetailkuCashflowSyncMode,
+  type RetailkuArApExistingMode,
 } from "./use-retailku-cashflow-sync-settings";
 export type { SyncAllInput, SyncAllResult } from "./sync-all";
 export {

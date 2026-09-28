@@ -10,13 +10,29 @@ Tiap tipe berpotensi punya field/fitur sendiri:
 - **Kredit** — limit, tanggal jatuh tempo, bunga
 - **Investasi** — jumlah unit, harga per unit, return
 - **Valas** — mata uang asal, kurs konversi
-- **Uang Muka** (`advance`) — uang yang SUDAH keluar dari kas tapi
-  BELUM jadi biaya/persediaan, menunggu direalisasikan (mis. uang muka
-  pembelian ke supplier). Muncul dari kebutuhan sync Retailku:
-  `PURCHASE_ORDER` bayar uang muka ke akun neraca terpisah (`1600 Uang
-  Muka Pembelian`), baru direalisasikan ke akun persediaan/beban/aset
+- **Uang Muka** (`advance`) — KONSEP UMUM, BUKAN spesifik pembelian dari
+  supplier (koreksi 2026-09-28, awalnya dipikir sempit sebagai
+  `purchase_advance`): uang yang SUDAH keluar/masuk kas tapi BELUM jadi
+  biaya/pendapatan final, menunggu direalisasikan oleh peristiwa lain.
+  DUA ARAH, sama pola dengan `account_type: "debt"` yang sudah ada
+  (satu tipe akun, dua arah dibedakan lewat kolom/nilai terpisah, bukan
+  dua `account_type` berbeda):
+  - **Kita bayar duluan** (uang keluar) — uang muka pembelian ke
+    supplier, preorder barang, DP renovasi, sewa dibayar di muka,
+    deposit ke vendor. Istilah akuntansi baku: *Prepaid Expense*/
+    *Advance Payment*.
+  - **Kita terima duluan** (uang masuk) — DP dari customer, deposit
+    yang kita terima, pembayaran di muka dari klien (kewajiban kita
+    belum tertunaikan). Istilah akuntansi baku: *Unearned/Deferred
+    Revenue*, *Customer Deposit*.
+  Muncul dari kebutuhan sync Retailku: `PURCHASE_ORDER` bayar uang muka
+  ke akun neraca terpisah (`1600 Uang Muka Pembelian`, role Retailku
+  `PURCHASE_ADVANCE`), baru direalisasikan ke akun persediaan/beban/aset
   saat `PURCHASE_RECEIVING` — lihat
-  `docs/reference/retailku-cashflow-row-classification.md`.
+  `docs/reference/retailku-cashflow-row-classification.md`. Retailku
+  cuma kasusnya (sisi "kita bayar duluan" utk pembelian) — tipe akun ini
+  di financial-app SENGAJA dirancang generik utk kedua arah, supaya
+  berguna juga di luar konteks sync Retailku (preorder pribadi, dst).
 - **Investasi** (`investment`) — belum ada implementasinya sama sekali
   (baru contoh nama di atas). Muncul dari kebutuhan sync Retailku:
   `sourceType: INVESTMENT_TRANSACTION` sekarang SEMENTARA menumpang di

@@ -146,5 +146,11 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0024_retailku_sync_field_mapping_extra_fields.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 25,
+            description: "debts_source_ref",
+            sql: include_str!("../migrations/0025_debts_source_ref.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

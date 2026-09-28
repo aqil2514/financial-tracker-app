@@ -10,6 +10,7 @@ export type ArApMappingKeyCandidate = {
   key: string;
   accountName: string;
   direction: "receivable" | "payable";
+  kind: "trade" | "non-trade" | null;
   transactionCount: number;
   partyNames: string[];
 };
@@ -48,6 +49,7 @@ export function useLoadArApMappingKeys() {
             key,
             accountName: row.accountName,
             direction: row.direction,
+            kind: row.kind,
             transactionCount: 1,
             partyNames: row.partyName ? [row.partyName] : [],
           });

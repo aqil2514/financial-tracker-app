@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db";
 import type { RetailkuMcpConfig } from "@/shared/retailku";
 import { syncCashflow, SyncCashflowPartialError } from "./cashflow";
-import type { RetailkuCashflowSyncMode } from "./use-retailku-cashflow-sync-settings";
+import type { RetailkuArApExistingMode, RetailkuCashflowSyncMode } from "./use-retailku-cashflow-sync-settings";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
@@ -11,12 +11,16 @@ export type SyncAllInput = {
   dateTo: string;
   timezone: string;
   mode: RetailkuCashflowSyncMode;
+  arApExistingMode: RetailkuArApExistingMode;
 };
 
 export type SyncAllResult = {
   cashflowInsertedCount: number;
   cashflowUnmappedKeys: string[];
   cashflowDeactivatedPaymentMethodAccountIds: string[];
+  arApInsertedCount: number;
+  arApUpdatedCount: number;
+  arApUnmappedDebtKeys: string[];
 };
 
 // Lock in-memory modul-level — mencegah 2 panggilan syncAll (mis. dobel klik) berjalan bersamaan.
@@ -45,12 +49,16 @@ async function syncAllInternal(input: SyncAllInput): Promise<SyncAllResult> {
       dateTo: input.dateTo,
       timezone: input.timezone,
       mode: input.mode,
+      arApExistingMode: input.arApExistingMode,
     });
 
     return {
       cashflowInsertedCount: result.insertedCount,
       cashflowUnmappedKeys: result.unmappedKeys,
       cashflowDeactivatedPaymentMethodAccountIds: result.deactivatedPaymentMethodAccountIds,
+      arApInsertedCount: result.arApInsertedCount,
+      arApUpdatedCount: result.arApUpdatedCount,
+      arApUnmappedDebtKeys: result.arApUnmappedDebtKeys,
     };
   } catch (err) {
     if (err instanceof SyncCashflowPartialError) {
@@ -66,10 +74,11 @@ async function rollbackManually(db: Db, insertedSourceRefs: string[]): Promise<v
 
   const placeholders = insertedSourceRefs.map((_, i) => `$${i + 1}`).join(", ");
 
+  // debts.source_ref langsung (bukan lewat transactions) — sebagian baris
+  // AR/AP sekarang transaction_id: NULL, jadi subquery lewat transactions
+  // tidak akan menjangkaunya. debt_payments ikut terhapus via ON DELETE CASCADE.
   await db.execute(
-    `DELETE FROM debts WHERE transaction_id IN (
-       SELECT id FROM transactions WHERE source = 'retailku_sync' AND source_ref IN (${placeholders})
-     )`,
+    `DELETE FROM debts WHERE source_ref IN (${placeholders})`,
     insertedSourceRefs
   );
   await db.execute(

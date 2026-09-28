@@ -114,6 +114,7 @@ export function useMappingCandidates({
         sourceType: "AR_AP",
         accountName: candidate.accountName,
         direction: candidate.direction,
+        kind: candidate.kind,
         transactionCount: candidate.transactionCount,
         partyNames: candidate.partyNames,
         localAccountId: saved?.localAccountId ?? null,

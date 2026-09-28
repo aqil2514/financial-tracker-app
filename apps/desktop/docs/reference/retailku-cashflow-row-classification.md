@@ -176,4 +176,6 @@ sama sekali di query sisi server.
 
 Kandidat `account_type: advance` di `docs/todos/plan/account-type.md`
 relevan di sini — uang muka itu levelnya "uang keluar tapi belum jadi
-biaya/persediaan", bukan kas biasa.
+biaya/persediaan", bukan kas biasa. Tipe akun itu sendiri generik dua
+arah (bukan spesifik pembelian) — `PURCHASE_ORDER` cuma salah satu
+kasus pemakaiannya (sisi "kita bayar duluan"), lihat dokumen plan.
