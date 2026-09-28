@@ -21,6 +21,17 @@ export type ArApRow = {
   cashAccounts: ArApCashAccount[];
   amount: number;
   sourceRef: string;
+  isReversed: boolean;
+  /** ID journal item piutang ASLI yang dilunasi baris pelunasan ini —
+   * cuma terisi kalau baris INI SENDIRI adalah baris piutang (akun
+   * TRADE_RECEIVABLE) dari journal entry SALE_PAYMENT (BEDA dari
+   * journal entry SALE aslinya, tapi sourceType-nya SAMA-SAMA piutang
+   * dagang) — server resolve field ini ke journal item piutang di
+   * journal SALE aslinya, dipakai mencari `debts` yang harus dicicil
+   * lewat source_ref. `null` untuk baris piutang BARU (bukan
+   * pelunasan) dan untuk kasus pelunasan selain SALE_PAYMENT (belum
+   * didukung). */
+  settledReceivablePayableJournalItemId: string | null;
 };
 
 export function buildArApMappingKey(accountId: string, direction: "receivable" | "payable"): string {
@@ -49,6 +60,8 @@ export function extractArApRows(
         direction,
         amount,
         sourceRef: `${row.id}:ar_ap`,
+        isReversed: row.isReversed,
+        settledReceivablePayableJournalItemId: row.settledReceivablePayableJournalItemId,
       };
     });
 }

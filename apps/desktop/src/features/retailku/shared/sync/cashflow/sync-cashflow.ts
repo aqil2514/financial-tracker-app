@@ -1,4 +1,5 @@
 import { computeCashflowSync } from "./compute-cashflow-sync";
+import { insertArApPayment } from "./helpers/insert-ar-ap-payment";
 import { insertArApTransaction } from "./helpers/insert-ar-ap-transaction";
 import { insertCashflowTransaction } from "./helpers/insert-cashflow-transaction";
 import type { Db, SyncCashflowInput, SyncCashflowResult } from "./types";
@@ -32,6 +33,7 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
 
   const insertedSourceRefs: string[] = [];
   const arApInsertedSourceRefs: string[] = [];
+  const arApPaymentInsertedSourceRefs: string[] = [];
   let arApUpdatedCount = 0;
 
   try {
@@ -85,8 +87,26 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
         arApInsertedSourceRefs.push(row.sourceRef);
       }
     }
+
+    for (const row of plan.arAp.rows) {
+      if (!row.willInsertPayment) continue;
+      if (DRY_RUN) {
+        console.log("[DRY_RUN] ar-ap payment row (insert)", {
+          paymentDebtId: row.paymentDebtId,
+          amount: Math.abs(row.amount),
+          date: row.date,
+          sourceRef: row.sourceRef,
+        });
+      } else {
+        await insertArApPayment(db, row);
+      }
+      arApPaymentInsertedSourceRefs.push(row.sourceRef);
+    }
   } catch (err) {
-    throw new SyncCashflowPartialError([...insertedSourceRefs, ...arApInsertedSourceRefs], err);
+    throw new SyncCashflowPartialError(
+      [...insertedSourceRefs, ...arApInsertedSourceRefs, ...arApPaymentInsertedSourceRefs],
+      err
+    );
   }
 
   return {
@@ -97,6 +117,8 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
     arApInsertedCount: arApInsertedSourceRefs.length,
     arApInsertedSourceRefs,
     arApUpdatedCount,
+    arApPaymentInsertedCount: arApPaymentInsertedSourceRefs.length,
+    arApPaymentInsertedSourceRefs,
     arApUnmappedDebtKeys: plan.arAp.unmappedDebtKeys,
   };
 }

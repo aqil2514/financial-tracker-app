@@ -19,6 +19,8 @@ function arApRow(overrides: Partial<ArApRow> = {}): ArApRow {
     cashAccounts: [],
     amount: 3000,
     sourceRef: "j1:ar_ap",
+    isReversed: false,
+    settledReceivablePayableJournalItemId: null,
     ...overrides,
   };
 }
@@ -66,12 +68,73 @@ describe("buildArApPlanRows", () => {
     expect(result.planRows[0].willUpdate).toBe(false);
   });
 
-  it("amount < 0 -> skipReason negative-amount-not-supported", async () => {
+  it("amount < 0, isReversed true -> skipReason reversal", async () => {
     const db = createFakeDb();
-    const result = await buildArApPlanRows(db as any, [arApRow({ amount: -500 })], mapping([]), "skip");
+    const result = await buildArApPlanRows(
+      db as any,
+      [arApRow({ amount: -500, isReversed: true })],
+      mapping([]),
+      "skip"
+    );
 
-    expect(result.planRows[0].skipReason).toBe("negative-amount-not-supported");
+    expect(result.planRows[0].skipReason).toBe("reversal");
     expect(result.planRows[0].willInsert).toBe(false);
+  });
+
+  it("amount < 0, isReversed false, settledReceivablePayableJournalItemId null -> skipReason settlement-not-supported", async () => {
+    const db = createFakeDb();
+    const result = await buildArApPlanRows(
+      db as any,
+      [arApRow({ amount: -500, isReversed: false, settledReceivablePayableJournalItemId: null })],
+      mapping([]),
+      "skip"
+    );
+
+    expect(result.planRows[0].skipReason).toBe("settlement-not-supported");
+    expect(result.planRows[0].willInsert).toBe(false);
+  });
+
+  it("amount < 0, isReversed false, link ke piutang asli ADA tapi belum pernah sync -> skipReason settled-debt-not-found", async () => {
+    const db = createFakeDb(); // "orig-item:ar_ap" TIDAK ada di debts
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: -500,
+          isReversed: false,
+          settledReceivablePayableJournalItemId: "orig-item",
+        }),
+      ],
+      mapping([]),
+      "skip"
+    );
+
+    expect(result.planRows[0].skipReason).toBe("settled-debt-not-found");
+    expect(result.planRows[0].willInsert).toBe(false);
+    expect(result.planRows[0].willInsertPayment).toBe(false);
+  });
+
+  it("amount < 0, isReversed false, piutang asli SUDAH pernah sync -> willInsertPayment true, paymentDebtId terisi", async () => {
+    const db = createFakeDb({ "orig-item:ar_ap": 77 });
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: -500,
+          isReversed: false,
+          settledReceivablePayableJournalItemId: "orig-item",
+        }),
+      ],
+      mapping([]),
+      "skip"
+    );
+
+    expect(result.planRows[0]).toMatchObject({
+      willInsert: false,
+      willInsertPayment: true,
+      paymentDebtId: 77,
+      skipReason: null,
+    });
   });
 
   it("akun debt unmapped -> skipReason unmapped-debt-account, masuk unmappedDebtKeys", async () => {

@@ -38,6 +38,8 @@ const emptyCashflowResult: SyncCashflowResult = {
   arApInsertedCount: 0,
   arApInsertedSourceRefs: [],
   arApUpdatedCount: 0,
+  arApPaymentInsertedCount: 0,
+  arApPaymentInsertedSourceRefs: [],
   arApUnmappedDebtKeys: [],
 };
 
@@ -80,11 +82,12 @@ describe("syncAll", () => {
       cashflowDeactivatedPaymentMethodAccountIds: [],
       arApInsertedCount: 0,
       arApUpdatedCount: 0,
+      arApPaymentInsertedCount: 0,
       arApUnmappedDebtKeys: [],
     });
   });
 
-  it("rollback manual (DELETE debts+transactions) saat syncCashflow gagal di tengah jalan", async () => {
+  it("rollback manual (DELETE debts+debt_payments+transactions) saat syncCashflow gagal di tengah jalan", async () => {
     vi.mocked(syncCashflow).mockRejectedValue(
       new SyncCashflowPartialError(["2026-01-01:acc1"], new Error("MCP timeout"))
     );
@@ -94,10 +97,17 @@ describe("syncAll", () => {
 
     await expect(syncAll(baseInput)).rejects.toThrow("MCP timeout");
 
-    // DELETE debts lalu DELETE transactions untuk source_ref yang sudah
-    // sempat ter-insert sebelum kegagalan.
+    // DELETE debts, debt_payments, lalu transactions untuk source_ref
+    // yang sudah sempat ter-insert sebelum kegagalan — debt_payments
+    // dari sync PELUNASAN punya source_ref sendiri (BEDA dari debts
+    // manapun di daftar ini), jadi tidak ikut ON DELETE CASCADE dan
+    // butuh DELETE eksplisit.
     expect(db.execute).toHaveBeenCalledWith(
       expect.stringContaining("DELETE FROM debts"),
+      ["2026-01-01:acc1"]
+    );
+    expect(db.execute).toHaveBeenCalledWith(
+      expect.stringContaining("DELETE FROM debt_payments"),
       ["2026-01-01:acc1"]
     );
     expect(db.execute).toHaveBeenCalledWith(

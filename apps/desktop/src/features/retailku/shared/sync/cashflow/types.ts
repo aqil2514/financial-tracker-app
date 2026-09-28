@@ -21,6 +21,8 @@ export type SyncCashflowResult = {
   arApInsertedCount: number;
   arApInsertedSourceRefs: string[];
   arApUpdatedCount: number;
+  arApPaymentInsertedCount: number;
+  arApPaymentInsertedSourceRefs: string[];
   arApUnmappedDebtKeys: string[];
 };
 
@@ -51,7 +53,9 @@ export type ArApSkipReason =
   | "already-synced"
   | "unmapped-debt-account"
   | "zero-amount"
-  | "negative-amount-not-supported";
+  | "reversal"
+  | "settlement-not-supported"
+  | "settled-debt-not-found";
 
 export type ArApSyncPlanRow = {
   journalItemId: string;
@@ -70,6 +74,19 @@ export type ArApSyncPlanRow = {
    * INSERT baru. existingDebtId wajib terisi kalau ini true. */
   willUpdate: boolean;
   existingDebtId: number | null;
+  /** true = baris ini pelunasan piutang dagang (SALE_PAYMENT) yang
+   * piutang aslinya SUDAH pernah tersinkron — akan di-INSERT sebagai
+   * `debt_payments` baru (BUKAN insert/update `debts`), mengurangi
+   * sisa piutang di `paymentDebtId` tanpa mengubah `debts.amount`
+   * (pokok tetap, cicilan terpisah — lihat 0012_debts.sql). Baru
+   * mencakup SALE_PAYMENT (piutang dagang) — PURCHASE_PAYMENT/
+   * LEDGER_ENTRY_PAYMENT/CONSIGNMENT_SETTLEMENT masih
+   * `settlement-not-supported`. */
+  willInsertPayment: boolean;
+  /** `debts.id` yang dicicil — wajib terisi kalau willInsertPayment
+   * true, hasil lookup `source_ref` = piutang asli via
+   * `settledReceivablePayableJournalItemId`. */
+  paymentDebtId: number | null;
   skipReason: ArApSkipReason | null;
   debtLocalAccountId: number | null;
   contactId: number | null;

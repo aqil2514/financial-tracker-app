@@ -18,6 +18,8 @@ export function basePlanRow(
     key,
     willUpdate: false,
     existingDebtId: null,
+    willInsertPayment: false,
+    paymentDebtId: null,
     debtLocalAccountId: null,
     contactId: null,
     contactFollowSource: false,

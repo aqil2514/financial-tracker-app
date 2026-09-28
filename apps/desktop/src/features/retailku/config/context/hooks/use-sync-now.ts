@@ -45,6 +45,9 @@ export function useSyncNow(input: UseSyncNowInput): UseSyncNowOutput {
           if (result.arApUpdatedCount > 0) {
             toast.info(`${result.arApUpdatedCount} piutang/utang yang sudah tersinkron diperbarui.`);
           }
+          if (result.arApPaymentInsertedCount > 0) {
+            toast.info(`${result.arApPaymentInsertedCount} pelunasan piutang tercatat.`);
+          }
         },
       }
     );

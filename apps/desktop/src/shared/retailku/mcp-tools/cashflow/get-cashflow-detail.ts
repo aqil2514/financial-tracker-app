@@ -27,6 +27,27 @@ export type RetailkuCashflowDetailRow = {
    * bukan pendapatan, meski `sourceType`-nya SALE. Lihat
    * docs/todos/plan/retailku-sale-category-mapping.md. */
   isProviderPayoutAccount: boolean;
+  /** `true` kalau entry jurnal SUMBER baris ini sudah dibalik (reversal)
+   * oleh entry lain — entry aslinya TETAP status POSTED (bukan VOIDED),
+   * jadi masih muncul di sini. Dibutuhkan untuk membedakan baris
+   * piutang/utang bertanda negatif: reversal (piutang/utang batal,
+   * TIDAK PERNAH jadi kas) vs pelunasan asli (kas benar-benar
+   * berpindah) — sourceType SAJA tidak cukup (mis. SALE muncul di
+   * piutang baru normal MAUPUN piutang yang lalu dibalik). Ditambahkan
+   * di server (`get-cfr-detail.helper.ts`, repo retail-multitenant)
+   * 2026-09-28, diverifikasi ke data nyata Warung Aqil. */
+  isReversed: boolean;
+  /** HANYA terisi (bukan `null`) untuk baris kas dari `sourceType:
+   * "SALE_PAYMENT"` — berisi `id` baris piutang dagang ASLI (dari
+   * transaksi SALE sebelumnya) yang dilunasi pembayaran ini. Dua
+   * journal entry (SALE vs SALE_PAYMENT) TIDAK terhubung lewat
+   * `sourceNumber` sama sekali — field ini satu-satunya cara
+   * menghubungkan keduanya. `null` untuk semua baris lain, TERMASUK
+   * baris piutang itu sendiri dan sourceType selain SALE_PAYMENT —
+   * belum mencakup PURCHASE_PAYMENT/LEDGER_ENTRY_PAYMENT/
+   * CONSIGNMENT_SETTLEMENT (struktur relasi beda, belum digarap).
+   * Ditambahkan di server 2026-09-28. */
+  settledReceivablePayableJournalItemId: string | null;
   /** Semua tipe produk (`"MERCHANDISE"`, `"PPOB"`, `"CONSIGNMENT"`, dst
    * — daftar penuh: enum `ProductType` di skema Retailku) yang terlibat
    * di transaksi penjualan SUMBER baris ini, di-dedupe. `null` kalau

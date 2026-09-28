@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/format-currency";
+import type { ArApSyncPlan, ArApSyncPlanRow } from "../../shared/sync";
 import { useRetailkuSyncCashflowConfig } from "../context";
 
 export function PreviewSyncSection() {
@@ -117,8 +118,86 @@ function PreviewContent({ result }: { result: NonNullable<ReturnType<typeof useR
           </Table>
         )}
       </div>
+
+      <ArApPreview arAp={result.cashflow.arAp} />
     </div>
   );
+}
+
+function ArApPreview({ arAp }: { arAp: ArApSyncPlan }) {
+  const toInsert = arAp.rows.filter((row) => row.willInsert);
+  const toUpdate = arAp.rows.filter((row) => row.willUpdate);
+  const toInsertPayment = arAp.rows.filter((row) => row.willInsertPayment);
+  const skipped = arAp.rows.filter(
+    (row) => !row.willInsert && !row.willUpdate && !row.willInsertPayment
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <SummaryStat label="Piutang/utang baru" value={toInsert.length} />
+        <SummaryStat label="Akan ditimpa ulang" value={toUpdate.length} />
+        <SummaryStat label="Pelunasan tercatat" value={toInsertPayment.length} />
+        <SummaryStat label="Baris di-skip" value={skipped.length} />
+        <SummaryStat label="Akun belum dipetakan" value={arAp.unmappedDebtKeys.length} />
+      </div>
+
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium">Piutang / Utang</h4>
+        {arAp.rows.length === 0 ? (
+          <p className="text-muted-foreground text-sm">Tidak ada baris piutang/utang pada rentang ini.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Akun</TableHead>
+                <TableHead>Pihak</TableHead>
+                <TableHead className="text-right">Nominal</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {arAp.rows.map((row) => (
+                <TableRow key={row.sourceRef}>
+                  <TableCell>{row.date}</TableCell>
+                  <TableCell className="text-muted-foreground">{row.accountName}</TableCell>
+                  <TableCell className="text-muted-foreground">{row.partyName ?? "—"}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(row.amount, "IDR")}</TableCell>
+                  <TableCell>
+                    <ArApStatusBadge row={row} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ArApStatusBadge({ row }: { row: ArApSyncPlanRow }) {
+  if (row.willInsert) return <Badge variant="outline">Piutang/utang baru</Badge>;
+  if (row.willUpdate) return <Badge variant="outline">Akan ditimpa ulang</Badge>;
+  if (row.willInsertPayment) return <Badge variant="outline">Pelunasan akan tercatat</Badge>;
+
+  switch (row.skipReason) {
+    case "already-synced":
+      return <Badge variant="secondary">Sudah tersinkron</Badge>;
+    case "unmapped-debt-account":
+      return <Badge variant="destructive">Belum dipetakan</Badge>;
+    case "zero-amount":
+      return <Badge variant="secondary">Lunas total (nihil)</Badge>;
+    case "reversal":
+      return <Badge variant="secondary">Dibalik di Retailku</Badge>;
+    case "settlement-not-supported":
+      return <Badge variant="secondary">Pelunasan (belum didukung)</Badge>;
+    case "settled-debt-not-found":
+      return <Badge variant="secondary">Piutang asal belum tersinkron</Badge>;
+    default:
+      return <Badge variant="secondary">Di-skip</Badge>;
+  }
 }
 
 function SummaryStat({ label, value }: { label: string; value: number }) {

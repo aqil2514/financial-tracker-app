@@ -1,6 +1,8 @@
 import { alreadySyncedPlanRow } from "./already-synced-plan-row";
 import { insertablePlanRow } from "./insertable-plan-row";
 import { negativeAmountPlanRow } from "./negative-amount-plan-row";
+import { settledDebtNotFoundPlanRow } from "./settled-debt-not-found-plan-row";
+import { settlementPlanRow } from "./settlement-plan-row";
 import { unmappedDebtAccountPlanRow } from "./unmapped-debt-account-plan-row";
 import { updatablePlanRow } from "./updatable-plan-row";
 import { zeroAmountPlanRow } from "./zero-amount-plan-row";
@@ -38,6 +40,16 @@ export async function buildArApPlanRows(
     }
 
     if (row.amount < 0) {
+      if (!row.isReversed && row.settledReceivablePayableJournalItemId != null) {
+        const settledSourceRef = `${row.settledReceivablePayableJournalItemId}:ar_ap`;
+        const paymentDebtId = await findSyncedArApDebtId(db, settledSourceRef);
+        planRows.push(
+          paymentDebtId != null
+            ? settlementPlanRow(row, key, paymentDebtId)
+            : settledDebtNotFoundPlanRow(row, key)
+        );
+        continue;
+      }
       planRows.push(negativeAmountPlanRow(row, key));
       continue;
     }

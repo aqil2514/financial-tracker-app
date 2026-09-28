@@ -23,6 +23,8 @@ function baseRow(overrides: Partial<ArApSyncPlanRow> = {}): ArApSyncPlanRow {
     willInsert: true,
     willUpdate: false,
     existingDebtId: null,
+    willInsertPayment: false,
+    paymentDebtId: null,
     skipReason: null,
     debtLocalAccountId: 42,
     contactId: 7,

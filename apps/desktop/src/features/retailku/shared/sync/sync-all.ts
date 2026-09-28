@@ -20,6 +20,7 @@ export type SyncAllResult = {
   cashflowDeactivatedPaymentMethodAccountIds: string[];
   arApInsertedCount: number;
   arApUpdatedCount: number;
+  arApPaymentInsertedCount: number;
   arApUnmappedDebtKeys: string[];
 };
 
@@ -58,6 +59,7 @@ async function syncAllInternal(input: SyncAllInput): Promise<SyncAllResult> {
       cashflowDeactivatedPaymentMethodAccountIds: result.deactivatedPaymentMethodAccountIds,
       arApInsertedCount: result.arApInsertedCount,
       arApUpdatedCount: result.arApUpdatedCount,
+      arApPaymentInsertedCount: result.arApPaymentInsertedCount,
       arApUnmappedDebtKeys: result.arApUnmappedDebtKeys,
     };
   } catch (err) {
@@ -76,9 +78,17 @@ async function rollbackManually(db: Db, insertedSourceRefs: string[]): Promise<v
 
   // debts.source_ref langsung (bukan lewat transactions) — sebagian baris
   // AR/AP sekarang transaction_id: NULL, jadi subquery lewat transactions
-  // tidak akan menjangkaunya. debt_payments ikut terhapus via ON DELETE CASCADE.
+  // tidak akan menjangkaunya. debt_payments dari CICILAN piutang baru
+  // (debts yg SAMA-SAMA baru insert di sync ini) ikut terhapus via ON
+  // DELETE CASCADE — TAPI debt_payments dari sync PELUNASAN (piutangnya
+  // SUDAH ADA sebelum sync ini, source_ref SENDIRI beda dari debts manapun
+  // di daftar ini) TIDAK ikut ter-cascade, jadi dihapus eksplisit di bawah.
   await db.execute(
     `DELETE FROM debts WHERE source_ref IN (${placeholders})`,
+    insertedSourceRefs
+  );
+  await db.execute(
+    `DELETE FROM debt_payments WHERE source_ref IN (${placeholders})`,
     insertedSourceRefs
   );
   await db.execute(
