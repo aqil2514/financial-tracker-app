@@ -2,6 +2,8 @@ import { alreadySyncedPlanRow } from "./already-synced-plan-row";
 import { insertablePlanRow } from "./insertable-plan-row";
 import { negativeAmountPlanRow } from "./negative-amount-plan-row";
 import { settledDebtNotFoundPlanRow } from "./settled-debt-not-found-plan-row";
+import { settlementBatchPlanRow } from "./settlement-batch-plan-row";
+import { settlementPartiallyNotFoundPlanRow } from "./settlement-partially-not-found-plan-row";
 import { settlementPlanRow } from "./settlement-plan-row";
 import { unmappedDebtAccountPlanRow } from "./unmapped-debt-account-plan-row";
 import { updatablePlanRow } from "./updatable-plan-row";
@@ -40,6 +42,25 @@ export async function buildArApPlanRows(
     }
 
     if (row.amount < 0) {
+      if (!row.isReversed && row.settledReceivablePayableJournalItemIds.length > 0) {
+        const allocations: { debtId: number; amount: number }[] = [];
+        let allFound = true;
+        for (const settled of row.settledReceivablePayableJournalItemIds) {
+          const debtId = await findSyncedArApDebtId(db, `${settled.journalItemId}:ar_ap`);
+          if (debtId == null) {
+            allFound = false;
+            break;
+          }
+          allocations.push({ debtId, amount: settled.amount });
+        }
+        planRows.push(
+          allFound
+            ? settlementBatchPlanRow(row, key, allocations)
+            : settlementPartiallyNotFoundPlanRow(row, key)
+        );
+        continue;
+      }
+
       if (!row.isReversed && row.settledReceivablePayableJournalItemId != null) {
         const settledSourceRef = `${row.settledReceivablePayableJournalItemId}:ar_ap`;
         const paymentDebtId = await findSyncedArApDebtId(db, settledSourceRef);

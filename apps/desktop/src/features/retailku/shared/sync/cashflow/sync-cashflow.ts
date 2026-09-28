@@ -1,5 +1,6 @@
 import { computeCashflowSync } from "./compute-cashflow-sync";
 import { insertArApPayment } from "./helpers/insert-ar-ap-payment";
+import { insertArApPaymentsBatch } from "./helpers/insert-ar-ap-payments-batch";
 import { insertArApTransaction } from "./helpers/insert-ar-ap-transaction";
 import { insertCashflowTransaction } from "./helpers/insert-cashflow-transaction";
 import type { Db, SyncCashflowInput, SyncCashflowResult } from "./types";
@@ -101,6 +102,22 @@ export async function syncCashflow(db: Db, input: SyncCashflowInput): Promise<Sy
         await insertArApPayment(db, row);
       }
       arApPaymentInsertedSourceRefs.push(row.sourceRef);
+    }
+
+    for (const row of plan.arAp.rows) {
+      if (row.willInsertPayments.length === 0) continue;
+      if (DRY_RUN) {
+        console.log("[DRY_RUN] ar-ap payments batch row (insert, consignment)", {
+          allocations: row.willInsertPayments,
+          date: row.date,
+          sourceRef: row.sourceRef,
+        });
+      } else {
+        await insertArApPaymentsBatch(db, row);
+      }
+      for (const allocation of row.willInsertPayments) {
+        arApPaymentInsertedSourceRefs.push(`${row.sourceRef}:${allocation.debtId}`);
+      }
     }
   } catch (err) {
     throw new SyncCashflowPartialError(

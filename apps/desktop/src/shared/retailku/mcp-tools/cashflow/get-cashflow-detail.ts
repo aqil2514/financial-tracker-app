@@ -48,6 +48,18 @@ export type RetailkuCashflowDetailRow = {
    * CONSIGNMENT_SETTLEMENT (struktur relasi beda, belum digarap).
    * Ditambahkan di server 2026-09-28. */
   settledReceivablePayableJournalItemId: string | null;
+  /** Array objek (BEDA BENTUK dari `settledReceivablePayableJournalItemId`
+   * di atas) — HANYA terisi (tidak kosong) untuk baris kas dari
+   * `sourceType: "CONSIGNMENT_SETTLEMENT"`. Tiap elemen: id satu baris
+   * "Hutang ke Penitip" asli + nominal PERSIS yang dialokasikan ke
+   * baris itu (hasil FIFO sisi Retailku, bukan tebakan) — satu
+   * settlement BISA melunasi banyak transaksi sekaligus (jurnalnya
+   * sendiri cuma 1 baris totalAmount gabungan, rinciannya
+   * direkonstruksi server dari `LedgerEntryPayment` yang dicatat
+   * terpisah saat settlement di-post). Jumlah semua `amount` = nilai
+   * absolut baris ini sendiri. `[]` untuk semua baris lain. Ditambahkan
+   * 2026-09-29. */
+  settledReceivablePayableJournalItemIds: { journalItemId: string; amount: number }[];
   /** Semua tipe produk (`"MERCHANDISE"`, `"PPOB"`, `"CONSIGNMENT"`, dst
    * — daftar penuh: enum `ProductType` di skema Retailku) yang terlibat
    * di transaksi penjualan SUMBER baris ini, di-dedupe. `null` kalau

@@ -21,6 +21,7 @@ function arApRow(overrides: Partial<ArApRow> = {}): ArApRow {
     sourceRef: "j1:ar_ap",
     isReversed: false,
     settledReceivablePayableJournalItemId: null,
+    settledReceivablePayableJournalItemIds: [],
     ...overrides,
   };
 }
@@ -135,6 +136,57 @@ describe("buildArApPlanRows", () => {
       paymentDebtId: 77,
       skipReason: null,
     });
+  });
+
+  it("consignment settlement: SEMUA debtId di array ketemu -> willInsertPayments terisi semua alokasi", async () => {
+    const db = createFakeDb({ "item-a:ar_ap": 10, "item-b:ar_ap": 20 });
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: -4500,
+          isReversed: false,
+          settledReceivablePayableJournalItemIds: [
+            { journalItemId: "item-a", amount: 1500 },
+            { journalItemId: "item-b", amount: 3000 },
+          ],
+        }),
+      ],
+      mapping([]),
+      "skip"
+    );
+
+    expect(result.planRows[0]).toMatchObject({
+      willInsert: false,
+      willInsertPayment: false,
+      skipReason: null,
+      willInsertPayments: [
+        { debtId: 10, amount: 1500 },
+        { debtId: 20, amount: 3000 },
+      ],
+    });
+  });
+
+  it("consignment settlement: SATU SAJA debtId tidak ketemu -> all-or-nothing, skipReason settlement-partially-not-found, willInsertPayments kosong", async () => {
+    const db = createFakeDb({ "item-a:ar_ap": 10 }); // "item-b" TIDAK ada
+    const result = await buildArApPlanRows(
+      db as any,
+      [
+        arApRow({
+          amount: -4500,
+          isReversed: false,
+          settledReceivablePayableJournalItemIds: [
+            { journalItemId: "item-a", amount: 1500 },
+            { journalItemId: "item-b", amount: 3000 },
+          ],
+        }),
+      ],
+      mapping([]),
+      "skip"
+    );
+
+    expect(result.planRows[0].skipReason).toBe("settlement-partially-not-found");
+    expect(result.planRows[0].willInsertPayments).toEqual([]);
   });
 
   it("akun debt unmapped -> skipReason unmapped-debt-account, masuk unmappedDebtKeys", async () => {

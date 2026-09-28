@@ -32,6 +32,12 @@ export type ArApRow = {
    * pelunasan) dan untuk kasus pelunasan selain SALE_PAYMENT (belum
    * didukung). */
   settledReceivablePayableJournalItemId: string | null;
+  /** Array objek (BEDA BENTUK dari field di atas) — HANYA terisi untuk
+   * baris pelunasan consignment (satu pembayaran BISA melunasi BANYAK
+   * `debts` sekaligus, masing-masing dengan porsi `amount`-nya
+   * sendiri). `[]` untuk semua kasus lain. Lihat
+   * `RetailkuCashflowDetailRow.settledReceivablePayableJournalItemIds`. */
+  settledReceivablePayableJournalItemIds: { journalItemId: string; amount: number }[];
 };
 
 export function buildArApMappingKey(accountId: string, direction: "receivable" | "payable"): string {
@@ -62,6 +68,7 @@ export function extractArApRows(
         sourceRef: `${row.id}:ar_ap`,
         isReversed: row.isReversed,
         settledReceivablePayableJournalItemId: row.settledReceivablePayableJournalItemId,
+        settledReceivablePayableJournalItemIds: row.settledReceivablePayableJournalItemIds,
       };
     });
 }

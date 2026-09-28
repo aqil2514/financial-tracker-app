@@ -55,7 +55,8 @@ export type ArApSkipReason =
   | "zero-amount"
   | "reversal"
   | "settlement-not-supported"
-  | "settled-debt-not-found";
+  | "settled-debt-not-found"
+  | "settlement-partially-not-found";
 
 export type ArApSyncPlanRow = {
   journalItemId: string;
@@ -87,6 +88,14 @@ export type ArApSyncPlanRow = {
    * true, hasil lookup `source_ref` = piutang asli via
    * `settledReceivablePayableJournalItemId`. */
   paymentDebtId: number | null;
+  /** Alokasi pelunasan CONSIGNMENT_SETTLEMENT — satu baris melunasi
+   * BANYAK `debts` sekaligus (beda dari willInsertPayment/paymentDebtId
+   * yang cuma untuk 1 debt). `[]` kalau bukan kasus ini. Kebijakan
+   * all-or-nothing: kalau SATU SAJA debtId di
+   * `settledReceivablePayableJournalItemIds` tidak ketemu di debts
+   * lokal, array ini TETAP `[]` dan skipReason jadi
+   * "settlement-partially-not-found" — TIDAK proses partial. */
+  willInsertPayments: { debtId: number; amount: number }[];
   skipReason: ArApSkipReason | null;
   debtLocalAccountId: number | null;
   contactId: number | null;

@@ -128,16 +128,19 @@ function ArApPreview({ arAp }: { arAp: ArApSyncPlan }) {
   const toInsert = arAp.rows.filter((row) => row.willInsert);
   const toUpdate = arAp.rows.filter((row) => row.willUpdate);
   const toInsertPayment = arAp.rows.filter((row) => row.willInsertPayment);
+  const toInsertPaymentsBatch = arAp.rows.filter((row) => row.willInsertPayments.length > 0);
   const skipped = arAp.rows.filter(
-    (row) => !row.willInsert && !row.willUpdate && !row.willInsertPayment
+    (row) =>
+      !row.willInsert && !row.willUpdate && !row.willInsertPayment && row.willInsertPayments.length === 0
   );
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
         <SummaryStat label="Piutang/utang baru" value={toInsert.length} />
         <SummaryStat label="Akan ditimpa ulang" value={toUpdate.length} />
         <SummaryStat label="Pelunasan tercatat" value={toInsertPayment.length} />
+        <SummaryStat label="Pelunasan konsinyasi" value={toInsertPaymentsBatch.length} />
         <SummaryStat label="Baris di-skip" value={skipped.length} />
         <SummaryStat label="Akun belum dipetakan" value={arAp.unmappedDebtKeys.length} />
       </div>
@@ -181,6 +184,9 @@ function ArApStatusBadge({ row }: { row: ArApSyncPlanRow }) {
   if (row.willInsert) return <Badge variant="outline">Piutang/utang baru</Badge>;
   if (row.willUpdate) return <Badge variant="outline">Akan ditimpa ulang</Badge>;
   if (row.willInsertPayment) return <Badge variant="outline">Pelunasan akan tercatat</Badge>;
+  if (row.willInsertPayments.length > 0) {
+    return <Badge variant="outline">Pelunasan konsinyasi ({row.willInsertPayments.length} utang)</Badge>;
+  }
 
   switch (row.skipReason) {
     case "already-synced":
@@ -195,6 +201,8 @@ function ArApStatusBadge({ row }: { row: ArApSyncPlanRow }) {
       return <Badge variant="secondary">Pelunasan (belum didukung)</Badge>;
     case "settled-debt-not-found":
       return <Badge variant="secondary">Piutang asal belum tersinkron</Badge>;
+    case "settlement-partially-not-found":
+      return <Badge variant="secondary">Sebagian piutang asal belum tersinkron</Badge>;
     default:
       return <Badge variant="secondary">Di-skip</Badge>;
   }

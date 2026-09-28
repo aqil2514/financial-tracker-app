@@ -198,29 +198,141 @@ tool `get_cashflow_detail` sama sekali.
     lewat panggilan tool MCP langsung) — dan seperti SALE_PAYMENT,
     cabang "ketemu" (`willInsertPayment: true`) masih belum bisa
     dites karena `debts` lokal belum ada baris `source: retailku_sync`.
+- [x] **Representasi pelunasan asli ke `debts` — perluasan ke utang
+  dagang (`PURCHASE_PAYMENT`)**:
+  - Riset skema Prisma (`purchase-payment.prisma`, `purchase-order.prisma`,
+    `purchase-receiving.prisma`) — `PurchasePayment` punya 3 FK opsional
+    (`directPurchaseId`/`goodsReceivingId`/`purchaseOrderId`), TAPI
+    `PurchaseOrder` SENDIRI TIDAK PUNYA `journalEntryId` (PO bukan
+    dokumen jurnal) — utang baru tercatat saat `GoodsReceiving`-nya
+    diverifikasi, jadi jalur `purchaseOrderId` perlu turun 1 level lagi
+    ke `purchaseOrder.goodsReceivings[0].journalEntry`. Diverifikasi ke
+    142 baris `PurchasePayment` nyata (Warung Aqil): SELALU maks 1
+    `GoodsReceiving` per PO (0 kasus >1), `[0]` aman dipakai. Ditemukan
+    juga pola PENTING: `type: DOWN_PAYMENT` mengkredit "Uang Muka
+    Pembelian" (akun 1600, role `PURCHASE_ADVANCE`) BUKAN "Hutang
+    Dagang" (2100) — filter `receivablePayableAccountIds` yang SUDAH
+    ADA (cuma 6 role AR/AP, TIDAK termasuk `PURCHASE_ADVANCE`) otomatis
+    mengembalikan array KOSONG untuk kasus DP murni TANPA logic
+    tambahan — pembayaran DP memang bukan pelunasan utang, `null` itu
+    benar.
+  - **Sisi `retail-multitenant`**: tambah relasi
+    `purchasePayment.directPurchase/goodsReceiving/purchaseOrder.goodsReceivings[0].journalEntry.items`
+    (3 jalur dicoba berurutan, saling eksklusif — cuma satu FK yang
+    pernah terisi per `PurchasePayment`). `settledReceivablePayableJournalItemId`
+    sekarang isi dari 3 jalur (`SALE_PAYMENT`/`LEDGER_ENTRY_PAYMENT`/
+    `PURCHASE_PAYMENT`). Deskripsi tool MCP diupdate. `npx nest build`
+    sukses (2 file sama yang berubah, prettier auto-format nested
+    ternary). Restart server (USER), diverifikasi LANGSUNG via
+    panggilan nyata (rentang 2026-05-29): baris `PP-260529-01`
+    (Pelunasan penerimaan barang - GR-260529-01, akun 2100, `debit:
+    19000`) `settledReceivablePayableJournalItemId` PERSIS sama dengan
+    `journalItemId` baris `GR-260529-01` (utang asli, "Mawar Store",
+    `credit: 19000` — nilai JUGA cocok persis). Sekaligus dikonfirmasi:
+    banyak baris `PURCHASE_ORDER` (jalur DP via `purchaseOrderId`) di
+    rentang yang sama benar `null` (kredit ke 1600, bukan 2100) —
+    sesuai desain, bukan bug.
+  - **Sisi `financial-app`: TIDAK PERLU perubahan kode sama sekali**
+    (sama seperti LEDGER_ENTRY_PAYMENT) — logic generik otomatis
+    mencakup sourceType baru begitu server expose field-nya.
+  - **BELUM** diverifikasi end-to-end via `tauri dev`, dan cabang
+    "ketemu" (`willInsertPayment: true`) masih belum bisa dites —
+    sama seperti 2 sourceType sebelumnya.
 
-**Hasil akhir checklist di atas: reversal MASIH di-skip permanen
-(memang seharusnya). Pelunasan asli SEKARANG bisa diproses UNTUK
-`SALE_PAYMENT` DAN `LEDGER_ENTRY_PAYMENT` (kalau piutang/utang
-aslinya sudah pernah tersinkron) — 2 sourceType pelunasan lain
-(`PURCHASE_PAYMENT`/`CONSIGNMENT_SETTLEMENT`) MASIH
-`settlement-not-supported`, ditunda ke bagian "Belum dikerjakan" di
-bawah. Representasi kas dari pelunasan (akun mana yang menerima uang)
-JUGA sengaja ditunda — `debt_payments.account_id` NULL untuk semua
-baris hasil sync ini.**
+**Hasil akhir: reversal MASIH di-skip permanen (memang seharusnya).
+Pelunasan asli SEKARANG bisa diproses untuk SEMUA 4 sourceType
+(`SALE_PAYMENT`, `LEDGER_ENTRY_PAYMENT`, `PURCHASE_PAYMENT`,
+`CONSIGNMENT_SETTLEMENT`) — kalau piutang/utang aslinya sudah pernah
+tersinkron (untuk consignment: SEMUA piutang/utang terkait, kebijakan
+all-or-nothing). Representasi kas dari pelunasan (akun mana yang
+menerima uang) TETAP sengaja ditunda untuk semua kasus —
+`debt_payments.account_id` NULL untuk semua baris hasil sync ini,
+lihat item terpisah di bawah.**
 
-### Belum dikerjakan (gap yang diketahui, keputusan sadar ditunda)
-
-- [ ] **Pelunasan utang dagang** (`PURCHASE_PAYMENT`) — link BALIK ke
-  transaksi asli tidak sesederhana `SALE_PAYMENT`: `purchase_payments`
-  punya 3 FK opsional (`directPurchaseId`/`purchaseOrderId`/
-  `goodsReceivingId`, cuma salah satu terisi tergantung sumber utang)
-  — perlu riset tambahan sebelum desain field server-nya.
-- [ ] **Pelunasan utang consignment** (`CONSIGNMENT_SETTLEMENT`) — pola
-  BEDA dari 3 lainnya: `consignment_settlements` link per-SUPPLIER
-  (bukan per-transaksi), 1 settlement BISA melunasi banyak baris
-  "Hutang ke Penitip" sekaligus — belum digali desainnya sama sekali
-  (many-to-many, bukan 1:1 seperti SALE_PAYMENT).
+- [x] **Representasi pelunasan asli ke `debts` — perluasan ke utang
+  consignment (`CONSIGNMENT_SETTLEMENT`)**:
+  - Riset awal (skema `consignment-settlement.prisma`): jurnal
+    `ConsignmentSettlement` cuma 1 baris "Hutang ke Penitip" dgn
+    `totalAmount` GABUNGAN — BEDA dari 3 kasus lain (1:1), 1 settlement
+    bisa melunasi BANYAK transaksi consignment sekaligus, jurnalnya
+    sendiri TIDAK menyimpan rincian per transaksi. Sempat disangka gap
+    struktural TIDAK BISA diselesaikan tanpa heuristik (FIFO by date +
+    akumulasi ke totalAmount) — **KELIRU**, dikoreksi user yang minta
+    dicek dulu apakah Retailku punya data yang cukup sebelum
+    memutuskan skip permanen.
+  - Riset lanjutan (`get-cs-form-data.helper.ts`, `post-cs.helper.ts`,
+    `ledger-entry-no-journal.helper.ts`) menemukan: consignment
+    ternyata dicatat lewat `LedgerEntry` (tabel SAMA dgn piutang/utang
+    non-dagang manual), BUKAN cuma journal item mentah — server
+    Retailku SUDAH menjalankan FIFO eksplisit saat posting settlement
+    (`applySettlementToLedger`) dan mencatat 1 `LedgerEntryPayment` PER
+    `LedgerEntry` yang dilunasi dgn `sourceType: 'CONSIGNMENT_SETTLEMENT'`
+    + `sourceId: settlement.id` — pemetaan yang "hilang" di jurnal
+    ternyata MASIH ADA, cuma di tabel lain. TIDAK PERLU heuristik sama
+    sekali, murni query.
+  - **Percobaan pertama SALAH**: `LedgerEntry.journalEntryId` untuk
+    consignment SELALU `NULL` (beda dari ledger manual yg dipakai
+    LEDGER_ENTRY_PAYMENT) — journal aslinya lewat `sourceType`/
+    `sourceId` POLYMORPHIC milik `LedgerEntry` itu SENDIRI. Diverifikasi
+    ke data nyata: 2 pola ditemukan — (1) `sourceType: 'SALE'`,
+    `sourceId` = `SaleTransactionItem.id` (BUKAN `SaleTransaction.id`
+    langsung — 1 transaksi bisa punya banyak item consignment dari
+    penitip berbeda), journal item via
+    `saleTransactionItem.saleTransaction.journalEntry.items`; (2)
+    `sourceType: 'CONSIGNMENT_LEDGER_MIGRATION'` (saldo awal migrasi
+    data lama, TIDAK PERNAH punya transaksi sumber — sengaja dilewati,
+    BUKAN bug).
+  - **Sisi `retail-multitenant`**: field baru
+    `settledReceivablePayableJournalItemIds: {journalItemId, amount}[]`
+    (ARRAY OBJEK, BEDA BENTUK dari `settledReceivablePayableJournalItemId`
+    yang tunggal) — HANYA terisi utk `CONSIGNMENT_SETTLEMENT`. Query 3
+    tahap: (1) kumpulkan `consignmentSettlement.id` dari `entries`, (2)
+    query `LedgerEntryPayment` dgn `sourceType`/`sourceId` match
+    (SERTAKAN `amount` — nominal PERSIS hasil FIFO Retailku, bukan
+    ditebak ulang financial-app), (3) utk yg
+    `ledgerEntry.sourceType === 'SALE'`, query lanjutan
+    `SaleTransactionItem -> saleTransaction.journalEntry.items`.
+    Deskripsi tool MCP diupdate. `npx nest build` sukses tiap iterasi
+    (3 file berubah total karena 1 percobaan gagal-perbaiki, +1 lagi
+    saat bentuk field diubah dari `string[]` ke objek). Diverifikasi
+    LANGSUNG via panggilan nyata: `KS-260908-01` (campuran 1×SALE +
+    1×MIGRATION, totalAmount 16500) -> array 1 item (migration sengaja
+    dilewati, BENAR); `KS-260918-01` (murni 3×SALE, totalAmount 6000)
+    -> array TEPAT 3 item `{1500, 1500, 3000}`, jumlahnya cocok
+    totalAmount.
+  - **Sisi `financial-app`**: field baru di `ArApSyncPlanRow` —
+    `willInsertPayments: {debtId, amount}[]` (beda dari
+    `willInsertPayment`/`paymentDebtId` yang cuma 1 debt), skip reason
+    baru `"settlement-partially-not-found"`. `buildArApPlanRows` —
+    cabang baru SEBELUM cabang 1:1 lama: kalau
+    `settledReceivablePayableJournalItemIds.length > 0`, loop tiap
+    elemen cari `debts` via `source_ref`, kebijakan **all-or-nothing**
+    (dikonfirmasi user): SATU SAJA tidak ketemu -> skip SELURUH baris
+    (`settlementPartiallyNotFoundPlanRow`), TIDAK proses partial;
+    SEMUA ketemu -> `settlementBatchPlanRow` dgn alokasi lengkap.
+    Helper baru `insertArApPaymentsBatch` — INSERT banyak
+    `debt_payments` sekaligus, `source_ref` per alokasi digabung
+    `debtId` (`${sourceRef}:${debtId}`) supaya tetap unik per baris
+    (constraint `idx_debt_payments_source_ref`) — TIDAK perlu
+    perubahan skema baru, migrasi 0026 yang sudah ada cukup. Rollback
+    (`sync-all.ts`) TIDAK perlu perubahan — `arApPaymentInsertedSourceRefs`
+    sudah otomatis pakai format gabungan itu juga. UI preview: summary
+    stat baru "Pelunasan konsinyasi", badge baru "Pelunasan konsinyasi
+    (N utang)" dan "Sebagian piutang asal belum tersinkron".
+  - Verifikasi: `tsc --noEmit` bersih, `cargo check` sukses,
+    `vitest run` 129/129 lulus (naik dari 125 — 4 test baru: 2 skenario
+    batch di `buildArApPlanRows`, 2 di `insertArApPaymentsBatch`). DAN
+    diverifikasi VISUAL oleh user di `tauri dev` nyata (rentang
+    2026-09-01 s/d 2026-09-28): `KS-260908-01` (-Rp16.500) DAN
+    `KS-260918-01` (-Rp6.000) SAMA-SAMA tampil "Sebagian piutang asal
+    belum tersinkron" — BENAR sesuai desain all-or-nothing, karena
+    piutang aslinya (termasuk yang baru "akan" dibuat di rentang sync
+    yang SAMA, `willInsert: true` tapi belum benar-benar ter-INSERT
+    selama DRY_RUN) belum ada satu pun yang tersimpan nyata ke `debts`
+    lokal. Sempat terlihat SALAH (skipReason lama
+    `settlement-not-supported`) di percobaan pertama karena cache
+    dev server belum reload kode terbaru — refresh manual oleh user
+    memperbaikinya, BUKAN bug kode.
 - [ ] **Representasi kas dari pelunasan** — `debt_payments.account_id`
   NULL sengaja untuk semua baris hasil sync (termasuk SALE_PAYMENT yang
   SUDAH diimplementasikan) — Retailku expose `cashAccounts` di baris

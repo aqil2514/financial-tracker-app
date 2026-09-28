@@ -20,6 +20,7 @@ export function basePlanRow(
     existingDebtId: null,
     willInsertPayment: false,
     paymentDebtId: null,
+    willInsertPayments: [],
     debtLocalAccountId: null,
     contactId: null,
     contactFollowSource: false,
