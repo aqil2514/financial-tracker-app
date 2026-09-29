@@ -302,3 +302,17 @@ sebelum mulai coding. Berkaitan erat dengan `multi-device-sync.md`
 (Turso jadi tooling yang sama-sama relevan utk KEDUA kebutuhan — sync
 multi-device DAN MCP server ini — lihat catatan silang di kedua
 dokumen).
+
+> **Update (2026-09-30, sesi lain)**: Turso DITOLAK sbg tooling final
+> (lihat `multi-device-sync-engine.md`, riset perbandingan konkret —
+> ganti driver DB, LWW tidak built-in, roadmap masih pre-1.0). DAN
+> "sync multi-device dulu, baru MCP" (urutan Opsi 2 di dokumen ini)
+> ternyata TIDAK PERLU — desktop belum final, mobile belum dibangun
+> sama sekali, jadi sync dua-arah beneran belum relevan. Insight baru:
+> MCP server SAJA (tanpa sync dua-arah) cukup dengan **push satu-arah
+> PC → Cloudflare D1** (PC tetap satu-satunya penulis, tidak ada
+> conflict yang mungkin terjadi). Rencana konkret dan lebih sederhana
+> ada di **`mcp-server-cloud-mirror.md`** — DOKUMEN ITU yang jadi
+> rencana aktif sekarang utk MCP server, bagian di atas (opsi A/B,
+> riset Turso) tetap disimpan sbg sejarah keputusan tapi SUDAH TIDAK
+> jadi arah yang dipakai.
