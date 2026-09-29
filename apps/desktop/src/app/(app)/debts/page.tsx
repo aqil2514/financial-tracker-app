@@ -1,18 +1,17 @@
 import { PageContainer } from "@/components/page-container";
-import { PageHeader } from "@/components/page-header";
-import { ContactSummaryCard, DebtsPageProvider, NewDebtDialog } from "@/features/debts";
+import {
+  DebtsSummaryContent,
+  DebtsSummaryHeader,
+  DebtsSummaryPageProvider,
+} from "@/features/debts-summary";
 
 export default function DebtsPage() {
   return (
-    <DebtsPageProvider>
+    <DebtsSummaryPageProvider>
       <PageContainer maxWidth="6xl">
-        <PageHeader
-          title="Ringkasan Kontak"
-          description="Rangkuman piutang dan utang per kontak"
-          actions={<NewDebtDialog />}
-        />
-        <ContactSummaryCard />
+        <DebtsSummaryHeader />
+        <DebtsSummaryContent />
       </PageContainer>
-    </DebtsPageProvider>
+    </DebtsSummaryPageProvider>
   );
 }

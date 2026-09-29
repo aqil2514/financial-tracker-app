@@ -45,6 +45,56 @@ diperlukan di kasus Retailku.
   supaya kedua device bisa saling bertukar perubahan. Beda dengan sync
   Retailku yang bisa langsung app→Retailku tanpa infrastruktur tambahan.
 
+## Masalah konkret yang HARUS diselesaikan sebelum multi-device jalan: primary key `AUTOINCREMENT`
+
+Ditemukan lewat diskusi (2026-09-29): skema SAAT INI (`categories`,
+`transactions`, `accounts`, `debts`, dst) semua pakai
+`id INTEGER PRIMARY KEY AUTOINCREMENT` — aman selama cuma SATU device
+yang pernah menulis. Begitu 2+ device bisa menulis OFFLINE
+bersamaan (walau SAMA-SAMA milik satu orang/single-user — masalah ini
+dipicu oleh JUMLAH DEVICE, bukan jumlah user), auto-increment lokal di
+tiap device independen satu sama lain:
+
+- Device A (offline) bikin transaksi baru → `id: 105` (auto increment
+  lokal A).
+- Device B (offline, belum pernah sync ke A) juga bikin transaksi baru
+  → `id: 105` juga (auto increment lokal B, tidak tahu-menahu soal A).
+- Begitu KEDUANYA sync ke server pusat yang sama → **tabrakan id**, dua
+  baris berbeda mengklaim `id: 105` yang sama.
+
+**Solusi standar (bukan eksperimental, pola mapan utk aplikasi
+offline-first)**: ganti primary key dari `INTEGER AUTOINCREMENT` ke
+UUID yang di-generate SAAT baris dibuat (bukan diserahkan ke database)
+— ruang kemungkinan UUID cukup besar sehingga 2 device offline
+bersamaan nyaris mustahil menghasilkan nilai sama.
+
+**Kenapa ini MAHAL kalau ditunda/dirombak belakangan** — bukan cuma
+migrasi SQL (pola "copy-and-rename" yang sudah biasa dipakai proyek
+ini, lihat `account-type.md` utk pola serupa), tapi terutama:
+- SETIAP tabel dengan primary key + SETIAP foreign key yang
+  mereferensikannya (`category_id`, `account_id`, `contact_id`, dst)
+  ikut berubah tipe (`number` → `string`/UUID) — menyentuh hampir semua
+  helper query/hook di kode TypeScript, bukan cuma skema.
+- Beberapa tempat di kode MUNGKIN diam-diam mengasumsikan id itu angka
+  urut (mis. dipakai sbg proxy "mana yang lebih baru") — perlu audit
+  satu-satu, bukan cuma ganti tipe.
+- Makin banyak fitur/tabel baru dibangun di atas asumsi auto-increment
+  sekarang (mis. `account_type` yang direncanakan di `account-type.md`,
+  tabel detail per tipe akun), makin besar juga scope migrasi UUID
+  nanti — **rekomendasi: pertimbangkan urutan pengerjaan, migrasi UUID
+  lebih murah dilakukan LEBIH AWAL sebelum tabel bertambah banyak,
+  bukan ditunda sampai aplikasi mau didistribusikan**.
+
+**Terpisah dari masalah id**: resolusi konflik (siapa menang kalau
+baris yang SAMA diedit di 2 device sebelum sempat sync) TETAP perlu
+dijawab meski cuma single-user — sudah dibahas di bagian "Yang beda
+dari kasus Retailku" di atas, 3 tingkatan solusi (last-write-wins →
+deteksi+tanya user → append-only/event sourcing), belum diputuskan
+mana yang dipakai. Untuk personal finance (kemungkinan jarang edit
+baris sama dari 2 device di window offline yang sama), last-write-wins
+atau deteksi+tanya user kemungkinan sudah cukup — TIDAK perlu langsung
+ke append-only yang paling berat.
+
 ## Kemungkinan tooling (belum diputuskan, sekadar referensi arah)
 
 - **Turso/libSQL** — SQLite yang didesain untuk replikasi/sync, embedded

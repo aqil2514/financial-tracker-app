@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryState } from "@/components/query-state";
-import { useDebtsPage } from "./page";
+import { useDebtsSummaryPage } from "../page";
 import { ContactCard } from "./card";
 import { findOldestOngoing } from "./utils";
 
@@ -12,10 +12,10 @@ import { findOldestOngoing } from "./utils";
  * kontak dengan 2 section terpisah — supaya "Budi pernah dipinjami DAN
  * pernah meminjamkan" tidak muncul sebagai 2 identitas berbeda di grid.
  *
- * Data diambil dari `useDebtsPage()` (context level halaman, lihat
- * features/debts/page/debts-page-context.tsx) — bukan fetch sendiri. */
-export function ContactSummaryCard() {
-  const { summary, isLoading, receivables, payables } = useDebtsPage();
+ * Data diambil dari `useDebtsSummaryPage()` (context level halaman, lihat
+ * features/debts-summary/page/index.tsx) — bukan fetch sendiri. */
+export function CardGrid() {
+  const { summary, isLoading, receivables, payables } = useDebtsSummaryPage();
 
   if (isLoading) {
     return <QueryState isLoading={isLoading} />;

@@ -16,19 +16,8 @@ import { ListItemActionsMenu } from "@/components/list-item-actions-menu";
 import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
 import { useDebtsList, type DebtListRow } from "@/shared/debts/use-debts-list";
-import { PayDebtDialog } from "./pay-debt-form/pay-debt-dialog";
-
-const STATUS_LABEL: Record<string, string> = {
-  ongoing: "Berjalan",
-  paid: "Lunas",
-  written_off: "Dihapuskan",
-};
-
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
-  ongoing: "default",
-  paid: "secondary",
-  written_off: "outline",
-};
+import { PayDebtDialog } from "@/shared/debts/pay-debt-form/pay-debt-dialog";
+import { DEBT_STATUS_LABEL, DEBT_STATUS_VARIANT } from "@/shared/debts/status-labels";
 
 export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
   const { data: debts, isLoading } = useDebtsList(type);
@@ -71,8 +60,8 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
                 {formatCurrency(debt.remaining, "IDR")}
               </TableCell>
               <TableCell>
-                <Badge variant={STATUS_VARIANT[debt.status]}>
-                  {STATUS_LABEL[debt.status]}
+                <Badge variant={DEBT_STATUS_VARIANT[debt.status]}>
+                  {DEBT_STATUS_LABEL[debt.status]}
                 </Badge>
               </TableCell>
               <TableCell>

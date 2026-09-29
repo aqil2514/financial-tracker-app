@@ -11,16 +11,19 @@ interface ContactCardContextType {
   oldestPayable: DebtListRow | undefined;
   payingDebt: DebtListRow | null;
   setPayingDebt: (debt: DebtListRow | null) => void;
+  detailOpen: boolean;
+  setDetailOpen: (open: boolean) => void;
 }
 
 const ContactCardContext = createContext<ContactCardContextType | undefined>(undefined);
 
 /** State satu `ContactCard` — pola sama dengan `AccountsProvider`
  * (features/accounts/sections/list/context/index.tsx): dialog
- * "Bayar" di-render SEKALI di `index.tsx`, bukan per section, baris
- * yang sedang dibayar (`payingDebt`) datang dari context, di-set lewat
- * `setPayingDebt()` dari tombol bayar di `body.tsx`. Section body jadi
- * tidak perlu tahu apa-apa soal state dialog. */
+ * "Bayar" DAN dialog "Detail" di-render SEKALI di `index.tsx`, bukan
+ * per section — baris yang sedang dibayar (`payingDebt`) datang dari
+ * context, di-set lewat `setPayingDebt()` dari tombol bayar di
+ * `body.tsx`; `detailOpen` dipicu dari tombol "Detail" di `header.tsx`.
+ * Section body/header jadi tidak perlu tahu apa-apa soal state dialog. */
 export function ContactCardProvider({
   contact,
   oldestReceivable,
@@ -33,10 +36,19 @@ export function ContactCardProvider({
   children: React.ReactNode;
 }) {
   const [payingDebt, setPayingDebt] = useState<DebtListRow | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   return (
     <ContactCardContext.Provider
-      value={{ contact, oldestReceivable, oldestPayable, payingDebt, setPayingDebt }}
+      value={{
+        contact,
+        oldestReceivable,
+        oldestPayable,
+        payingDebt,
+        setPayingDebt,
+        detailOpen,
+        setDetailOpen,
+      }}
     >
       {children}
     </ContactCardContext.Provider>
