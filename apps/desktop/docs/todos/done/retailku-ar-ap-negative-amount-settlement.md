@@ -462,10 +462,30 @@ lihat item terpisah di bawah.**
     perubahan spesifik ini (DRY_RUN masih aktif) — sejauh ini cuma
     tervalidasi lewat unit test, SAMA seperti gap "representasi kas
     dari pelunasan" di atas.
-- [ ] `account_type: advance` — masih rencana dokumen terpisah
-  (`docs/todos/plan/account-type.md`).
-- [ ] DRY_RUN belum dinonaktifkan — semua di atas baru actionable
-  setelah keputusan eksplisit user mengaktifkan insert sungguhan.
+- [x] **DRY_RUN dinonaktifkan** (`sync-cashflow.ts`, `DRY_RUN = false`) —
+  `tsc`/`vitest` (153/153)/`cargo check` tetap bersih. Diverifikasi
+  LANGSUNG di database dev (disalin bersih dari `finance.db` produksi
+  dulu via `docs/rules/checking-dev-database.md`, supaya tidak
+  tercampur fitur lama "Piutang Retailku" snapshot manual): user
+  menjalankan sync sungguhan, hasil dicek query SQL — 2 baris `debts`
+  baru (`source: retailku_sync`, kontak "Mba-mba Kado Kuning") DAN 2
+  baris `transactions` DP (`source_ref: ...:ar_ap_dp`, note "Omzet
+  Dagang") ter-INSERT benar dengan nilai yang cocok (piutang net
+  1500/6000, DP 6000/12000 — pola sama seperti riset sebelumnya, DP >
+  piutang net). Sekaligus terkonfirmasi live 1 baris skip
+  `settled-debt-not-found` ("Nenek Petok", -Rp2000): dicek ke MCP
+  Retailku (`get_sales_customer_transactions`) — piutang aslinya
+  tercipta 2026-05-29 (`SL-260529-11`), jauh sebelum rentang sync yang
+  pernah dijalankan (mulai September) — BUKAN bug, cabang skip bekerja
+  sesuai desain saat piutang induk belum pernah masuk `debts` lokal.
+  **Cabang "ketemu" pelunasan (`debt_payments` terisi) MASIH belum
+  tervalidasi live** — perlu sync mundur ke rentang yang mencakup
+  tanggal piutang lama supaya piutang induknya ter-insert dulu; akan
+  terjadi bertahap secara alami seiring sync rentang lain/data baru,
+  bukan gap kode yang perlu dikerjakan lagi.
+**Catatan: `account_type: advance` BUKAN bagian scope dokumen ini** —
+rencana terpisah di `docs/todos/plan/account-type.md`, disebut di sini
+sebelumnya cuma sebagai referensi silang, bukan todo item dokumen ini.
 
 ## Keputusan yang sudah dikonfirmasi user (sesi ini)
 

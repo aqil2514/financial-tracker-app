@@ -6,8 +6,7 @@ import { insertArApTransaction } from "./helpers/insert-ar-ap-transaction";
 import { insertCashflowTransaction } from "./helpers/insert-cashflow-transaction";
 import type { Db, SyncCashflowInput, SyncCashflowResult } from "./types";
 
-// DEBUG SEMENTARA — set false setelah investigasi selesai. Skip semua insert, cuma console.log.
-const DRY_RUN = true;
+const DRY_RUN = false;
 
 export class SyncCashflowPartialError extends Error {
   constructor(

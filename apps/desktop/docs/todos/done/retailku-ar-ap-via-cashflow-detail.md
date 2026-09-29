@@ -1,5 +1,15 @@
 # Sync AR/AP lewat `get_cashflow_detail` (menggantikan `get_ar_ap` + snapshot-diff)
 
+> **DIPINDAH KE `done/` (2026-09-29)** — gap "belum oke" (akun kas AR/AP
+> generik) yang membuat dokumen ini ditutup akhirnya tuntas lewat
+> rangkaian dokumen penerus: `retailku-dynamic-sourcetype-mapping.md` →
+> `retailku-ar-ap-negative-amount-settlement.md` (representasi kas dari
+> pelunasan DAN dari DP/split payment, keduanya SELESAI + DRY_RUN
+> dinonaktifkan + diverifikasi live). Implementasi inti dokumen INI
+> sendiri (sync AR/AP dasar via `get_cashflow_detail`) sudah lama SELESAI
+> dan terverifikasi (lihat status di bawah) — dipindahkan sekarang murni
+> supaya tidak menumpuk di `plan/`, BUKAN klaim baru.
+>
 > **DITUTUP (2026-09-26) — DIGANTIKAN oleh
 > `docs/todos/plan/retailku-dynamic-sourcetype-mapping.md`.** Investigasi
 > lanjutan menemukan bahwa akun kas AR/AP generik (satu-satunya gap yang

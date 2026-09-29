@@ -1,10 +1,15 @@
 # Mapping field non-fakta hasil sync Retailku (menggantikan `retailku_account_mapping`)
 
-> **Status: DISEPAKATI untuk mode summary+detail, siap implementasi.**
-> Mode ketiga (breakdown PPOB/Consignment, lihat
-> `retailku-sale-category-mapping.md`) BELUM masuk skema ini — akan
-> dikembangkan terpisah sambil skema ini sudah berjalan produksi
-> beberapa hari untuk mode summary/detail.
+> **Status: SELESAI DIIMPLEMENTASIKAN untuk mode summary+detail**
+> (dipindah ke `done/` 2026-09-29). Tabel `retailku_sync_field_mapping`
+> dibuat lewat migrasi 0020 (+ perluasan 0023 `secondary_account`, 0024
+> `extra_fields`), konsumen lama (`load-account-mapping.ts`, dst.) sudah
+> di-retire — kode produksi sekarang query `retailku_sync_field_mapping`
+> langsung (`load-field-mapping.ts`), bukan `retailku_account_mapping`
+> lagi. **Mode ketiga** (breakdown PPOB/Consignment) TETAP sengaja di
+> luar scope dokumen ini — dilacak terpisah di
+> `retailku-sale-category-mapping.md` (masih `plan/`, belum tuntas),
+> lihat "Di luar cakupan versi pertama ini" di bawah.
 
 ## Latar belakang
 
