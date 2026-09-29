@@ -1,6 +1,7 @@
 "use client";
 
 import { getDb } from "@/lib/db";
+import { newId } from "@/lib/id";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
@@ -39,40 +40,38 @@ export function useCreateDebt() {
       const contactId = await resolveContactId(values.contact_name);
 
       const db = await getDb();
-      const cashAccountId = Number(values.cash_account_id);
-      const debtAccountId = Number(values.debt_account_id);
+      const cashAccountId = values.cash_account_id;
+      const debtAccountId = values.debt_account_id;
 
       // receivable: kas -> debt. payable: debt -> kas.
       const accountId = values.debt_type === "receivable" ? cashAccountId : debtAccountId;
       const transferAccountId =
         values.debt_type === "receivable" ? debtAccountId : cashAccountId;
+      const transactionId = newId();
 
-      const result = await db.execute(
-        `INSERT INTO transactions (type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
-         VALUES ('transfer', $1, NULL, $2, $3, $4, NULL, $5, $6)`,
-        [values.amount, accountId, transferAccountId, values.note, values.date, contactId]
+      await db.execute(
+        `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
+         VALUES ($1, 'transfer', $2, NULL, $3, $4, $5, NULL, $6, $7)`,
+        [transactionId, values.amount, accountId, transferAccountId, values.note, values.date, contactId]
       );
-      const transactionId = result.lastInsertId ?? null;
 
-      if (transactionId != null) {
-        await applyDebtTransaction({
-          db,
-          transactionId,
-          type: "transfer",
-          accountId,
-          transferAccountId,
-          contactId,
-          amount: values.amount,
-          date: values.date,
-          // debt_type === 'payable' berarti arah transfer adalah
-          // debt->kas, yang ambigu di applyDebtTransaction tanpa
-          // debtAction eksplisit — form ini SELALU berarti "utang baru",
-          // tidak pernah pelunasan (itu tugas form "Catat Pembayaran"
-          // yang terpisah), jadi dipaksa 'payable' di sini.
-          debtAction: values.debt_type === "payable" ? "payable" : null,
-          settleDebtIds: [],
-        });
-      }
+      await applyDebtTransaction({
+        db,
+        transactionId,
+        type: "transfer",
+        accountId,
+        transferAccountId,
+        contactId,
+        amount: values.amount,
+        date: values.date,
+        // debt_type === 'payable' berarti arah transfer adalah
+        // debt->kas, yang ambigu di applyDebtTransaction tanpa
+        // debtAction eksplisit — form ini SELALU berarti "utang baru",
+        // tidak pernah pelunasan (itu tugas form "Catat Pembayaran"
+        // yang terpisah), jadi dipaksa 'payable' di sini.
+        debtAction: values.debt_type === "payable" ? "payable" : null,
+        settleDebtIds: [],
+      });
 
       return transactionId;
     },

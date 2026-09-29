@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   applyDebtTransaction,
@@ -16,24 +16,28 @@ import type { TransactionDebtStatus } from "./use-transaction-debt-status";
  * cakupan logic yang diuji di sini (murni branching, bukan SQL itu sendiri
  * — SQL-nya sudah diverifikasi manual lewat simulasi di salinan
  * finance.dev.db, lihat debt-receivable-tracking.md).
+ *
+ * ID sekarang UUID (TEXT PRIMARY KEY, lihat migrasi 0027_uuid_primary_keys.sql)
+ * — INSERT menyertakan `id` eksplisit sebagai parameter pertama (BUKAN lagi
+ * `lastInsertId` dari auto-increment), fake db meniru pola itu persis.
  */
-type AccountRow = { id: number; account_type: "cash" | "debt" };
+type AccountRow = { id: string; account_type: "cash" | "debt" };
 type DebtRow = {
-  id: number;
+  id: string;
   type: "receivable" | "payable";
-  contact_id: number | null;
+  contact_id: string | null;
   amount: number;
-  account_id: number | null;
-  transaction_id: number | null;
+  account_id: string | null;
+  transaction_id: string | null;
   status: "ongoing" | "paid" | "written_off";
   date: string;
 };
 type DebtPaymentRow = {
-  id: number;
-  debt_id: number;
+  id: string;
+  debt_id: string;
   amount: number;
-  account_id: number | null;
-  transaction_id: number | null;
+  account_id: string | null;
+  transaction_id: string | null;
   date: string;
 };
 
@@ -41,10 +45,8 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
   const accounts = seed.accounts ?? [];
   const debts: DebtRow[] = seed.debts ?? [];
   const debtPayments: DebtPaymentRow[] = seed.debtPayments ?? [];
-  let nextDebtId = Math.max(0, ...debts.map((d) => d.id)) + 1;
-  let nextPaymentId = Math.max(0, ...debtPayments.map((p) => p.id)) + 1;
 
-  function remaining(debtId: number): number {
+  function remaining(debtId: string): number {
     const debt = debts.find((d) => d.id === debtId);
     if (!debt) return 0;
     const paid = debtPayments
@@ -56,19 +58,19 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
   const db = {
     async select<T>(sql: string, params: unknown[] = []): Promise<T> {
       if (sql.includes("FROM accounts WHERE id")) {
-        const [id] = params as [number];
+        const [id] = params as [string];
         const account = accounts.find((a) => a.id === id);
         return (account ? [{ account_type: account.account_type }] : []) as T;
       }
       if (sql.includes("FROM debts") && sql.includes("remaining") && sql.includes("IN (")) {
-        const ids = params as number[];
+        const ids = params as string[];
         const rows = debts
           .filter((d) => ids.includes(d.id))
           .map((d) => ({ id: d.id, remaining: remaining(d.id) }))
           .sort((a, b) => {
             const da = debts.find((d) => d.id === a.id)!;
             const dbb = debts.find((d) => d.id === b.id)!;
-            return da.date === dbb.date ? a.id - b.id : da.date.localeCompare(dbb.date);
+            return da.date === dbb.date ? a.id.localeCompare(b.id) : da.date.localeCompare(dbb.date);
           });
         return rows as T;
       }
@@ -76,15 +78,15 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
     },
     async execute(sql: string, params: unknown[] = []): Promise<{ lastInsertId?: number }> {
       if (sql.startsWith("INSERT INTO debts")) {
-        const [contactId, amount, accountId, transactionId, date] = params as [
-          number | null,
+        const [id, contactId, amount, accountId, transactionId, date] = params as [
+          string,
+          string | null,
           number,
-          number,
-          number,
+          string,
+          string,
           string,
         ];
         const type = sql.includes("'receivable'") ? "receivable" : "payable";
-        const id = nextDebtId++;
         debts.push({
           id,
           type,
@@ -95,10 +97,10 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
           status: "ongoing",
           date,
         });
-        return { lastInsertId: id };
+        return {};
       }
       if (sql.startsWith("DELETE FROM debts")) {
-        const [id] = params as [number];
+        const [id] = params as [string];
         const index = debts.findIndex((d) => d.id === id);
         if (index >= 0) debts.splice(index, 1);
         // Simulasikan ON DELETE CASCADE debt_payments -> debts.
@@ -108,19 +110,19 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
         return {};
       }
       if (sql.startsWith("UPDATE debts SET date")) {
-        const [date, id] = params as [string, number];
+        const [date, id] = params as [string, string];
         const debt = debts.find((d) => d.id === id);
         if (debt) debt.date = date;
         return {};
       }
       if (sql.startsWith("UPDATE debts SET status = 'paid'")) {
-        const [id] = params as [number];
+        const [id] = params as [string];
         const debt = debts.find((d) => d.id === id);
         if (debt) debt.status = "paid";
         return {};
       }
       if (sql.startsWith("UPDATE debts SET status = 'ongoing'")) {
-        const [id] = params as [number];
+        const [id] = params as [string];
         const debt = debts.find((d) => d.id === id && d.status === "paid");
         const totalPaid = debtPayments
           .filter((p) => p.debt_id === id)
@@ -131,25 +133,25 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
         return {};
       }
       if (sql.startsWith("INSERT INTO debt_payments")) {
-        const [debtId, amount, accountId, transactionId, date] = params as [
-          number,
-          number,
-          number,
+        const [id, debtId, amount, accountId, transactionId, date] = params as [
+          string,
+          string,
           number,
           string,
+          string,
+          string,
         ];
-        const id = nextPaymentId++;
         debtPayments.push({ id, debt_id: debtId, amount, account_id: accountId, transaction_id: transactionId, date });
-        return { lastInsertId: id };
+        return {};
       }
       if (sql.startsWith("DELETE FROM debt_payments")) {
-        const [id] = params as [number];
+        const [id] = params as [string];
         const index = debtPayments.findIndex((p) => p.id === id);
         if (index >= 0) debtPayments.splice(index, 1);
         return {};
       }
       if (sql.startsWith("UPDATE debt_payments SET date")) {
-        const [date, id] = params as [string, number];
+        const [date, id] = params as [string, string];
         const payment = debtPayments.find((p) => p.id === id);
         if (payment) payment.date = date;
         return {};
@@ -161,8 +163,8 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
   return { db, accounts, debts, debtPayments };
 }
 
-const CASH_ACCOUNT: AccountRow = { id: 1, account_type: "cash" };
-const DEBT_ACCOUNT: AccountRow = { id: 2, account_type: "debt" };
+const CASH_ACCOUNT: AccountRow = { id: "cash-1", account_type: "cash" };
+const DEBT_ACCOUNT: AccountRow = { id: "debt-1", account_type: "debt" };
 
 describe("applyDebtTransaction", () => {
   it("tidak melakukan apa pun untuk transaksi income/expense", async () => {
@@ -170,9 +172,9 @@ describe("applyDebtTransaction", () => {
 
     await applyDebtTransaction({
       db: db as never,
-      transactionId: 1,
+      transactionId: "tx-1",
       type: "expense",
-      accountId: 1,
+      accountId: "cash-1",
       transferAccountId: null,
       contactId: null,
       amount: 1000,
@@ -185,15 +187,15 @@ describe("applyDebtTransaction", () => {
   });
 
   it("tidak melakukan apa pun untuk transfer kas ke kas", async () => {
-    const cashB: AccountRow = { id: 3, account_type: "cash" };
+    const cashB: AccountRow = { id: "cash-2", account_type: "cash" };
     const { db, debts } = createFakeDb({ accounts: [CASH_ACCOUNT, cashB] });
 
     await applyDebtTransaction({
       db: db as never,
-      transactionId: 1,
+      transactionId: "tx-1",
       type: "transfer",
-      accountId: 1,
-      transferAccountId: 3,
+      accountId: "cash-1",
+      transferAccountId: "cash-2",
       contactId: null,
       amount: 1000,
       date: "2026-01-01",
@@ -205,16 +207,16 @@ describe("applyDebtTransaction", () => {
   });
 
   it("tidak melakukan apa pun untuk transfer debt ke debt", async () => {
-    const debtB: AccountRow = { id: 3, account_type: "debt" };
+    const debtB: AccountRow = { id: "debt-2", account_type: "debt" };
     const { db, debts } = createFakeDb({ accounts: [DEBT_ACCOUNT, debtB] });
 
     await applyDebtTransaction({
       db: db as never,
-      transactionId: 1,
+      transactionId: "tx-1",
       type: "transfer",
-      accountId: 2,
-      transferAccountId: 3,
-      contactId: 10,
+      accountId: "debt-1",
+      transferAccountId: "debt-2",
+      contactId: "contact-10",
       amount: 1000,
       date: "2026-01-01",
       debtAction: null,
@@ -229,11 +231,11 @@ describe("applyDebtTransaction", () => {
 
     await applyDebtTransaction({
       db: db as never,
-      transactionId: 42,
+      transactionId: "tx-42",
       type: "transfer",
-      accountId: 1,
-      transferAccountId: 2,
-      contactId: 10,
+      accountId: "cash-1",
+      transferAccountId: "debt-1",
+      contactId: "contact-10",
       amount: 50000,
       date: "2026-01-01",
       debtAction: null,
@@ -242,12 +244,12 @@ describe("applyDebtTransaction", () => {
 
     expect(debts).toEqual([
       {
-        id: 1,
+        id: expect.any(String),
         type: "receivable",
-        contact_id: 10,
+        contact_id: "contact-10",
         amount: 50000,
-        account_id: 2,
-        transaction_id: 42,
+        account_id: "debt-1",
+        transaction_id: "tx-42",
         status: "ongoing",
         date: "2026-01-01",
       },
@@ -259,11 +261,11 @@ describe("applyDebtTransaction", () => {
 
     await applyDebtTransaction({
       db: db as never,
-      transactionId: 7,
+      transactionId: "tx-7",
       type: "transfer",
-      accountId: 2,
-      transferAccountId: 1,
-      contactId: 20,
+      accountId: "debt-1",
+      transferAccountId: "cash-1",
+      contactId: "contact-20",
       amount: 30000,
       date: "2026-02-01",
       debtAction: "payable",
@@ -272,12 +274,12 @@ describe("applyDebtTransaction", () => {
 
     expect(debts).toEqual([
       {
-        id: 1,
+        id: expect.any(String),
         type: "payable",
-        contact_id: 20,
+        contact_id: "contact-20",
         amount: 30000,
-        account_id: 2,
-        transaction_id: 7,
+        account_id: "debt-1",
+        transaction_id: "tx-7",
         status: "ongoing",
         date: "2026-02-01",
       },
@@ -287,22 +289,22 @@ describe("applyDebtTransaction", () => {
   it("debt -> kas dengan debtAction='settlement' mengalokasikan FIFO ke piutang terlama dulu", async () => {
     const seedDebts: DebtRow[] = [
       {
-        id: 1,
+        id: "debt-row-1",
         type: "receivable",
-        contact_id: 10,
+        contact_id: "contact-10",
         amount: 30000,
-        account_id: 2,
-        transaction_id: 100,
+        account_id: "debt-1",
+        transaction_id: "tx-100",
         status: "ongoing",
         date: "2026-01-01",
       },
       {
-        id: 2,
+        id: "debt-row-2",
         type: "receivable",
-        contact_id: 10,
+        contact_id: "contact-10",
         amount: 40000,
-        account_id: 2,
-        transaction_id: 101,
+        account_id: "debt-1",
+        transaction_id: "tx-101",
         status: "ongoing",
         date: "2026-01-10",
       },
@@ -314,25 +316,25 @@ describe("applyDebtTransaction", () => {
 
     await applyDebtTransaction({
       db: db as never,
-      transactionId: 200,
+      transactionId: "tx-200",
       type: "transfer",
-      accountId: 2,
-      transferAccountId: 1,
-      contactId: 10,
+      accountId: "debt-1",
+      transferAccountId: "cash-1",
+      contactId: "contact-10",
       amount: 60000,
       date: "2026-02-01",
       debtAction: "settlement",
-      settleDebtIds: ["1", "2"],
+      settleDebtIds: ["debt-row-1", "debt-row-2"],
     });
 
-    // Debt 1 (30000, TERLAMA) lunas penuh duluan, sisa 30000 dari 60000
-    // mengalir ke debt 2 (40000) -> debt 2 sisa 10000, masih ongoing.
+    // debt-row-1 (30000, TERLAMA) lunas penuh duluan, sisa 30000 dari
+    // 60000 mengalir ke debt-row-2 (40000) -> sisa 10000, masih ongoing.
     expect(debtPayments).toEqual([
-      { id: 1, debt_id: 1, amount: 30000, account_id: 2, transaction_id: 200, date: "2026-02-01" },
-      { id: 2, debt_id: 2, amount: 30000, account_id: 2, transaction_id: 200, date: "2026-02-01" },
+      { id: expect.any(String), debt_id: "debt-row-1", amount: 30000, account_id: "debt-1", transaction_id: "tx-200", date: "2026-02-01" },
+      { id: expect.any(String), debt_id: "debt-row-2", amount: 30000, account_id: "debt-1", transaction_id: "tx-200", date: "2026-02-01" },
     ]);
-    expect(debts.find((d) => d.id === 1)?.status).toBe("paid");
-    expect(debts.find((d) => d.id === 2)?.status).toBe("ongoing");
+    expect(debts.find((d) => d.id === "debt-row-1")?.status).toBe("paid");
+    expect(debts.find((d) => d.id === "debt-row-2")?.status).toBe("ongoing");
   });
 
   it("settlement dengan settleDebtIds kosong tidak melakukan apa pun", async () => {
@@ -340,11 +342,11 @@ describe("applyDebtTransaction", () => {
 
     await applyDebtTransaction({
       db: db as never,
-      transactionId: 1,
+      transactionId: "tx-1",
       type: "transfer",
-      accountId: 2,
-      transferAccountId: 1,
-      contactId: 10,
+      accountId: "debt-1",
+      transferAccountId: "cash-1",
+      contactId: "contact-10",
       amount: 1000,
       date: "2026-01-01",
       debtAction: "settlement",
@@ -357,11 +359,11 @@ describe("applyDebtTransaction", () => {
 
 describe("applyDebtTransactionEdit", () => {
   const baseInput = {
-    transactionId: 42,
+    transactionId: "tx-42",
     type: "transfer" as const,
-    accountId: 1,
-    transferAccountId: 2,
-    contactId: 10,
+    accountId: "cash-1",
+    transferAccountId: "debt-1",
+    contactId: "contact-10",
     amount: 50000,
     date: "2026-03-01",
     debtAction: null,
@@ -380,24 +382,24 @@ describe("applyDebtTransactionEdit", () => {
     });
 
     expect(debts).toHaveLength(1);
-    expect(debts[0].transaction_id).toBe(42);
+    expect(debts[0].transaction_id).toBe("tx-42");
   });
 
   it("role='principal', field berbahaya TIDAK berubah: cuma sinkronkan date", async () => {
     const seedDebts: DebtRow[] = [
       {
-        id: 5,
+        id: "debt-row-5",
         type: "receivable",
-        contact_id: 10,
+        contact_id: "contact-10",
         amount: 50000,
-        account_id: 2,
-        transaction_id: 42,
+        account_id: "debt-1",
+        transaction_id: "tx-42",
         status: "ongoing",
         date: "2026-01-01",
       },
     ];
     const { db, debts } = createFakeDb({ accounts: [CASH_ACCOUNT, DEBT_ACCOUNT], debts: seedDebts });
-    const status: TransactionDebtStatus = { role: "principal", debtId: 5, hasPayments: false };
+    const status: TransactionDebtStatus = { role: "principal", debtId: "debt-row-5", hasPayments: false };
 
     await applyDebtTransactionEdit({
       db: db as never,
@@ -415,18 +417,18 @@ describe("applyDebtTransactionEdit", () => {
   it("role='principal', field berbahaya berubah, BELUM ada cicilan: recreate dari nilai baru", async () => {
     const seedDebts: DebtRow[] = [
       {
-        id: 5,
+        id: "debt-row-5",
         type: "receivable",
-        contact_id: 10,
+        contact_id: "contact-10",
         amount: 50000,
-        account_id: 2,
-        transaction_id: 42,
+        account_id: "debt-1",
+        transaction_id: "tx-42",
         status: "ongoing",
         date: "2026-01-01",
       },
     ];
     const { db, debts } = createFakeDb({ accounts: [CASH_ACCOUNT, DEBT_ACCOUNT], debts: seedDebts });
-    const status: TransactionDebtStatus = { role: "principal", debtId: 5, hasPayments: false };
+    const status: TransactionDebtStatus = { role: "principal", debtId: "debt-row-5", hasPayments: false };
 
     await applyDebtTransactionEdit({
       db: db as never,
@@ -437,33 +439,33 @@ describe("applyDebtTransactionEdit", () => {
     });
 
     expect(debts).toHaveLength(1);
-    expect(debts[0].id).not.toBe(5); // baris lama sudah dihapus, ini baris baru
+    expect(debts[0].id).not.toBe("debt-row-5"); // baris lama sudah dihapus, ini baris baru
     expect(debts[0].amount).toBe(75000);
-    expect(debts[0].transaction_id).toBe(42);
+    expect(debts[0].transaction_id).toBe("tx-42");
   });
 
   it("role='principal', field berbahaya berubah, SUDAH ada cicilan dari transaksi lain: DIBLOKIR", async () => {
     const seedDebts: DebtRow[] = [
       {
-        id: 5,
+        id: "debt-row-5",
         type: "receivable",
-        contact_id: 10,
+        contact_id: "contact-10",
         amount: 50000,
-        account_id: 2,
-        transaction_id: 42,
+        account_id: "debt-1",
+        transaction_id: "tx-42",
         status: "ongoing",
         date: "2026-01-01",
       },
     ];
     const seedPayments: DebtPaymentRow[] = [
-      { id: 1, debt_id: 5, amount: 20000, account_id: 1, transaction_id: 999, date: "2026-02-01" },
+      { id: "payment-1", debt_id: "debt-row-5", amount: 20000, account_id: "cash-1", transaction_id: "tx-999", date: "2026-02-01" },
     ];
     const { db, debts, debtPayments } = createFakeDb({
       accounts: [CASH_ACCOUNT, DEBT_ACCOUNT],
       debts: seedDebts,
       debtPayments: seedPayments,
     });
-    const status: TransactionDebtStatus = { role: "principal", debtId: 5, hasPayments: true };
+    const status: TransactionDebtStatus = { role: "principal", debtId: "debt-row-5", hasPayments: true };
 
     await expect(
       applyDebtTransactionEdit({
@@ -484,25 +486,25 @@ describe("applyDebtTransactionEdit", () => {
   it("role='payment', field berbahaya TIDAK berubah: cuma sinkronkan date", async () => {
     const seedDebts: DebtRow[] = [
       {
-        id: 5,
+        id: "debt-row-5",
         type: "receivable",
-        contact_id: 10,
+        contact_id: "contact-10",
         amount: 50000,
-        account_id: 2,
-        transaction_id: 999,
+        account_id: "debt-1",
+        transaction_id: "tx-999",
         status: "ongoing",
         date: "2026-01-01",
       },
     ];
     const seedPayments: DebtPaymentRow[] = [
-      { id: 8, debt_id: 5, amount: 20000, account_id: 1, transaction_id: 42, date: "2026-02-01" },
+      { id: "payment-8", debt_id: "debt-row-5", amount: 20000, account_id: "cash-1", transaction_id: "tx-42", date: "2026-02-01" },
     ];
     const { db, debtPayments } = createFakeDb({
       accounts: [CASH_ACCOUNT, DEBT_ACCOUNT],
       debts: seedDebts,
       debtPayments: seedPayments,
     });
-    const status: TransactionDebtStatus = { role: "payment", debtPaymentId: 8, debtId: 5 };
+    const status: TransactionDebtStatus = { role: "payment", debtPaymentId: "payment-8", debtId: "debt-row-5" };
 
     await applyDebtTransactionEdit({
       db: db as never,
@@ -520,79 +522,79 @@ describe("applyDebtTransactionEdit", () => {
   it("role='payment', field berbahaya berubah: recreate aman, debt induk tetap ongoing kalau masih ada sisa", async () => {
     const seedDebts: DebtRow[] = [
       {
-        id: 5,
+        id: "debt-row-5",
         type: "receivable",
-        contact_id: 10,
+        contact_id: "contact-10",
         amount: 50000,
-        account_id: 2,
-        transaction_id: 999,
+        account_id: "debt-1",
+        transaction_id: "tx-999",
         status: "ongoing",
         date: "2026-01-01",
       },
     ];
     const seedPayments: DebtPaymentRow[] = [
-      { id: 8, debt_id: 5, amount: 20000, account_id: 1, transaction_id: 42, date: "2026-02-01" },
+      { id: "payment-8", debt_id: "debt-row-5", amount: 20000, account_id: "cash-1", transaction_id: "tx-42", date: "2026-02-01" },
     ];
     const { db, debts, debtPayments } = createFakeDb({
       accounts: [CASH_ACCOUNT, DEBT_ACCOUNT],
       debts: seedDebts,
       debtPayments: seedPayments,
     });
-    const status: TransactionDebtStatus = { role: "payment", debtPaymentId: 8, debtId: 5 };
+    const status: TransactionDebtStatus = { role: "payment", debtPaymentId: "payment-8", debtId: "debt-row-5" };
 
     await applyDebtTransactionEdit({
       db: db as never,
       ...baseInput,
-      accountId: 2,
-      transferAccountId: 1,
+      accountId: "debt-1",
+      transferAccountId: "cash-1",
       amount: 25000, // nominal cicilan berubah
       debtAction: "settlement",
-      settleDebtIds: ["5"],
+      settleDebtIds: ["debt-row-5"],
       status,
       dangerousFieldsChanged: true,
     });
 
     expect(debtPayments).toHaveLength(1);
-    expect(debtPayments[0].id).not.toBe(8); // baris lama sudah dihapus
+    expect(debtPayments[0].id).not.toBe("payment-8"); // baris lama sudah dihapus
     expect(debtPayments[0].amount).toBe(25000);
-    expect(debts.find((d) => d.id === 5)?.status).toBe("ongoing"); // sisa 25000, belum lunas
+    expect(debts.find((d) => d.id === "debt-row-5")?.status).toBe("ongoing"); // sisa 25000, belum lunas
   });
 
   it("role='payment', field berbahaya berubah, pembayaran BARU melunasi penuh: debt induk jadi paid", async () => {
     const seedDebts: DebtRow[] = [
       {
-        id: 5,
+        id: "debt-row-5",
         type: "receivable",
-        contact_id: 10,
+        contact_id: "contact-10",
         amount: 50000,
-        account_id: 2,
-        transaction_id: 999,
+        account_id: "debt-1",
+        transaction_id: "tx-999",
         status: "ongoing",
         date: "2026-01-01",
       },
     ];
     const seedPayments: DebtPaymentRow[] = [
-      { id: 8, debt_id: 5, amount: 20000, account_id: 1, transaction_id: 42, date: "2026-02-01" },
+      { id: "payment-8", debt_id: "debt-row-5", amount: 20000, account_id: "cash-1", transaction_id: "tx-42", date: "2026-02-01" },
     ];
     const { db, debts } = createFakeDb({
       accounts: [CASH_ACCOUNT, DEBT_ACCOUNT],
       debts: seedDebts,
       debtPayments: seedPayments,
     });
-    const status: TransactionDebtStatus = { role: "payment", debtPaymentId: 8, debtId: 5 };
+    const status: TransactionDebtStatus = { role: "payment", debtPaymentId: "payment-8", debtId: "debt-row-5" };
 
     await applyDebtTransactionEdit({
       db: db as never,
       ...baseInput,
-      accountId: 2,
-      transferAccountId: 1,
+      accountId: "debt-1",
+      transferAccountId: "cash-1",
       amount: 50000, // melunasi seluruh sisa
       debtAction: "settlement",
-      settleDebtIds: ["5"],
+      settleDebtIds: ["debt-row-5"],
       status,
       dangerousFieldsChanged: true,
     });
 
-    expect(debts.find((d) => d.id === 5)?.status).toBe("paid");
+    expect(debts.find((d) => d.id === "debt-row-5")?.status).toBe("paid");
   });
 });

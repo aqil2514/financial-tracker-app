@@ -4,8 +4,8 @@ import type { Db } from "../types";
 // beda dari isPeriodSynced yang prefix-match tanggal+akun (agregasi per hari).
 // Return id (bukan cuma boolean) supaya mode "overwrite" tahu baris debts
 // mana yang harus di-UPDATE.
-export async function findSyncedArApDebtId(db: Db, sourceRef: string): Promise<number | null> {
-  const rows = await db.select<{ id: number }[]>(
+export async function findSyncedArApDebtId(db: Db, sourceRef: string): Promise<string | null> {
+  const rows = await db.select<{ id: string }[]>(
     "SELECT id FROM debts WHERE source_ref = $1 LIMIT 1",
     [sourceRef]
   );

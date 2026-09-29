@@ -11,7 +11,7 @@ export type DebtPaymentRow = DebtPayment & {
  * dialog detail kontak (features/debts-summary/content/card/detail/),
  * lazy-fetch saat baris di-expand (bukan sekaligus semua debt sebuah
  * kontak) lewat opsi `enabled`. */
-export function useDebtPayments(debtId: number | undefined) {
+export function useDebtPayments(debtId: string | undefined) {
   return useQuery({
     queryKey: [...debtPaymentsQueryKey, debtId],
     enabled: debtId != null,

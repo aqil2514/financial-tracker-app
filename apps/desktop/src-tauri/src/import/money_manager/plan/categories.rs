@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use uuid::Uuid;
+
 use super::super::source::SourceCategory;
 use super::types::PlannedCategory;
 
@@ -7,19 +9,18 @@ pub const ADJUSTMENT_CATEGORY_NAME: &str = "Penyesuaian Saldo";
 
 pub struct MappedCategories {
     pub categories: Vec<PlannedCategory>,
-    pub id_by_uid: HashMap<String, i64>,
-    pub adjustment_income_id: i64,
-    pub adjustment_expense_id: i64,
+    pub id_by_uid: HashMap<String, String>,
+    pub adjustment_income_id: String,
+    pub adjustment_expense_id: String,
 }
 
 pub fn map_categories(categories: &[SourceCategory]) -> MappedCategories {
-    let mut id_by_uid: HashMap<String, i64> = HashMap::new();
+    let mut id_by_uid: HashMap<String, String> = HashMap::new();
     let mut planned: Vec<PlannedCategory> = categories
         .iter()
-        .enumerate()
-        .map(|(i, c)| {
-            let id = (i + 1) as i64;
-            id_by_uid.insert(c.uid.clone(), id);
+        .map(|c| {
+            let id = Uuid::now_v7().to_string();
+            id_by_uid.insert(c.uid.clone(), id.clone());
             PlannedCategory {
                 id,
                 name: c.name.clone(),
@@ -32,21 +33,21 @@ pub fn map_categories(categories: &[SourceCategory]) -> MappedCategories {
     for (i, c) in categories.iter().enumerate() {
         if let Some(parent_uid) = &c.parent_uid {
             if !parent_uid.is_empty() {
-                planned[i].parent_id = id_by_uid.get(parent_uid).copied();
+                planned[i].parent_id = id_by_uid.get(parent_uid).cloned();
             }
         }
     }
 
-    let adjustment_income_id = planned.len() as i64 + 1;
+    let adjustment_income_id = Uuid::now_v7().to_string();
     planned.push(PlannedCategory {
-        id: adjustment_income_id,
+        id: adjustment_income_id.clone(),
         name: ADJUSTMENT_CATEGORY_NAME.to_string(),
         type_str: "income",
         parent_id: None,
     });
-    let adjustment_expense_id = adjustment_income_id + 1;
+    let adjustment_expense_id = Uuid::now_v7().to_string();
     planned.push(PlannedCategory {
-        id: adjustment_expense_id,
+        id: adjustment_expense_id.clone(),
         name: ADJUSTMENT_CATEGORY_NAME.to_string(),
         type_str: "expense",
         parent_id: None,

@@ -10,7 +10,7 @@ export function resolvePaymentAccountId(
   row: ArApRow,
   fieldMapping: Map<string, RetailkuSyncFieldMappingRow>,
   mode: RetailkuCashflowSyncMode
-): number | null {
+): string | null {
   if (row.cashAccounts.length !== 1) return null;
   const [resolved] = resolveArApCashAccounts(row.cashAccounts, row.sourceType, mode, fieldMapping);
   return resolved.localAccountId;

@@ -12,7 +12,7 @@ export function useListData(
   dateFilter: string | undefined,
   sorts: SortConfig[],
   filters: FilterConfig[],
-  accountId?: number,
+  accountId?: string,
   dateRange?: { from: string; to: string }
 ): ListContextData {
   const { data, isLoading, error } = useTransactions(

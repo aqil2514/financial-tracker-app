@@ -36,13 +36,13 @@ export type CashflowSyncPlanRow = {
   accountName: string;
   net: number;
   note: string;
-  categoryId: number | null;
+  categoryId: string | null;
   description: string | null;
   key: string;
   sourceRef: string;
   willInsert: boolean;
   skipReason: "already-synced" | "unmapped-account" | "deactivated-payment-method" | null;
-  localAccountId: number | null;
+  localAccountId: string | null;
 };
 
 export type CashflowSyncPlan = {
@@ -77,7 +77,7 @@ export type ArApSyncPlanRow = {
    * aktif — insertArApTransaction akan UPDATE debts.id ini, bukan
    * INSERT baru. existingDebtId wajib terisi kalau ini true. */
   willUpdate: boolean;
-  existingDebtId: number | null;
+  existingDebtId: string | null;
   /** true = baris ini pelunasan piutang dagang (SALE_PAYMENT) yang
    * piutang aslinya SUDAH pernah tersinkron — akan di-INSERT sebagai
    * `debt_payments` baru (BUKAN insert/update `debts`), mengurangi
@@ -90,7 +90,7 @@ export type ArApSyncPlanRow = {
   /** `debts.id` yang dicicil — wajib terisi kalau willInsertPayment
    * true, hasil lookup `source_ref` = piutang asli via
    * `settledReceivablePayableJournalItemId`. */
-  paymentDebtId: number | null;
+  paymentDebtId: string | null;
   /** Alokasi pelunasan CONSIGNMENT_SETTLEMENT — satu baris melunasi
    * BANYAK `debts` sekaligus (beda dari willInsertPayment/paymentDebtId
    * yang cuma untuk 1 debt). `[]` kalau bukan kasus ini. Kebijakan
@@ -98,7 +98,7 @@ export type ArApSyncPlanRow = {
    * `settledReceivablePayableJournalItemIds` tidak ketemu di debts
    * lokal, array ini TETAP `[]` dan skipReason jadi
    * "settlement-partially-not-found" — TIDAK proses partial. */
-  willInsertPayments: { debtId: number; amount: number }[];
+  willInsertPayments: { debtId: string; amount: number }[];
   /** Akun kas lokal yang menerima pelunasan ini — hasil resolve
    * row.cashAccounts via resolveArApCashAccounts. Cuma terisi kalau
    * baris pelunasan (willInsertPayment atau willInsertPayments) PERSIS
@@ -108,7 +108,7 @@ export type ArApSyncPlanRow = {
    * pelunasan, split ke >1 akun kas belum pernah terjadi. NULL untuk
    * kasus lain (0 atau >1 cashAccount, atau belum dipetakan) — akun
    * kas tetap tidak terisi, tapi pelunasan itu sendiri tetap tercatat. */
-  paymentAccountId: number | null;
+  paymentAccountId: string | null;
   /** DP/uang muka yang diterima BERSAMAAN piutang/utang baru tercipta
    * (row.willInsert atau row.willUpdate true, row.amount SUDAH net
    * setelah DP dikurangi) — hasil resolve row.cashAccounts via
@@ -119,8 +119,8 @@ export type ArApSyncPlanRow = {
    * debt_payments) — debts.amount TETAP row.amount, tidak disentuh. */
   downPayment: ResolvedDownPayment | null;
   skipReason: ArApSkipReason | null;
-  debtLocalAccountId: number | null;
-  contactId: number | null;
+  debtLocalAccountId: string | null;
+  contactId: string | null;
   contactFollowSource: boolean;
 };
 
@@ -142,9 +142,9 @@ export type AggregatedTotal = {
 
 export type RetailkuSyncFieldMappingRow = {
   key: string;
-  localAccountId: number;
+  localAccountId: string;
   note: string | null;
-  categoryId: number | null;
+  categoryId: string | null;
   description: string | null;
   extraFields: FieldMappingExtraFields;
 };

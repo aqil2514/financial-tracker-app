@@ -1,6 +1,7 @@
 "use client";
 
 import { getDb } from "@/lib/db";
+import { newId } from "@/lib/id";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 import { dependentKeysOf } from "@/lib/query-dependencies";
 
@@ -17,7 +18,7 @@ function now() {
 }
 
 export type CorrectAccountBalanceInput = {
-  accountId: number;
+  accountId: string;
   /** Saldo yang seharusnya sekarang, diinput user. */
   targetBalance: number;
   /** Saldo berjalan saat ini (dihitung), dipakai untuk cari selisihnya. */
@@ -30,18 +31,19 @@ export type CorrectAccountBalanceInput = {
 async function getOrCreateCorrectionCategoryId(
   db: Awaited<ReturnType<typeof getDb>>,
   type: "income" | "expense"
-): Promise<number> {
-  const existing = await db.select<{ id: number }[]>(
+): Promise<string> {
+  const existing = await db.select<{ id: string }[]>(
     "SELECT id FROM categories WHERE name = $1 AND type = $2 LIMIT 1",
     [CORRECTION_CATEGORY_NAME, type]
   );
   if (existing.length > 0) return existing[0].id;
 
-  const result = await db.execute(
-    "INSERT INTO categories (name, type, is_active) VALUES ($1, $2, 1)",
-    [CORRECTION_CATEGORY_NAME, type]
+  const id = newId();
+  await db.execute(
+    "INSERT INTO categories (id, name, type, is_active) VALUES ($1, $2, $3, 1)",
+    [id, CORRECTION_CATEGORY_NAME, type]
   );
-  return result.lastInsertId as number;
+  return id;
 }
 
 export function useCorrectAccountBalance() {

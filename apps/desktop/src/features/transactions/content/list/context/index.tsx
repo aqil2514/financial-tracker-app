@@ -21,7 +21,7 @@ export function ListProvider({
   /** Scoped ke satu akun (dipakai halaman detail akun) — dicocokkan baik
    * sebagai akun utama maupun akun tujuan transfer. Tanpa ini, list
    * menampilkan semua transaksi seperti biasa. */
-  accountId?: number;
+  accountId?: string;
 }) {
   const { dateFilter } = useTransactionsPage();
   const { data: accounts } = useAccounts();

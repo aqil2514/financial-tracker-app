@@ -5,7 +5,7 @@ import { useDbMutation } from "@/hooks/use-db-mutation";
 import { dependentKeysOf } from "@/lib/query-dependencies";
 
 export type DeleteAccountInput = {
-  id: number;
+  id: string;
   /**
    * Perlakuan transaksi yang masih merujuk akun ini (account_id ATAU
    * transfer_account_id) — wajib diisi kalau masih ada transaksi terkait.

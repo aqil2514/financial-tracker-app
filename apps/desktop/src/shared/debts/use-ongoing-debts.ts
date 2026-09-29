@@ -27,8 +27,8 @@ export type OngoingDebt = Debt & { remaining: number };
  * debt-receivable-tracking.md).
  */
 export function useOngoingDebts(
-  contactId: number | null,
-  options: { excludeDebtId?: number; excludeTransactionId?: number } = {}
+  contactId: string | null,
+  options: { excludeDebtId?: string; excludeTransactionId?: string } = {}
 ) {
   const { excludeDebtId, excludeTransactionId } = options;
 

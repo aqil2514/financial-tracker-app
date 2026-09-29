@@ -10,7 +10,7 @@ import { useTransactionsDialog } from "./context";
 export function TransactionEditDialog() {
   const { dialog, closeDialog } = useTransactionsDialog();
   const open = dialog?.type === "edit";
-  const transactionId = open && dialog.dataId ? Number(dialog.dataId) : null;
+  const transactionId = open && dialog.dataId ? dialog.dataId : null;
 
   const { data: transaction } = useTransactionById(transactionId);
 

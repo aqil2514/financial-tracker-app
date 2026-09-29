@@ -37,8 +37,8 @@ export function useArApMappingForm({
 
   useEffect(() => {
     onChange({
-      localAccountId: localAccountId ? Number(localAccountId) : null,
-      contactId: contactId ? Number(contactId) : null,
+      localAccountId: localAccountId ? localAccountId : null,
+      contactId: contactId ? contactId : null,
       contactFollowSource: contactFollowSource ?? false,
       note: note ?? "",
       description: (description as JSONContent | null) ?? null,

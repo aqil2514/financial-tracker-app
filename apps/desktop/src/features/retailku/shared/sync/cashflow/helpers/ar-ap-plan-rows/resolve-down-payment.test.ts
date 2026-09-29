@@ -30,7 +30,7 @@ function mapping(entries: [string, Partial<RetailkuSyncFieldMappingRow>][]): Map
   return new Map(
     entries.map(([key, partial]) => [
       key,
-      { key, localAccountId: 1, note: null, categoryId: null, description: null, extraFields: {}, ...partial },
+      { key, localAccountId: "1", note: null, categoryId: null, description: null, extraFields: {}, ...partial },
     ])
   );
 }
@@ -43,14 +43,14 @@ describe("resolveDownPayment", () => {
 
   it("cashAccounts tepat 1, positif, sudah dipetakan -> resolved dgn amount dari cashAccounts", () => {
     const fieldMapping = mapping([
-      ["detail:kas-tunai:SALE:inflow", { localAccountId: 30, note: "DP custom", categoryId: 5 }],
+      ["detail:kas-tunai:SALE:inflow", { localAccountId: "30", note: "DP custom", categoryId: "5" }],
     ]);
     const result = resolveDownPayment(
       arApRow({ cashAccounts: [{ accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 18000 }] }),
       fieldMapping,
       "detail"
     );
-    expect(result).toEqual({ amount: 18000, localAccountId: 30, note: "DP custom", categoryId: 5, description: null });
+    expect(result).toEqual({ amount: 18000, localAccountId: "30", note: "DP custom", categoryId: "5", description: null });
   });
 
   it("belum dipetakan -> null (DP tidak dicatat, tapi tidak error)", () => {
@@ -63,7 +63,7 @@ describe("resolveDownPayment", () => {
   });
 
   it("cashAccounts negatif (kas KELUAR, mis. talangan LEDGER_ENTRY) -> null, bukan pola DP", () => {
-    const fieldMapping = mapping([["detail:kas-tunai:LEDGER_ENTRY:outflow", { localAccountId: 30 }]]);
+    const fieldMapping = mapping([["detail:kas-tunai:LEDGER_ENTRY:outflow", { localAccountId: "30" }]]);
     const result = resolveDownPayment(
       arApRow({
         sourceType: "LEDGER_ENTRY",
@@ -78,8 +78,8 @@ describe("resolveDownPayment", () => {
 
   it("cashAccounts >1 (campuran, mis. payout PPOB Seabank) -> null, bukan pola DP murni", () => {
     const fieldMapping = mapping([
-      ["detail:kas-tunai:SALE:inflow", { localAccountId: 30 }],
-      ["detail:seabank:SALE:outflow", { localAccountId: 40 }],
+      ["detail:kas-tunai:SALE:inflow", { localAccountId: "30" }],
+      ["detail:seabank:SALE:outflow", { localAccountId: "40" }],
     ]);
     const result = resolveDownPayment(
       arApRow({
@@ -95,7 +95,7 @@ describe("resolveDownPayment", () => {
   });
 
   it("note fallback ke template default kalau mapping.note null", () => {
-    const fieldMapping = mapping([["detail:kas-tunai:SALE:inflow", { localAccountId: 30, note: null }]]);
+    const fieldMapping = mapping([["detail:kas-tunai:SALE:inflow", { localAccountId: "30", note: null }]]);
     const result = resolveDownPayment(
       arApRow({ cashAccounts: [{ accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 18000 }] }),
       fieldMapping,
@@ -105,12 +105,12 @@ describe("resolveDownPayment", () => {
   });
 
   it("mode summary -> key tanpa sourceType, tetap resolve", () => {
-    const fieldMapping = mapping([["summary:inflow:kas-tunai", { localAccountId: 30 }]]);
+    const fieldMapping = mapping([["summary:inflow:kas-tunai", { localAccountId: "30" }]]);
     const result = resolveDownPayment(
       arApRow({ cashAccounts: [{ accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 18000 }] }),
       fieldMapping,
       "summary"
     );
-    expect(result?.localAccountId).toBe(30);
+    expect(result?.localAccountId).toBe("30");
   });
 });

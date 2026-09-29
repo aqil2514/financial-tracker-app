@@ -23,8 +23,8 @@ pub fn build_plan(source_path: &str) -> rusqlite::Result<Plan> {
         &source.income_expense,
         &mapped_accounts.id_by_uid,
         &mapped_categories.id_by_uid,
-        mapped_categories.adjustment_income_id,
-        mapped_categories.adjustment_expense_id,
+        &mapped_categories.adjustment_income_id,
+        &mapped_categories.adjustment_expense_id,
     );
 
     let transfers = map_transfers(

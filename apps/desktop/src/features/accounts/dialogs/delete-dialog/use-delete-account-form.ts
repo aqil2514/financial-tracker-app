@@ -10,7 +10,7 @@ import { useDeleteAccount } from "./use-delete-account";
 
 type RelationAction = "unassign" | "reassign";
 
-function useTransactionCountByAccount(accountId: number) {
+function useTransactionCountByAccount(accountId: string) {
   return useQuery({
     queryKey: ["accounts", "transaction-count", accountId],
     queryFn: async () => {

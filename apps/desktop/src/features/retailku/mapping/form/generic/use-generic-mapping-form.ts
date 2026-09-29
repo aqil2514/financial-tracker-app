@@ -43,8 +43,8 @@ export function useGenericMappingForm({
 
   useEffect(() => {
     onChange({
-      localAccountId: localAccountId ? Number(localAccountId) : null,
-      categoryId: categoryId ? Number(categoryId) : null,
+      localAccountId: localAccountId ? localAccountId : null,
+      categoryId: categoryId ? categoryId : null,
       note: note ?? "",
       description: (description as JSONContent | null) ?? null,
       noteFollowSource: noteFollowSource ?? false,

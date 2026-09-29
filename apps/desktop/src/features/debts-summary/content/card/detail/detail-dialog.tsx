@@ -4,7 +4,7 @@ import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { ContactDetailContent } from "./content";
 
 type ContactDetailDialogProps = {
-  contactId: number;
+  contactId: string;
   contactName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;

@@ -5,8 +5,8 @@ import { useOngoingDebts } from "@/shared/debts/use-ongoing-debts";
 import type { TransactionFormOutput } from "../schema";
 
 type UseTransactionDebtFieldsParams = {
-  transactionId: number | undefined;
-  contactId: number | null;
+  transactionId: string | undefined;
+  contactId: string | null;
   type: "income" | "expense" | "transfer";
   sourceIsDebt: boolean;
   destinationIsDebt: boolean;

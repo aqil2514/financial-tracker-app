@@ -30,8 +30,8 @@ export interface ListContextPageControl {
 }
 
 export interface ListContextLookup {
-  accountName: (id: number | null) => string;
-  categoryName: (id: number | null) => string | null;
+  accountName: (id: string | null) => string;
+  categoryName: (id: string | null) => string | null;
 }
 
 export interface ListContextType {

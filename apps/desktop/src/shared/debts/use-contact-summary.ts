@@ -27,7 +27,7 @@ const SORTABLE_COLUMNS = [
 const DEFAULT_ORDER_CLAUSE = "contact_name COLLATE NOCASE";
 
 export type ContactDebtSummary = {
-  contact_id: number;
+  contact_id: string;
   contact_name: string;
   /** Total POKOK piutang ONGOING milik kontak ini (sebelum dikurangi
    * cicilan yang sudah masuk). 0 kalau tidak ada piutang ongoing. */

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use uuid::Uuid;
+
 use super::super::source::SourceTx;
 use super::types::PlannedTransaction;
 
@@ -19,10 +21,10 @@ pub struct MappedIncomeExpense {
 
 pub fn map_income_expense(
     rows: &[SourceTx],
-    account_id_by_uid: &HashMap<String, i64>,
-    category_id_by_uid: &HashMap<String, i64>,
-    adjustment_income_id: i64,
-    adjustment_expense_id: i64,
+    account_id_by_uid: &HashMap<String, String>,
+    category_id_by_uid: &HashMap<String, String>,
+    adjustment_income_id: &str,
+    adjustment_expense_id: &str,
 ) -> MappedIncomeExpense {
     let mut transactions = Vec::new();
     let mut unresolved_accounts = 0usize;
@@ -30,7 +32,7 @@ pub fn map_income_expense(
 
     for row in rows {
         let account_id = match row.asset_uid.as_ref().and_then(|u| account_id_by_uid.get(u)) {
-            Some(id) => *id,
+            Some(id) => id.clone(),
             None => {
                 unresolved_accounts += 1;
                 continue;
@@ -42,12 +44,12 @@ pub fn map_income_expense(
 
         let category_id = match row.ctg_uid.as_deref() {
             Some("-4") => Some(if is_income {
-                adjustment_income_id
+                adjustment_income_id.to_string()
             } else {
-                adjustment_expense_id
+                adjustment_expense_id.to_string()
             }),
             Some(uid) if !uid.is_empty() => {
-                let resolved = category_id_by_uid.get(uid).copied();
+                let resolved = category_id_by_uid.get(uid).cloned();
                 if resolved.is_none() {
                     unresolved_categories += 1;
                 }
@@ -57,6 +59,7 @@ pub fn map_income_expense(
         };
 
         transactions.push(PlannedTransaction {
+            id: Uuid::now_v7().to_string(),
             type_str,
             amount: row.amount.abs(),
             category_id,
@@ -83,7 +86,7 @@ pub struct MappedTransfers {
 pub fn map_transfers(
     transfer_out: &[SourceTx],
     transfer_in: &[SourceTx],
-    account_id_by_uid: &HashMap<String, i64>,
+    account_id_by_uid: &HashMap<String, String>,
 ) -> MappedTransfers {
     let mut transfer_in_index: HashMap<(String, String, i64, String), &SourceTx> = HashMap::new();
     for row in transfer_in {
@@ -113,11 +116,11 @@ pub fn map_transfers(
             continue;
         }
 
-        let account_id = out.asset_uid.as_ref().and_then(|u| account_id_by_uid.get(u).copied());
+        let account_id = out.asset_uid.as_ref().and_then(|u| account_id_by_uid.get(u).cloned());
         let transfer_account_id = out
             .to_asset_uid
             .as_ref()
-            .and_then(|u| account_id_by_uid.get(u).copied());
+            .and_then(|u| account_id_by_uid.get(u).cloned());
 
         let (account_id, transfer_account_id) = match (account_id, transfer_account_id) {
             (Some(a), Some(b)) => (a, b),
@@ -128,6 +131,7 @@ pub fn map_transfers(
         };
 
         transactions.push(PlannedTransaction {
+            id: Uuid::now_v7().to_string(),
             type_str: "transfer",
             amount: out.amount.abs(),
             category_id: None,

@@ -6,7 +6,7 @@ import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 
 export function useDeleteContact() {
   return useDbMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       const db = await getDb();
       await db.execute("DELETE FROM contacts WHERE id = $1", [id]);
     },

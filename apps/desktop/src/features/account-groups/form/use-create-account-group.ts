@@ -1,6 +1,7 @@
 "use client";
 
 import { getDb } from "@/lib/db";
+import { newId } from "@/lib/id";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import {
   accountGroupSchema,
@@ -14,7 +15,8 @@ export function useCreateAccountGroup() {
     defaultValues: () => ({ name: "" }),
     mutationFn: async (values: AccountGroupFormOutput) => {
       const db = await getDb();
-      await db.execute("INSERT INTO account_groups (name) VALUES ($1)", [
+      await db.execute("INSERT INTO account_groups (id, name) VALUES ($1, $2)", [
+        newId(),
         values.name,
       ]);
     },

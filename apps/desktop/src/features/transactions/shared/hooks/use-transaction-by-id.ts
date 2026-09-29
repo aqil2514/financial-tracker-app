@@ -5,7 +5,7 @@ import { transactionsQueryKey } from "../../content/list/use-transactions";
 /** Ambil 1 transaksi by id — dipakai untuk buka TransactionEditDialog
  * dari luar list (mis. deep-link ?edit=123 dari dialog detail akun),
  * bukan dari item list yang objeknya sudah ada di tangan. */
-export function useTransactionById(transactionId: number | null) {
+export function useTransactionById(transactionId: string | null) {
   return useQuery({
     queryKey: [...transactionsQueryKey, "by-id", transactionId],
     queryFn: async () => {

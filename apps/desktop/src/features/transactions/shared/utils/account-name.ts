@@ -9,7 +9,7 @@ import type { AccountWithBalance } from "@/features/accounts";
  */
 export function accountName(
   accounts: AccountWithBalance[] | undefined,
-  id: number | null
+  id: string | null
 ): string {
   const account = accounts?.find((account) => account.id === id);
   if (!account) return "-";

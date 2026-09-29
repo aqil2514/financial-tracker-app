@@ -5,7 +5,7 @@ import { createContext, useContext } from "react";
 import { useAccounts, type AccountWithBalance } from "@/features/accounts";
 
 interface AccountDetailPageContextType {
-  accountId: number;
+  accountId: string;
   account: AccountWithBalance | undefined;
   isLoading: boolean;
 }
@@ -27,7 +27,7 @@ export function AccountDetailPageProvider({
   accountId,
   children,
 }: {
-  accountId: number;
+  accountId: string;
   children: React.ReactNode;
 }) {
   const { data: accounts, isLoading } = useAccounts();

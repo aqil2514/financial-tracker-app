@@ -29,7 +29,7 @@ import { useDeleteCategory } from "./use-delete-category";
 
 type RelationAction = "unassign" | "reassign";
 
-function useTransactionCountByCategory(categoryId: number) {
+function useTransactionCountByCategory(categoryId: string) {
   return useQuery({
     queryKey: ["categories", "transaction-count", categoryId],
     queryFn: async () => {

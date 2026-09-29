@@ -11,7 +11,7 @@ export type AccountMonthSummary = {
   transfer: number;
 };
 
-export function useAccountMonthSummary(accountId: number, month: Date) {
+export function useAccountMonthSummary(accountId: string, month: Date) {
   const monthKey = format(month, "yyyy-MM");
 
   return useQuery({

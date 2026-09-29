@@ -1,4 +1,5 @@
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
+import { newId } from "@/lib/id";
 import type { ArApSyncPlanRow, Db } from "../types";
 
 // row.amount sudah dijamin positif oleh buildArApPlanRows (amount<=0 di-skip).
@@ -18,8 +19,8 @@ export async function insertArApTransaction(db: Db, row: ArApSyncPlanRow): Promi
   }
 
   await db.execute(
-    `INSERT INTO debts (type, contact_id, amount, account_id, transaction_id, date, source, source_ref)
-     VALUES ($1, $2, $3, $4, NULL, $5, 'retailku_sync', $6)`,
-    [row.direction, contactId, row.amount, row.debtLocalAccountId, row.date, row.sourceRef]
+    `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date, source, source_ref)
+     VALUES ($1, $2, $3, $4, $5, NULL, $6, 'retailku_sync', $7)`,
+    [newId(), row.direction, contactId, row.amount, row.debtLocalAccountId, row.date, row.sourceRef]
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { getDb } from "@/lib/db";
+import { newId } from "@/lib/id";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { DEFAULT_ACCOUNT_COLOR } from "@/lib/account-colors";
 import { accountSchema, type AccountFormOutput } from "./account.schema";
@@ -22,11 +23,12 @@ export function useCreateAccount() {
     mutationFn: async (values: AccountFormOutput) => {
       const db = await getDb();
       await db.execute(
-        "INSERT INTO accounts (name, initial_balance, group_id, description, is_active, account_type, icon, color) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        "INSERT INTO accounts (id, name, initial_balance, group_id, description, is_active, account_type, icon, color) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
+          newId(),
           values.name,
           values.initial_balance,
-          values.group_id ? Number(values.group_id) : null,
+          values.group_id ? values.group_id : null,
           values.description,
           Number(values.is_active),
           values.account_type,

@@ -5,19 +5,19 @@ import { useQuery } from "@tanstack/react-query";
 import { getDb } from "@/lib/db";
 
 export type TransactionAttachment = {
-  id: number;
-  transaction_id: number;
+  id: string;
+  transaction_id: string;
   file_path: string;
   created_at: string;
 };
 
-export function transactionAttachmentsQueryKey(transactionId: number) {
+export function transactionAttachmentsQueryKey(transactionId: string) {
   return ["transaction-attachments", transactionId];
 }
 
-export function useTransactionAttachments(transactionId: number | null) {
+export function useTransactionAttachments(transactionId: string | null) {
   return useQuery({
-    queryKey: transactionAttachmentsQueryKey(transactionId ?? -1),
+    queryKey: transactionAttachmentsQueryKey(transactionId ?? "none"),
     queryFn: async (): Promise<TransactionAttachment[]> => {
       const db = await getDb();
       return db.select<TransactionAttachment[]>(

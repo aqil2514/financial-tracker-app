@@ -3,9 +3,9 @@ import type { Db, RetailkuSyncFieldMappingRow } from "../../types";
 
 type FieldMappingDbRow = {
   key: string;
-  local_account_id: number;
+  local_account_id: string;
   note: string | null;
-  category_id: number | null;
+  category_id: string | null;
   description: string | null;
   extra_fields: string | null;
 };

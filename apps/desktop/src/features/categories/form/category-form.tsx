@@ -18,7 +18,7 @@ type CategoryFormProps = {
   isPending: boolean;
   submitLabel?: string;
   /** Kategori yang sedang diedit — dikecualikan dari opsi parent supaya tidak self-parent. */
-  excludeId?: number;
+  excludeId?: string;
 };
 
 export function CategoryForm({

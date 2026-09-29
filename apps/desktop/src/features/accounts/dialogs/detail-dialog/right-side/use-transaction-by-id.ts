@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getDb, type Transaction } from "@/lib/db";
 
-export function useTransactionById(transactionId: number | null) {
+export function useTransactionById(transactionId: string | null) {
   return useQuery({
     queryKey: ["accounts", "transaction-detail", transactionId],
     queryFn: async () => {

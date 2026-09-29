@@ -17,8 +17,8 @@ interface AccountDetailContextType {
   activeTab: AccountDetailTab;
   setActiveTab: (tab: AccountDetailTab) => void;
   /** Transaksi yang sedang dipilih untuk ditampilkan di tab Detail. */
-  selectedTransactionId: number | null;
-  selectTransaction: (id: number) => void;
+  selectedTransactionId: string | null;
+  selectTransaction: (id: string) => void;
   /** Menutup dialog detail akun ini sendiri — dipakai tombol "Edit" di
    * tab Detail sebelum navigasi ke halaman Transaksi, supaya dialog
    * akun tidak menumpuk di belakang dialog edit transaksi. */
@@ -36,9 +36,9 @@ export function AccountDetailProvider({
 }) {
   const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()));
   const [activeTab, setActiveTab] = useState<AccountDetailTab>("recent");
-  const [selectedTransactionId, setSelectedTransactionId] = useState<number | null>(null);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
-  function selectTransaction(id: number) {
+  function selectTransaction(id: string) {
     setSelectedTransactionId(id);
     setActiveTab("detail");
   }

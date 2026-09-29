@@ -1,21 +1,22 @@
 use std::collections::HashMap;
 
+use uuid::Uuid;
+
 use super::super::source::SourceGroup;
 use super::types::PlannedAccountGroup;
 
 pub struct MappedGroups {
     pub account_groups: Vec<PlannedAccountGroup>,
-    pub id_by_uid: HashMap<String, i64>,
+    pub id_by_uid: HashMap<String, String>,
 }
 
 pub fn map_account_groups(groups: &[SourceGroup]) -> MappedGroups {
-    let mut id_by_uid: HashMap<String, i64> = HashMap::new();
+    let mut id_by_uid: HashMap<String, String> = HashMap::new();
     let account_groups: Vec<PlannedAccountGroup> = groups
         .iter()
-        .enumerate()
-        .map(|(i, g)| {
-            let id = (i + 1) as i64;
-            id_by_uid.insert(g.uid.clone(), id);
+        .map(|g| {
+            let id = Uuid::now_v7().to_string();
+            id_by_uid.insert(g.uid.clone(), id.clone());
             PlannedAccountGroup {
                 id,
                 name: if g.name.is_empty() {

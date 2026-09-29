@@ -22,7 +22,7 @@ import { useTransactionsDialog } from "./context";
 export function TransactionDetailDialog() {
   const { dialog, closeDialog, openDialog } = useTransactionsDialog();
   const open = dialog?.type === "detail";
-  const transactionId = open && dialog.dataId ? Number(dialog.dataId) : null;
+  const transactionId = open && dialog.dataId ? dialog.dataId : null;
 
   const { data: transaction } = useTransactionById(transactionId);
 

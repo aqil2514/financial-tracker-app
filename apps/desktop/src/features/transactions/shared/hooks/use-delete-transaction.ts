@@ -6,7 +6,7 @@ import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 
 export function useDeleteTransaction() {
   return useDbMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       const db = await getDb();
       await db.execute("DELETE FROM transactions WHERE id = $1", [id]);
     },

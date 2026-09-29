@@ -17,7 +17,7 @@ export const accountSummaryQueryKey = ["transactions", "account-summary"];
  * di akun ini + transfer KELUAR ke akun lain (`account_id` pada baris
  * transfer, uangnya meninggalkan akun ini).
  */
-export function useAccountSummary(accountId: number) {
+export function useAccountSummary(accountId: string) {
   return useQuery({
     queryKey: [...accountSummaryQueryKey, accountId],
     queryFn: async () => {

@@ -4,7 +4,7 @@ import type { resolveMappedTotal } from "./resolve-mapped-total";
 /** Tanggal+akun ini sudah pernah tersinkron sebelumnya (idempotency). */
 export function alreadySyncedPlanRow(
   resolved: ReturnType<typeof resolveMappedTotal>,
-  localAccountId: number
+  localAccountId: string
 ): CashflowSyncPlanRow {
   return {
     ...resolved,

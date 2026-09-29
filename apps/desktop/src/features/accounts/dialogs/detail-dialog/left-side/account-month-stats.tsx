@@ -11,7 +11,7 @@ import { useAccountMonthSummary } from "./use-account-month-summary";
  * tren multi-bulan (yang lebih lengkap ada di halaman Laporan). Transfer
  * dipisah dari income/expense karena bukan kategori akuntansi yang sama,
  * tapi tetap menggerakkan saldo akun ini (net masuk - keluar). */
-export function AccountMonthStats({ accountId }: { accountId: number }) {
+export function AccountMonthStats({ accountId }: { accountId: string }) {
   const { selectedMonth } = useAccountDetail();
   const { data } = useAccountMonthSummary(accountId, selectedMonth);
 

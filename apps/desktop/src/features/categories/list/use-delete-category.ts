@@ -5,7 +5,7 @@ import { useDbMutation } from "@/hooks/use-db-mutation";
 import { dependentKeysOf } from "@/lib/query-dependencies";
 
 export type DeleteCategoryInput = {
-  id: number;
+  id: string;
   /** Perlakuan sub-kategori (parent_id = id ini) — wajib diisi kalau masih ada sub-kategori. */
   childAction?: "unassign" | "reassign";
   targetParentId?: number;

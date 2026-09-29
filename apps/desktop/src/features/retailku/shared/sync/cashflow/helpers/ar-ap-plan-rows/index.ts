@@ -49,7 +49,7 @@ export async function buildArApPlanRows(
 
     if (row.amount < 0) {
       if (!row.isReversed && row.settledReceivablePayableJournalItemIds.length > 0) {
-        const allocations: { debtId: number; amount: number }[] = [];
+        const allocations: { debtId: string; amount: number }[] = [];
         let allFound = true;
         for (const settled of row.settledReceivablePayableJournalItemIds) {
           const debtId = await findSyncedArApDebtId(db, `${settled.journalItemId}:ar_ap`);

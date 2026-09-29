@@ -33,7 +33,7 @@ export function CategoryList() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  function parentName(parentId: number | null) {
+  function parentName(parentId: string | null) {
     return categories?.find((category) => category.id === parentId)?.name ?? null;
   }
 

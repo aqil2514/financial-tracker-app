@@ -22,9 +22,9 @@ function baseRow(overrides: Partial<ArApSyncPlanRow> = {}): ArApSyncPlanRow {
     paymentDebtId: null,
     willInsertPayments: [],
     paymentAccountId: null,
-    downPayment: { amount: 18000, localAccountId: 30, note: "DP", categoryId: 5, description: null },
+    downPayment: { amount: 18000, localAccountId: "30", note: "DP", categoryId: "5", description: null },
     skipReason: null,
-    debtLocalAccountId: 42,
+    debtLocalAccountId: "42",
     contactId: null,
     contactFollowSource: false,
     ...overrides,
@@ -61,7 +61,17 @@ describe("insertArApDownPayment", () => {
     expect(inserted).toHaveLength(1);
     expect(inserted[0].sql).toContain("INSERT INTO transactions");
     expect(inserted[0].sql).not.toContain("debt_payments");
-    expect(inserted[0].params).toEqual(["income", 18000, 30, "DP", 5, null, "2026-07-10T00:00", "j1:ar_ap_dp"]);
+    expect(inserted[0].params).toEqual([
+      expect.any(String), // id (UUID di-generate saat insert)
+      "income",
+      18000,
+      "30",
+      "DP",
+      "5",
+      null,
+      "2026-07-10T00:00",
+      "j1:ar_ap_dp",
+    ]);
   });
 
   it("downPayment null -> tidak insert apa pun", async () => {

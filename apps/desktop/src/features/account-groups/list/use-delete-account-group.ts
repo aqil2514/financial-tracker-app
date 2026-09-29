@@ -5,7 +5,7 @@ import { useDbMutation } from "@/hooks/use-db-mutation";
 import { dependentKeysOf } from "@/lib/query-dependencies";
 
 export type DeleteAccountGroupInput = {
-  id: number;
+  id: string;
   /** Perlakuan akun anggota grup ini — wajib diisi kalau grup masih punya anggota. */
   memberAction?: "unassign" | "reassign";
   /** Wajib diisi kalau memberAction === "reassign". */

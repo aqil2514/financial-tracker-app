@@ -1,3 +1,4 @@
+import { newId } from "@/lib/id";
 import type { ArApSyncPlanRow, Db } from "../types";
 
 // row.willInsertPayment sudah dijamin true + paymentDebtId terisi oleh
@@ -11,8 +12,8 @@ import type { ArApSyncPlanRow, Db } from "../types";
 // tercatat walau representasi kasnya kosong.
 export async function insertArApPayment(db: Db, row: ArApSyncPlanRow): Promise<void> {
   await db.execute(
-    `INSERT INTO debt_payments (debt_id, amount, account_id, date, source, source_ref)
-     VALUES ($1, $2, $3, $4, 'retailku_sync', $5)`,
-    [row.paymentDebtId, Math.abs(row.amount), row.paymentAccountId, row.date, row.sourceRef]
+    `INSERT INTO debt_payments (id, debt_id, amount, account_id, date, source, source_ref)
+     VALUES ($1, $2, $3, $4, $5, 'retailku_sync', $6)`,
+    [newId(), row.paymentDebtId, Math.abs(row.amount), row.paymentAccountId, row.date, row.sourceRef]
   );
 }

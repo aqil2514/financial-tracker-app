@@ -17,7 +17,7 @@ export function TransactionCreateDialog({
 }: {
   /** Akun yang otomatis dipilih saat form dibuka — lihat
    * `useCreateTransaction`. */
-  defaultAccountId?: number;
+  defaultAccountId?: string;
 } = {}) {
   const { dialog, closeDialog } = useTransactionsDialog();
   const open = dialog?.type === "create";

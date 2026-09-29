@@ -7,7 +7,7 @@ export function updatablePlanRow(
   row: ArApRow,
   key: string,
   mapping: RetailkuSyncFieldMappingRow,
-  existingDebtId: number,
+  existingDebtId: string,
   downPayment: ResolvedDownPayment | null
 ): ArApSyncPlanRow {
   return {

@@ -53,10 +53,10 @@ export function DetailTab() {
     });
   }
 
-  const accountName = (id: number | null) =>
+  const accountName = (id: string | null) =>
     accounts?.find((account) => account.id === id)?.name ?? "-";
 
-  const categoryName = (id: number | null) =>
+  const categoryName = (id: string | null) =>
     categories?.find((category) => category.id === id)?.name ?? null;
 
   if (!selectedTransactionId || !transaction) {

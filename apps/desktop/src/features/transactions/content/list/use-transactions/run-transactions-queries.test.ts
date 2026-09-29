@@ -56,11 +56,11 @@ describe("runTransactionsQueries", () => {
     // sendiri sudah masuk whereClause dengan $1/$2 (dua slot, nilai sama).
     await runTransactionsQueries(db as never, {
       whereClause: "WHERE (account_id = $1 OR transfer_account_id = $2)",
-      params: [5, 5],
+      params: ["acc-5", "acc-5"],
       orderClause: "ORDER BY date DESC, id DESC",
       limitOffsetClause: "LIMIT $3 OFFSET $4",
       limitOffsetParams: [20, 0],
-      accountId: 5,
+      accountId: "acc-5",
     });
 
     const [rowsCall, countCall] = calls;
@@ -70,15 +70,15 @@ describe("runTransactionsQueries", () => {
     expect(rowsCall.sql).toContain("WITH ordered_tx AS");
     expect(rowsCall.sql).toContain("running_balance");
     expect(rowsCall.sql).toContain("$5");
-    expect(rowsCall.params).toEqual([5, 5, 20, 0, 5]);
+    expect(rowsCall.params).toEqual(["acc-5", "acc-5", 20, 0, "acc-5"]);
     // Placeholder terakhir ($5) harus konsisten dengan accountId asli.
-    expect(rowsCall.params[4]).toBe(5);
+    expect(rowsCall.params[4]).toBe("acc-5");
 
     // countParams = [...params(2), accountId] = 3 item -> accountIdIndex
     // untuk count = clauses.params.length + 1 = 2 + 1 = 3.
     expect(countCall.sql).toContain("WITH ordered_tx AS");
     expect(countCall.sql).toContain("$3");
-    expect(countCall.params).toEqual([5, 5, 5]);
+    expect(countCall.params).toEqual(["acc-5", "acc-5", "acc-5"]);
   });
 
   it("dengan accountId TANPA filter user lain: numbering tetap benar (whereClause kosong)", async () => {
@@ -90,7 +90,7 @@ describe("runTransactionsQueries", () => {
       orderClause: "ORDER BY date DESC, id DESC",
       limitOffsetClause: "LIMIT $1 OFFSET $2",
       limitOffsetParams: [20, 0],
-      accountId: 7,
+      accountId: "acc-7",
     });
 
     const [rowsCall, countCall] = calls;
@@ -98,10 +98,10 @@ describe("runTransactionsQueries", () => {
     // rowsParams = [...[](0), ...limitOffsetParams(2)] = 2 item ->
     // accountIdIndex = 2 + 1 = 3.
     expect(rowsCall.sql).toContain("$3");
-    expect(rowsCall.params).toEqual([20, 0, 7]);
+    expect(rowsCall.params).toEqual([20, 0, "acc-7"]);
 
     // countParams = [...[](0), accountId] = 1 item -> accountIdIndex = 1.
     expect(countCall.sql).toContain("$1");
-    expect(countCall.params).toEqual([7]);
+    expect(countCall.params).toEqual(["acc-7"]);
   });
 });

@@ -60,9 +60,9 @@ export function useUpdateTransaction(
       const contactId = await resolveContactId(values.contact_name);
 
       const db = await getDb();
-      const accountId = Number(values.account_id);
+      const accountId = values.account_id;
       const transferAccountId =
-        values.type === "transfer" ? Number(values.transfer_account_id) : null;
+        values.type === "transfer" ? values.transfer_account_id : null;
 
       // Field yang mempengaruhi PERHITUNGAN debt — kalau salah satu
       // berubah dari nilai semula, debt/debt_payment terkait (kalau ada)
@@ -86,7 +86,7 @@ export function useUpdateTransaction(
           values.amount,
           values.type === "transfer" || !values.category_id
             ? null
-            : Number(values.category_id),
+            : values.category_id,
           accountId,
           transferAccountId,
           values.note,

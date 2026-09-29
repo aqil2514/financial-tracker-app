@@ -7,7 +7,7 @@ import { useDbMutation } from "@/hooks/use-db-mutation";
 import type { TransactionAttachment } from "./use-transaction-attachments";
 import { transactionAttachmentsQueryKey } from "./use-transaction-attachments";
 
-export function useDeleteAttachment(transactionId: number) {
+export function useDeleteAttachment(transactionId: string) {
   return useDbMutation({
     mutationFn: async (attachment: TransactionAttachment) => {
       const db = await getDb();

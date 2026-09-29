@@ -12,7 +12,7 @@ export type ContactDebtRow = Debt & {
  * dipakai dialog detail kontak (features/debts-summary/content/card/detail/),
  * beda dari `useDebtsList` yang difilter per `type` untuk halaman
  * /debts/receivables & /payables, bukan per kontak. */
-export function useContactDebts(contactId: number | undefined) {
+export function useContactDebts(contactId: string | undefined) {
   return useQuery({
     queryKey: [...contactDebtsQueryKey, contactId],
     enabled: contactId != null,

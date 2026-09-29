@@ -14,7 +14,7 @@ import { AccountDetailPageProvider } from "./account-detail-page-context";
  */
 export function AccountDetailPageBody({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
-  const accountId = Number(searchParams.get("id"));
+  const accountId = searchParams.get("id");
 
   if (!accountId) {
     return (

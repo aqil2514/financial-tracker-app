@@ -6,7 +6,7 @@ import {
   type TransactionWithRunningBalance,
 } from "./running-balance-query";
 
-export function useAccountMonthTransactions(accountId: number, month: Date) {
+export function useAccountMonthTransactions(accountId: string, month: Date) {
   const monthKey = format(month, "yyyy-MM");
 
   return useQuery({

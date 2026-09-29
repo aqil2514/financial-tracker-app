@@ -30,7 +30,7 @@ tauri-plugin-clipboard-manager = "2.3.3"
 tauri-plugin-http = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 chrono = "0.4"
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "v7"] }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

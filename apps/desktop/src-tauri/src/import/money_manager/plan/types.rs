@@ -1,28 +1,29 @@
 pub struct PlannedAccountGroup {
-    pub id: i64,
+    pub id: String,
     pub name: String,
 }
 
 pub struct PlannedAccount {
-    pub id: i64,
+    pub id: String,
     pub name: String,
-    pub group_id: Option<i64>,
+    pub group_id: Option<String>,
     pub description: Option<String>,
 }
 
 pub struct PlannedCategory {
-    pub id: i64,
+    pub id: String,
     pub name: String,
     pub type_str: &'static str,
-    pub parent_id: Option<i64>,
+    pub parent_id: Option<String>,
 }
 
 pub struct PlannedTransaction {
+    pub id: String,
     pub type_str: &'static str,
     pub amount: f64,
-    pub category_id: Option<i64>,
-    pub account_id: i64,
-    pub transfer_account_id: Option<i64>,
+    pub category_id: Option<String>,
+    pub account_id: String,
+    pub transfer_account_id: Option<String>,
     pub note: Option<String>,
     pub date: String,
 }

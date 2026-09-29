@@ -13,7 +13,7 @@ export function AccountSummaryStats({
   accountId,
   balance,
 }: {
-  accountId: number;
+  accountId: string;
   balance: number;
 }) {
   const { data, isLoading, error } = useAccountSummary(accountId);

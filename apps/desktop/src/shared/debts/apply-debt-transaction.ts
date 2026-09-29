@@ -1,18 +1,19 @@
 import { getDb, type Account } from "@/lib/db";
+import { newId } from "@/lib/id";
 import type { TransactionDebtStatus } from "./use-transaction-debt-status";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
-type OngoingDebtRow = { id: number; remaining: number };
+type OngoingDebtRow = { id: string; remaining: number };
 
 export type ApplyDebtTransactionInput = {
   db: Db;
-  transactionId: number;
+  transactionId: string;
   type: "income" | "expense" | "transfer";
-  accountId: number;
+  accountId: string;
   /** Hanya terisi untuk `type === 'transfer'`. */
-  transferAccountId: number | null;
-  contactId: number | null;
+  transferAccountId: string | null;
+  contactId: string | null;
   amount: number;
   date: string;
   /** Hanya relevan saat arah transfer adalah debt->cash (ambigu antara
@@ -24,7 +25,7 @@ export type ApplyDebtTransactionInput = {
   settleDebtIds: string[];
 };
 
-async function getAccountType(db: Db, accountId: number): Promise<Account["account_type"] | null> {
+async function getAccountType(db: Db, accountId: string): Promise<Account["account_type"] | null> {
   const rows = await db.select<Pick<Account, "account_type">[]>(
     "SELECT account_type FROM accounts WHERE id = $1",
     [accountId]
@@ -81,9 +82,9 @@ export async function applyDebtTransaction({
   if (destinationIsDebt) {
     // Kas -> Debt: piutang baru, tidak ambigu.
     await db.execute(
-      `INSERT INTO debts (type, contact_id, amount, account_id, transaction_id, date)
-       VALUES ('receivable', $1, $2, $3, $4, $5)`,
-      [contactId, amount, transferAccountId, transactionId, date]
+      `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)
+       VALUES ($1, 'receivable', $2, $3, $4, $5, $6)`,
+      [newId(), contactId, amount, transferAccountId, transactionId, date]
     );
     return;
   }
@@ -91,9 +92,9 @@ export async function applyDebtTransaction({
   // Debt -> Kas: butuh keputusan eksplisit dari form.
   if (debtAction === "payable") {
     await db.execute(
-      `INSERT INTO debts (type, contact_id, amount, account_id, transaction_id, date)
-       VALUES ('payable', $1, $2, $3, $4, $5)`,
-      [contactId, amount, accountId, transactionId, date]
+      `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)
+       VALUES ($1, 'payable', $2, $3, $4, $5, $6)`,
+      [newId(), contactId, amount, accountId, transactionId, date]
     );
     return;
   }
@@ -212,16 +213,15 @@ async function settleDebtsFifo({
   settleDebtIds,
 }: {
   db: Db;
-  transactionId: number;
-  accountId: number;
+  transactionId: string;
+  accountId: string;
   amount: number;
   date: string;
   settleDebtIds: string[];
 }): Promise<void> {
   if (settleDebtIds.length === 0) return;
 
-  const ids = settleDebtIds.map(Number);
-  const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
+  const placeholders = settleDebtIds.map((_, i) => `$${i + 1}`).join(", ");
   const debts = await db.select<OngoingDebtRow[]>(
     `SELECT
        debts.id,
@@ -232,7 +232,7 @@ async function settleDebtsFifo({
      FROM debts
      WHERE debts.id IN (${placeholders})
      ORDER BY debts.date ASC, debts.id ASC`,
-    ids
+    settleDebtIds
   );
 
   let remainingToAllocate = amount;
@@ -242,9 +242,9 @@ async function settleDebtsFifo({
     if (allocation <= 0) continue;
 
     await db.execute(
-      `INSERT INTO debt_payments (debt_id, amount, account_id, transaction_id, date)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [debt.id, allocation, accountId, transactionId, date]
+      `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [newId(), debt.id, allocation, accountId, transactionId, date]
     );
 
     if (allocation >= debt.remaining) {

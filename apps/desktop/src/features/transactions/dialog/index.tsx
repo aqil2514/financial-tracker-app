@@ -7,7 +7,7 @@ export function TransactionsDialogs({
   defaultAccountId,
 }: {
   /** Diteruskan ke `TransactionCreateDialog` — lihat `useCreateTransaction`. */
-  defaultAccountId?: number;
+  defaultAccountId?: string;
 } = {}) {
   return (
     <>

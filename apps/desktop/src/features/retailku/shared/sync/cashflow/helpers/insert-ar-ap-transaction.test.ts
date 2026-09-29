@@ -29,8 +29,8 @@ function baseRow(overrides: Partial<ArApSyncPlanRow> = {}): ArApSyncPlanRow {
     paymentAccountId: null,
     downPayment: null,
     skipReason: null,
-    debtLocalAccountId: 42,
-    contactId: 7,
+    debtLocalAccountId: "42",
+    contactId: "7",
     contactFollowSource: false,
     ...overrides,
   };
@@ -57,25 +57,25 @@ describe("insertArApTransaction", () => {
 
   it("contactFollowSource false -> pakai row.contactId langsung, resolveContactId TIDAK dipanggil", async () => {
     const { db, inserted } = createFakeDb();
-    const row = baseRow({ contactFollowSource: false, contactId: 7 });
+    const row = baseRow({ contactFollowSource: false, contactId: "7" });
 
     await insertArApTransaction(db as any, row);
 
     expect(resolveContactId).not.toHaveBeenCalled();
     expect(inserted).toHaveLength(1);
     expect(inserted[0].sql).toContain("INSERT INTO debts");
-    expect(inserted[0].params).toEqual(["receivable", 7, 3000, 42, "2026-06-12", "j1:ar_ap"]);
+    expect(inserted[0].params).toEqual([expect.any(String), "receivable", "7", 3000, "42", "2026-06-12", "j1:ar_ap"]);
   });
 
   it("contactFollowSource true -> resolveContactId dipanggil dengan partyName", async () => {
-    vi.mocked(resolveContactId).mockResolvedValue(99);
+    vi.mocked(resolveContactId).mockResolvedValue("99");
     const { db, inserted } = createFakeDb();
     const row = baseRow({ contactFollowSource: true, contactId: null, partyName: "Budi" });
 
     await insertArApTransaction(db as any, row);
 
     expect(resolveContactId).toHaveBeenCalledWith("Budi");
-    expect(inserted[0].params[1]).toBe(99);
+    expect(inserted[0].params[2]).toBe("99");
   });
 
   it("insert debts dengan transaction_id NULL dan source/source_ref retailku_sync", async () => {
@@ -95,9 +95,9 @@ describe("insertArApTransaction", () => {
     const row = baseRow({
       willInsert: false,
       willUpdate: true,
-      existingDebtId: 100,
+      existingDebtId: "100",
       amount: 5000,
-      debtLocalAccountId: 99,
+      debtLocalAccountId: "99",
     });
 
     await insertArApTransaction(db as any, row);
@@ -105,16 +105,16 @@ describe("insertArApTransaction", () => {
     expect(inserted).toHaveLength(1);
     expect(inserted[0].sql).toContain("UPDATE debts");
     expect(inserted[0].sql).not.toContain("INSERT INTO debts");
-    expect(inserted[0].params).toEqual(["receivable", 7, 5000, 99, "2026-06-12", 100]);
+    expect(inserted[0].params).toEqual(["receivable", "7", 5000, "99", "2026-06-12", "100"]);
   });
 
   it("willUpdate true + contactFollowSource true -> tetap resolveContactId dulu sebelum UPDATE", async () => {
-    vi.mocked(resolveContactId).mockResolvedValue(55);
+    vi.mocked(resolveContactId).mockResolvedValue("55");
     const { db, inserted } = createFakeDb();
     const row = baseRow({
       willInsert: false,
       willUpdate: true,
-      existingDebtId: 100,
+      existingDebtId: "100",
       contactFollowSource: true,
       contactId: null,
       partyName: "Nenek Petok",
@@ -123,6 +123,6 @@ describe("insertArApTransaction", () => {
     await insertArApTransaction(db as any, row);
 
     expect(resolveContactId).toHaveBeenCalledWith("Nenek Petok");
-    expect(inserted[0].params[1]).toBe(55);
+    expect(inserted[0].params[1]).toBe("55");
   });
 });

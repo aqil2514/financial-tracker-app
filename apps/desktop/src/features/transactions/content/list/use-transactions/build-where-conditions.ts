@@ -15,7 +15,7 @@ export const buildWhereConditions = (
   filters: FilterConfig[],
   date: string | undefined,
   extraConditions: ReturnType<typeof extractAttachmentCondition>["extraConditions"],
-  accountId?: number,
+  accountId?: string,
   dateRange?: { from: string; to: string }
 ) => {
   const dateCondition = date ? [{ condition: "date(date) = $1", params: [date] }] : [];

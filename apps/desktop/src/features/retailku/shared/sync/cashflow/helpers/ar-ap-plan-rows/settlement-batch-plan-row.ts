@@ -10,8 +10,8 @@ import type { ArApSyncPlanRow } from "../../types";
 export function settlementBatchPlanRow(
   row: ArApRow,
   key: string,
-  allocations: { debtId: number; amount: number }[],
-  paymentAccountId: number | null
+  allocations: { debtId: string; amount: number }[],
+  paymentAccountId: string | null
 ): ArApSyncPlanRow {
   return {
     ...basePlanRow(row, key),

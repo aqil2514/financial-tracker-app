@@ -8,9 +8,9 @@ import type { DebtListRow } from "@/shared/debts/use-debts-list";
  * /payables (tiap baris, bukan agregat per kontak). */
 export function findOldestOngoing(
   debts: DebtListRow[] | undefined,
-  contactId: number
+  contactId: string
 ): DebtListRow | undefined {
   return debts
     ?.filter((debt) => debt.contact_id === contactId && debt.status === "ongoing")
-    .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)[0];
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))[0];
 }

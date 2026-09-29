@@ -2,7 +2,7 @@ import type { Category } from "@/lib/db";
 
 export function categoryName(
   categories: Category[] | undefined,
-  id: number | null
+  id: string | null
 ): string | null {
   return categories?.find((category) => category.id === id)?.name ?? null;
 }

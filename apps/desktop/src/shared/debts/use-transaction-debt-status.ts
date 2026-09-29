@@ -10,10 +10,10 @@ export type TransactionDebtStatus =
    * `hasPayments` = piutang itu SUDAH menerima cicilan dari transaksi
    * LAIN — kalau true, field "berbahaya" (amount/akun/kontak/dst) HARUS
    * dikunci karena recreate akan menghapus cicilan itu lewat CASCADE. */
-  | { role: "principal"; debtId: number; hasPayments: boolean }
+  | { role: "principal"; debtId: string; hasPayments: boolean }
   /** Transaksi ini adalah SATU cicilan/pelunasan (`debt_payments`) —
    * recreate selalu aman, tidak ada yang bergantung padanya. */
-  | { role: "payment"; debtPaymentId: number; debtId: number };
+  | { role: "payment"; debtPaymentId: string; debtId: string };
 
 /**
  * Peran transaksi ini terhadap `debts`/`debt_payments` (lihat "Deteksi
@@ -22,13 +22,13 @@ export type TransactionDebtStatus =
  * boleh diedit bebas dan strategi apa (recreate/update/lock) yang dipakai
  * `applyDebtTransactionEdit()` saat submit.
  */
-export function useTransactionDebtStatus(transactionId: number | undefined) {
+export function useTransactionDebtStatus(transactionId: string | undefined) {
   return useQuery({
     queryKey: ["debts", "transaction-status", transactionId],
     queryFn: async (): Promise<TransactionDebtStatus> => {
       const db = await getDb();
 
-      const asPrincipal = await db.select<{ id: number }[]>(
+      const asPrincipal = await db.select<{ id: string }[]>(
         "SELECT id FROM debts WHERE transaction_id = $1 LIMIT 1",
         [transactionId]
       );
@@ -41,7 +41,7 @@ export function useTransactionDebtStatus(transactionId: number | undefined) {
         return { role: "principal", debtId, hasPayments: payments[0]?.found === 1 };
       }
 
-      const asPayment = await db.select<{ id: number; debt_id: number }[]>(
+      const asPayment = await db.select<{ id: string; debt_id: string }[]>(
         "SELECT id, debt_id FROM debt_payments WHERE transaction_id = $1 LIMIT 1",
         [transactionId]
       );

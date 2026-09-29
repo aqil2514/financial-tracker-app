@@ -7,8 +7,7 @@ pub fn clear_existing_data(tx: &Transaction) -> Result<(), String> {
         "DELETE FROM transactions;
          DELETE FROM accounts;
          DELETE FROM categories;
-         DELETE FROM account_groups;
-         DELETE FROM sqlite_sequence WHERE name IN ('transactions','accounts','categories','account_groups');",
+         DELETE FROM account_groups;",
     )
     .map_err(|e| format!("Gagal menghapus data lama: {e}"))
 }
@@ -52,12 +51,13 @@ pub fn write_plan(tx: &Transaction, plan: &Plan) -> Result<(), String> {
     {
         let mut stmt = tx
             .prepare(
-                "INSERT INTO transactions (type, amount, category_id, account_id, transfer_account_id, note, date)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                "INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, date)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             )
             .map_err(|e| e.to_string())?;
         for t in &plan.transactions {
             stmt.execute(rusqlite::params![
+                t.id,
                 t.type_str,
                 t.amount,
                 t.category_id,

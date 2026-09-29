@@ -18,7 +18,7 @@ function summarize(debts: ContactDebtRow[], type: "receivable" | "payable") {
   };
 }
 
-export function ContactDetailContent({ contactId }: { contactId: number }) {
+export function ContactDetailContent({ contactId }: { contactId: string }) {
   const { data: debts, isLoading } = useContactDebts(contactId);
 
   if (isLoading || !debts) {

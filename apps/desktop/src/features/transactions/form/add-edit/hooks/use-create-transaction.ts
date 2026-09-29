@@ -3,6 +3,7 @@
 import { toast } from "sonner";
 
 import { getDb } from "@/lib/db";
+import { newId } from "@/lib/id";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { isEmptyDoc } from "@/components/rich-text";
 import { saveAttachmentToTransaction } from "@/shared/attachments/use-add-attachment";
@@ -38,7 +39,7 @@ type UseCreateTransactionOptions = {
   /** Akun yang otomatis dipilih saat form dibuka — dipakai halaman detail
    * akun supaya transaksi baru langsung ter-scope ke akun yang sedang
    * dilihat, tanpa user perlu memilih lagi. */
-  defaultAccountId?: number;
+  defaultAccountId?: string;
 };
 
 export function useCreateTransaction(options: UseCreateTransactionOptions) {
@@ -72,19 +73,21 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
       const contactId = await resolveContactId(values.contact_name);
 
       const db = await getDb();
-      const accountId = Number(values.account_id);
+      const accountId = values.account_id;
       const transferAccountId =
-        values.type === "transfer" ? Number(values.transfer_account_id) : null;
+        values.type === "transfer" ? values.transfer_account_id : null;
+      const transactionId = newId();
 
-      const result = await db.execute(
-        `INSERT INTO transactions (type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      await db.execute(
+        `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
+          transactionId,
           values.type,
           values.amount,
           values.type === "transfer" || !values.category_id
             ? null
-            : Number(values.category_id),
+            : values.category_id,
           accountId,
           transferAccountId,
           values.note,
@@ -93,22 +96,19 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
           contactId,
         ]
       );
-      const transactionId = result.lastInsertId ?? null;
 
-      if (transactionId != null) {
-        await applyDebtTransaction({
-          db,
-          transactionId,
-          type: values.type,
-          accountId,
-          transferAccountId,
-          contactId,
-          amount: values.amount,
-          date: values.date,
-          debtAction: values.debt_action,
-          settleDebtIds: values.settle_debt_ids,
-        });
-      }
+      await applyDebtTransaction({
+        db,
+        transactionId,
+        type: values.type,
+        accountId,
+        transferAccountId,
+        contactId,
+        amount: values.amount,
+        date: values.date,
+        debtAction: values.debt_action,
+        settleDebtIds: values.settle_debt_ids,
+      });
 
       return transactionId;
     },

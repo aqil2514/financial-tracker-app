@@ -3,7 +3,7 @@
 import { useAccountTransactions } from "./use-account-transactions";
 import { TransactionList } from "./transaction-list";
 
-export function RecentTab({ accountId }: { accountId: number }) {
+export function RecentTab({ accountId }: { accountId: string }) {
   const { data: transactions } = useAccountTransactions(accountId);
   return <TransactionList transactions={transactions} accountId={accountId} />;
 }

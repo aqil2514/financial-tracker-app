@@ -26,7 +26,7 @@ function arApRow(overrides: Partial<ArApRow> = {}): ArApRow {
   };
 }
 
-function mapping(entries: [string, number][]): Map<string, RetailkuSyncFieldMappingRow> {
+function mapping(entries: [string, string][]): Map<string, RetailkuSyncFieldMappingRow> {
   return new Map(
     entries.map(([key, localAccountId]) => [
       key,
@@ -42,13 +42,13 @@ describe("resolvePaymentAccountId", () => {
   });
 
   it("cashAccounts tepat 1 dan sudah dipetakan -> localAccountId terisi", () => {
-    const fieldMapping = mapping([["detail:kas-tunai:SALE_PAYMENT:inflow", 9]]);
+    const fieldMapping = mapping([["detail:kas-tunai:SALE_PAYMENT:inflow", "9"]]);
     const result = resolvePaymentAccountId(
       arApRow({ cashAccounts: [{ accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 500 }] }),
       fieldMapping,
       "detail"
     );
-    expect(result).toBe(9);
+    expect(result).toBe("9");
   });
 
   it("cashAccounts tepat 1 tapi belum dipetakan -> null", () => {
@@ -62,8 +62,8 @@ describe("resolvePaymentAccountId", () => {
 
   it("cashAccounts >1 (split, belum pernah terjadi di data nyata) -> null", () => {
     const fieldMapping = mapping([
-      ["detail:kas-tunai:SALE_PAYMENT:inflow", 9],
-      ["detail:seabank:SALE_PAYMENT:inflow", 11],
+      ["detail:kas-tunai:SALE_PAYMENT:inflow", "9"],
+      ["detail:seabank:SALE_PAYMENT:inflow", "11"],
     ]);
     const result = resolvePaymentAccountId(
       arApRow({
@@ -79,12 +79,12 @@ describe("resolvePaymentAccountId", () => {
   });
 
   it("mode summary -> key tanpa sourceType, tetap resolve", () => {
-    const fieldMapping = mapping([["summary:inflow:kas-tunai", 9]]);
+    const fieldMapping = mapping([["summary:inflow:kas-tunai", "9"]]);
     const result = resolvePaymentAccountId(
       arApRow({ cashAccounts: [{ accountId: "kas-tunai", accountCode: "1101", accountName: "Kas Tunai", amount: 500 }] }),
       fieldMapping,
       "summary"
     );
-    expect(result).toBe(9);
+    expect(result).toBe("9");
   });
 });

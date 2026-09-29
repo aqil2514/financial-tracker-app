@@ -24,16 +24,16 @@ export function TransactionList({
   accountId,
 }: {
   transactions: TransactionWithRunningBalance[] | undefined;
-  accountId: number;
+  accountId: string;
 }) {
   const { selectTransaction } = useAccountDetail();
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
 
-  const accountName = (id: number | null) =>
+  const accountName = (id: string | null) =>
     accounts?.find((account) => account.id === id)?.name ?? "-";
 
-  const categoryName = (id: number | null) =>
+  const categoryName = (id: string | null) =>
     categories?.find((category) => category.id === id)?.name ?? null;
 
   if (!transactions) return null;

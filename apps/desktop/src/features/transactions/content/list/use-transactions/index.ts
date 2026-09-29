@@ -25,7 +25,7 @@ export function useTransactions(
   date?: string,
   sorts: SortConfig[] = [],
   filters: FilterConfig[] = [],
-  accountId?: number,
+  accountId?: string,
   dateRange?: { from: string; to: string }
 ) {
   return useQuery({

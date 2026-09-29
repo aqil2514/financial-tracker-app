@@ -4,9 +4,9 @@ import type { RetailkuSyncFieldMappingRow } from "../../types";
 
 export type ResolvedDownPayment = {
   amount: number;
-  localAccountId: number;
+  localAccountId: string;
   note: string;
-  categoryId: number | null;
+  categoryId: string | null;
   description: string | null;
 };
 

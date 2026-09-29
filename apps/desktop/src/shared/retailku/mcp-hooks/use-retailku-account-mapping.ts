@@ -10,14 +10,14 @@ export type RetailkuAccountMapping = {
   retailkuAccountId: string;
   retailkuAccountCode: string;
   retailkuAccountName: string;
-  localAccountId: number;
+  localAccountId: string;
 };
 
 type RetailkuSyncFieldMappingRow = {
   retailku_account_id: string;
   retailku_account_code: string;
   retailku_account_name: string;
-  local_account_id: number;
+  local_account_id: string;
 };
 
 /**

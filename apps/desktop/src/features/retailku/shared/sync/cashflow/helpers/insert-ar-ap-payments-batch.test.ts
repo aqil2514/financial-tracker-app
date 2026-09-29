@@ -21,8 +21,8 @@ function baseRow(overrides: Partial<ArApSyncPlanRow> = {}): ArApSyncPlanRow {
     willInsertPayment: false,
     paymentDebtId: null,
     willInsertPayments: [
-      { debtId: 10, amount: 1500 },
-      { debtId: 20, amount: 3000 },
+      { debtId: "10", amount: 1500 },
+      { debtId: "20", amount: 3000 },
     ],
     paymentAccountId: null,
     downPayment: null,
@@ -57,18 +57,18 @@ describe("insertArApPaymentsBatch", () => {
 
     expect(inserted).toHaveLength(2);
     expect(inserted[0].sql).toContain("INSERT INTO debt_payments");
-    expect(inserted[0].params).toEqual([10, 1500, null, "2026-09-18", "j1:ar_ap:10"]);
-    expect(inserted[1].params).toEqual([20, 3000, null, "2026-09-18", "j1:ar_ap:20"]);
+    expect(inserted[0].params).toEqual([expect.any(String), "10", 1500, null, "2026-09-18", "j1:ar_ap:10"]);
+    expect(inserted[1].params).toEqual([expect.any(String), "20", 3000, null, "2026-09-18", "j1:ar_ap:20"]);
   });
 
   it("paymentAccountId terisi -> account_id SAMA untuk semua alokasi", async () => {
     const { db, inserted } = createFakeDb();
-    const row = baseRow({ paymentAccountId: 5 });
+    const row = baseRow({ paymentAccountId: "5" });
 
     await insertArApPaymentsBatch(db as any, row);
 
-    expect(inserted[0].params).toEqual([10, 1500, 5, "2026-09-18", "j1:ar_ap:10"]);
-    expect(inserted[1].params).toEqual([20, 3000, 5, "2026-09-18", "j1:ar_ap:20"]);
+    expect(inserted[0].params).toEqual([expect.any(String), "10", 1500, "5", "2026-09-18", "j1:ar_ap:10"]);
+    expect(inserted[1].params).toEqual([expect.any(String), "20", 3000, "5", "2026-09-18", "j1:ar_ap:20"]);
   });
 
   it("willInsertPayments kosong -> tidak insert apa pun", async () => {

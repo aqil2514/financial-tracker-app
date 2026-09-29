@@ -43,7 +43,7 @@ export const runTransactionsQueries = (
     orderClause: string;
     limitOffsetClause: string;
     limitOffsetParams: unknown[];
-    accountId?: number;
+    accountId?: string;
   }
 ) => {
   const rowsParams = [...clauses.params, ...clauses.limitOffsetParams];

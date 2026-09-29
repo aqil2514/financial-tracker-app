@@ -19,7 +19,7 @@ type DebtActionFieldProps = {
    * untuk sebuah piutang yang sudah `status='paid'`, piutang itu TETAP
    * muncul di checklist (lihat use-ongoing-debts.ts). Undefined saat
    * form create (transaksi belum ada, tidak mungkin py peran apa pun). */
-  transactionId?: number;
+  transactionId?: string;
   debtStatus?: TransactionDebtStatus;
 };
 

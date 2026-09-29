@@ -5,7 +5,7 @@ import {
   type TransactionWithRunningBalance,
 } from "./running-balance-query";
 
-export function useAccountTransactions(accountId: number, limit: number = 10) {
+export function useAccountTransactions(accountId: string, limit: number = 10) {
   return useQuery({
     queryKey: ["accounts", "recent-transactions", accountId, limit],
     queryFn: async () => {

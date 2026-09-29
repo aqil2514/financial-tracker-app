@@ -1,4 +1,5 @@
 import { getDb, type Contact } from "@/lib/db";
+import { newId } from "@/lib/id";
 
 /**
  * Mengubah nama kontak (hasil ketikan bebas dari form transaksi) menjadi
@@ -7,7 +8,7 @@ import { getDb, type Contact } from "@/lib/db";
  * User sudah diberi warning fuzzy-match di form sebelum submit, jadi di
  * titik ini keputusan "pakai yang sudah ada atau buat baru" sudah final.
  */
-export async function resolveContactId(name: string | null): Promise<number | null> {
+export async function resolveContactId(name: string | null): Promise<string | null> {
   const trimmed = name?.trim();
   if (!trimmed) return null;
 
@@ -18,6 +19,7 @@ export async function resolveContactId(name: string | null): Promise<number | nu
   );
   if (existing.length > 0) return existing[0].id;
 
-  const result = await db.execute("INSERT INTO contacts (name) VALUES ($1)", [trimmed]);
-  return result.lastInsertId ?? null;
+  const id = newId();
+  await db.execute("INSERT INTO contacts (id, name) VALUES ($1, $2)", [id, trimmed]);
+  return id;
 }

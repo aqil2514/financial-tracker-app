@@ -24,9 +24,9 @@ export interface GenericMappingRowDraft {
   retailkuAccountId: string;
   retailkuAccountCode: string;
   accountName: string;
-  localAccountId: number | null;
+  localAccountId: string | null;
   note: string;
-  categoryId: number | null;
+  categoryId: string | null;
   description: JSONContent | null;
   noteFollowSource: boolean;
   descriptionFollowSource: boolean;
@@ -38,10 +38,10 @@ export interface TransferMappingRowDraft {
   fromAccountName: string;
   toAccountName: string;
   transactionCount: number;
-  localAccountId: number | null;
-  secondaryAccountId: number | null;
+  localAccountId: string | null;
+  secondaryAccountId: string | null;
   note: string;
-  categoryId: number | null;
+  categoryId: string | null;
   description: JSONContent | null;
   noteFollowSource: boolean;
   descriptionFollowSource: boolean;
@@ -55,8 +55,8 @@ export interface ArApMappingRowDraft {
   kind: "trade" | "non-trade" | null;
   transactionCount: number;
   partyNames: string[];
-  localAccountId: number | null;
-  contactId: number | null;
+  localAccountId: string | null;
+  contactId: string | null;
   contactFollowSource: boolean;
   note: string;
   description: JSONContent | null;

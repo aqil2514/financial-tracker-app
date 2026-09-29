@@ -46,7 +46,7 @@ export function DebtRow({ debt }: { debt: ContactDebtRow }) {
   );
 }
 
-function PaymentsList({ debtId }: { debtId: number }) {
+function PaymentsList({ debtId }: { debtId: string }) {
   const { data: payments, isLoading } = useDebtPayments(debtId);
 
   if (isLoading) {

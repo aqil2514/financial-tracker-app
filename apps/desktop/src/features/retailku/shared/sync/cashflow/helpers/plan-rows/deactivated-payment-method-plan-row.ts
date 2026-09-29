@@ -6,7 +6,7 @@ import type { resolveMappedTotal } from "./resolve-mapped-total";
  * lihat dokumentasi `computeCashflowSync`. */
 export function deactivatedPaymentMethodPlanRow(
   resolved: ReturnType<typeof resolveMappedTotal>,
-  localAccountId: number
+  localAccountId: string
 ): CashflowSyncPlanRow {
   return {
     ...resolved,

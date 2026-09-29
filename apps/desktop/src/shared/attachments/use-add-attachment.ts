@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { getDb } from "@/lib/db";
+import { newId } from "@/lib/id";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 import { transactionAttachmentsQueryKey } from "./use-transaction-attachments";
 
@@ -31,19 +32,19 @@ export async function saveFile(input: AddAttachmentInput, targetDir: string | nu
  * disimpan (jadi baru dapat `transactionId`-nya di titik itu).
  */
 export async function saveAttachmentToTransaction(
-  transactionId: number,
+  transactionId: string,
   input: AddAttachmentInput,
   targetDir: string | null
 ) {
   const filePath = await saveFile(input, targetDir);
   const db = await getDb();
   await db.execute(
-    "INSERT INTO transaction_attachments (transaction_id, file_path) VALUES ($1, $2)",
-    [transactionId, filePath]
+    "INSERT INTO transaction_attachments (id, transaction_id, file_path) VALUES ($1, $2, $3)",
+    [newId(), transactionId, filePath]
   );
 }
 
-export function useAddAttachment(transactionId: number, targetDir: string | null) {
+export function useAddAttachment(transactionId: string, targetDir: string | null) {
   return useDbMutation({
     mutationFn: (input: AddAttachmentInput) =>
       saveAttachmentToTransaction(transactionId, input, targetDir),

@@ -1,6 +1,7 @@
 "use client";
 
 import { getDb } from "@/lib/db";
+import { newId } from "@/lib/id";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
@@ -35,33 +36,31 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
     resetOnOpen: true,
     mutationFn: async (values: PayDebtFormOutput) => {
       const db = await getDb();
-      const cashAccountId = Number(values.cash_account_id);
+      const cashAccountId = values.cash_account_id;
+      const transactionId = newId();
 
       // debt.account_id adalah akun `debt` milik baris ini — arah
       // transfer SELALU debt -> kas untuk pelunasan, apa pun type-nya
       // (receivable maupun payable, keduanya dilunasi dengan arah yang
       // sama: uang keluar dari akun debt virtual ke akun kas nyata).
-      const result = await db.execute(
-        `INSERT INTO transactions (type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
-         VALUES ('transfer', $1, NULL, $2, $3, $4, NULL, $5, $6)`,
-        [values.amount, debt.account_id, cashAccountId, values.note, values.date, debt.contact_id]
+      await db.execute(
+        `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
+         VALUES ($1, 'transfer', $2, NULL, $3, $4, $5, NULL, $6, $7)`,
+        [transactionId, values.amount, debt.account_id, cashAccountId, values.note, values.date, debt.contact_id]
       );
-      const transactionId = result.lastInsertId ?? null;
 
-      if (transactionId != null) {
-        await applyDebtTransaction({
-          db,
-          transactionId,
-          type: "transfer",
-          accountId: debt.account_id ?? 0,
-          transferAccountId: cashAccountId,
-          contactId: debt.contact_id,
-          amount: values.amount,
-          date: values.date,
-          debtAction: "settlement",
-          settleDebtIds: [String(debt.id)],
-        });
-      }
+      await applyDebtTransaction({
+        db,
+        transactionId,
+        type: "transfer",
+        accountId: debt.account_id ?? "",
+        transferAccountId: cashAccountId,
+        contactId: debt.contact_id,
+        amount: values.amount,
+        date: values.date,
+        debtAction: "settlement",
+        settleDebtIds: [debt.id],
+      });
 
       return transactionId;
     },

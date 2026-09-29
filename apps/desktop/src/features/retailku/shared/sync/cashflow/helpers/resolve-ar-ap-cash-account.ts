@@ -7,7 +7,7 @@ export type ResolvedArApCashAccount = {
   accountName: string;
   amount: number;
   key: string;
-  localAccountId: number | null;
+  localAccountId: string | null;
 };
 
 function buildLookupKey(

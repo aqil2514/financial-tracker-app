@@ -25,22 +25,22 @@ export function getDb() {
 }
 
 export type Category = {
-  id: number;
+  id: string;
   name: string;
   icon: string | null;
   type: "income" | "expense";
-  parent_id: number | null;
+  parent_id: string | null;
   is_active: number;
 };
 
 export type AccountGroup = {
-  id: number;
+  id: string;
   name: string;
   created_at: string;
 };
 
 export type Account = {
-  id: number;
+  id: string;
   name: string;
   /** Nama komponen lucide-react (mis. "Wallet"), lihat
    * lib/account-icons.ts — null kalau belum dipilih (fallback ke icon
@@ -51,7 +51,7 @@ export type Account = {
    * Independen dari `icon`: bentuk dan warna dipilih terpisah. */
   color: string | null;
   initial_balance: number;
-  group_id: number | null;
+  group_id: string | null;
   description: string | null;
   created_at: string;
   is_active: number;
@@ -59,23 +59,23 @@ export type Account = {
 };
 
 export type Transaction = {
-  id: number;
+  id: string;
   type: "income" | "expense" | "transfer";
   amount: number;
-  category_id: number | null;
-  account_id: number | null;
-  transfer_account_id: number | null;
+  category_id: string | null;
+  account_id: string | null;
+  transfer_account_id: string | null;
   note: string;
   /** JSON dokumen Tiptap terserialisasi (`JSON.stringify`), atau `null`
    * kalau belum diisi — deskripsi detail, terpisah dari `note`. */
   description: string | null;
   date: string;
   created_at: string;
-  contact_id: number | null;
+  contact_id: string | null;
 };
 
 export type Contact = {
-  id: number;
+  id: string;
   name: string;
   /** JSON dokumen Tiptap terserialisasi (`JSON.stringify`), atau `null`
    * kalau belum diisi. */
@@ -84,15 +84,15 @@ export type Contact = {
 };
 
 export type Debt = {
-  id: number;
+  id: string;
   /** 'receivable' = piutang (orang lain berutang ke saya), 'payable' =
    * utang (saya berutang ke orang lain). */
   type: "receivable" | "payable";
-  contact_id: number | null;
+  contact_id: string | null;
   amount: number;
-  account_id: number | null;
+  account_id: string | null;
   /** Jejak transaksi transfer otomatis yang membuat piutang/utang ini. */
-  transaction_id: number | null;
+  transaction_id: string | null;
   status: "ongoing" | "paid" | "written_off";
   note: string | null;
   date: string;
@@ -100,12 +100,12 @@ export type Debt = {
 };
 
 export type DebtPayment = {
-  id: number;
-  debt_id: number;
+  id: string;
+  debt_id: string;
   amount: number;
-  account_id: number | null;
+  account_id: string | null;
   /** Jejak transaksi transfer otomatis untuk cicilan/pelunasan ini. */
-  transaction_id: number | null;
+  transaction_id: string | null;
   note: string | null;
   date: string;
   created_at: string;

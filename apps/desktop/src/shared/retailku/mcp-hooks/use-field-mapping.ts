@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getDb } from "@/lib/db";
+import { newId } from "@/lib/id";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 
 export const fieldMappingQueryKey = ["retailku", "field-mapping"];
@@ -26,7 +27,7 @@ export type FieldMappingExtraFields = {
    * 2026-09-28, konsisten dgn alasan JSON dipakai utk `noteFollowSource`
    * dkk: makin banyak field spesifik per `sourceKind`, kolom eksplisit
    * akan TERUS MENUMPUK. */
-  contactId?: number;
+  contactId?: string;
   /** `true` = kontak transaksi hasil sync IKUT nama PIHAK ASLI Retailku
    * PER TRANSAKSI (bukan `contactId` statis di atas) — cuma relevan
    * `source_kind: "AR_AP"`. SAMA konsep `noteFollowSource`/
@@ -46,12 +47,12 @@ export type FieldMapping = {
   retailkuAccountId: string;
   retailkuAccountCode: string;
   retailkuAccountName: string;
-  localAccountId: number;
+  localAccountId: string;
   /** Akun kedua (mis. `toAccountId` FUND_TRANSFER) — `null` utk key yang
    * cukup 1 akun (mapping generik), lihat migrasi 0023. */
-  secondaryAccountId: number | null;
+  secondaryAccountId: string | null;
   note: string | null;
-  categoryId: number | null;
+  categoryId: string | null;
   description: string | null;
   extraFields: FieldMappingExtraFields;
 };
@@ -62,10 +63,10 @@ type FieldMappingRow = {
   retailku_account_id: string;
   retailku_account_code: string;
   retailku_account_name: string;
-  local_account_id: number;
-  secondary_account_id: number | null;
+  local_account_id: string;
+  secondary_account_id: string | null;
   note: string | null;
-  category_id: number | null;
+  category_id: string | null;
   description: string | null;
   extra_fields: string | null;
 };
@@ -124,10 +125,10 @@ export type SaveFieldMappingInput = {
   retailkuAccountId: string;
   retailkuAccountCode: string;
   retailkuAccountName: string;
-  localAccountId: number;
-  secondaryAccountId: number | null;
+  localAccountId: string;
+  secondaryAccountId: string | null;
   note: string | null;
-  categoryId: number | null;
+  categoryId: string | null;
   description: string | null;
   extraFields: FieldMappingExtraFields;
 }[];
@@ -144,9 +145,9 @@ export function useSaveFieldMapping() {
       for (const mapping of mappings) {
         await db.execute(
           `INSERT INTO retailku_sync_field_mapping
-             (key, source_kind, retailku_account_id, retailku_account_code, retailku_account_name,
+             (id, key, source_kind, retailku_account_id, retailku_account_code, retailku_account_name,
               local_account_id, secondary_account_id, note, category_id, description, extra_fields, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, datetime('now'))
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, datetime('now'))
            ON CONFLICT(key) DO UPDATE SET
              source_kind = excluded.source_kind,
              retailku_account_code = excluded.retailku_account_code,
@@ -159,6 +160,7 @@ export function useSaveFieldMapping() {
              extra_fields = excluded.extra_fields,
              updated_at = excluded.updated_at`,
           [
+            newId(),
             mapping.key,
             mapping.sourceKind,
             mapping.retailkuAccountId,

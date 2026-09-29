@@ -1,3 +1,4 @@
+import { newId } from "@/lib/id";
 import type { ArApSyncPlanRow, Db } from "../types";
 
 // row.willInsertPayments sudah dijamin terisi (all-or-nothing) oleh
@@ -13,9 +14,9 @@ import type { ArApSyncPlanRow, Db } from "../types";
 export async function insertArApPaymentsBatch(db: Db, row: ArApSyncPlanRow): Promise<void> {
   for (const allocation of row.willInsertPayments) {
     await db.execute(
-      `INSERT INTO debt_payments (debt_id, amount, account_id, date, source, source_ref)
-       VALUES ($1, $2, $3, $4, 'retailku_sync', $5)`,
-      [allocation.debtId, allocation.amount, row.paymentAccountId, row.date, `${row.sourceRef}:${allocation.debtId}`]
+      `INSERT INTO debt_payments (id, debt_id, amount, account_id, date, source, source_ref)
+       VALUES ($1, $2, $3, $4, $5, 'retailku_sync', $6)`,
+      [newId(), allocation.debtId, allocation.amount, row.paymentAccountId, row.date, `${row.sourceRef}:${allocation.debtId}`]
     );
   }
 }

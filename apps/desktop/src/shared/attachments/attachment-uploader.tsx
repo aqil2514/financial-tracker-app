@@ -16,7 +16,7 @@ import { AttachmentThumbnail } from "./attachment-thumbnail";
  * setiap foto yang ditangkap langsung disimpan ke disk + database. Untuk
  * form Tambah transaksi (belum ada id), pakai `PendingAttachmentUploader`.
  */
-export function AttachmentUploader({ transactionId }: { transactionId: number }) {
+export function AttachmentUploader({ transactionId }: { transactionId: string }) {
   const { data: attachmentFolder } = useAttachmentFolder();
   const { data: attachments } = useTransactionAttachments(transactionId);
   const addAttachment = useAddAttachment(transactionId, attachmentFolder ?? null);

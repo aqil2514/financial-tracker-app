@@ -49,9 +49,9 @@ export function useFundTransferMappingForm({
 
   useEffect(() => {
     onChange({
-      localAccountId: fromAccountId ? Number(fromAccountId) : null,
-      secondaryAccountId: toAccountId ? Number(toAccountId) : null,
-      categoryId: categoryId ? Number(categoryId) : null,
+      localAccountId: fromAccountId ? fromAccountId : null,
+      secondaryAccountId: toAccountId ? toAccountId : null,
+      categoryId: categoryId ? categoryId : null,
       note: note ?? "",
       description: description ?? null,
       noteFollowSource: noteFollowSource ?? false,

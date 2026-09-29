@@ -14,7 +14,7 @@ type UseTransactionFormParams = {
   form: UseFormReturn<TransactionFormValues, unknown, TransactionFormOutput>;
   onSubmit: (values: TransactionFormOutput) => void;
   onSubmitAndContinue?: (values: TransactionFormOutput) => void;
-  transactionId?: number;
+  transactionId?: string;
 };
 
 /**

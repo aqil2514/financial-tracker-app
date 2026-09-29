@@ -8,8 +8,8 @@ import type { ArApSyncPlanRow } from "../../types";
 export function settlementPlanRow(
   row: ArApRow,
   key: string,
-  paymentDebtId: number,
-  paymentAccountId: number | null
+  paymentDebtId: string,
+  paymentAccountId: string | null
 ): ArApSyncPlanRow {
   return {
     ...basePlanRow(row, key),
