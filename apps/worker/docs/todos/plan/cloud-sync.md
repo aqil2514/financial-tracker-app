@@ -219,18 +219,45 @@ terpusat di satu tempat.
       --file=schema/0001_initial.sql --remote`, dicek via CLI + D1
       Studio: ketujuh tabel ada).
 - [x] **Endpoint `POST /transactions`** (`src/index.ts`) — terima 1
-      baris transaksi, INSERT ke D1 dgn `sync_source='pc'`. **SENGAJA
-      DEVELOPMENT ONLY**: belum ada autentikasi (siapa saja yg tahu
-      URL bisa akses), belum ada validasi logic bisnis dari audit
-      (FIFO debt, larangan akun `debt` utk income/expense, dst) — JANGAN
-      dipakai dari integrasi PC sungguhan atau tool MCP tulis manapun
-      sebelum validasi itu ditambahkan. **DIVERIFIKASI end-to-end**:
-      payload valid → 201 + tersimpan benar di D1 (dites via `curl`,
-      data uji sudah dihapus lagi); payload cacat → 400 ditolak.
+      baris transaksi, INSERT ke D1 dgn `sync_source='pc'`. Proteksi
+      autentikasi SUDAH ADA (lihat poin autentikasi di bawah), TAPI
+      **MASIH BELUM ADA validasi logic bisnis dari audit** (FIFO debt,
+      larangan akun `debt` utk income/expense, dst) — JANGAN dipakai
+      dari integrasi PC sungguhan atau tool MCP tulis manapun sebelum
+      validasi itu ditambahkan. Juga BELUM menangani UPDATE/DELETE,
+      cuma INSERT polos (belum UPSERT dgn LWW). **DIVERIFIKASI
+      end-to-end di PRODUCTION** (bukan cuma `wrangler dev`): payload
+      valid + token benar → 201 + tersimpan benar di D1; payload cacat
+      → 400 ditolak; tanpa/token salah → 401 ditolak (data uji sudah
+      dihapus lagi).
 - [x] **Endpoint `GET /health`** — cek koneksi D1 hidup, return daftar
-      tabel yang ada. Ditemukan: `sqlite_version()` DIBLOKIR D1
-      (`SQLITE_ERROR code 7500`, "not authorized to use function") —
-      pakai query `sqlite_master` sbg gantinya utk cek konektivitas.
+      tabel yang ada, TANPA autentikasi (disengaja — tidak sensitif).
+      Ditemukan: `sqlite_version()` DIBLOKIR D1 (`SQLITE_ERROR code
+      7500`, "not authorized to use function") — pakai query
+      `sqlite_master` sbg gantinya utk cek konektivitas.
+- [x] **Autentikasi PC↔Worker**: token statis Bearer (`PC_SYNC_TOKEN`),
+      dicek di `isAuthorized()` sebelum endpoint tulis apa pun jalan.
+      Disimpan sbg Cloudflare secret (`wrangler secret put
+      PC_SYNC_TOKEN`), TIDAK di `wrangler.toml`. Token production
+      digenerate via `openssl rand -hex 32` (32-byte random, bukan
+      dipilih manual) — token yg SAMA nantinya dipakai sbg
+      `cloud_sync_token` di tabel `settings` PC (Tahap 6). **CATATAN
+      TOOLING PENTING**: `wrangler dev --remote` TIDAK meneruskan
+      `.dev.vars` ke Worker yg jalan di edge remote (env var jadi
+      `undefined` walau ringkasan binding menampilkan "(hidden)" —
+      terverifikasi via endpoint debug sementara, lalu dihapus lagi)
+      — sedangkan `wrangler dev` TANPA `--remote` membaca `.dev.vars`
+      dgn benar TAPI D1-nya jadi simulasi lokal kosong (bukan D1 remote
+      asli). Makanya verifikasi penuh (auth + D1 asli sekaligus) HARUS
+      lewat deploy sungguhan (`wrangler deploy`), bukan `wrangler dev`
+      dalam mode apa pun. **DIVERIFIKASI di URL production asli**
+      (`https://financial-app-worker.muhamadaqil383.workers.dev`) — 4
+      skenario lolos: `/health` tanpa auth (200), POST tanpa header
+      (401), POST token salah (401), POST token benar (201 + baris
+      tersimpan benar, sudah dibersihkan lagi).
+- [x] **Worker sudah di-deploy** ke Cloudflare (bukan cuma preview
+      `wrangler dev` lagi) — URL:
+      `https://financial-app-worker.muhamadaqil383.workers.dev`.
 
 ## Todo list eksekusi
 
@@ -257,8 +284,11 @@ terpusat di satu tempat.
 ### Tahap 4 — Cloudflare: Worker + D1 — SEDANG BERJALAN
 
 - [x] Provisioning 1 database D1.
-- [x] Endpoint tulis pertama (`POST /transactions`) — DEVELOPMENT ONLY,
-      lihat "Progress implementasi".
+- [x] Endpoint tulis pertama (`POST /transactions`) — lihat "Progress
+      implementasi" utk detail scope (baru INSERT, belum UPSERT/LWW).
+- [x] Autentikasi PC↔Worker (token terpisah dari OAuth-shim MCP) —
+      token statis Bearer, lihat "Progress implementasi". Worker sudah
+      DI-DEPLOY ke production (bukan cuma preview dev lagi).
 - [ ] Endpoint sync lengkap: pull (kirim baris D1 sejak checkpoint),
       push UPSERT dgn LWW per baris (bukan cuma INSERT polos spt
       sekarang) — endpoint saat ini BELUM menangani UPDATE/konflik.
@@ -268,9 +298,7 @@ terpusat di satu tempat.
       lihat checklist porting di
       `mcp-server-business-logic-audit.md`. **BELUM ADA SATU PUN** yg
       di-port — endpoint `/transactions` saat ini TIDAK memvalidasi
-      apa pun.
-- [ ] Autentikasi PC↔Worker (token terpisah dari OAuth-shim MCP) —
-      BELUM ADA, endpoint saat ini terbuka tanpa proteksi.
+      apa pun secara bisnis (auth SUDAH ada, validasi bisnis BELUM).
 
 ### Tahap 5 — MCP server (Vercel) — BELUM DIMULAI
 
