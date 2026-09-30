@@ -264,6 +264,17 @@ terpusat di satu tempat.
       lengkap. Termasuk keputusan pola "modul pemilik vs modul pemicu"
       utk logic lintas-tabel (mis. FIFO debt dipicu dari `transactions`
       tapi dimiliki `debts`).
+- [x] **Migrasi routing ke Hono** (REVISI dari keputusan awal "manual
+      if/else") — dipicu kebutuhan path dinamis pertama
+      (`/transactions/:id` utk endpoint update, belum dibuat). Tiap
+      modul sekarang py `router.ts` (sub-app Hono), `index.ts` jadi
+      induk yg `.route(prefix, subApp)`. Controller diubah terima
+      `Context` Hono langsung (bukan `request`+`env` terpisah). Lihat
+      `apps/worker/docs/rules/module-structure.md` utk pola lengkap.
+      **DIVERIFIKASI regresi penuh di production setelah migrasi** —
+      SEMUA endpoint existing (health, auth 401, formula saldo, FIFO
+      debt, larangan akun debt, koreksi saldo) dites ulang dgn hasil
+      IDENTIK sebelum migrasi, 0 regresi.
 - [x] **Modul `accounts` + logic #5 & #6 dari audit di-port**
       (`src/modules/accounts/`):
       - `getAccountBalance()` — port PERSIS formula saldo dari

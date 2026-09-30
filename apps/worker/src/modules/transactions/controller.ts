@@ -1,23 +1,20 @@
+import type { Context } from "hono";
 import type { Env } from "../../shared/env";
-import { isAuthorized } from "../../shared/auth";
 import { isPushTransactionPayload } from "./schema";
 import { insertTransaction } from "./service";
 
-export async function handlePostTransaction(request: Request, env: Env): Promise<Response> {
-  if (!isAuthorized(request, env)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await request.json().catch(() => null);
+// Autentikasi ditangani requireAuth middleware, dipasang di router.ts.
+export async function handlePostTransaction(c: Context<{ Bindings: Env }>) {
+  const body = await c.req.json().catch(() => null);
   if (!isPushTransactionPayload(body)) {
-    return Response.json({ error: "Invalid payload" }, { status: 400 });
+    return c.json({ error: "Invalid payload" }, 400);
   }
 
-  const result = await insertTransaction(env, body);
+  const result = await insertTransaction(c.env, body);
 
   if (result.status === "rejected") {
-    return Response.json({ error: result.reason }, { status: 422 });
+    return c.json({ error: result.reason }, 422);
   }
 
-  return Response.json({ status: "ok", id: body.id }, { status: 201 });
+  return c.json({ status: "ok", id: body.id }, 201);
 }

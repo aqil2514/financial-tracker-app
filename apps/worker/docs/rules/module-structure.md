@@ -3,19 +3,26 @@
 ## Aturan
 
 Tiap resource (`transactions`, `accounts`, `debts`, dst) punya folder
-sendiri di `src/modules/<nama>/`, isinya dipecah 3 file berdasarkan
+sendiri di `src/modules/<nama>/`, isinya dipecah 4 file berdasarkan
 tanggung jawab:
 
 ```
 src/modules/transactions/
-├── controller.ts   ← handle HTTP: parse request, panggil service, bentuk Response
+├── router.ts       ← sub-app Hono: daftar path relatif -> controller
+├── controller.ts   ← handle HTTP: terima Context Hono, panggil service, bentuk Response
 ├── service.ts      ← logic bisnis + panggil D1
 └── schema.ts        ← tipe payload + validator bentuk data
 ```
 
-`src/index.ts` HANYA jadi router — daftar `if (url.pathname === ...)`
-yang mendelegasikan ke `controller.ts` modul yang sesuai, TIDAK ADA
-logic apa pun di situ selain routing.
+`src/index.ts` HANYA jadi induk Hono — `.route(prefix, subApp)` yang
+menempelkan tiap `router.ts` modul ke prefix path-nya (`/transactions`,
+`/accounts`, dst), TIDAK ADA logic routing detail atau HTTP handling
+apa pun di situ.
+
+Kalau modul TIDAK punya path dinamis dan cuma 1 endpoint sederhana
+(mis. `health`), `router.ts` boleh dilewati — daftar langsung di
+`index.ts` — TAPI begitu modul itu bertambah endpoint, pindahkan ke
+`router.ts` sendiri supaya `index.ts` tetap ringkas.
 
 `src/shared/` isinya yang dipakai LINTAS modul (`env.ts` untuk
 interface `Env`, `auth.ts` untuk `isAuthorized()`) — kalau sesuatu
@@ -71,35 +78,61 @@ export async function insertTransaction(env: Env, payload: PushTransactionPayloa
 }
 ```
 
-`controller.ts` — HANYA orkestrasi HTTP, tidak ada logic bisnis:
+`controller.ts` — HANYA orkestrasi HTTP, terima `Context` Hono
+langsung (diputuskan 2026-09-30 barengan migrasi ke Hono — konsisten
+krn `router.ts` sudah 100% terikat Hono, lebih ringkas drpd extract
+`request`/`env` manual di tiap controller):
 
 ```typescript
+import type { Context } from "hono";
 import type { Env } from "../../shared/env";
-import { isAuthorized } from "../../shared/auth";
 import { isPushTransactionPayload } from "./schema";
 import { insertTransaction } from "./service";
 
-export async function handlePostTransaction(request: Request, env: Env): Promise<Response> {
-  if (!isAuthorized(request, env)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const body = await request.json().catch(() => null);
+// Autentikasi ditangani requireAuth middleware, dipasang di router.ts
+// -- controller TIDAK perlu cek isAuthorized() manual.
+export async function handlePostTransaction(c: Context<{ Bindings: Env }>) {
+  const body = await c.req.json().catch(() => null);
   if (!isPushTransactionPayload(body)) {
-    return Response.json({ error: "Invalid payload" }, { status: 400 });
+    return c.json({ error: "Invalid payload" }, 400);
   }
-  await insertTransaction(env, body);
-  return Response.json({ status: "ok", id: body.id }, { status: 201 });
+  await insertTransaction(c.env, body);
+  return c.json({ status: "ok", id: body.id }, 201);
 }
 ```
 
-`src/index.ts` — router murni:
+`router.ts` — sub-app Hono, path RELATIF thd prefix yg ditempel induk.
+Autentikasi dipasang SEKALI di sini via `router.use(requireAuth)`
+(diputuskan 2026-09-30, REVISI dari cek manual di tiap controller yg
+berulang) — kalau cuma SEBAGIAN endpoint dalam satu modul yg butuh
+proteksi (belum ada kasusnya per 2026-09-30), pasang per-route:
+`router.post("/", requireAuth, handler)`:
 
 ```typescript
-import { handlePostTransaction } from "./modules/transactions/controller";
+import { Hono } from "hono";
+import type { Env } from "../../shared/env";
+import { requireAuth } from "../../shared/auth";
+import { handlePostTransaction } from "./controller";
 
-if (url.pathname === "/transactions" && request.method === "POST") {
-  return handlePostTransaction(request, env);
-}
+export const transactionsRouter = new Hono<{ Bindings: Env }>();
+transactionsRouter.use(requireAuth);
+transactionsRouter.post("/", handlePostTransaction);
+// nanti: transactionsRouter.patch("/:id", handlePatchTransaction);
+```
+
+`src/index.ts` — induk Hono, cuma menempelkan sub-app tiap modul:
+
+```typescript
+import { Hono } from "hono";
+import type { Env } from "./shared/env";
+import { transactionsRouter } from "./modules/transactions/router";
+import { accountsRouter } from "./modules/accounts/router";
+
+const app = new Hono<{ Bindings: Env }>();
+app.route("/transactions", transactionsRouter);
+app.route("/accounts", accountsRouter);
+
+export default app;
 ```
 
 ## Logic bisnis lintas-modul: modul PEMILIK vs modul PEMICU
@@ -128,15 +161,23 @@ expense di akun debt", #7 `dangerousFieldsChanged`) TETAP taruh di
 pemicu/pemilik di atas HANYA berlaku kalau tabel yg diubah benar-benar
 beda dari modul yg memicu.
 
-## Routing: manual if/else, BUKAN router library
+## Routing: Hono, sub-app per modul
 
-Diputuskan 2026-09-30: tetap `if (url.pathname === ...)` manual di
-`index.ts`, TIDAK pakai `itty-router`/`Hono`/dst. Alasan: jumlah modul
-masih kecil (<10-an), belum butuh path dinamis (`/transactions/:id`)
-— tambah dependency baru belum sepadan manfaatnya di skala ini. Kalau
-nanti kebutuhan routing jadi kompleks (banyak path dinamis, nested
-routes), pertimbangkan ulang keputusan ini, JANGAN dianggap final
-selamanya.
+**REVISI 2026-09-30** (keputusan awal "manual if/else" DIBATALKAN):
+begitu path dinamis pertama dibutuhkan (`PATCH /transactions/:id`),
+parsing manual via regex mulai rapuh & akan berulang tiap resource baru
+— pindah ke `Hono` (`npm install hono` di `apps/worker`).
+
+Pola: tiap modul punya `router.ts` (sub-app Hono, `new Hono<{ Bindings:
+Env }>()`, path RELATIF), `index.ts` jadi induk yg `.route(prefix,
+subApp)` tiap modul — lihat contoh kode di atas. Path dinamis pakai
+syntax `:nama` bawaan Hono (`c.req.param("id")`), TIDAK perlu regex
+manual.
+
+Kenapa Hono (bukan `itty-router`/lainnya): dirancang khusus utk edge
+runtime (Cloudflare Workers/Deno/Bun), sangat ringan, API `.route()`
+utk nested router cocok PERSIS dgn kebutuhan "1 sub-app per modul" di
+sini.
 
 ## Submodule (kalau satu resource jadi kompleks)
 
