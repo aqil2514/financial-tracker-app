@@ -29,8 +29,15 @@ Claude — BELUM DIBUAT).
       Detail sisi D1:
       [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
 - [ ] **Tahap 4** — Worker: endpoint sync + tulis + validasi bisnis +
-      autentikasi PC↔Worker — **SEDANG BERJALAN** (provisioning D1 +
-      1 endpoint development-only selesai, sisanya belum). Detail:
+      autentikasi PC↔Worker — **SEDANG BERJALAN**. Selesai: provisioning
+      D1, autentikasi PC↔Worker (token statis Bearer), Worker SUDAH
+      DI-DEPLOY ke production
+      (`https://financial-app-worker.muhamadaqil383.workers.dev`),
+      struktur kode dirapikan jadi per-modul (`controller`/`service`/
+      `schema`, lihat `apps/worker/docs/rules/module-structure.md`).
+      Belum: validasi logic bisnis (0 dari 7 di-port), endpoint baru
+      `transactions` create (belum update/delete, belum tabel lain),
+      belum UPSERT/LWW (masih INSERT polos). Detail:
       [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
 - [ ] **Tahap 5** — MCP server (Vercel + `mcp-handler`) — **BELUM
       DIMULAI**, `apps/mcp-server` belum ada. Detail:

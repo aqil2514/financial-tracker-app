@@ -258,6 +258,44 @@ terpusat di satu tempat.
 - [x] **Worker sudah di-deploy** ke Cloudflare (bukan cuma preview
       `wrangler dev` lagi) — URL:
       `https://financial-app-worker.muhamadaqil383.workers.dev`.
+- [x] **Struktur kode dirapikan per-modul** (`controller`/`service`/
+      `schema` per resource, `src/index.ts` jadi router murni) — lihat
+      `apps/worker/docs/rules/module-structure.md` utk aturan & alasan
+      lengkap. Termasuk keputusan pola "modul pemilik vs modul pemicu"
+      utk logic lintas-tabel (mis. FIFO debt dipicu dari `transactions`
+      tapi dimiliki `debts`).
+- [x] **Modul `accounts` + logic #5 & #6 dari audit di-port**
+      (`src/modules/accounts/`):
+      - `getAccountBalance()` — port PERSIS formula saldo dari
+        `use-accounts.ts` (`SELECT_ACCOUNTS_WITH_BALANCE`), termasuk
+        arah tanda transfer. BEDA dari query asli: filter
+        `deleted_at IS NULL` ditambah SEJAK AWAL (soft delete belum
+        dipakai di kode manapun, tapi aman krn semua baris NULL
+        sekarang — begitu Tahap 6 mulai soft-delete, formula ini
+        otomatis benar).
+      - `correctAccountBalance()` — port dari
+        `use-correct-account-balance.ts`: get-or-create kategori
+        "Penyesuaian Saldo" per type, no-op kalau diff=0. BEDA dari
+        desktop: `currentBalance` DIHITUNG ULANG di Worker (panggil
+        `getAccountBalance()` sendiri), TIDAK dipercaya dari client
+        (beda dari desktop yg terima dari cache React Query).
+      - Endpoint: `GET /accounts/balance?accountId=`, `POST
+        /accounts/correct-balance`. Pakai `uuidv7` package (SAMA
+        dgn `apps/desktop/src/lib/id.ts`) utk generate ID, TERBUKTI
+        kompatibel dgn Cloudflare Worker runtime (belum pernah
+        divalidasi sebelumnya).
+      - `sync_source` transaksi/kategori hasil endpoint ini di-hardcode
+        `'mcp'` (SEMENTARA, ada `TODO` di kode) — endpoint ini bukan
+        hasil push dari PC. Begitu token MCP terpisah dari
+        `PC_SYNC_TOKEN` dibuat, WAJIB diganti jadi derive dari jenis
+        token yg dipakai request (JANGAN percaya `sync_source` dari
+        body payload client, bisa dipalsukan).
+      - **DIVERIFIKASI end-to-end di production** dgn akun uji nyata:
+        saldo awal benar (`initial_balance` tanpa transaksi), koreksi
+        `+50000` menghasilkan transaksi `income` yg tepat + kategori
+        auto-created dgn `type` benar, saldo setelah koreksi benar,
+        panggilan ulang dgn target sama → `no_change` (bukan transaksi
+        duplikat). Data uji sudah dibersihkan.
 
 ## Todo list eksekusi
 
@@ -295,10 +333,14 @@ terpusat di satu tempat.
 - [ ] Endpoint tulis lengkap utk semua 7 tabel (baru `transactions`
       yg ada, dan itu pun cuma INSERT, belum UPDATE/DELETE).
 - [ ] Validasi/logic bisnis hasil audit diimplementasikan di Worker —
-      lihat checklist porting di
-      `mcp-server-business-logic-audit.md`. **BELUM ADA SATU PUN** yg
-      di-port — endpoint `/transactions` saat ini TIDAK memvalidasi
-      apa pun secara bisnis (auth SUDAH ada, validasi bisnis BELUM).
+      lihat checklist porting di `mcp-server-business-logic-audit.md`.
+      **PROGRESS: 2 dari 7 SELESAI** (#5 formula saldo, #6 koreksi
+      saldo — modul `accounts`, lihat "Progress implementasi"). Endpoint
+      `/transactions` (`POST`, create) MASIH TIDAK memvalidasi apa pun
+      secara bisnis — 5 logic sisanya (#1 FIFO debt, #2 guard edit,
+      #3 validasi pelunasan, #4 larangan akun debt, #7
+      `dangerousFieldsChanged`) BELUM di-port, semuanya terkait modul
+      `debts`/`transactions` yg belum disentuh.
 
 ### Tahap 5 — MCP server (Vercel) — BELUM DIMULAI
 

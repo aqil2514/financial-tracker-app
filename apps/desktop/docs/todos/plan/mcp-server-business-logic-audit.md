@@ -188,8 +188,12 @@ kehilangan uang.
 - [ ] Port `applyDebtTransactionEdit` + `DebtEditBlockedError` ke Worker.
 - [ ] Port validasi nominal pelunasan ≤ sisa piutang ke Worker.
 - [ ] Port larangan income/expense di akun `debt` ke Worker.
-- [ ] Port formula saldo akun ke Worker (untuk tool baca `get_account_balances`).
-- [ ] Port logic koreksi saldo manual ke Worker (kalau tool ini dibuka dari MCP).
+- [x] Port formula saldo akun ke Worker — `apps/worker/src/modules/accounts/service.ts`
+      (`getAccountBalance()`), endpoint `GET /accounts/balance`.
+      DIVERIFIKASI end-to-end di production.
+- [x] Port logic koreksi saldo manual ke Worker — `apps/worker/src/modules/accounts/service.ts`
+      (`correctAccountBalance()`), endpoint `POST /accounts/correct-balance`.
+      DIVERIFIKASI end-to-end di production.
 - [ ] Port `dangerousFieldsChanged` comparison ke Worker (untuk tool update transaksi).
 - [ ] Putuskan & implementasikan kebijakan reassign/unassign delete account/category/group.
 - [ ] Putuskan & implementasikan filter `category.type === transaction.type` di Worker.

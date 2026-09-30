@@ -102,6 +102,32 @@ if (url.pathname === "/transactions" && request.method === "POST") {
 }
 ```
 
+## Logic bisnis lintas-modul: modul PEMILIK vs modul PEMICU
+
+Sebagian logic (lihat checklist di
+`mcp-server-business-logic-audit.md`) DIPICU dari satu modul tapi
+mengubah tabel milik modul LAIN — contoh: transaksi `transfer` ke akun
+`debt` (dipicu dari `transactions`) yg harus otomatis membuat/mengubah
+baris di tabel `debts`.
+
+Aturan: modul yg tabelnya DIUBAH tetap jadi PEMILIK logic itu (ekspor
+fungsi dari `service.ts`-nya), modul yg MEMICU cuma memanggil fungsi
+itu — TIDAK menduplikasi logic-nya sendiri. Contoh: FIFO debt (logic
+#1) dimiliki `debts/service.ts` (mis. `createDebtFromTransfer()`,
+`settleDebtsFifo()`), dipanggil dari `transactions/service.ts` saat
+insert/update transaksi `transfer` yg menyentuh akun `debt`.
+
+Alasan: satu sumber kebenaran per logic — kalau nanti ada endpoint
+`debts` langsung (mis. tool MCP "buat piutang manual" tanpa lewat
+transaksi), dia manggil fungsi yg SAMA dari `debts/service.ts`, bukan
+menyalin ulang logic FIFO ke tempat lain.
+
+Larangan yg SEPENUHNYA milik satu modul (mis. #4 "larangan income/
+expense di akun debt", #7 `dangerousFieldsChanged`) TETAP taruh di
+`service.ts` modul itu sendiri (`transactions/service.ts`) — pola
+pemicu/pemilik di atas HANYA berlaku kalau tabel yg diubah benar-benar
+beda dari modul yg memicu.
+
 ## Routing: manual if/else, BUKAN router library
 
 Diputuskan 2026-09-30: tetap `if (url.pathname === ...)` manual di
