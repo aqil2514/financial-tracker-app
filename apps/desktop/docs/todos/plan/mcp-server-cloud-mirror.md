@@ -250,13 +250,21 @@ tetap berlaku:
       SAMA dipakai PC utk sync (supaya logic validasi/`updated_at`
       terpusat di satu tempat, tidak dobel-tulis di Vercel & Worker).
       Condong ke opsi kedua (logic terpusat) tapi belum final.
-- [ ] **Inventarisir logic bisnis yang perlu di-port ke server** — cek
-      `src/features/*` app desktop utk aturan validasi yg WAJIB
-      direplikasi di sisi server (mis. constraint saldo, alokasi FIFO
-      pelunasan utang piutang yg disebut di `apply-debt-transaction.ts`
-      dari sesi migrasi UUID kemarin, aturan kategori/akun, dst) —
-      belum dilakukan, task besar tersendiri sebelum tool tulis
-      pertama bisa dibangun dgn aman.
+- [x] ~~Inventarisir logic bisnis yang perlu di-port ke server~~ —
+      SELESAI, lihat
+      [`mcp-server-business-logic-audit.md`](./mcp-server-business-logic-audit.md)
+      utk daftar lengkap (7 logic risiko TINGGI wajib, +5 keputusan
+      desain risiko SEDANG).
+- [ ] **3 open question turunan dari audit logic bisnis** (detail di
+      dokumen audit, bagian "Perlu keputusan desain eksplisit"):
+      (a) reassign/unassign saat delete account/category/account-group
+      via MCP tool — WAJIB terima parameter target setara UI, atau
+      selalu unassign default?; (b) guard delete transaksi terhadap
+      debt/payment terkait — SAAT INI tidak ada sama sekali bahkan di
+      desktop, dibiarkan atau ditambah di kedua sisi sekalian?;
+      (c) definisi tunggal formula `remaining`/`balance` (shared
+      util/VIEW) dibuat SEBELUM porting ke Worker, atau di-port apa
+      adanya per lokasi (risiko drift diterima)?
 - [ ] Daftar tool CRUD fase pertama & urutan prioritas — draft awal py
       5 tool BACA (`get_account_balances`, dst, lihat riwayat di git
       kalau perlu dicek ulang) — perlu diperluas dgn tool TULIS, belum
@@ -293,22 +301,26 @@ tetap berlaku:
 - [x] Pemicu pull: saat app dibuka+online. Pemicu push: **on-write**
       (langsung tiap ada perubahan di PC, async, kalau online).
 
-### Tahap 2 — Inventarisir logic bisnis yang perlu direplikasi ke server
+### Tahap 2 — Inventarisir logic bisnis yang perlu direplikasi ke server — AUDIT SELESAI (2026-09-30)
 
-- [ ] Audit `src/features/*` app desktop: cari SEMUA aturan validasi/
-      logic bisnis yang berjalan di lapisan TypeScript/React sebelum
-      data sampai ke SQLite (bukan cuma constraint di skema SQL) — ini
-      HARUS direplikasi di server, karena tool MCP menulis LANGSUNG ke
-      D1, TIDAK lewat kode TypeScript app desktop sama sekali.
-- [ ] Daftar per fitur: transaksi (validasi kategori/akun cocok?),
-      debt/debt_payments (alokasi FIFO pelunasan — lihat catatan
-      `apply-debt-transaction.ts` di `uuid-migration.md`), accounts
-      (constraint saldo?), dst.
-- [ ] Putuskan: logic ini ditulis ULANG di server (duplikasi kode,
-      risiko drift antara 2 implementasi), atau diekstrak jadi shared
-      logic yang bisa dipanggil dari kedua sisi (lebih ideal, tapi
-      app desktop React+SQLite lokal vs server Node+D1 beda runtime,
-      perlu dicek seberapa mungkin benar2 dibagi).
+- [x] Audit lengkap `src/features/*` (+ `src/shared/debts`,
+      `src/shared/contacts`, `src-tauri/`) sudah dilakukan (via Agent
+      Explore) — **DIPINDAH ke dokumen terpisah**
+      [`mcp-server-business-logic-audit.md`](./mcp-server-business-logic-audit.md)
+      supaya dokumen ini tidak terlalu panjang. Ringkasan temuan: skema
+      SQL HAMPIR TIDAK PUNYA business rule finansial (cuma `CHECK` enum
+      + `UNIQUE` idempotency), jadi 7 logic risiko TINGGI (FIFO debt,
+      guard edit, validasi pelunasan, larangan income/expense di akun
+      debt, formula saldo, koreksi saldo, `dangerousFieldsChanged`)
+      WAJIB direplikasi di server sebelum tool tulis MCP aktif — plus
+      5 area keputusan desain risiko SEDANG. Baca dokumen itu utk detail
+      lengkap + checklist porting per fungsi.
+- [x] Putuskan: logic DITULIS ULANG di server (bukan diekstrak jadi
+      shared logic) — app desktop React+SQLite lokal vs server
+      Node/Worker+D1 beda runtime total, tidak realistis dibagi kode
+      langsung. Port manual per fungsi, jaga tetap sinkron manual saat
+      ada perubahan (risiko drift diterima, sama seperti trade-off LWW
+      vs log — konsisten dgn preferensi "jangan over-engineer").
 
 ### Tahap 3 — Skema: siapkan kolom pendukung sync dua-arah
 
@@ -382,6 +394,10 @@ tetap berlaku:
 
 ## Terkait
 
+- `docs/todos/plan/mcp-server-business-logic-audit.md` — hasil audit
+  LENGKAP Tahap 2 (logic bisnis yang wajib/perlu direplikasi ke
+  server), dipecah dari dokumen ini supaya tetap ringkas. Baca dokumen
+  itu SEBELUM mulai Tahap 4/5 (implementasi Worker/MCP tool tulis).
 - `docs/todos/plan/mcp-server-for-claude.md` — riset paling awal,
   opsi hosting/autentikasi/tooling dasar (masih berlaku, lihat "Riset
   autentikasi & hosting" di atas).

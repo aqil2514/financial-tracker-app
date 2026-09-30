@@ -8,6 +8,8 @@
     "dev:desktop": "npm run tauri dev --workspace=desktop",
     "build:desktop": "npm run tauri build --workspace=desktop",
     "dev:mobile": "npm run start --workspace=mobile",
+    "dev:worker": "npm run dev --workspace=worker",
+    "deploy:worker": "npm run deploy --workspace=worker",
     "test:desktop": "npm run test --workspace=desktop",
     "test:desktop:watch": "npm run test:watch --workspace=desktop",
     "import:money-manager": "npm run import:money-manager --prefix internal",
