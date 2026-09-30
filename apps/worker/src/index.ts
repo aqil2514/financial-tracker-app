@@ -7,7 +7,10 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/health") {
-      return Response.json({ status: "ok" });
+      const { results } = await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table'"
+      ).all<{ name: string }>();
+      return Response.json({ status: "ok", tables: results.map((row) => row.name) });
     }
 
     return new Response("Not found", { status: 404 });
