@@ -1,156 +1,72 @@
-# MCP Server — Sync Dua-Arah PC ↔ Cloud + CRUD via Claude
+# Cloud Sync (Sisi PC) — Kelola Data Keuangan dari HP via Claude
 
-> **Perubahan besar (2026-09-30, sesi sama)**: dokumen ini AWALNYA
-> dirancang sbg "cloud mirror satu-arah, MCP read-only" (judul lama:
-> "Cloud Mirror Satu-Arah"). Setelah dibahas ulang, kebutuhan
-> sebenarnya adalah **CRUD PENUH lewat HP/Claude Web, setara dengan
-> yang bisa dilakukan di PC** — bukan cuma tanya saldo, tapi tambah/
-> edit/hapus transaksi dkk dari HP SEBELUM aplikasi mobile native ada.
-> Ini mengubah premis dasar: D1 sekarang py **DUA sumber tulis** (PC
-> dan MCP tool atas nama HP), bukan satu. Seluruh dokumen ditulis
-> ulang utk mencerminkan ini — draft lama (read-only, snapshot penuh
-> tanpa conflict resolution) SUDAH TIDAK BERLAKU.
+> **Dokumen ini DIPECAH (2026-09-30)** — sebelumnya berisi SEMUA
+> keputusan lintas-app (desktop+worker+mcp-server) sekaligus, padahal
+> isinya banyak yang bukan tanggung jawab `apps/desktop`. Sekarang:
+> keputusan desain umum, skema D1, endpoint Worker, autentikasi
+> PC↔Worker, dan progress implementasi Worker ada di
+> [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../../worker/docs/todos/plan/cloud-sync.md).
+> Dokumen INI cuma berisi yang jadi tanggung jawab PC: migrasi lokal,
+> titik integrasi UI Settings, dan Tahap 6 (integrasi klien). Lihat
+> [`docs/todos/plan/cloud-sync-mcp.md`](../../../../../docs/todos/plan/cloud-sync-mcp.md) di root repo utk
+> index navigasi lintas-app.
 
 ## Latar belakang
 
-Lanjutan dari `mcp-server-for-claude.md` (riset awal MCP server utk
-Claude Web) dan `uuid-migration.md` (prasyarat teknis, SELESAI).
 Kebutuhan intinya: aplikasi mobile native (`apps/mobile`) belum
 dibangun sama sekali (masih skeleton Expo kosong), TAPI ingin sudah
 bisa mengelola data keuangan dari HP SEKARANG — jawabannya lewat
 Claude Web + MCP server yang tool-nya setara operasi CRUD di app
 desktop, bukan menunggu app mobile jadi.
 
-**Kenapa dokumen ini TETAP terpisah dari `multi-device-sync-engine.md`**
-meski sama-sama akhirnya butuh conflict resolution: dokumen itu
-dirancang utk kasus desktop ↔ MOBILE APP NATIF saling sync (2 aplikasi
-penuh, offline-first di kedua sisi, device fisik berbeda yang bisa
-lama sekali tidak online). Dokumen INI kasusnya lebih sempit: PC ↔ D1,
-dengan sisi kedua BUKAN aplikasi mandiri tapi **tool MCP yang dipanggil
-Claude Web** — selalu online saat dipakai (tidak ada "HP offline
-seharian"), tidak py SQLite lokal sendiri (Claude langsung baca/tulis
-ke D1 tiap tool call, tidak ada local-first di sisi ini). Lebih simpel
-dari kasus mobile-native, tapi TIDAK SESIMPEL "satu penulis" spt draft
-awal dokumen ini.
+Lanjutan dari `mcp-server-for-claude.md` (riset awal MCP server) dan
+`uuid-migration.md` (prasyarat teknis, SELESAI). PC (`finance.dev.db`)
+TETAP 100% bisa dipakai offline-first — constraint ini tidak berubah.
+Yang baru: PC WAJIB pull dari D1 sebelum push (bukan snapshot buta),
+karena D1 sekarang punya 2 sumber tulis (PC dan tool MCP). Detail
+lengkap kenapa & keputusan conflict resolution (LWW dst) ada di
+dokumen `apps/worker` yang ditautkan di atas.
 
-`multi-device-sync-engine.md` TETAP disimpan apa adanya utk nanti kalau
-`apps/mobile` sungguhan mulai dibangun (kasus offline-first beneran di
-2 device fisik) — TIDAK digabung ke sini, TIDAK dihapus.
+## Migrasi skema PC — Tahap 3 (bagian PC)
 
-## Konteks penting: kenapa ini BUKAN "satu penulis" lagi
+- [x] Audit tabel: TIDAK ADA satu tabel pun yang sudah punya
+      `updated_at` sebelumnya — semua cuma punya `created_at` (diisi
+      sekali saat INSERT). 7 tabel data user relevan disinkron:
+      `transactions`, `accounts`, `account_groups`, `categories`,
+      `contacts`, `debts`, `debt_payments`. TIDAK relevan: `settings`
+      (config lokal per-device), `transaction_attachments` (file
+      lokal, di luar D1).
+- [x] Migrasi: `src-tauri/migrations/0028_cloud_sync_columns.sql` (+
+      didaftarkan di `src-tauri/src/migrations.rs` versi 28) — nambah
+      `updated_at`, `deleted_at`, `sync_source` (BUKAN `source` —
+      bentrok dgn kolom `source` BISNIS yg sudah ada di
+      `transactions`/`debts`, maknanya beda sama sekali: asal data
+      `'manual'`/`'retailku_sync'` vs asal penulis sync `'pc'`/`'mcp'`).
+      `updated_at` di-backfill dari `created_at` utk baris lama,
+      auto-refresh via trigger `AFTER UPDATE` per tabel (bukan diisi
+      manual di kode TS — supaya tidak ada titik lupa isi). **DIVERIFIKASI
+      jalan di `finance.dev.db` nyata** (bukan cuma database uji) —
+      migrasi tercatat sukses di `_sqlx_migrations`, 0 baris NULL di
+      `updated_at` di ketujuh tabel, trigger terbukti bekerja (diuji
+      lewat copy WAL+SHM ke scratchpad, lihat
+      `docs/rules/checking-dev-database.md` utk prosedurnya).
+- [ ] Checkpoint sync terakhir disimpan di PC (tabel `settings`) —
+      BELUM dikerjakan, menyusul di Tahap 6 di bawah.
 
-Draft awal dokumen ini berasumsi PC = satu-satunya sumber tulis, D1 =
-mirror baca-saja. Begitu tool MCP boleh CRUD (bukan cuma baca), asumsi
-itu runtuh:
-- PC bisa menulis (seperti biasa, lokal dulu, lalu push/pull ke D1).
-- MCP tool (dipanggil Claude atas permintaan user dari HP) bisa
-  menulis LANGSUNG ke D1, TANPA lewat PC sama sekali.
-- Kalau PC push snapshot penuh begitu saja (rencana awal), itu akan
-  MENIMPA perubahan yang baru dibuat dari HP — regresi data.
+**Catatan penting utk migrasi Tauri**: menulis file `.sql` baru di
+`src-tauri/migrations/` TIDAK CUKUP — wajib juga didaftarkan manual di
+`src-tauri/src/migrations.rs` (`include_str!` per file, bukan
+auto-scan folder). Lupa mendaftarkan berarti migrasi TIDAK PERNAH
+jalan, berapa kali pun `tauri dev` di-restart.
 
-**Konsekuensi desain**: perlu conflict resolution beneran, mirip
-(bukan sama persis) dgn yang sudah diputuskan di
-`multi-device-sync-engine.md`.
-
-## Keputusan desain final
-
-- **Strategi conflict resolution: last-write-wins sederhana via
-  `updated_at`** (dipilih 2026-09-30, SETELAH mempertimbangkan &
-  MENOLAK alternatif tabel log/event-sourcing terpusat). Alasan
-  penolakan log terpusat: menang di "tidak pernah kehilangan data
-  diam-diam", TAPI kalah jauh di effort jangka panjang (semua fitur
-  baru ke depan wajib juga menulis ke log, permanent tax) dan storage
-  (log tumbuh tak terbatas, butuh snapshotting supaya replay tetap
-  cepat). Untuk skala personal ini (bukan sistem finansial
-  multi-pihak kritikal), trade-off "bisa kehilangan perubahan yang
-  kalah, kasus jarang" diterima — konsisten dgn keputusan LWW yang
-  sama di `multi-device-sync-engine.md`. Log audit BISA ditambah nanti
-  sbg fitur terpisah (mis. utk fitur "riwayat aktivitas" di app) kalau
-  memang dibutuhkan — TIDAK digabung ke mekanisme sync/resolusi konflik.
-- **PC WAJIB pull dari D1 SEBELUM push** (bukan snapshot buta spt draft
-  awal) — supaya perubahan yg dibuat lewat MCP/HP sejak sync terakhir
-  tidak hilang tertimpa. Alur per baris saat pull: bandingkan
-  `updated_at` D1 vs lokal, yang lebih baru menang, terapkan ke lokal.
-  Alur push: kirim baris lokal yg `updated_at`-nya lebih baru dari
-  checkpoint sync terakhir (BUKAN snapshot penuh lagi — snapshot penuh
-  cuma valid kalau satu arah, sekarang dua arah butuh gerakan lebih
-  presisi per baris).
-- **Pemicu pull: saat app dibuka + online** (tetap sama spt draft awal).
-  **Pemicu push: ON-WRITE** (dipilih 2026-09-30, BERBEDA dari pull) —
-  begitu user tambah/edit/hapus data di PC, langsung push baris itu ke
-  D1 saat itu juga (async, tidak blocking UI), kalau online. Kalau
-  offline, masuk antrian lokal, dikirim saat online lagi (mis. saat
-  pull berikutnya berjalan, atau begitu koneksi kembali). Alasan beda
-  dari pull: window "PC punya data baru yg belum sampai ke D1" perlu
-  sekecil mungkin (detik-menit, bukan jam) krn D1 sekarang bisa berubah
-  dari HP KAPAN SAJA — push lambat (mis. cuma saat app dibuka/ditutup)
-  memperbesar peluang bentrok nyata dgn perubahan dari HP di antara itu.
-- **Soft delete relevan lagi** (`deleted_at`) — sama alasannya dgn
-  `multi-device-sync-engine.md`: hard delete di satu sisi (PC hapus
-  transaksi) sementara sisi lain (MCP) sempat UPDATE baris yg sama
-  sebelum tahu terhapus → ambigu. Soft delete tetap bisa dibandingkan
-  by timestamp.
-- **`device_id`/`source` per baris — disertakan**, tapi bentuknya beda
-  dari `multi-device-sync-engine.md` (bukan UUID per install device
-  fisik, cukup enum sederhana: `"pc"` vs `"mcp"`) — berguna utk audit
-  ringan ("perubahan ini dari HP atau dari PC") tanpa kompleksitas
-  identitas device penuh (krn cuma ada 2 "sumber", bukan N device fisik
-  yg tak diketahui jumlahnya).
-- **Tool MCP CRUD setara operasi PC** — bukan cuma 5 tool baca dari
-  draft awal, tapi tool tulis yg logic-nya SEPADAN dgn validasi yg
-  sudah ada di app desktop (mis. kalau ada aturan "saldo tidak boleh
-  minus" atau logic alokasi FIFO pelunasan utang piutang di app
-  desktop, tool tulis MCP WAJIB menghormati aturan yg sama, bukan raw
-  INSERT/UPDATE tanpa validasi). Ini brarti sebagian LOGIC BISNIS dari
-  `src/features/*` app desktop perlu di-port/direplikasi ke sisi
-  server (Cloudflare Worker atau Vercel function) — bukan trivial,
-  perlu diinventarisir Tahap berikutnya.
-- **Tetap Cloudflare D1** (bukan Turso) — alasan sama dgn
-  `multi-device-sync-engine.md` (Turso wajib ganti driver DB, LWW tdk
-  built-in; D1 = SQLite juga, skema tdk perlu diterjemahkan).
-- **Tetap Vercel Hobby + `mcp-handler`** utk hosting MCP server, TETAP
-  OAuth shim di atas API key statis utk autentikasi (pola dicontoh dari
-  implementasi live MCP Retailku — lihat "Riset autentikasi" di bawah,
-  BAGIAN INI TIDAK BERUBAH dari draft awal).
-
-## Alur yang dibangun
-
-```
-                    ┌─────────────────────────────┐
-                    │  Cloudflare D1 (sumber       │
-                    │  kebenaran BERSAMA, dua      │
-                    │  sisi baca+tulis)            │
-                    └──────────────┬───────────────┘
-                     pull-lalu-push │  baca+tulis langsung
-                    (saat app buka  │  (tiap tool call MCP,
-                     +online)       │  real-time)
-           ┌────────────────────────┴────────────────────────┐
-           │                                                  │
-┌──────────▼──────────┐                          ┌────────────▼────────────┐
-│ SQLite lokal PC      │                          │ MCP server (Vercel)     │
-│ (finance.db)         │                          │ tool CRUD, panggil D1   │
-│ TETAP offline-first, │                          │ langsung tiap request   │
-│ sync ke D1 opsional  │                          │ dari Claude Web (HP)    │
-└──────────────────────┘                          └─────────────┬───────────┘
-                                                                  │
-                                                        ┌─────────▼─────────┐
-                                                        │ Claude Web (HP)    │
-                                                        └────────────────────┘
-```
-
-PC tetap 100% bisa dipakai offline (constraint tak berubah). Bedanya
-dari draft awal: PC sekarang WAJIB *pull* sebelum *push* setiap kali
-sync, dan D1 bukan lagi "mirror pasif" tapi sumber kebenaran bersama
-yang bisa berubah dari 2 arah.
-
-## Titik integrasi UI (desktop) — cara user menyalakan/mematikan fitur ini
+## Titik integrasi UI (Settings) — cara user menyalakan/mematikan fitur ini
 
 Dicek pola yang SUDAH ADA di `src/features/settings/` supaya konsisten
 — kasus paling mirip adalah `content/retailku-integration/` (sync
 opsional ke layanan luar, dikonfigurasi dari Settings). Meski arah
 Retailku terbalik (app ini jadi MCP CLIENT ke Retailku, sedangkan fitur
-ini app jadi MCP SERVER), pola UI/penyimpanannya tetap bisa dicontoh
-langsung:
+ini app jadi sumber data utk MCP SERVER terpisah), pola UI/penyimpanannya
+tetap bisa dicontoh langsung:
 
 - **Section baru di halaman Settings**: `content/cloud-sync/` (folder
   baru), mengikuti struktur `attachment-folder/` — `cloud-sync-section.tsx`
@@ -163,18 +79,19 @@ langsung:
   dibungkus `Controller` react-hook-form, help text kondisional saat
   aktif). BUKAN cuma "isi API key = otomatis aktif" seperti Retailku
   (yang toggle-nya implisit dari kelengkapan field) — di sini toggle
-  EKSPLISIT lebih tepat karena on-write push (lihat "Pemicu push") akan
-  langsung mulai mengirim data ke internet begitu diaktifkan; user perlu
-  kontrol jelas kapan itu boleh mulai terjadi, bukan cuma "kebetulan
-  kredensial sudah lengkap".
+  EKSPLISIT lebih tepat karena on-write push akan langsung mulai
+  mengirim data ke internet begitu diaktifkan; user perlu kontrol
+  jelas kapan itu boleh mulai terjadi, bukan cuma "kebetulan kredensial
+  sudah lengkap".
 - **Penyimpanan konfigurasi**: tabel `settings` key-value yang SUDAH
   ADA (`src-tauri/migrations/0001_initial.sql`), TIDAK perlu tabel/
   migrasi baru untuk config. Key baru yang dibutuhkan:
   - `cloud_sync_enabled` (`"1"`/`"0"`) — status toggle.
-  - `cloud_sync_worker_url` — URL endpoint Cloudflare Worker.
-  - `cloud_sync_token` — token PC↔Worker (lihat "Autentikasi PC↔Worker").
+  - `cloud_sync_worker_url` — URL endpoint Worker (`apps/worker`).
+  - `cloud_sync_token` — token PC↔Worker (lihat "Autentikasi PC↔Worker"
+    di dokumen `apps/worker`, BELUM ada bentuknya).
   - `cloud_sync_last_checkpoint` — timestamp sync terakhir (utk pull
-    incremental, lihat Tahap 3).
+    incremental).
   Dibaca/ditulis dgn pola PERSIS sama seperti
   `use-retailku-settings.ts`/`use-attachment-folder.ts`: `useQuery` +
   `useDbMutation` (wrapper generik yg sudah ada di
@@ -183,7 +100,7 @@ langsung:
   (2026-09-30, konsisten dgn `retailku_api_key`), BUKAN OS keychain/
   Stronghold. Alasan SAMA dgn yg sudah dicatat utk Retailku: aplikasi
   desktop single-user, database tidak pernah meninggalkan mesin kecuali
-  saat memanggil layanan (di sini: Cloudflare Worker) itu sendiri —
+  saat memanggil layanan (di sini: Worker) itu sendiri —
   DIPERTIMBANGKAN ULANG scr eksplisit (bukan asumsi ikut2an) krn token
   ini scope-nya LEBIH BESAR dari token Retailku (buka akses TULIS ke
   SELURUH data keuangan, bukan cuma baca data toko sendiri), tapi tetap
@@ -199,12 +116,12 @@ langsung:
 - **Apa yang terjadi saat toggle di-ON-kan**: (a) generate/tampilkan
   cara dapat `cloud_sync_worker_url`+`cloud_sync_token` (kemungkinan:
   di-generate manual sekali oleh developer/user sendiri saat setup
-  Cloudflare Worker pertama kali, ditempel di form — MIRIP alur
-  Retailku "salin dari halaman API Keys mereka", tapi di sini "salin
-  dari hasil `wrangler` setup sendiri"), (b) begitu toggle ON dan
-  kredensial lengkap, PC mulai (i) pull sekali saat itu juga, (ii) pasang
-  hook push on-write utk semua operasi tulis berikutnya. Toggle OFF
-  = hentikan hook push, TIDAK menghapus data yg sudah ter-sync di D1
+  Worker pertama kali, ditempel di form — MIRIP alur Retailku "salin
+  dari halaman API Keys mereka", tapi di sini "salin dari hasil
+  `wrangler` setup sendiri"), (b) begitu toggle ON dan kredensial
+  lengkap, PC mulai (i) pull sekali saat itu juga, (ii) pasang hook
+  push on-write utk semua operasi tulis berikutnya. Toggle OFF =
+  hentikan hook push, TIDAK menghapus data yg sudah ter-sync di D1
   (D1 tetap ada, MCP server tetap bisa dipakai dari HP walau PC lagi
   "mode offline dari sync" — cuma PC berhenti kirim/terima perubahan
   sampai di-ON-kan lagi).
@@ -213,185 +130,7 @@ langsung:
   manual bahwa Worker bisa dihubungi dgn token yg dimasukkan, TANPA
   menulis apa pun, sebelum toggle benar2 diaktifkan.
 
-## Riset autentikasi & hosting (hasil, TIDAK BERUBAH dari draft awal)
-
-Bagian ini sudah diriset & diputuskan sebelum perubahan besar di atas,
-tetap berlaku:
-
-- **Hosting: Vercel Hobby**, package **`mcp-handler`** (Next.js App
-  Router) — isolasi penuh dari server bisnis Retailku, Rp0 utk skala
-  personal.
-- **Autentikasi: OAuth shim di atas API key statis** — diverifikasi
-  dari implementasi LIVE MCP Retailku (`Warung Aqil`) di
-  `D:\Programming\Pribadi\retail-multitenant\apps\api\src\app\mcp\`.
-  Claude Web mewajibkan alur discovery OAuth
-  (`.well-known/oauth-protected-resource`, `/register`,
-  `/oauth/authorize`, `/oauth/token`), tapi di baliknya cukup satu form
-  HTML "masukkan API key" — `access_token` yg dikembalikan ya API key
-  itu sendiri (di-hash utk validasi), `expires_in` di-set sangat
-  panjang. Utk `financial-app`, LEBIH SEDERHANA drpd Retailku krn
-  single-user: satu token env var, tanpa tabel database.
-- **Akses D1 baca dari Vercel: langsung via REST API**
-  (`POST https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{database_id}/query`,
-  `Authorization: Bearer <CLOUDFLARE_API_TOKEN>`), rate limit 1200
-  req/5menit per akun — jauh cukup utk skala personal, TIDAK perlu
-  Worker perantara utk baca.
-- **Akses D1 tulis**: TETAP lewat Cloudflare Worker (native binding,
-  bukan REST API) — TAPI sekarang Worker ini dipanggil dari 2 arah:
-  dari PC (sync push) DAN berpotensi dari Vercel MCP tool (kalau tool
-  tulis MCP tidak langsung akses D1 REST API, tapi lewat Worker jg utk
-  konsistensi logic validasi — lihat "Yang belum diputuskan").
-
-## Yang BELUM diputuskan
-
-- [ ] **Arsitektur tool tulis MCP**: apakah Vercel MCP function akses
-      D1 langsung (REST API, tulis manual dgn `updated_at`+validasi di
-      kode Vercel), ATAU tool tulis MCP memanggil Cloudflare Worker yg
-      SAMA dipakai PC utk sync (supaya logic validasi/`updated_at`
-      terpusat di satu tempat, tidak dobel-tulis di Vercel & Worker).
-      Condong ke opsi kedua (logic terpusat) tapi belum final.
-- [x] ~~Inventarisir logic bisnis yang perlu di-port ke server~~ —
-      SELESAI, lihat
-      [`mcp-server-business-logic-audit.md`](./mcp-server-business-logic-audit.md)
-      utk daftar lengkap (7 logic risiko TINGGI wajib, +5 keputusan
-      desain risiko SEDANG).
-- [ ] **3 open question turunan dari audit logic bisnis** (detail di
-      dokumen audit, bagian "Perlu keputusan desain eksplisit"):
-      (a) reassign/unassign saat delete account/category/account-group
-      via MCP tool — WAJIB terima parameter target setara UI, atau
-      selalu unassign default?; (b) guard delete transaksi terhadap
-      debt/payment terkait — SAAT INI tidak ada sama sekali bahkan di
-      desktop, dibiarkan atau ditambah di kedua sisi sekalian?;
-      (c) definisi tunggal formula `remaining`/`balance` (shared
-      util/VIEW) dibuat SEBELUM porting ke Worker, atau di-port apa
-      adanya per lokasi (risiko drift diterima)?
-- [ ] Daftar tool CRUD fase pertama & urutan prioritas — draft awal py
-      5 tool BACA (`get_account_balances`, dst, lihat riwayat di git
-      kalau perlu dicek ulang) — perlu diperluas dgn tool TULIS, belum
-      diputuskan mana yg paling mendesak (tambah transaksi dulu? edit
-      saldo? dst).
-- [x] ~~Skema kolom sync (`updated_at`, `deleted_at`, `source`) — reuse
-      persis atau terpisah dari `multi-device-sync-engine.md`?~~ —
-      DIPUTUSKAN 2026-09-30: **SEBAGIAN reuse, bukan reuse persis, bukan
-      terpisah total**.
-      - `updated_at` & `deleted_at` — **identik** (nama kolom, tipe,
-        semantik LWW) dgn `multi-device-sync-engine.md`. Alasan: kedua
-        kolom ini ADALAH mekanisme LWW itu sendiri — kalau nanti mobile
-        native jadi dan menulis ke tabel D1 yg SAMA dgn yg dipakai MCP
-        (skenario realistis: PC + HP native + MCP semua nulis ke
-        `transactions`), format `updated_at` yg beda antar rencana akan
-        merusak perbandingan LWW lintas sumber. Jadi kolom LWW WAJIB
-        konsisten lintas rencana sync manapun.
-      - Kolom identitas sumber — **TETAP beda**: `source` (enum
-        `"pc"`/`"mcp"`) di sini, BUKAN `device_id` (UUID per install)
-        spt `multi-device-sync-engine.md`. Alasan: `device_id` didesain
-        utk N device fisik yg tak diketahui jumlahnya, digenerate &
-        disimpan SEKALI per install — tidak masuk akal utk tool MCP yg
-        dipanggil ulang tiap request dari Claude (bukan "device" yg
-        install sekali). Kasus ini cuma py 2 kemungkinan penulis
-        selamanya (PC atau tool MCP), enum 2 nilai sudah cukup;
-        memaksakan `device_id` UUID di sini jadi over-engineering
-        kosong. Ini MENEGASKAN (bukan mengubah) keputusan `source` yg
-        sudah ada di "Keputusan desain final" di atas.
-- [ ] Nama/struktur endpoint Worker (`/sync` masih working name).
-- [ ] DI MANA token OAuth-shim/API key disimpan & di-generate.
-
-## Todo list eksekusi
-
-### Tahap 0 — Riset arsitektur dasar (autentikasi, hosting, akses D1) — SELESAI
-
-- [x] Hosting: Vercel Hobby + `mcp-handler`.
-- [x] Autentikasi: OAuth shim di atas API key statis (pola dari MCP
-      Retailku live).
-- [x] Akses D1 baca: langsung REST API dari Vercel.
-- [x] Akses D1 tulis: Cloudflare Worker, native binding.
-
-### Tahap 1 — Keputusan conflict resolution — SELESAI
-
-- [x] Strategi: last-write-wins sederhana via `updated_at` (menolak
-      tabel log terpusat/event-sourcing setelah pertimbangan
-      effort-vs-jaminan).
-- [x] Soft delete (`deleted_at`) relevan lagi, dipakai.
-- [x] `source`/`device_id` sederhana (`"pc"` vs `"mcp"`), bukan UUID
-      device penuh.
-- [x] Pemicu pull: saat app dibuka+online. Pemicu push: **on-write**
-      (langsung tiap ada perubahan di PC, async, kalau online).
-
-### Tahap 2 — Inventarisir logic bisnis yang perlu direplikasi ke server — AUDIT SELESAI (2026-09-30)
-
-- [x] Audit lengkap `src/features/*` (+ `src/shared/debts`,
-      `src/shared/contacts`, `src-tauri/`) sudah dilakukan (via Agent
-      Explore) — **DIPINDAH ke dokumen terpisah**
-      [`mcp-server-business-logic-audit.md`](./mcp-server-business-logic-audit.md)
-      supaya dokumen ini tidak terlalu panjang. Ringkasan temuan: skema
-      SQL HAMPIR TIDAK PUNYA business rule finansial (cuma `CHECK` enum
-      + `UNIQUE` idempotency), jadi 7 logic risiko TINGGI (FIFO debt,
-      guard edit, validasi pelunasan, larangan income/expense di akun
-      debt, formula saldo, koreksi saldo, `dangerousFieldsChanged`)
-      WAJIB direplikasi di server sebelum tool tulis MCP aktif — plus
-      5 area keputusan desain risiko SEDANG. Baca dokumen itu utk detail
-      lengkap + checklist porting per fungsi.
-- [x] Putuskan: logic DITULIS ULANG di server (bukan diekstrak jadi
-      shared logic) — app desktop React+SQLite lokal vs server
-      Node/Worker+D1 beda runtime total, tidak realistis dibagi kode
-      langsung. Port manual per fungsi, jaga tetap sinkron manual saat
-      ada perubahan (risiko drift diterima, sama seperti trade-off LWW
-      vs log — konsisten dgn preferensi "jangan over-engineer").
-
-### Tahap 3 — Skema: siapkan kolom pendukung sync dua-arah
-
-- [x] Audit tabel: TIDAK ADA satu tabel pun yang sudah punya `updated_at`
-      sebelumnya — semua cuma punya `created_at` (diisi sekali saat
-      INSERT). 7 tabel data user relevan disinkron: `transactions`,
-      `accounts`, `account_groups`, `categories`, `contacts`, `debts`,
-      `debt_payments`. TIDAK relevan: `settings` (config lokal
-      per-device), `transaction_attachments` (file lokal, di luar D1).
-- [x] Migrasi PC: `apps/desktop/src-tauri/migrations/
-      0028_cloud_sync_columns.sql` (+ didaftarkan di `migrations.rs`
-      versi 28) — nambah `updated_at`, `deleted_at`, `sync_source` (BUKAN
-      `source`, lihat catatan penamaan di file migrasi & di
-      "Yang belum diputuskan" sebelumnya — bentrok dgn kolom `source`
-      bisnis yg sudah ada di `transactions`/`debts`). `updated_at`
-      di-backfill dari `created_at` utk baris lama, auto-refresh via
-      trigger `AFTER UPDATE` per tabel (bukan diisi manual di kode TS).
-      **DIVERIFIKASI jalan di `finance.dev.db` nyata** (bukan cuma
-      database uji) — migrasi tercatat sukses, 0 baris NULL di
-      `updated_at` di ketujuh tabel, trigger terbukti bekerja.
-- [x] Skema D1: `apps/worker/schema/0001_initial.sql` — replika 7 tabel
-      + kolom sync yang sama (persis kolomnya, TANPA histori migrasi
-      bertahap spt PC — D1 mulai dari 1 file bersih krn memang kosong
-      dari awal). BEDA sengaja dari PC: TIDAK ada trigger auto-`updated_at`
-      di D1 (Worker akan SELALU mengisi `updated_at` eksplisit di tiap
-      tulis, bukan auto-generate DB — supaya logic LWW dikontrol presisi
-      oleh Worker). **DIVERIFIKASI ter-apply ke D1 remote asli** (dijalankan
-      user sendiri via `wrangler d1 execute financial-app --file=schema/0001_initial.sql --remote`,
-      dicek lewat D1 Studio Cloudflare + CLI: ketujuh tabel ada).
-- [ ] Checkpoint sync terakhir disimpan di PC (tabel/`settings`) — BELUM
-      dikerjakan, menyusul saat Tahap 6 (integrasi klien PC) mulai.
-
-### Tahap 4 — Cloudflare: Worker + D1
-
-- [ ] Provisioning 1 database D1.
-- [ ] Worker dgn endpoint sync (pull: kirim baris D1 sejak checkpoint
-      device; push: terima baris dari PC, UPSERT dgn LWW per baris)
-      DAN endpoint tulis utk tool MCP (kalau opsi "logic terpusat di
-      Worker" yang dipilih di Tahap 0 lanjutan).
-- [ ] Validasi/logic bisnis hasil Tahap 2 diimplementasikan di Worker.
-- [ ] Autentikasi PC↔Worker (token terpisah dari OAuth-shim MCP).
-
-### Tahap 5 — MCP server (Vercel)
-
-- [ ] Setup Next.js App Router + `mcp-handler`.
-- [ ] OAuth shim (port dari `mcp-oauth.controller.ts`/`mcp-auth.guard.ts`
-      milik Retailku, disederhanakan single-user).
-- [ ] Tool BACA (5 tool draft awal: saldo akun, ringkasan pengeluaran
-      per kategori, list transaksi, ringkasan utang piutang, riwayat
-      per kontak).
-- [ ] Tool TULIS (daftar final, lihat "Yang belum diputuskan") — tiap
-      tool memanggil Worker (bukan langsung D1) supaya validasi Tahap 2
-      konsisten dipakai.
-
-### Tahap 6 — Integrasi klien PC (Rust/Tauri)
+## Todo list eksekusi (Tahap 6 — Integrasi klien PC)
 
 - [ ] Section baru `content/cloud-sync/` di `features/settings/` —
       toggle `<Switch>` + field URL Worker + token, pola dicontoh dari
@@ -415,7 +154,12 @@ tetap berlaku:
 - [ ] Toggle OFF = hentikan hook push/pull, TIDAK menghapus data yang
       sudah ter-sync di D1 (D1 & MCP server tetap jalan independen).
 
-### Tahap 7 — Verifikasi
+**Prasyarat sebelum Tahap 6 bisa mulai**: endpoint Worker WAJIB sudah
+punya autentikasi PC↔Worker (belum ada — lihat dokumen `apps/worker`)
+supaya PC tidak push data lewat endpoint yang masih terbuka tanpa
+proteksi.
+
+## Verifikasi (sisi PC)
 
 - [ ] Uji skenario inti: tambah transaksi dari HP (via Claude/MCP)
       SAAT PC mati → nyalakan PC → pastikan transaksi itu muncul
@@ -423,9 +167,6 @@ tetap berlaku:
 - [ ] Uji skenario konflik: edit baris sama dari PC (offline dari
       internet, misal) dan dari HP hampir bersamaan → pastikan
       `updated_at` lebih baru yang menang, bukan silent corruption.
-- [ ] Uji validasi bisnis dari sisi MCP: coba operasi yg SEHARUSNYA
-      ditolak (mis. aturan yg berlaku di app desktop) lewat tool MCP,
-      pastikan server MENOLAK juga, bukan cuma divalidasi di client.
 - [ ] Uji constraint "PC tetap 100% offline-first" tidak regresi.
 - [ ] Uji soft delete: hapus dari satu sisi, sisi lain sempat edit
       sebelum tahu — pastikan resolve masuk akal (bukan crash/data
@@ -433,21 +174,24 @@ tetap berlaku:
 
 ## Terkait
 
-- `docs/todos/plan/mcp-server-business-logic-audit.md` — hasil audit
-  LENGKAP Tahap 2 (logic bisnis yang wajib/perlu direplikasi ke
-  server), dipecah dari dokumen ini supaya tetap ringkas. Baca dokumen
-  itu SEBELUM mulai Tahap 4/5 (implementasi Worker/MCP tool tulis).
-- `docs/todos/plan/mcp-server-for-claude.md` — riset paling awal,
-  opsi hosting/autentikasi/tooling dasar (masih berlaku, lihat "Riset
-  autentikasi & hosting" di atas).
-- `docs/todos/plan/multi-device-sync-engine.md` — DISIMPAN utk nanti,
-  kasus BERBEDA (mobile app nativ sungguhan, bukan tool MCP) — TAPI
-  keputusan LWW/soft-delete di sana jadi RUJUKAN LANGSUNG utk dokumen
-  ini krn kasusnya mirip (dua sumber tulis, butuh conflict resolution).
-- `docs/todos/done/uuid-migration.md` — prasyarat, SUDAH SELESAI. Catat
-  jg: `apply-debt-transaction.ts` (logic alokasi FIFO pelunasan utang
-  piutang) disebut eksplisit di situ sbg salah satu titik yg PALING
-  perlu hati-hati direplikasi ke server (Tahap 2 di atas).
-- `D:\Programming\Pribadi\retail-multitenant\apps\api\src\app\mcp\` —
-  implementasi LIVE rujukan pola OAuth shim (`mcp-oauth.controller.ts`,
-  `mcp-auth.guard.ts`, `mcp.module.ts`, `mcp.controller.ts`).
+- [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../../worker/docs/todos/plan/cloud-sync.md)
+  — dokumen UTAMA: keputusan desain lengkap (LWW, soft delete,
+  `sync_source`), skema D1, endpoint Worker, autentikasi, roadmap
+  Tahap 0/1/4/5/7, progress implementasi terkini.
+- [`mcp-server-business-logic-audit.md`](./mcp-server-business-logic-audit.md)
+  — hasil audit LENGKAP logic bisnis `apps/desktop` yang wajib
+  direplikasi ke Worker sebelum tool tulis MCP aktif. TETAP di sini
+  (bukan pindah ke `apps/worker`) krn isinya murni audit kode desktop
+  (file:baris spesifik), meski dipakai sbg checklist porting Worker.
+- [`docs/todos/plan/cloud-sync-mcp.md`](../../../../../docs/todos/plan/cloud-sync-mcp.md) — index navigasi
+  lintas-app di root repo.
+- `mcp-server-for-claude.md` — riset paling awal, opsi hosting/
+  autentikasi/tooling dasar (masih berlaku, lihat "Riset autentikasi &
+  hosting" di dokumen `apps/worker`).
+- `multi-device-sync-engine.md` — DISIMPAN utk nanti, kasus BERBEDA
+  (mobile app nativ sungguhan, bukan tool MCP) — TAPI keputusan
+  LWW/soft-delete di sana jadi RUJUKAN LANGSUNG utk dokumen
+  `apps/worker` krn kasusnya mirip.
+- `docs/rules/checking-dev-database.md` — prosedur verifikasi migrasi
+  lokal PC (copy `.db`+`.db-wal`+`.db-shm`, jangan query file aktif
+  langsung).

@@ -1,0 +1,47 @@
+# Cloud Sync + MCP Server — Index Navigasi
+
+> Index navigasi utk SATU fitur lintas-app spesifik (cloud sync +
+> kelola data keuangan dari HP via Claude). Lihat
+> [`../README.md`](../README.md) utk penjelasan umum struktur
+> `docs/todos/{plan,done}/` di root repo — folder ini bisa berisi
+> rencana lintas-app LAIN di masa depan, bukan cuma topik ini.
+
+Index ini HANYA navigasi + checklist ringkas. Detail keputusan desain,
+riset, dan progress implementasi ada di dokumen masing-masing app —
+JANGAN duplikasi isi ke sini, cukup pointer.
+
+## Cloud sync + MCP server (kelola data keuangan dari HP via Claude)
+
+Fitur lintas-app: `apps/desktop` (PC) ↔ `apps/worker` (Cloudflare,
+satu-satunya penulis D1) ↔ `apps/mcp-server` (Vercel, jembatan ke
+Claude — BELUM DIBUAT).
+
+- [ ] **Tahap 0-1** — Riset arsitektur & keputusan conflict resolution
+      — **SELESAI**. Detail:
+      [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
+- [ ] **Tahap 2** — Audit logic bisnis yang wajib direplikasi ke Worker
+      — **AUDIT SELESAI, PORTING BELUM DIMULAI**. Detail:
+      [`apps/desktop/docs/todos/plan/mcp-server-business-logic-audit.md`](../../../apps/desktop/docs/todos/plan/mcp-server-business-logic-audit.md)
+- [ ] **Tahap 3** — Skema kolom sync (`updated_at`/`deleted_at`/`sync_source`)
+      — **SELESAI** di kedua sisi (PC + D1), checkpoint sync PC BELUM.
+      Detail sisi PC:
+      [`apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`](../../../apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md) —
+      Detail sisi D1:
+      [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
+- [ ] **Tahap 4** — Worker: endpoint sync + tulis + validasi bisnis +
+      autentikasi PC↔Worker — **SEDANG BERJALAN** (provisioning D1 +
+      1 endpoint development-only selesai, sisanya belum). Detail:
+      [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
+- [ ] **Tahap 5** — MCP server (Vercel + `mcp-handler`) — **BELUM
+      DIMULAI**, `apps/mcp-server` belum ada. Detail:
+      [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
+- [ ] **Tahap 6** — Integrasi klien PC (toggle Settings, hook push
+      on-write, pull saat app dibuka) — **BELUM DIMULAI**. Detail:
+      [`apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`](../../../apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md)
+- [ ] **Tahap 7** — Verifikasi end-to-end — **BELUM DIMULAI**.
+
+**Dokumen historis/rujukan** (tidak perlu dibaca kecuali menelusuri
+alasan suatu keputusan): `apps/desktop/docs/todos/plan/mcp-server-for-claude.md`
+(riset paling awal), `apps/desktop/docs/todos/plan/multi-device-sync-engine.md`
+(rencana TERPISAH untuk `apps/mobile` native nanti, disimpan untuk
+masa depan — bukan bagian dari fitur MCP ini).

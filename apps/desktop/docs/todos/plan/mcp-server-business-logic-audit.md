@@ -2,9 +2,16 @@
 
 > Dipecah dari `mcp-server-cloud-mirror.md` Tahap 2 (2026-09-30) supaya
 > dokumen utama tidak terlalu panjang. Dokumen ini KHUSUS berisi hasil
-> audit + checklist porting logic bisnis. Semua keputusan sync/conflict
-> resolution/arsitektur MCP tetap di `mcp-server-cloud-mirror.md` —
-> dokumen ini murni referensi teknis pendukung Tahap 2 di sana.
+> audit + checklist porting logic bisnis, dan TETAP di `apps/desktop`
+> (bukan pindah ke `apps/worker`) krn isinya murni audit kode desktop
+> (file:baris spesifik di `src/features/*` dst) — meski dipakai sbg
+> checklist porting ke Worker. Semua keputusan sync/conflict
+> resolution/arsitektur MCP ada di
+> [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../../worker/docs/todos/plan/cloud-sync.md)
+> (dipecah lagi dari `mcp-server-cloud-mirror.md` supaya tiap app py
+> dokumen sendiri, lihat [`docs/todos/plan/cloud-sync-mcp.md`](../../../../../docs/todos/plan/cloud-sync-mcp.md)
+> di root utk index lintas-app). `mcp-server-cloud-mirror.md` sekarang
+> cuma berisi bagian tanggung jawab PC (migrasi lokal, integrasi UI).
 
 ## Latar belakang
 
@@ -175,7 +182,7 @@ kehilangan uang.
       (risiko drift diterima, sama seperti trade-off LWW vs log —
       konsisten dgn preferensi "jangan over-engineer").
 
-## Checklist porting (belum dikerjakan — untuk Tahap 4/5 di `mcp-server-cloud-mirror.md`)
+## Checklist porting (belum dikerjakan — untuk Tahap 4/5 di `apps/worker/docs/todos/plan/cloud-sync.md`)
 
 - [ ] Port `applyDebtTransaction`/`settleDebtsFifo` ke Worker.
 - [ ] Port `applyDebtTransactionEdit` + `DebtEditBlockedError` ke Worker.
@@ -193,8 +200,11 @@ kehilangan uang.
 
 ## Terkait
 
-- `docs/todos/plan/mcp-server-cloud-mirror.md` — dokumen utama, Tahap 2
-  merujuk ke sini. Semua keputusan sync/arsitektur/conflict resolution
-  ada di sana.
+- [`../../../../worker/docs/todos/plan/cloud-sync.md`](../../../../worker/docs/todos/plan/cloud-sync.md)
+  — dokumen UTAMA: semua keputusan sync/arsitektur/conflict resolution,
+  progress implementasi Worker, checklist Tahap 4/5 yang merujuk ke
+  checklist porting di dokumen ini.
+- [`mcp-server-cloud-mirror.md`](./mcp-server-cloud-mirror.md) —
+  dokumen sisi PC: migrasi lokal, integrasi UI Settings.
 - `docs/todos/done/uuid-migration.md` — sesi migrasi UUID yang pertama
   kali menyebut `apply-debt-transaction.ts` sbg titik paling kritis.
