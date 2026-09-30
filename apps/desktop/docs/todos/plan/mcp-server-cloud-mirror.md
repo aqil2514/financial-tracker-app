@@ -270,13 +270,29 @@ tetap berlaku:
       kalau perlu dicek ulang) — perlu diperluas dgn tool TULIS, belum
       diputuskan mana yg paling mendesak (tambah transaksi dulu? edit
       saldo? dst).
-- [ ] Skema kolom sync (`updated_at`, `deleted_at`, `source`) — apakah
-      REUSE persis kolom yg SAMA dgn yg direncanakan di
-      `multi-device-sync-engine.md` (kalau nanti mobile native jadi,
-      mungkin bisa pakai skema sync yg sama utk kedua kebutuhan), atau
-      dibuat terpisah krn kasusnya beda (device fisik vs tool
-      MCP) — belum diputuskan, berpotensi menghemat kerja kalau bisa
-      disatukan.
+- [x] ~~Skema kolom sync (`updated_at`, `deleted_at`, `source`) — reuse
+      persis atau terpisah dari `multi-device-sync-engine.md`?~~ —
+      DIPUTUSKAN 2026-09-30: **SEBAGIAN reuse, bukan reuse persis, bukan
+      terpisah total**.
+      - `updated_at` & `deleted_at` — **identik** (nama kolom, tipe,
+        semantik LWW) dgn `multi-device-sync-engine.md`. Alasan: kedua
+        kolom ini ADALAH mekanisme LWW itu sendiri — kalau nanti mobile
+        native jadi dan menulis ke tabel D1 yg SAMA dgn yg dipakai MCP
+        (skenario realistis: PC + HP native + MCP semua nulis ke
+        `transactions`), format `updated_at` yg beda antar rencana akan
+        merusak perbandingan LWW lintas sumber. Jadi kolom LWW WAJIB
+        konsisten lintas rencana sync manapun.
+      - Kolom identitas sumber — **TETAP beda**: `source` (enum
+        `"pc"`/`"mcp"`) di sini, BUKAN `device_id` (UUID per install)
+        spt `multi-device-sync-engine.md`. Alasan: `device_id` didesain
+        utk N device fisik yg tak diketahui jumlahnya, digenerate &
+        disimpan SEKALI per install — tidak masuk akal utk tool MCP yg
+        dipanggil ulang tiap request dari Claude (bukan "device" yg
+        install sekali). Kasus ini cuma py 2 kemungkinan penulis
+        selamanya (PC atau tool MCP), enum 2 nilai sudah cukup;
+        memaksakan `device_id` UUID di sini jadi over-engineering
+        kosong. Ini MENEGASKAN (bukan mengubah) keputusan `source` yg
+        sudah ada di "Keputusan desain final" di atas.
 - [ ] Nama/struktur endpoint Worker (`/sync` masih working name).
 - [ ] DI MANA token OAuth-shim/API key disimpan & di-generate.
 
@@ -324,11 +340,34 @@ tetap berlaku:
 
 ### Tahap 3 — Skema: siapkan kolom pendukung sync dua-arah
 
-- [ ] Audit tabel: mana yang sudah/belum punya `updated_at`.
-- [ ] Migrasi tambah `updated_at`, `deleted_at`, `source` ke tabel yang
-      relevan (skema lokal PC).
-- [ ] Skema D1 = replika skema lokal + kolom sync yang sama.
-- [ ] Checkpoint sync terakhir disimpan di PC (tabel/`settings`).
+- [x] Audit tabel: TIDAK ADA satu tabel pun yang sudah punya `updated_at`
+      sebelumnya — semua cuma punya `created_at` (diisi sekali saat
+      INSERT). 7 tabel data user relevan disinkron: `transactions`,
+      `accounts`, `account_groups`, `categories`, `contacts`, `debts`,
+      `debt_payments`. TIDAK relevan: `settings` (config lokal
+      per-device), `transaction_attachments` (file lokal, di luar D1).
+- [x] Migrasi PC: `apps/desktop/src-tauri/migrations/
+      0028_cloud_sync_columns.sql` (+ didaftarkan di `migrations.rs`
+      versi 28) — nambah `updated_at`, `deleted_at`, `sync_source` (BUKAN
+      `source`, lihat catatan penamaan di file migrasi & di
+      "Yang belum diputuskan" sebelumnya — bentrok dgn kolom `source`
+      bisnis yg sudah ada di `transactions`/`debts`). `updated_at`
+      di-backfill dari `created_at` utk baris lama, auto-refresh via
+      trigger `AFTER UPDATE` per tabel (bukan diisi manual di kode TS).
+      **DIVERIFIKASI jalan di `finance.dev.db` nyata** (bukan cuma
+      database uji) — migrasi tercatat sukses, 0 baris NULL di
+      `updated_at` di ketujuh tabel, trigger terbukti bekerja.
+- [x] Skema D1: `apps/worker/schema/0001_initial.sql` — replika 7 tabel
+      + kolom sync yang sama (persis kolomnya, TANPA histori migrasi
+      bertahap spt PC — D1 mulai dari 1 file bersih krn memang kosong
+      dari awal). BEDA sengaja dari PC: TIDAK ada trigger auto-`updated_at`
+      di D1 (Worker akan SELALU mengisi `updated_at` eksplisit di tiap
+      tulis, bukan auto-generate DB — supaya logic LWW dikontrol presisi
+      oleh Worker). **DIVERIFIKASI ter-apply ke D1 remote asli** (dijalankan
+      user sendiri via `wrangler d1 execute financial-app --file=schema/0001_initial.sql --remote`,
+      dicek lewat D1 Studio Cloudflare + CLI: ketujuh tabel ada).
+- [ ] Checkpoint sync terakhir disimpan di PC (tabel/`settings`) — BELUM
+      dikerjakan, menyusul saat Tahap 6 (integrasi klien PC) mulai.
 
 ### Tahap 4 — Cloudflare: Worker + D1
 

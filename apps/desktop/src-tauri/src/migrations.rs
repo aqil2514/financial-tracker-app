@@ -164,5 +164,11 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0027_uuid_primary_keys.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 28,
+            description: "cloud_sync_columns",
+            sql: include_str!("../migrations/0028_cloud_sync_columns.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
