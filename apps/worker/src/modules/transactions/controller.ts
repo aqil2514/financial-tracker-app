@@ -13,7 +13,11 @@ export async function handlePostTransaction(request: Request, env: Env): Promise
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  await insertTransaction(env, body);
+  const result = await insertTransaction(env, body);
+
+  if (result.status === "rejected") {
+    return Response.json({ error: result.reason }, { status: 422 });
+  }
 
   return Response.json({ status: "ok", id: body.id }, { status: 201 });
 }

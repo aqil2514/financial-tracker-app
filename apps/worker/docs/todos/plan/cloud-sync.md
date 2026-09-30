@@ -296,6 +296,42 @@ terpusat di satu tempat.
         auto-created dgn `type` benar, saldo setelah koreksi benar,
         panggilan ulang dgn target sama → `no_change` (bukan transaksi
         duplikat). Data uji sudah dibersihkan.
+- [x] **Modul `debts` + logic #1 & #4 dari audit di-port**
+      (`src/modules/debts/service.ts`, plus perubahan di
+      `src/modules/transactions/service.ts`):
+      - `applyDebtTransaction()` — port PERSIS dari
+        `apply-debt-transaction.ts`: transfer cash→debt = piutang baru
+        otomatis; transfer debt→cash = WAJIB `debtAction` eksplisit
+        (`'payable'`/`'settlement'`); debt→debt/cash→cash = no-op.
+        Dipanggil dari `transactions/service.ts` (modul PEMICU) SETELAH
+        insert `transactions` berhasil — pola "modul pemilik vs
+        pemicu" dari `module-structure.md`.
+      - `settleDebtsFifo()` (private, dipanggil dari dalam
+        `applyDebtTransaction`) — urutkan `debts` by `date ASC, id ASC`,
+        alokasikan `amount` sampai habis per debt, insert
+        `debt_payments`, set `status='paid'` kalau alokasi menutup
+        sisa penuh.
+      - **Logic #4** (larangan income/expense di akun `debt`) — DI SINI
+        jadi VALIDASI KERAS (HTTP 422 reject), BEDA dari desktop yg
+        auto-correct via `useEffect` di form (Worker tidak punya UI utk
+        "otomatis ganti pilihan user", cuma bisa terima/tolak).
+      - Payload `POST /transactions` diperluas: `debtAction`,
+        `settleDebtIds` (opsional, cuma relevan utk transfer debt→cash).
+      - **DIVERIFIKASI end-to-end di production** dgn akun cash+debt uji
+        nyata, 4 skenario: (1) expense ke akun debt → 422 ditolak;
+        (2) transfer cash→debt → piutang baru `type=receivable` benar;
+        (3) settlement parsial (60rb dari 100rb) → `debt_payments`
+        tercatat benar, status TETAP `ongoing`; (4) settlement sisa
+        (40rb) → status berubah jadi `paid` tepat saat lunas. Data uji
+        sudah dibersihkan (0 baris tersisa di 4 tabel terkait).
+      - **BELUM di-port**: #2 (guard edit) & #3 (validasi pelunasan ≤
+        sisa) — keduanya baru relevan begitu ada endpoint UPDATE
+        transaksi (belum ada, baru create). #3 khususnya PENTING
+        diingat: `settleDebtsFifo` SAAT INI tidak memvalidasi total
+        `amount` ≤ total `remaining` semua debt terpilih — kelebihan
+        alokasi akan HILANG SENYAP (persis seperti dicatat di audit),
+        BUKAN ditolak. Client (PC/MCP tool) WAJIB validasi ini SENDIRI
+        sebelum kirim request sampai #3 di-port ke sini.
 
 ## Todo list eksekusi
 
@@ -334,13 +370,16 @@ terpusat di satu tempat.
       yg ada, dan itu pun cuma INSERT, belum UPDATE/DELETE).
 - [ ] Validasi/logic bisnis hasil audit diimplementasikan di Worker —
       lihat checklist porting di `mcp-server-business-logic-audit.md`.
-      **PROGRESS: 2 dari 7 SELESAI** (#5 formula saldo, #6 koreksi
-      saldo — modul `accounts`, lihat "Progress implementasi"). Endpoint
-      `/transactions` (`POST`, create) MASIH TIDAK memvalidasi apa pun
-      secara bisnis — 5 logic sisanya (#1 FIFO debt, #2 guard edit,
-      #3 validasi pelunasan, #4 larangan akun debt, #7
-      `dangerousFieldsChanged`) BELUM di-port, semuanya terkait modul
-      `debts`/`transactions` yg belum disentuh.
+      **PROGRESS: 4 dari 7 SELESAI** (#1 FIFO debt, #4 larangan akun
+      debt — modul `debts`+`transactions`; #5 formula saldo, #6 koreksi
+      saldo — modul `accounts`; lihat "Progress implementasi"). Endpoint
+      `POST /transactions` (create) SUDAH memvalidasi #4 & menjalankan
+      #1. **3 logic sisanya BELUM**: #2 (guard edit) & #7
+      (`dangerousFieldsChanged`) — belum relevan krn belum ada endpoint
+      UPDATE transaksi; #3 (validasi pelunasan ≤ sisa) — **CELAH AKTIF**,
+      `settleDebtsFifo` skrg tidak menolak kelebihan alokasi, cuma
+      diam-diam tidak mengalokasikan sisanya (silent, sesuai peringatan
+      di audit) — client WAJIB validasi ini sendiri sampai di-port.
 
 ### Tahap 5 — MCP server (Vercel) — BELUM DIMULAI
 

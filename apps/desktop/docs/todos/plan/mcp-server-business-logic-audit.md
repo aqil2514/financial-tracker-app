@@ -184,10 +184,25 @@ kehilangan uang.
 
 ## Checklist porting (belum dikerjakan — untuk Tahap 4/5 di `apps/worker/docs/todos/plan/cloud-sync.md`)
 
-- [ ] Port `applyDebtTransaction`/`settleDebtsFifo` ke Worker.
-- [ ] Port `applyDebtTransactionEdit` + `DebtEditBlockedError` ke Worker.
-- [ ] Port validasi nominal pelunasan ≤ sisa piutang ke Worker.
-- [ ] Port larangan income/expense di akun `debt` ke Worker.
+- [x] Port `applyDebtTransaction`/`settleDebtsFifo` ke Worker —
+      `apps/worker/src/modules/debts/service.ts`, dipanggil dari
+      `apps/worker/src/modules/transactions/service.ts` setelah insert
+      transaksi (pola "modul pemilik vs pemicu"). DIVERIFIKASI
+      end-to-end di production: cash→debt (piutang baru), settlement
+      parsial+penuh via FIFO (status `ongoing`→`paid` tepat waktu).
+- [ ] Port `applyDebtTransactionEdit` + `DebtEditBlockedError` ke Worker
+      — BELUM relevan, endpoint UPDATE transaksi belum ada di Worker
+      (baru create).
+- [ ] Port validasi nominal pelunasan ≤ sisa piutang ke Worker — **CELAH
+      AKTIF**: `settleDebtsFifo` yg sudah di-port TIDAK menolak
+      kelebihan alokasi, cuma diam-diam tidak mengalokasikan sisanya
+      (persis peringatan di temuan #3 di atas). Client WAJIB validasi
+      sendiri sampai ini di-port.
+- [x] Port larangan income/expense di akun `debt` ke Worker —
+      `apps/worker/src/modules/transactions/service.ts`
+      (`violatesDebtAccountRule()`), jadi VALIDASI KERAS (HTTP 422
+      reject) — BEDA dari desktop yg auto-correct via form, Worker
+      tidak punya UI utk itu. DIVERIFIKASI end-to-end di production.
 - [x] Port formula saldo akun ke Worker — `apps/worker/src/modules/accounts/service.ts`
       (`getAccountBalance()`), endpoint `GET /accounts/balance`.
       DIVERIFIKASI end-to-end di production.
