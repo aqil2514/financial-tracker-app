@@ -30,10 +30,13 @@ export function CloudSyncForm() {
     isLoading,
     canTest,
     canEnable,
+    canBackfill,
     isSaving,
     testState,
+    backfillState,
     handleSave,
     handleTestConnection,
+    handleBackfill,
   } = useCloudSyncForm();
 
   return (
@@ -110,6 +113,45 @@ export function CloudSyncForm() {
           Gagal terhubung — periksa URL dan token.
         </p>
       )}
+
+      <div className="space-y-2 border-t pt-4">
+        <p className="text-sm font-medium">Sync Semua Data Sekarang</p>
+        <p className="text-muted-foreground text-xs">
+          Kirim SEMUA data yang sudah ada di PC (akun, kategori, kontak,
+          transaksi) ke Worker, sekali jalan. Perlu dijalankan MINIMAL
+          SEKALI setelah mengisi URL+token di atas — tanpa ini, transaksi
+          baru yang merujuk akun/kategori LAMA akan ditolak Worker
+          (data lama itu belum pernah dikirim). Aman dijalankan berkali-
+          kali (baris yang sudah ada di Worker cukup diperbarui, tidak
+          dobel).
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleBackfill}
+          disabled={!canBackfill}
+        >
+          {backfillState.status === "running" ? "Mengirim..." : "Sync Semua Data Sekarang"}
+        </Button>
+        {backfillState.status === "running" && backfillState.progress && (
+          <p className="text-muted-foreground text-xs">
+            {backfillState.progress.table}: {backfillState.progress.done}/
+            {backfillState.progress.total}
+          </p>
+        )}
+        {backfillState.status === "done" && (
+          <p className="text-sm text-green-600">
+            Selesai — {backfillState.summary.pushed} terkirim,{" "}
+            {backfillState.summary.rejected} ditolak Worker,{" "}
+            {backfillState.summary.failed} gagal (cek koneksi).
+          </p>
+        )}
+        {backfillState.status === "error" && (
+          <p className="text-destructive text-sm">
+            Gagal menjalankan sync — periksa URL dan token.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

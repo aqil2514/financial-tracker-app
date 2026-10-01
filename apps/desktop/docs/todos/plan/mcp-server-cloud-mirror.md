@@ -194,41 +194,181 @@ tetap bisa dicontoh langsung:
         diverifikasi ulang di production (create→ignored dgn field
         eksplisit terkonfirmasi), test unit disesuaikan, full test
         suite (166 test) tetap 0 regresi.
-- [ ] Section baru `content/cloud-sync/` di `features/settings/` —
-      toggle `<Switch>` + field URL Worker + token, pola dicontoh dari
-      `retailku-integration/` (lihat "Titik integrasi UI" di atas).
-- [ ] Tombol "Tes Koneksi" (verifikasi token+URL valid, tanpa menulis).
-- [ ] Logic pull saat app dibuka+online (HANYA kalau
-      `cloud_sync_enabled`): bandingkan `updated_at` per baris,
-      terapkan yang menang ke SQLite lokal, update checkpoint.
-- [ ] Logic push ON-WRITE (HANYA kalau `cloud_sync_enabled`): hook di
-      tiap titik INSERT/UPDATE/DELETE (soft) yang relevan, kirim baris
-      itu ke Worker segera (async, tidak blocking UI) kalau online;
-      kalau offline, masuk antrian lokal (tabel/queue kecil) utk
-      dikirim ulang saat online lagi.
-- [ ] Retry/antrian utk push yang gagal (offline saat terjadi, atau
-      request gagal) — jangan sampai perubahan hilang senyap kalau
-      push pertama gagal.
-- [ ] Toggle OFF = hentikan hook push/pull, TIDAK menghapus data yang
-      sudah ter-sync di D1 (D1 & MCP server tetap jalan independen).
+- [x] **Section baru `content/cloud-sync/`** (2026-10-01,
+      `features/settings/content/cloud-sync/` — `cloud-sync-section.tsx`
+      (Card), `cloud-sync-form.tsx` (render murni), `use-cloud-sync-form.ts`
+      (state+logic), pola dicontoh persis dari `retailku-integration/`.
+      Toggle `<Switch>` EKSPLISIT (bukan implisit dari kelengkapan
+      field). Help text tiap field sengaja jelasin DARI MANA nilainya
+      (`wrangler deploy` output utk URL, secret `PC_SYNC_TOKEN` utk
+      token) — fitur ini BUKAN layanan pihak ketiga yg bisa didaftar
+      lewat form, murni "bawa Worker sendiri". Teks juga netral MCP
+      (bukan nyebut nama asisten AI spesifik) krn MCP didukung lebih
+      dari satu client.
+- [x] **Tombol "Tes Koneksi"** — panggil `/health`, TANPA menulis.
+- [x] **Logic pull saat app dibuka+online** (2026-10-01,
+      `shared/cloud-sync/pull-sync.ts` + `use-pull-sync.ts`) —
+      `useAutoPullSync()` dipasang SEKALI di `app/providers.tsx`
+      (`CloudSyncBootstrap`), jalan sekali per sesi app terbuka kalau
+      `cloud_sync_enabled`+kredensial lengkap. Per baris per tabel: LWW
+      compare `updatedAt` masuk vs `updated_at` lokal (valid krn trigger
+      `AFTER UPDATE` migrasi 0028 selalu ngisi `updated_at` lokal).
+      **Keputusan desain**: `deletedAt` terisi dari Worker → HARD DELETE
+      lokal (BUKAN simpan `deleted_at` apa adanya) — desktop TIDAK py
+      SATU PUN query yang filter `deleted_at IS NULL`, jadi soft-delete
+      mentah akan "hidup tapi tersembunyi setengah2" di semua list/
+      laporan PC. Urutan apply ikut dependency FK. Checkpoint diupdate
+      via `useSetCloudSyncCheckpoint` (silent) SETELAH pull sukses, lalu
+      `queryClient.invalidateQueries()` penuh (data berubah di luar
+      jalur mutation biasa). Best-effort, silently skip kalau offline/
+      gagal (pola sama `useRetailkuMappingIssues`).
+- [x] **Logic push ON-WRITE** (2026-10-01, `shared/cloud-sync/
+      push-on-write.ts` + `push-row.ts`) — disisipkan ke **17 mutation
+      hooks** (create/update/delete × account_groups/accounts/
+      categories/contacts, create+update transactions — `transactions`
+      delete SENGAJA DISKIP, Worker belum py endpoint DELETE, lihat Gap
+      di bawah). `pushOnWrite()` dipanggil `void` (non-blocking, TIDAK
+      di-await) stlh SQL lokal sukses — mutationFn tetap resolve cepat,
+      push jalan di background. Baca kredensial LANGSUNG via SQL
+      (`SELECT ... FROM settings`), BUKAN `useCloudSyncSettings()` (hook
+      React Query tidak valid dipanggil di dalam `mutationFn`).
+      **Keputusan delete**: push ke Worker SEBELUM hard-delete lokal
+      (`await pushDeleteOnWrite(...)`, BUKAN `void`) — payload DELETE
+      cuma butuh id, gagal/offline TIDAK memblokir delete lokal (resolve
+      normal baik sukses maupun gagal→enqueue).
+      - **Bug lama ditemukan & diperbaiki sambil lewat**: 3 dialog
+        delete (`delete-account-group-dialog.tsx`,
+        `use-delete-account-form.ts`, `delete-category-dialog.tsx`)
+        masih panggil `Number(targetXxxId)` pada id yg sebenarnya UUID
+        STRING sejak migrasi `0027_uuid_primary_keys.sql` — selalu kirim
+        `NaN` ke SQL reassign (bug reassign account/account-group/
+        category senyap sejak migrasi UUID). Tipe `DeleteAccountInput`/
+        `DeleteAccountGroupInput`/`DeleteCategoryInput` (`targetXxxId`)
+        diperbaiki dari `number` ke `string`, 3 caller-nya ikut
+        diperbaiki.
+- [x] **Retry/antrian push gagal** (2026-10-01, migrasi
+      `0029_cloud_sync_queue.sql`+`0030_cloud_sync_queue_payload.sql`,
+      tabel `cloud_sync_queue`, `shared/cloud-sync/push-queue.ts`). Isi
+      antrian `{table, id, op}` — **BUKAN payload penuh** utk
+      `op='upsert'` (baca ULANG row terbaru dari SQLite lokal saat
+      retry, selalu dapat data terbaru). **Pengecualian WAJIB utk
+      `op='delete'`**: kolom `payload` (JSON) menyimpan action
+      reassign/unassign — row sudah hard-deleted lokal di titik enqueue,
+      actionnya keputusan SESAAT user, tidak ada apa pun utk "dibaca
+      ulang". `flushPushQueue()` dipanggil dari `retryPendingPushes()`
+      di awal tiap `useAutoPullSync()` (SEBELUM pull, supaya perubahan
+      lokal yg blm terkirim jalan duluan).
+- [x] **Toggle OFF** — otomatis (bukan logic terpisah): `resolveCredentials()`
+      di `push-on-write.ts` DAN `enabled` check di `use-pull-sync.ts`
+      sama2 baca `cloud_sync_enabled` tiap panggilan — OFF → semua
+      fungsi jadi no-op. Tidak ada aksi delete apa pun yg dipicu toggle,
+      data D1 tidak tersentuh.
 
 **Prasyarat sebelum Tahap 6 bisa mulai**: endpoint Worker WAJIB sudah
-punya autentikasi PC↔Worker (belum ada — lihat dokumen `apps/worker`)
-supaya PC tidak push data lewat endpoint yang masih terbuka tanpa
-proteksi.
+punya autentikasi PC↔Worker — SUDAH ADA (Bearer token `PC_SYNC_TOKEN`,
+selesai sesi sebelumnya).
+
+### Fitur TAMBAHAN ditemukan perlu saat verifikasi (2026-10-01, BUKAN di rencana awal)
+
+- [x] **CORS di Worker** — Worker TIDAK PUNYA CORS middleware sama
+      sekali sebelum sesi ini (semua tes sebelumnya lewat `curl`/Node
+      script, bukan browser/WebView — celah ini tidak pernah ketahuan).
+      DITEMUKAN saat klik "Tes Koneksi" pertama kali dari app
+      sungguhan: `Access to fetch ... blocked by CORS policy`.
+      **Diperbaiki**: `app.use("*", cors())` (Hono, izinkan SEMUA
+      origin) di `apps/worker/src/index.ts` — aman krn SETIAP endpoint
+      tulis/baca tetap wajib Bearer token, CORS cuma relevan utk
+      browser. Origin Tauri WebView bisa beda2 (dev vs production
+      build) jadi wildcard dipilih drpd whitelist spesifik. Di-deploy &
+      diverifikasi (`Access-Control-Allow-Origin: *` di response
+      preflight).
+- [x] **Backfill manual "Sync Semua Data Sekarang"** (2026-10-01,
+      `shared/cloud-sync/backfill-sync.ts`, tombol baru di
+      `cloud-sync-form.tsx`) — **GAP ARSITEKTUR ditemukan saat
+      verifikasi production nyata**: push-on-write cuma mengirim baris
+      yg DITULIS SETELAH fitur aktif, data yg SUDAH lama ada di SQLite
+      (5500+ transaksi, 116 kategori, dst) tidak pernah otomatis
+      ter-push. Transaksi baru yg merujuk akun LAMA (blm pernah
+      ter-push) ditolak Worker dgn `FOREIGN KEY constraint failed`.
+      **Keputusan user**: tombol manual terpisah (BUKAN otomatis saat
+      toggle ON) — user sadar kapan proses (bisa lama, push 1
+      baris/network call) ini jalan. Urut FK: account_groups →
+      categories → contacts → accounts → transactions, `debts`/
+      `debt_payments` TIDAK di-push (sama spt push-on-write, SENGAJA
+      SKIP). Best-effort per baris (satu gagal tidak hentikan sisanya),
+      progress live via callback, idempotent (aman diulang).
+      - **Bug KEDUA ditemukan SAAT backfill pertama jalan di production**:
+        `categories` SELF-REFERENCING (`parent_id`) — `SELECT id FROM
+        categories` TIDAK menjamin induk terkirim sebelum anak, 36 dari
+        116 kategori gagal FK (+ efek domino ke ratusan transaksi yg
+        pakainya) krn sub-kategori sempat ter-push duluan. **Diperbaiki**:
+        `getCategoryIdsParentsFirst()` — push `parent_id IS NULL` dulu,
+        baru `parent_id IS NOT NULL`. Diverifikasi di data nyata:
+        hierarki cuma 2 level (tidak ada grandparent), jadi solusi 2-pass
+        ini cukup (BUKAN solusi umum N-level).
+      - **Hasil akhir backfill production**: 5764 terkirim, 25 ditolak
+        Worker, 0 gagal. 25 yang ditolak = transaksi historis 2024-2025
+        bertipe income/expense yg menyentuh akun `account_type='debt'`
+        (aturan `violatesDebtAccountRule` BARU ada di Worker, desktop
+        lama tidak pernah menolaknya) — **diterima sbg divergence
+        historis** (keputusan user): data itu valid & tetap ada di PC,
+        cuma tidak ikut tersinkron ke D1/HP, tidak dianggap bug.
 
 ## Verifikasi (sisi PC)
 
-- [ ] Uji skenario inti: tambah transaksi dari HP (via Claude/MCP)
-      SAAT PC mati → nyalakan PC → pastikan transaksi itu muncul
-      setelah pull, TIDAK hilang.
+- [x] **Push PC→D1 real-time** — DIVERIFIKASI production nyata
+      2026-10-01: transaksi "Test Sinkron" ditambah dari UI PC, muncul
+      di D1 (`wrangler d1 execute --remote`) dalam hitungan detik tanpa
+      aksi manual apa pun.
+- [x] **Pull D1→PC** — DIVERIFIKASI production nyata 2026-10-01:
+      transaksi "Test dari HP (simulasi)" di-INSERT manual ke D1 via
+      `wrangler d1 execute` (mensimulasikan tool MCP/HP, krn
+      `apps/mcp-server` belum ada), muncul otomatis di UI PC stlh
+      restart app (lewat `useAutoPullSync`), lengkap dgn join nama akun
+      yg benar.
+- [ ] Uji skenario inti: tambah transaksi dari HP (via MCP sungguhan,
+      bukan simulasi manual) SAAT PC mati → nyalakan PC → pastikan
+      transaksi itu muncul setelah pull, TIDAK hilang. **Masih BLOCKED**
+      oleh `apps/mcp-server` yang belum ada (Tahap 5).
 - [ ] Uji skenario konflik: edit baris sama dari PC (offline dari
       internet, misal) dan dari HP hampir bersamaan → pastikan
       `updated_at` lebih baru yang menang, bukan silent corruption.
-- [ ] Uji constraint "PC tetap 100% offline-first" tidak regresi.
+- [x] Uji constraint "PC tetap 100% offline-first" tidak regresi —
+      SEMUA push-on-write dipanggil non-blocking (`void`, kecuali
+      delete yg memang didesain tidak memblokir meski di-`await`), app
+      tetap berfungsi normal tanpa internet (gagal → masuk antrian
+      retry senyap, TIDAK pernah memblokir UI).
 - [ ] Uji soft delete: hapus dari satu sisi, sisi lain sempat edit
       sebelum tahu — pastikan resolve masuk akal (bukan crash/data
-      hilang tanpa jejak sama sekali).
+      hilang tanpa jejak sama sekali). Perlu `DELETE /transactions/:id`
+      dulu (belum ada, lihat Gap) utk kasus transactions.
+
+## Gap yang TERSISA (per 2026-10-01, akhir sesi Tahap 6)
+
+Tahap 6 (integrasi klien PC) **SELESAI secara fungsional** — push
+on-write, pull, retry queue, backfill, UI Settings semua diverifikasi
+jalan di production nyata (push PC→D1 DAN pull D1→PC, dua arah). Sisa
+pekerjaan di luar scope sesi ini:
+
+1. `DELETE /transactions/:id` di Worker (sisa kecil Tahap 4) — perlu
+   keputusan desain guard debt/payment dulu (desktop sendiri TIDAK py
+   guard delete transaksi sama sekali). Tanpa ini, `useDeleteTransaction`
+   TIDAK push delete ke Worker (baris di D1 tetap ada meski dihapus di
+   PC) — divergence yang diketahui, belum ditutup.
+2. Token MCP terpisah dari `PC_SYNC_TOKEN` — prasyarat sblm `sync_source`
+   endpoint `correct-balance` bisa berhenti hardcode `'mcp'`.
+3. `apps/mcp-server` (Tahap 5) — BELUM disentuh sama sekali, app-nya
+   sendiri belum ada. Tanpa ini, skenario "tambah transaksi dari HP via
+   MCP sungguhan" baru bisa disimulasikan manual (INSERT langsung ke D1
+   via `wrangler d1 execute`), bukan lewat jalur MCP asli.
+4. Uji skenario konflik nyata (edit baris sama dari 2 sisi hampir
+   bersamaan) dan soft-delete cross-device — perlu Tahap 5 jalan dulu
+   utk skenario yang realistis (bukan simulasi satu sisi).
+5. 25 transaksi historis yang ditolak Worker (lihat "diterima sbg
+   divergence historis" di atas) — tidak urgent, TAPI kalau suatu saat
+   mau ditutup, opsinya: ubah `account_type` akun terkait jadi `cash`,
+   atau longgarkan aturan `violatesDebtAccountRule` di Worker utk data
+   lama (belum diputuskan, sengaja dibiarkan terbuka).
 
 ## Terkait
 
