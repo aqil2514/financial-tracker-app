@@ -7,6 +7,11 @@ type UseDbMutationOptions<TInput, TResult> = {
   successMessage: string;
   errorMessage: string;
   onSuccess?: (result: TResult) => void | Promise<void>;
+  /** Skip toast.success() -- utk mutation yg jalan otomatis di
+   * background (bukan aksi user eksplisit, mis. update checkpoint
+   * sync), supaya tidak muncul toast berulang tanpa user minta.
+   * Query tetap di-invalidate & onSuccess tetap jalan spt biasa. */
+  silent?: boolean;
 };
 
 function isQueryKeyList(key: QueryKey | QueryKey[]): key is QueryKey[] {
@@ -19,6 +24,7 @@ export function useDbMutation<TInput, TResult = void>({
   successMessage,
   errorMessage,
   onSuccess,
+  silent,
 }: UseDbMutationOptions<TInput, TResult>) {
   const queryClient = useQueryClient();
 
@@ -30,7 +36,7 @@ export function useDbMutation<TInput, TResult = void>({
         : [invalidateKey];
       keys.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       await onSuccess?.(result);
-      toast.success(successMessage);
+      if (!silent) toast.success(successMessage);
     },
     onError: (err) => {
       const detail = err instanceof Error ? err.message : String(err);

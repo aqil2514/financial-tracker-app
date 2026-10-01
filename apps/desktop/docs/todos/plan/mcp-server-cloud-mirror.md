@@ -132,13 +132,71 @@ tetap bisa dicontoh langsung:
 
 ## Todo list eksekusi (Tahap 6 — Integrasi klien PC)
 
+- [x] **Key baru di tabel `settings`** (2026-10-01,
+      `shared/cloud-sync/use-cloud-sync-settings.ts`):
+      `cloud_sync_enabled`, `cloud_sync_worker_url`, `cloud_sync_token`,
+      `cloud_sync_last_checkpoint` — via `useQuery`+`useDbMutation`,
+      TIDAK perlu migrasi tabel baru. `useCloudSyncSettings()` (baca
+      ke-4 key sekaligus), `useSetCloudSyncSettings()` (tulis 3 key
+      pertama, dipanggil dari form Settings), `useSetCloudSyncCheckpoint()`
+      (tulis checkpoint SETELAH pull berhasil — terpisah krn ini field
+      internal yg diupdate OTOMATIS, bukan oleh user).
+      - **Perubahan pendukung**: `useDbMutation` (hook generik,
+        `hooks/use-db-mutation.ts`) ditambah opsi `silent?: boolean` —
+        skip `toast.success()` tapi tetap invalidate query + jalankan
+        `onSuccess`. Dibutuhkan krn checkpoint update terjadi OTOMATIS
+        di background (tiap kali pull sukses, bukan 1x aksi user) — tanpa
+        ini toast "berhasil" akan muncul berulang tanpa user minta.
+        Reusable utk mutation background lain nanti (push on-write jg
+        background, pola sama).
+- [x] **Client fetch ke Worker** (2026-10-01,
+      `shared/cloud-sync/worker-client.ts`) — wrapper HTTP tipis,
+      TIDAK tahu kapan dipanggil (itu urusan hook push on-write/logic
+      pull, BELUM dibuat), cuma tahu CARA memanggil endpoint Worker dgn
+      benar. Semua fungsi terima `{ workerUrl, token }` eksplisit
+      (bukan baca sendiri dari `useCloudSyncSettings`) — modul tetap
+      murni/testable tanpa bergantung React Query/SQLite.
+      - `testCloudSyncConnection()` — panggil `/health`, return
+        boolean (TIDAK throw), utk tombol "Tes Koneksi".
+      - `pushTransaction()`/`pushAccount()`/`pushAccountGroup()`/
+        `pushCategory()`/`pushContact()` — UPSERT 1 baris, return
+        `{status: 'ok'|'ignored'|'rejected', reason?}`. Status
+        `'ignored'` dideteksi dari `message` response yg diawali
+        `"Ignored:"` (kontrak informal dgn Worker, BUKAN field
+        terstruktur — lihat catatan risiko di bawah). Status
+        `'rejected'` HANYA utk HTTP 422 (validasi bisnis Worker
+        menolak); error lain (500, dst) tetap di-throw sbg
+        `WorkerRequestError`, TIDAK ditelan jadi 'rejected'.
+      - `pullSync(creds, since)` — `since: null` → query kosong (Worker
+        balas full snapshot). Bentuk `SyncResponse` SAMA PERSIS dgn
+        `apps/worker/src/modules/sync/service.ts`.
+      - **DIUJI 2 lapis**: (1) smoke test manual via Node thdp Worker
+        PRODUCTION nyata (bukan mock) — health check, push create,
+        push stale (ignored), pull (cek row muncul), delete — SEMUA
+        skenario cocok persis dgn ekspektasi kontrak, data uji
+        dibersihkan; (2) unit test formal
+        `worker-client.test.ts` (13 test, `fetch` di-mock via
+        `vi.stubGlobal`) — header Authorization, trailing-slash URL,
+        deteksi 'ignored' dari message, 422→rejected vs error
+        lain→throw, payload JSON body persis, `since` null vs terisi
+        di query string. Full test suite desktop (166 test, 23 file)
+        tetap 0 regresi setelah perubahan ini.
+      - **Risiko kontrak informal DITEMUKAN & DITUTUP sebelum lanjut**:
+        awalnya deteksi `'ignored'` pakai
+        `message.startsWith("Ignored:")` (string matching thdp pesan
+        bebas) — rapuh, diam-diam gagal kalau teks Worker berubah.
+        **Diperbaiki 2026-10-01**: SEMUA controller endpoint tulis
+        Worker (`transactions`, `accounts`, `account-groups`,
+        `categories`, `contacts` — 8 titik di 5 file) diubah balas
+        field terstruktur `{ status: "ignored", id }` di level JSON,
+        BUKAN lagi dalam `message`. `worker-client.ts` diupdate cek
+        `result.status === "ignored"` langsung. Worker di-redeploy &
+        diverifikasi ulang di production (create→ignored dgn field
+        eksplisit terkonfirmasi), test unit disesuaikan, full test
+        suite (166 test) tetap 0 regresi.
 - [ ] Section baru `content/cloud-sync/` di `features/settings/` —
       toggle `<Switch>` + field URL Worker + token, pola dicontoh dari
       `retailku-integration/` (lihat "Titik integrasi UI" di atas).
-- [ ] Key baru di tabel `settings`: `cloud_sync_enabled`,
-      `cloud_sync_worker_url`, `cloud_sync_token`,
-      `cloud_sync_last_checkpoint` — via `useQuery`+`useDbMutation`,
-      TIDAK perlu migrasi tabel baru.
 - [ ] Tombol "Tes Koneksi" (verifikasi token+URL valid, tanpa menulis).
 - [ ] Logic pull saat app dibuka+online (HANYA kalau
       `cloud_sync_enabled`): bandingkan `updated_at` per baris,

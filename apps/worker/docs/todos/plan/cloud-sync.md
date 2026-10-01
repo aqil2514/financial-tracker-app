@@ -340,6 +340,16 @@ terpusat di satu tempat.
         checkpoint lokal, terapkan baris masuk ke SQLite lokal dgn LWW
         compare, trigger saat app dibuka+online) — itu scope Tahap 6,
         BELUM disentuh sama sekali di `apps/desktop`.
+- [x] **Kontrak response `"ignored"` diperbaiki jadi field terstruktur**
+      (2026-10-01, ditemukan saat bangun fondasi client PC di Tahap 6)
+      — SEMUA endpoint tulis (`transactions`, `accounts`,
+      `account-groups`, `categories`, `contacts`) awalnya balas status
+      LWW-ignored via `{ status: "ok", message: "Ignored: existing row
+      is newer (LWW)" }` (pesan bebas di `message`, BUKAN field
+      terstruktur) — rapuh utk caller otomatis (PC/MCP) yg butuh
+      deteksi reliable, bukan cuma ditampilkan ke user. Diubah jadi
+      `{ status: "ignored", id }` di level JSON. Redeploy & diverifikasi
+      ulang di production, 0 regresi di endpoint lain.
 
 ## Yang BELUM diputuskan
 

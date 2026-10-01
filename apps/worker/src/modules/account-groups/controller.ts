@@ -10,7 +10,7 @@ export async function handlePostAccountGroup(c: Context<{ Bindings: Env }>) {
   }
   const result = await upsertAccountGroup(c.env, body);
   if (result.status === "stale") {
-    return c.json({ status: "ok", message: "Ignored: existing row is newer (LWW)" });
+    return c.json({ status: "ignored", id: body.id });
   }
   return c.json({ status: "ok", id: result.id }, 201);
 }
@@ -36,7 +36,7 @@ export async function handlePatchAccountGroup(c: Context<{ Bindings: Env }>) {
 
   const result = await upsertAccountGroup(c.env, merged);
   if (result.status === "stale") {
-    return c.json({ status: "ok", message: "Ignored: existing row is newer (LWW)" });
+    return c.json({ status: "ignored", id });
   }
   return c.json({ status: "ok", id: result.id }, 200);
 }

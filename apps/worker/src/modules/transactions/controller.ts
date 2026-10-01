@@ -16,7 +16,7 @@ export async function handlePostTransaction(c: Context<{ Bindings: Env }>) {
     return c.json({ error: result.reason }, 422);
   }
   if (result.status === "ignored") {
-    return c.json({ status: "ok", message: "Ignored: existing row is newer (LWW)" });
+    return c.json({ status: "ignored", id: body.id });
   }
 
   return c.json({ status: "ok", id: body.id }, 201);
@@ -41,7 +41,7 @@ export async function handlePatchTransaction(c: Context<{ Bindings: Env }>) {
     return c.json({ error: result.reason }, 422);
   }
   if (result.status === "ignored") {
-    return c.json({ status: "ok", message: "Ignored: existing row is newer (LWW)" });
+    return c.json({ status: "ignored", id });
   }
 
   return c.json({ status: "ok", id }, 200);
