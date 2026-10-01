@@ -6,6 +6,7 @@ import { accountsRouter } from "./modules/accounts/router";
 import { accountGroupsRouter } from "./modules/account-groups/router";
 import { categoriesRouter } from "./modules/categories/router";
 import { contactsRouter } from "./modules/contacts/router";
+import { syncRouter } from "./modules/sync/router";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -15,5 +16,6 @@ app.route("/accounts", accountsRouter);
 app.route("/account-groups", accountGroupsRouter);
 app.route("/categories", categoriesRouter);
 app.route("/contacts", contactsRouter);
+app.route("/sync", syncRouter);
 
 export default app;

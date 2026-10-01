@@ -46,16 +46,17 @@ Claude — BELUM DIBUAT).
       /transactions/:id`), `accounts` (create, update, `balance`,
       `correct-balance`, `DELETE` — CRUD LENGKAP), `account_groups`/
       `categories`/`contacts` (create + update + `DELETE` — reassign/
-      unassign eksplisit PERSIS pola desktop). **SEMUA endpoint tulis
-      di atas SEKARANG UPSERT dgn LWW beneran** (SEJAK 2026-10-01,
-      lewat `updatedAt` opsional di payload, bandingkan vs row existing
-      — bukan INSERT/UPDATE polos lagi). **SENGAJA SKIP** endpoint
-      `/debts` & `/debt-payments` langsung — tidak py padanan
+      unassign eksplisit PERSIS pola desktop), `GET /sync?since=` (pull
+      gabungan 7 tabel, full snapshot kalau `since` kosong). **SEMUA
+      endpoint tulis di atas SEKARANG UPSERT dgn LWW beneran** (SEJAK
+      2026-10-01, lewat `updatedAt` opsional di payload, bandingkan vs
+      row existing — bukan INSERT/UPDATE polos lagi). **SENGAJA SKIP**
+      endpoint `/debts` & `/debt-payments` langsung — tidak py padanan
       create/update di desktop (SELALU lewat
       `transactions`+`applyDebtTransaction`, sudah ter-cover). Belum:
-      endpoint PULL (`GET /sync?since=`, PC blm py cara ambil perubahan
-      dari sisi lain); `DELETE /transactions/:id` (perlu keputusan guard
-      debt/payment dulu); token MCP terpisah dari `PC_SYNC_TOKEN`. Detail:
+      `DELETE /transactions/:id` (perlu keputusan guard debt/payment
+      dulu); token MCP terpisah dari `PC_SYNC_TOKEN`; sisi PC yg
+      MEMANGGIL endpoint pull/push (Tahap 6, belum disentuh). Detail:
       [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
 - [ ] **Tahap 5** — MCP server (Vercel + `mcp-handler`) — **BELUM
       DIMULAI**, `apps/mcp-server` belum ada. Detail:

@@ -303,9 +303,43 @@ terpusat di satu tempat.
         tetap 422) di jalur UPSERT baru; spot-check `contacts`/
         `categories`/`accounts` sama2 lolos pola stale+menang. Data uji
         sudah dibersihkan (0 baris tersisa).
-      - **BELUM dikerjakan**: endpoint pull (`GET /sync?since=`) — PC
-        msh blm py cara AMBIL baris D1 yg berubah dari sisi lain, cuma
-        bisa PUSH (lewat endpoint2 di atas). Prasyarat Tahap 6.
+- [x] **Endpoint pull `GET /sync?since=`** (2026-10-01, modul baru
+      `src/modules/sync/`) — satu endpoint gabungan, balas SEMUA 7
+      tabel sekaligus dalam satu response (keputusan: PC selalu pull
+      semua tabel bareng, tidak ada skenario "cuma mau tabel tertentu").
+      - **Keputusan desain** (dikonfirmasi user): (1) `since` opsional,
+        format TEXT sama persis dgn `updated_at` (`"YYYY-MM-DD
+        HH:mm:ss"`); (2) `since` KOSONG = first sync = **full snapshot
+        SEMUA baris** (termasuk yg `deleted_at` terisi) — awalnya
+        ditanya soal biaya D1, dijelaskan biaya dihitung dari ROWS READ
+        bukan ukuran response, dan skala personal (ribuan baris bukan
+        jutaan) jauh di bawah limit free tier, PLUS ini cuma terjadi
+        SEKALI (first sync), bukan pola berulang tiap app-open —
+        diputuskan lanjut full snapshot, JANGAN over-engineer dari awal
+        utk kasus yg blm tentu jadi masalah; (3) field response
+        camelCase (`accountId`, `updatedAt`, dst), KONSISTEN dgn payload
+        endpoint tulis — supaya PC bisa reuse field yg sama kalau mau
+        push ulang baris ini tanpa mapping manual.
+      - `checkpoint` di response = waktu Worker MEMPROSES request
+        (diambil SEBELUM query jalan, bukan sesudah) — PC simpan nilai
+        ini utk pull berikutnya, hindari celah "baris berubah PAS SAAT
+        query berjalan" ter-skip di pull selanjutnya.
+      - Filter `updated_at > since` (STRICT greater-than, bukan `>=`) —
+        baris dgn `updated_at` SAMA PERSIS dgn `since` TIDAK ikut
+        (sudah pernah diterima di pull sebelumnya yg menghasilkan
+        checkpoint itu).
+      - **DIVERIFIKASI end-to-end di production**: full snapshot (tanpa
+        `since`) mengembalikan SEMUA baris termasuk yg soft-deleted
+        dgn `deletedAt` terisi; incremental pull dgn `since` di antara
+        dua baris beda `updated_at` cuma balas yg lebih baru; boundary
+        `since` SAMA PERSIS dgn `updated_at` suatu baris → baris itu
+        TIDAK ikut (strict `>` terverifikasi); 400 utk format `since`
+        invalid; 401 tanpa token; semua 7 key tabel + `checkpoint`
+        terverifikasi ada di response. Data uji sudah dibersihkan.
+      - **BELUM dikerjakan**: sisi PC yg MEMANGGIL endpoint ini (simpan
+        checkpoint lokal, terapkan baris masuk ke SQLite lokal dgn LWW
+        compare, trigger saat app dibuka+online) — itu scope Tahap 6,
+        BELUM disentuh sama sekali di `apps/desktop`.
 
 ## Yang BELUM diputuskan
 
@@ -604,7 +638,9 @@ terpusat di satu tempat.
       DI-DEPLOY ke production (bukan cuma preview dev lagi).
 - [x] Push UPSERT dgn LWW per baris — SELESAI 2026-10-01, lihat
       "Progress implementasi".
-- [ ] Endpoint pull (kirim baris D1 sejak checkpoint) — BELUM ADA.
+- [x] Endpoint pull (`GET /sync?since=`) — SELESAI 2026-10-01, lihat
+      "Progress implementasi". Sisi Worker LENGKAP; sisi PC yg
+      memanggilnya BELUM (Tahap 6).
 - [x] Endpoint create+update utk `account_groups`, `categories`,
       `contacts` — lihat "Progress implementasi" utk detail.
       **SENGAJA SKIP** `/debts` & `/debt-payments` langsung (tidak py
