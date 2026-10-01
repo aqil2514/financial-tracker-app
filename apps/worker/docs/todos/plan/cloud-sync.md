@@ -145,6 +145,43 @@ terpusat di satu tempat.
   Worker jg utk konsistensi logic validasi — lihat "Yang belum
   diputuskan").
 
+- [x] **Endpoint create+update utk `account_groups`, `categories`,
+      `contacts`** (2026-10-01, modul baru `src/modules/account-groups/`,
+      `src/modules/categories/`, `src/modules/contacts/`):
+      - **Riset dulu**: `debts`/`debt_payments` TERNYATA tidak punya
+        padanan create/update LANGSUNG di desktop — form "tambah
+        utang/piutang" (`use-create-debt.ts`) dan "bayar"
+        (`use-pay-debt.ts`) SELALU lewat insert `transactions` (transfer)
+        + `applyDebtTransaction`, sudah ter-cover endpoint `POST/PATCH
+        /transactions` yg ada. **Keputusan: SKIP endpoint `/debts` &
+        `/debt-payments` langsung** — menambahnya berarti membuat jalur
+        BARU yg tidak ada di desktop (duplikasi logic FIFO/validasi di
+        luar `applyDebtTransaction`), bukan porting. Tool MCP/PC cukup
+        pakai `/transactions` dgn `debtAction` yg sesuai.
+      - `account_groups` — port PERSIS `use-create-account-group.ts` +
+        `use-update-account-group.ts`, entity paling sederhana (cuma
+        `name`).
+      - `categories` — port PERSIS `use-create-category.ts` +
+        `use-update-category.ts`. **SENGAJA TANPA validasi baru**
+        "parent.type === type" — desktop sendiri TIDAK memvalidasi ini
+        di level schema/hook (cuma filter dropdown UI), port apa adanya
+        konsisten dgn prinsip "logic ditulis ulang PERSIS, bukan
+        ditambah" — DIVERIFIKASI: create child dgn `type` beda dari
+        parent tetap 201 (BUKAN bug, keputusan sadar).
+      - `contacts` — port PERSIS `use-create-contact.ts` +
+        `use-update-contact.ts`, PLUS `resolveContactId()` (get-or-create
+        exact match case-insensitive, port dari `resolve-contact.ts`) —
+        diekspor dari `contacts/service.ts` utk dipakai modul LAIN
+        nanti (mis. kalau endpoint `debts` manual akhirnya dibuat) sbg
+        PEMICU, pola "modul pemilik vs pemicu". **BELUM ada entry point
+        HTTP yg memanggilnya** (konsisten dgn keputusan skip
+        `/debts` manual di atas) — fungsi sudah ada, tinggal dipakai
+        begitu dibutuhkan.
+      - **DIVERIFIKASI end-to-end di production** dgn data uji nyata:
+        create+update+404-not-found+400-invalid-payload utk ketiga
+        modul, termasuk cek eksplisit `is_active=false` tersimpan `0` di
+        D1. Data uji sudah dibersihkan (0 baris tersisa).
+
 ## Yang BELUM diputuskan
 
 - [ ] **Arsitektur tool tulis MCP**: apakah `apps/mcp-server` akses D1
@@ -438,10 +475,14 @@ terpusat di satu tempat.
 - [ ] Endpoint sync lengkap: pull (kirim baris D1 sejak checkpoint),
       push UPSERT dgn LWW per baris (bukan cuma INSERT/UPDATE polos spt
       sekarang) — endpoint saat ini BELUM menangani konflik LWW.
-- [ ] Endpoint tulis lengkap utk semua 7 tabel (baru `transactions`
-      yg py create+update, `accounts` py balance+correct-balance; 5
-      tabel lain — `account_groups`, `categories`, `contacts`, `debts`
-      langsung, `debt_payments` — belum py endpoint sama sekali).
+- [x] Endpoint create+update utk `account_groups`, `categories`,
+      `contacts` — lihat "Progress implementasi" utk detail.
+      **SENGAJA SKIP** `/debts` & `/debt-payments` langsung (tidak py
+      padanan di desktop, lihat alasan lengkap di "Progress
+      implementasi").
+- [ ] Endpoint DELETE utk `account_groups`/`categories`/`contacts` —
+      BELUM, perlu keputusan desain reassign/unassign dulu (lihat "Yang
+      BELUM diputuskan" poin 2a).
 - [ ] Endpoint `DELETE /transactions/:id` (soft delete) — belum ada;
       audit mencatat delete transaksi TIDAK py guard thd debt/payment
       terkait sama sekali, keputusan desain belum diambil (lihat "Yang

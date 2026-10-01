@@ -149,7 +149,11 @@ kehilangan uang.
   hanya warning UI non-blocking) — bisa diserahkan ke tool caller
   (Claude) utk exact-match saja; auto-create by exact name via
   `resolve-contact.ts:11-25` tetap perlu direplikasi (bukan opsional)
-  supaya nama bebas dari HP tidak selalu bikin kontak baru.
+  supaya nama bebas dari HP tidak selalu bikin kontak baru. **PORTED**
+  2026-10-01 ke `apps/worker/src/modules/contacts/service.ts`
+  (`resolveContactId`), DIVERIFIKASI secara statis (belum ada entry
+  point HTTP yg memanggilnya — `debts` manual SENGAJA di-skip, lihat
+  `apps/worker/docs/todos/plan/cloud-sync.md`).
 - Format tanggal lokal custom (`now()` ISO-lokal tanpa offset,
   BEDA dari `datetime('now')` SQLite yg pakai spasi bukan `"T"`) —
   dipakai konsisten di 4 titik (`use-create-transaction.ts`,

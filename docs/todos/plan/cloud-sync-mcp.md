@@ -43,12 +43,16 @@ Claude — BELUM DIBUAT).
       (**celah ditutup**, dulu over-alokasi gagal senyap — sekarang
       reject 422 keras sebelum tulis apa pun), #7 `dangerousFieldsChanged`.
       Endpoint yang ada: `transactions` (create + update via `PATCH
-      /transactions/:id`) & `accounts` (`balance`, `correct-balance`).
-      Belum: endpoint tulis utk 5 tabel lain (`account_groups`,
-      `categories`, `contacts`, `debts` langsung, `debt_payments`);
-      `DELETE /transactions/:id`; UPSERT+LWW beneran (semua endpoint
-      tulis skrg masih INSERT/UPDATE polos, belum bandingkan
-      `updated_at`); token MCP terpisah dari `PC_SYNC_TOKEN`. Detail:
+      /transactions/:id`), `accounts` (`balance`, `correct-balance`),
+      `account_groups`/`categories`/`contacts` (create + update, SEJAK
+      2026-10-01). **SENGAJA SKIP** endpoint `/debts` & `/debt-payments`
+      langsung — tidak py padanan create/update di desktop (SELALU lewat
+      `transactions`+`applyDebtTransaction`, sudah ter-cover). Belum:
+      endpoint DELETE apa pun (perlu keputusan desain reassign/unassign
+      dulu utk account_groups/categories/contacts, guard debt/payment
+      dulu utk transactions); UPSERT+LWW beneran (semua endpoint tulis
+      skrg masih INSERT/UPDATE polos, belum bandingkan `updated_at`);
+      token MCP terpisah dari `PC_SYNC_TOKEN`. Detail:
       [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
 - [ ] **Tahap 5** — MCP server (Vercel + `mcp-handler`) — **BELUM
       DIMULAI**, `apps/mcp-server` belum ada. Detail:
