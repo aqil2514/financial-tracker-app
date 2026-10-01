@@ -335,14 +335,72 @@ terpusat di satu tempat.
         tercatat benar, status TETAP `ongoing`; (4) settlement sisa
         (40rb) → status berubah jadi `paid` tepat saat lunas. Data uji
         sudah dibersihkan (0 baris tersisa di 4 tabel terkait).
-      - **BELUM di-port**: #2 (guard edit) & #3 (validasi pelunasan ≤
-        sisa) — keduanya baru relevan begitu ada endpoint UPDATE
-        transaksi (belum ada, baru create). #3 khususnya PENTING
-        diingat: `settleDebtsFifo` SAAT INI tidak memvalidasi total
-        `amount` ≤ total `remaining` semua debt terpilih — kelebihan
-        alokasi akan HILANG SENYAP (persis seperti dicatat di audit),
-        BUKAN ditolak. Client (PC/MCP tool) WAJIB validasi ini SENDIRI
-        sebelum kirim request sampai #3 di-port ke sini.
+      - **BELUM di-port** (status SEBELUM sesi 2026-10-01): #2 (guard
+        edit) & #3 (validasi pelunasan ≤ sisa) — keduanya baru relevan
+        begitu ada endpoint UPDATE transaksi (belum ada, baru create).
+        **Lihat bagian "Endpoint `PATCH /transactions/:id` + 3 logic
+        sisa" di bawah — KETIGANYA sudah di-port di sesi 2026-10-01.**
+- [x] **Endpoint `PATCH /transactions/:id` + 3 logic sisa (#2, #3, #7)
+      dari audit di-port** (2026-10-01,
+      `src/modules/transactions/service.ts` fungsi `updateTransaction()`,
+      `src/modules/debts/service.ts` fungsi baru):
+      - **#7 `dangerousFieldsChanged`** — port PERSIS dari
+        `use-update-transaction.ts`: field type/accountId/
+        transferAccountId/amount/contactId dibandingkan terhadap NILAI
+        LAMA transaksi (`ExistingTransactionRow`, di-query dulu sebelum
+        update). Field lain (note/date/description) tidak pernah
+        trigger recreate debt.
+      - **#2 guard edit (`DebtEditBlockedError`)** — port PERSIS dari
+        `apply-debt-transaction.ts` (`applyDebtTransactionEdit`):
+        `getTransactionDebtStatus()` (versi Worker query D1 langsung,
+        BUKAN dari cache spt `use-transaction-debt-status.ts` di
+        desktop) resolve role transaksi (`none`/`principal`/`payment`)
+        SEBELUM UPDATE jalan — kalau `principal` + field berbahaya
+        berubah + `hasPayments`, REJECT 422 SEBELUM baris `transactions`
+        di-update sama sekali (bukan recreate-lalu-gagal).
+      - **#3 validasi pelunasan ≤ sisa** — **CELAH DITUTUP**: fungsi
+        baru `validateDebtSettlementAmount()` di `debts/service.ts`
+        dipanggil sbg PRE-CHECK sebelum INSERT/UPDATE baris
+        `transactions` (baik dari `insertTransaction` maupun
+        `updateTransaction`), REJECT 422 KERAS kalau `amount` > total
+        `remaining` debts terpilih — **beda dari audit awal** (yg
+        menduga reject terjadi "di dalam" FIFO, setelah data tertulis):
+        pre-check dipindah ke SEBELUM tulis apa pun supaya atomic (lihat
+        temuan atomicity di bawah). `settleDebtsFifo` SENDIRI tetap
+        divalidasi ulang (defense-in-depth, dipanggil dari 2 jalur:
+        create & edit).
+      - **Temuan atomicity BARU** (ditemukan saat implementasi, BUKAN
+        dari audit asli): `insertTransaction`/`updateTransaction`
+        awalnya akan INSERT/UPDATE baris `transactions` DULU baru
+        panggil `applyDebtTransaction` (yg bisa reject krn #3) — kalau
+        reject terjadi SETELAH tulis, baris transaksi/update sudah
+        terlanjur tersimpan tanpa FIFO settlement-nya (tidak atomic). D1
+        Workers Binding `batch()` TIDAK cocok sbg solusi krn FIFO butuh
+        baca-remaining-dulu-baru-tentukan-tulis (dua fase, bukan
+        statement tetap). **Solusi dipilih**: semua pre-check (#3, #2,
+        #4) dijalankan SEBELUM statement INSERT/UPDATE `transactions`
+        apa pun — pola yg SAMA dgn #4 (`violatesDebtAccountRule`) yg
+        sudah lebih dulu ada. DIVERIFIKASI eksplisit: reject #3 dgn
+        `amount` jauh melebihi sisa → 0 baris `transactions` tersimpan;
+        reject #2 → `transactions.amount` TETAP nilai lama (tidak
+        ter-update sebagian).
+      - Endpoint: `PATCH /transactions/:id` (`transactions/router.ts`,
+        `transactions/controller.ts` `handlePatchTransaction`). 404
+        kalau transaksi tidak ada/sudah `deleted_at`.
+      - **DIVERIFIKASI end-to-end di production** dgn akun+kontak uji
+        nyata, 6 skenario: (1) PATCH field aman (note) → 200, debt tidak
+        tersentuh; (2) PATCH field berbahaya (amount) pada `principal`
+        BELUM dicicil → 200, debt RECREATE (id baru, amount baru
+        terverifikasi di D1); (3) PATCH field berbahaya pada `principal`
+        SUDAH dicicil (insert manual 1 `debt_payments`) → 422 blocked,
+        `transactions.amount` terverifikasi TETAP nilai lama; (4) POST
+        transfer settlement dgn `amount` jauh > sisa piutang → 422
+        rejected, 0 baris `transactions` tersimpan (atomicity
+        terverifikasi); (5) POST transfer settlement dgn `amount` PAS =
+        sisa → 201 ok, `debts.status` terverifikasi jadi `'paid'`; (6)
+        PATCH transaksi id tidak ada → 404. Data uji sudah dibersihkan
+        (0 baris tersisa di 5 tabel terkait, terverifikasi via COUNT
+        query).
 
 ## Todo list eksekusi
 
@@ -371,26 +429,33 @@ terpusat di satu tempat.
 - [x] Provisioning 1 database D1.
 - [x] Endpoint tulis pertama (`POST /transactions`) — lihat "Progress
       implementasi" utk detail scope (baru INSERT, belum UPSERT/LWW).
+- [x] Endpoint `PATCH /transactions/:id` (2026-10-01) — lihat "Progress
+      implementasi" utk detail. Masih INSERT/UPDATE polos (belum
+      UPSERT/LWW), belum DELETE.
 - [x] Autentikasi PC↔Worker (token terpisah dari OAuth-shim MCP) —
       token statis Bearer, lihat "Progress implementasi". Worker sudah
       DI-DEPLOY ke production (bukan cuma preview dev lagi).
 - [ ] Endpoint sync lengkap: pull (kirim baris D1 sejak checkpoint),
-      push UPSERT dgn LWW per baris (bukan cuma INSERT polos spt
-      sekarang) — endpoint saat ini BELUM menangani UPDATE/konflik.
+      push UPSERT dgn LWW per baris (bukan cuma INSERT/UPDATE polos spt
+      sekarang) — endpoint saat ini BELUM menangani konflik LWW.
 - [ ] Endpoint tulis lengkap utk semua 7 tabel (baru `transactions`
-      yg ada, dan itu pun cuma INSERT, belum UPDATE/DELETE).
-- [ ] Validasi/logic bisnis hasil audit diimplementasikan di Worker —
+      yg py create+update, `accounts` py balance+correct-balance; 5
+      tabel lain — `account_groups`, `categories`, `contacts`, `debts`
+      langsung, `debt_payments` — belum py endpoint sama sekali).
+- [ ] Endpoint `DELETE /transactions/:id` (soft delete) — belum ada;
+      audit mencatat delete transaksi TIDAK py guard thd debt/payment
+      terkait sama sekali, keputusan desain belum diambil (lihat "Yang
+      BELUM diputuskan" di `mcp-server-business-logic-audit.md`).
+- [x] Validasi/logic bisnis hasil audit diimplementasikan di Worker —
       lihat checklist porting di `mcp-server-business-logic-audit.md`.
-      **PROGRESS: 4 dari 7 SELESAI** (#1 FIFO debt, #4 larangan akun
-      debt — modul `debts`+`transactions`; #5 formula saldo, #6 koreksi
-      saldo — modul `accounts`; lihat "Progress implementasi"). Endpoint
-      `POST /transactions` (create) SUDAH memvalidasi #4 & menjalankan
-      #1. **3 logic sisanya BELUM**: #2 (guard edit) & #7
-      (`dangerousFieldsChanged`) — belum relevan krn belum ada endpoint
-      UPDATE transaksi; #3 (validasi pelunasan ≤ sisa) — **CELAH AKTIF**,
-      `settleDebtsFifo` skrg tidak menolak kelebihan alokasi, cuma
-      diam-diam tidak mengalokasikan sisanya (silent, sesuai peringatan
-      di audit) — client WAJIB validasi ini sendiri sampai di-port.
+      **PROGRESS: 7 dari 7 SELESAI** (2026-10-01). #1 FIFO debt, #4
+      larangan akun debt (modul `debts`+`transactions`, endpoint `POST
+      /transactions`); #5 formula saldo, #6 koreksi saldo (modul
+      `accounts`); #2 guard edit, #3 validasi pelunasan ≤ sisa, #7
+      `dangerousFieldsChanged` (endpoint `PATCH /transactions/:id`,
+      lihat "Progress implementasi" utk detail lengkap). **CELAH #3
+      SUDAH DITUTUP** — client TIDAK perlu lagi validasi sendiri,
+      Worker reject 422 keras sebelum tulis apa pun.
 
 ### Tahap 5 — MCP server (Vercel) — BELUM DIMULAI
 

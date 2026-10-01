@@ -190,14 +190,24 @@ kehilangan uang.
       transaksi (pola "modul pemilik vs pemicu"). DIVERIFIKASI
       end-to-end di production: cash→debt (piutang baru), settlement
       parsial+penuh via FIFO (status `ongoing`→`paid` tepat waktu).
-- [ ] Port `applyDebtTransactionEdit` + `DebtEditBlockedError` ke Worker
-      — BELUM relevan, endpoint UPDATE transaksi belum ada di Worker
-      (baru create).
-- [ ] Port validasi nominal pelunasan ≤ sisa piutang ke Worker — **CELAH
-      AKTIF**: `settleDebtsFifo` yg sudah di-port TIDAK menolak
-      kelebihan alokasi, cuma diam-diam tidak mengalokasikan sisanya
-      (persis peringatan di temuan #3 di atas). Client WAJIB validasi
-      sendiri sampai ini di-port.
+- [x] Port `applyDebtTransactionEdit` + `DebtEditBlockedError` ke Worker
+      — SELESAI 2026-10-01, `apps/worker/src/modules/debts/service.ts`
+      (`applyDebtTransactionEdit`, `getTransactionDebtStatus`), dipanggil
+      dari `transactions/service.ts` (`updateTransaction`) via endpoint
+      `PATCH /transactions/:id`. DIVERIFIKASI end-to-end di production:
+      field berbahaya pada `principal` tanpa cicilan → recreate aman;
+      field berbahaya pada `principal` DENGAN cicilan → 422 blocked,
+      baris `transactions` TERBUKTI tidak ter-update.
+- [x] Port validasi nominal pelunasan ≤ sisa piutang ke Worker —
+      **CELAH DITUTUP** 2026-10-01, fungsi
+      `validateDebtSettlementAmount()` di `debts/service.ts`, dipanggil
+      sbg pre-check SEBELUM tulis baris `transactions` apa pun (bukan di
+      dalam `settleDebtsFifo` spt dugaan awal — dipindah krn temuan
+      atomicity: reject SETELAH tulis akan menyisakan baris transaksi
+      yatim, lihat catatan lengkap di
+      `apps/worker/docs/todos/plan/cloud-sync.md`). DIVERIFIKASI: amount
+      jauh > sisa → 422, 0 baris transaksi tersimpan; amount pas = sisa
+      → 201 ok, status piutang jadi `paid`.
 - [x] Port larangan income/expense di akun `debt` ke Worker —
       `apps/worker/src/modules/transactions/service.ts`
       (`violatesDebtAccountRule()`), jadi VALIDASI KERAS (HTTP 422
@@ -209,7 +219,10 @@ kehilangan uang.
 - [x] Port logic koreksi saldo manual ke Worker — `apps/worker/src/modules/accounts/service.ts`
       (`correctAccountBalance()`), endpoint `POST /accounts/correct-balance`.
       DIVERIFIKASI end-to-end di production.
-- [ ] Port `dangerousFieldsChanged` comparison ke Worker (untuk tool update transaksi).
+- [x] Port `dangerousFieldsChanged` comparison ke Worker — SELESAI
+      2026-10-01, `apps/worker/src/modules/transactions/service.ts`
+      (fungsi `dangerousFieldsChanged`), dipanggil dari
+      `updateTransaction` sebelum UPDATE baris `transactions` dijalankan.
 - [ ] Putuskan & implementasikan kebijakan reassign/unassign delete account/category/group.
 - [ ] Putuskan & implementasikan filter `category.type === transaction.type` di Worker.
 - [ ] Port auto-null `category_id` pada transfer ke Worker.

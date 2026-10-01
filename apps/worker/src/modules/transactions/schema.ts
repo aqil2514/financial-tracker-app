@@ -45,3 +45,28 @@ export function isPushTransactionPayload(value: unknown): value is PushTransacti
     settleDebtIdsValid
   );
 }
+
+// Payload PATCH /transactions/:id -- SAMA bentuknya dgn
+// PushTransactionPayload tapi TANPA `id` (dari path param, bukan body).
+export type PatchTransactionPayload = Omit<PushTransactionPayload, "id">;
+
+export function isPatchTransactionPayload(value: unknown): value is PatchTransactionPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const debtActionValid =
+    v.debtAction === undefined ||
+    v.debtAction === null ||
+    v.debtAction === "settlement" ||
+    v.debtAction === "payable";
+  const settleDebtIdsValid =
+    v.settleDebtIds === undefined ||
+    (Array.isArray(v.settleDebtIds) && v.settleDebtIds.every((id) => typeof id === "string"));
+  return (
+    (v.type === "income" || v.type === "expense" || v.type === "transfer") &&
+    typeof v.amount === "number" &&
+    typeof v.note === "string" &&
+    typeof v.date === "string" &&
+    debtActionValid &&
+    settleDebtIdsValid
+  );
+}

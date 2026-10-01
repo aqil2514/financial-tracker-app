@@ -201,16 +201,35 @@ Ini bukan fitur generik "import CSV" — ada domain accounting logic
 di baliknya (AR/AP, consignment, uang muka pembelian) yang dibangun
 khusus dari kebutuhan nyata mengelola Warung Aqil.
 
-## 4. Offline-first sungguhan, dengan rencana multi-device yang sadar trade-off
+## 4. Offline-first sungguhan, dengan cloud sync yang sadar trade-off (mulai dibangun, belum selesai)
 
 - Data tersimpan **lokal** (SQLite via Tauri), tidak butuh koneksi untuk
   input/lihat data sehari-hari.
-- Rencana sync multi-device (desktop ↔ mobile, lihat
-  `apps/desktop/docs/todos/plan/multi-device-sync.md`) secara eksplisit
-  membedakan dirinya dari sync Retailku: di sini **dua arah, banyak
-  sumber tulis**, sehingga butuh strategi conflict resolution (bukan
-  "server selalu benar" seperti kasus Retailku). Trade-off ini didesain
-  dari awal, bukan ditambal belakangan.
+- Sync dua sumber tulis (PC ↔ Cloudflare Worker, nanti juga MCP server
+  atas nama Claude/HP) secara eksplisit membedakan dirinya dari sync
+  Retailku: di sini **dua arah, banyak sumber tulis**, sehingga butuh
+  strategi conflict resolution (bukan "server selalu benar" seperti
+  kasus Retailku) — last-write-wins via `updated_at` per baris, PC wajib
+  pull sebelum push, soft delete (`deleted_at`) supaya hapus di satu
+  sisi tidak ambigu kalau sisi lain sempat update baris yang sama.
+  Trade-off ini didesain dari awal (termasuk sadar menolak alternatif
+  event-sourcing/log terpusat karena effort jangka panjangnya tidak
+  sepadan untuk skala personal), bukan ditambal belakangan.
+- **Sudah ada implementasi nyata, bukan cuma dokumen rencana**:
+  `apps/worker` (Cloudflare Worker + D1 + Hono) **live di production**
+  sejak 2026-09-30. 4 dari 7 logic bisnis kritis (formula saldo akun,
+  koreksi saldo manual, FIFO pelunasan utang-piutang, larangan
+  income/expense di akun `debt`) sudah di-port ulang ke Worker dan
+  diverifikasi end-to-end dengan data nyata di production. Endpoint yang
+  sudah jalan: transaksi (create) dan akun; endpoint tulis untuk tabel
+  lain serta UPSERT+LWW yang sesungguhnya masih belum ada.
+- **Batas jujur**: ini motivasinya utamanya bukan multi-device dalam
+  arti umum, tapi jembatan supaya data bisa dikelola dari HP lewat
+  Claude Web + MCP server sebelum `apps/mobile` (masih skeleton) benar
+  dibangun. `apps/mcp-server` sendiri belum disentuh sama sekali, dan
+  ada celah aktif (validasi pelunasan melebihi sisa piutang belum
+  di-port ke Worker) yang harus ditutup sebelum tool MCP tulis
+  dianggap aman dipakai. Detail: `apps/worker/docs/todos/plan/cloud-sync.md`.
 
 ## 5. Audit histori data, bukan cuma migrasi buta
 
@@ -297,6 +316,9 @@ sebagai fakta di materi portofolio manapun.
 - **Mobile** — belum ada fitur berjalan, baru rencana & skeleton project.
 - **AI assistant** — ada di rencana awal (`finance-app-plan.md`) tapi
   belum diimplementasikan di platform mana pun.
-- **Multi-device sync** — baru dokumen perencanaan (belum ada
-  implementasi/pilihan tooling final antara Turso, PowerSync, atau sync
-  engine custom).
+- **Multi-device sync** — arah final sudah dipilih (Cloudflare Worker +
+  D1 + Hono, bukan Turso/PowerSync) dan `apps/worker` sudah live di
+  production dengan sebagian logic bisnis ter-port (lihat bagian 4),
+  tapi baru 2 dari 7 endpoint tulis yang ada, belum ada UPSERT+LWW
+  sesungguhnya, dan `apps/mcp-server` belum disentuh sama sekali — jadi
+  masih jauh dari selesai, bukan lagi sekadar dokumen rencana.

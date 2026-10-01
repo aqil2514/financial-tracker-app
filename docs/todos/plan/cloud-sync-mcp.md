@@ -34,10 +34,21 @@ Claude — BELUM DIBUAT).
       DI-DEPLOY ke production
       (`https://financial-app-worker.muhamadaqil383.workers.dev`),
       struktur kode dirapikan jadi per-modul (`controller`/`service`/
-      `schema`, lihat `apps/worker/docs/rules/module-structure.md`).
-      Belum: validasi logic bisnis (0 dari 7 di-port), endpoint baru
-      `transactions` create (belum update/delete, belum tabel lain),
-      belum UPSERT/LWW (masih INSERT polos). Detail:
+      `schema`, lihat `apps/worker/docs/rules/module-structure.md`),
+      migrasi routing ke Hono (0 regresi, diverifikasi penuh). **Logic
+      bisnis: 7 dari 7 SUDAH di-port & diverifikasi end-to-end di
+      production** (2026-10-01) — #1 FIFO debt, #4 larangan
+      income/expense di akun debt, #5 formula saldo akun, #6 koreksi
+      saldo manual, #2 guard edit, #3 validasi pelunasan ≤ sisa
+      (**celah ditutup**, dulu over-alokasi gagal senyap — sekarang
+      reject 422 keras sebelum tulis apa pun), #7 `dangerousFieldsChanged`.
+      Endpoint yang ada: `transactions` (create + update via `PATCH
+      /transactions/:id`) & `accounts` (`balance`, `correct-balance`).
+      Belum: endpoint tulis utk 5 tabel lain (`account_groups`,
+      `categories`, `contacts`, `debts` langsung, `debt_payments`);
+      `DELETE /transactions/:id`; UPSERT+LWW beneran (semua endpoint
+      tulis skrg masih INSERT/UPDATE polos, belum bandingkan
+      `updated_at`); token MCP terpisah dari `PC_SYNC_TOKEN`. Detail:
       [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
 - [ ] **Tahap 5** — MCP server (Vercel + `mcp-handler`) — **BELUM
       DIMULAI**, `apps/mcp-server` belum ada. Detail:
