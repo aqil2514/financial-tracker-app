@@ -23,3 +23,29 @@ export function isCategoryPayload(value: unknown): value is CategoryPayload {
     (v.isActive === undefined || typeof v.isActive === "boolean")
   );
 }
+
+// Port dari use-delete-category.ts (DeleteCategoryInput) -- category py
+// DUA relasi independen yg masing2 wajib ditangani: sub-kategori
+// (categories.parent_id = id ini) DAN transaksi (transactions.category_id
+// = id ini). Masing2 py pasangan action/target sendiri.
+export type DeleteCategoryPayload = {
+  childAction?: "unassign" | "reassign";
+  targetParentId?: string;
+  transactionAction?: "unassign" | "reassign";
+  targetCategoryId?: string;
+};
+
+export function isDeleteCategoryPayload(value: unknown): value is DeleteCategoryPayload {
+  if (value === null || value === undefined) return true;
+  if (typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  const childActionValid =
+    v.childAction === undefined || v.childAction === "unassign" || v.childAction === "reassign";
+  const targetParentValid = v.targetParentId === undefined || typeof v.targetParentId === "string";
+  const txActionValid =
+    v.transactionAction === undefined ||
+    v.transactionAction === "unassign" ||
+    v.transactionAction === "reassign";
+  const targetCategoryValid = v.targetCategoryId === undefined || typeof v.targetCategoryId === "string";
+  return childActionValid && targetParentValid && txActionValid && targetCategoryValid;
+}

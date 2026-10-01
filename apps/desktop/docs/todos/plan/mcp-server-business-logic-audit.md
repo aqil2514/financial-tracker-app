@@ -114,10 +114,12 @@ kehilangan uang.
   - Account group (`use-delete-account-group.ts:15-35`): pola sama,
     tapi risiko lebih rendah (`group_id` tidak dipakai formula saldo
     manapun, murni kosmetik pengelompokan).
-  - **Keputusan yang perlu diambil**: apakah tool MCP "delete
-    account/category/group" WAJIB menerima parameter reassign target
-    (setara UI), atau cukup selalu berperilaku "unassign" default dan
-    terima konsekuensinya.
+  - **DIPUTUSKAN & DI-IMPLEMENTASI 2026-10-01**: endpoint `DELETE` di
+    Worker WAJIB menerima parameter aksi eksplisit per relasi (field
+    `*Action: "unassign"|"reassign"` + target id), PERSIS pola desktop
+    — BUKAN default "unassign" diam-diam. Lihat
+    `apps/worker/docs/todos/plan/cloud-sync.md` bagian endpoint
+    `DELETE` utk detail lengkap + temuan soft-delete `contacts`.
 - **Filter `category.type === transaction.type` TIDAK dipaksakan di DB**
   (`use-account-category-options.tsx:37-81`) — hanya filter dropdown
   UI. Kalau MCP tool insert transaksi `income` dengan `category_id`
@@ -227,7 +229,7 @@ kehilangan uang.
       2026-10-01, `apps/worker/src/modules/transactions/service.ts`
       (fungsi `dangerousFieldsChanged`), dipanggil dari
       `updateTransaction` sebelum UPDATE baris `transactions` dijalankan.
-- [ ] Putuskan & implementasikan kebijakan reassign/unassign delete account/category/group.
+- [x] Putuskan & implementasikan kebijakan reassign/unassign delete account/category/group — SELESAI 2026-10-01.
 - [ ] Putuskan & implementasikan filter `category.type === transaction.type` di Worker.
 - [ ] Port auto-null `category_id` pada transfer ke Worker.
 - [ ] Putuskan & implementasikan definisi tunggal formula `remaining`/`balance` (shared util/VIEW) sebelum port lanjut.

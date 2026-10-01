@@ -182,6 +182,56 @@ terpusat di satu tempat.
         modul, termasuk cek eksplisit `is_active=false` tersimpan `0` di
         D1. Data uji sudah dibersihkan (0 baris tersisa).
 
+- [x] **Endpoint `DELETE` utk `account_groups`, `accounts`, `categories`,
+      `contacts`** (2026-10-01):
+      - **Keputusan desain** (dikonfirmasi user): endpoint terima field
+        aksi EKSPLISIT per relasi, PERSIS pola desktop (BUKAN satu
+        `reassignTo` opsional) — mis. `{ memberAction: "unassign" |
+        "reassign", targetGroupId?: string }` utk `account_groups`.
+        Kalau field aksi tidak dikirim sama sekali, TIDAK ada UPDATE
+        apa pun dijalankan (sama persis perilaku desktop).
+      - `account_groups` — `memberAction`/`targetGroupId` (relasi:
+        `accounts.group_id`).
+      - `accounts` — `transactionAction`/`targetAccountId`, menangani
+        DUA kolom sekaligus (`transactions.account_id` DAN
+        `transfer_account_id`), PERSIS urutan `use-delete-account.ts`.
+      - `categories` — DUA relasi independen:
+        `childAction`/`targetParentId` (`categories.parent_id`) DAN
+        `transactionAction`/`targetCategoryId`
+        (`transactions.category_id`).
+      - `contacts` — **TANPA payload sama sekali** (beda dari 3 lainnya)
+        — `use-delete-contact.ts` TIDAK py reassign/unassign eksplisit
+        apa pun, langsung delete, FK `ON DELETE SET NULL` yg
+        menangani (di desktop, hard delete).
+      - **Temuan arsitektur BARU** (ditemukan saat verifikasi, bukan
+        dari audit awal): soft delete (`deleted_at`, Worker) BEDA
+        perilaku dari hard delete (desktop) utk kasus `contacts` —
+        krn FK `ON DELETE SET NULL` cuma terpicu kalau baris BENAR2
+        dihapus, soft-delete `contacts` MENINGGALKAN
+        `transactions.contact_id` tetap menunjuk ke kontak yg sudah
+        `deleted_at` (TIDAK auto-NULL spt di desktop).
+        **DIVERIFIKASI eksplisit**: delete kontak via endpoint → query
+        JOIN transaksi+kontak membuktikan `contact_id` TETAP terisi
+        walau `contacts.deleted_at` sudah terisi. **BELUM diputuskan**
+        apakah ini perlu ditangani (tambah unassign eksplisit di Worker,
+        beda dari desktop) atau diterima sbg keterbatasan soft-delete —
+        TIDAK urgent krn `contact_id` cuma dipakai di laporan ringkasan
+        kontak, bukan formula saldo/debt.
+      - **DIVERIFIKASI end-to-end di production** dgn data uji nyata:
+        reassign account_group (anggota pindah grup, grup lama
+        `deleted_at` terisi); unassign account (`account_id` jadi NULL
+        di transaksi terkait); reassign child category + unassign
+        transaction category BARENG dalam satu request; delete contact
+        tanpa body; 404 utk entity tidak ada; 400 utk payload invalid
+        (`memberAction` bukan `"unassign"`/`"reassign"`). Data uji sudah
+        dibersihkan (0 baris tersisa).
+      - **Catatan terpisah**: `accounts` SAAT INI belum py endpoint
+        create/update (`POST /accounts`, `PATCH /accounts/:id`) — hanya
+        `balance`, `correct-balance`, dan sekarang `DELETE` yg ada.
+        `use-create-account.ts`/`use-update-account.ts` di desktop ADA
+        tapi belum di-port — gap terpisah, BUKAN bagian scope delete
+        ini.
+
 ## Yang BELUM diputuskan
 
 - [ ] **Arsitektur tool tulis MCP**: apakah `apps/mcp-server` akses D1
@@ -190,17 +240,22 @@ terpusat di satu tempat.
       dipakai PC utk sync (supaya logic validasi/`updated_at` terpusat
       di satu tempat, tidak dobel-tulis di Vercel & Worker). Condong ke
       opsi kedua (logic terpusat) tapi belum final.
-- [ ] **3 open question turunan dari audit logic bisnis** (detail di
+- [x] ~~(a) reassign/unassign saat delete account/category/account-group~~
+      — **DIPUTUSKAN & DI-IMPLEMENTASI 2026-10-01**: WAJIB terima
+      parameter aksi eksplisit, PERSIS pola desktop. Lihat "Progress
+      implementasi" bagian endpoint `DELETE`.
+- [ ] **2 open question tersisa** dari audit logic bisnis (detail di
       `mcp-server-business-logic-audit.md`, bagian "Perlu keputusan
-      desain eksplisit"): (a) reassign/unassign saat delete
-      account/category/account-group via MCP tool — WAJIB terima
-      parameter target setara UI, atau selalu unassign default?;
-      (b) guard delete transaksi terhadap debt/payment terkait — SAAT
-      INI tidak ada sama sekali bahkan di desktop, dibiarkan atau
-      ditambah di kedua sisi sekalian?; (c) definisi tunggal formula
-      `remaining`/`balance` (shared util/VIEW) dibuat SEBELUM porting
-      ke Worker, atau di-port apa adanya per lokasi (risiko drift
-      diterima)?
+      desain eksplisit"): (b) guard delete transaksi terhadap
+      debt/payment terkait — SAAT INI tidak ada sama sekali bahkan di
+      desktop, dibiarkan atau ditambah di kedua sisi sekalian?; (c)
+      definisi tunggal formula `remaining`/`balance` (shared util/VIEW)
+      dibuat SEBELUM porting ke Worker, atau di-port apa adanya per
+      lokasi (risiko drift diterima)?
+- [ ] **BARU**: soft-delete `contacts` tidak auto-unassign
+      `transactions.contact_id` (beda dari hard-delete desktop) — lihat
+      temuan lengkap di "Progress implementasi". Perlu diputuskan apakah
+      ditangani atau diterima sbg keterbatasan.
 - [ ] Daftar tool CRUD fase pertama & urutan prioritas — draft awal py
       5 tool BACA (`get_account_balances`, dst) — perlu diperluas dgn
       tool TULIS, belum diputuskan mana yg paling mendesak.
@@ -480,13 +535,17 @@ terpusat di satu tempat.
       **SENGAJA SKIP** `/debts` & `/debt-payments` langsung (tidak py
       padanan di desktop, lihat alasan lengkap di "Progress
       implementasi").
-- [ ] Endpoint DELETE utk `account_groups`/`categories`/`contacts` —
-      BELUM, perlu keputusan desain reassign/unassign dulu (lihat "Yang
-      BELUM diputuskan" poin 2a).
+- [x] Endpoint DELETE utk `account_groups`/`accounts`/`categories`/
+      `contacts` — SELESAI 2026-10-01, lihat "Progress implementasi".
 - [ ] Endpoint `DELETE /transactions/:id` (soft delete) — belum ada;
       audit mencatat delete transaksi TIDAK py guard thd debt/payment
       terkait sama sekali, keputusan desain belum diambil (lihat "Yang
       BELUM diputuskan" di `mcp-server-business-logic-audit.md`).
+- [ ] Endpoint create+update utk `accounts` (`POST /accounts`, `PATCH
+      /accounts/:id`) — GAP terpisah ditemukan 2026-10-01, belum pernah
+      di-port padahal `use-create-account.ts`/`use-update-account.ts`
+      ADA di desktop. `accounts` sejauh ini cuma py `balance`,
+      `correct-balance`, `DELETE`.
 - [x] Validasi/logic bisnis hasil audit diimplementasikan di Worker —
       lihat checklist porting di `mcp-server-business-logic-audit.md`.
       **PROGRESS: 7 dari 7 SELESAI** (2026-10-01). #1 FIFO debt, #4

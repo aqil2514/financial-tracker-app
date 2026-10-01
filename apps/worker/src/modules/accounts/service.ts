@@ -1,5 +1,6 @@
 import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
+import type { DeleteAccountPayload } from "./schema";
 
 const CORRECTION_CATEGORY_NAME = "Penyesuaian Saldo";
 
@@ -93,6 +94,52 @@ export async function correctAccountBalance(
     .run();
 
   return { status: "corrected", transactionId };
+}
+
+export type DeleteAccountResult = { status: "ok" } | { status: "not_found" };
+
+// Port dari use-delete-account.ts, soft delete versi Worker (lihat
+// catatan soft-delete di account-groups/service.ts -- alasan sama:
+// desktop hard DELETE + FK SET NULL, Worker SET deleted_at krn tidak
+// benar2 menghapus baris). Akun dipakai di DUA kolom transactions
+// (account_id DAN transfer_account_id) -- keduanya di-UPDATE bareng,
+// PERSIS urutan desktop.
+export async function deleteAccount(
+  env: Env,
+  id: string,
+  payload: DeleteAccountPayload
+): Promise<DeleteAccountResult> {
+  const existing = await env.DB.prepare("SELECT id FROM accounts WHERE id = ?1 AND deleted_at IS NULL")
+    .bind(id)
+    .first<{ id: string }>();
+  if (!existing) return { status: "not_found" };
+
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+
+  if (payload.transactionAction === "unassign") {
+    await env.DB.prepare("UPDATE transactions SET account_id = NULL, updated_at = ?1 WHERE account_id = ?2")
+      .bind(now, id)
+      .run();
+    await env.DB.prepare(
+      "UPDATE transactions SET transfer_account_id = NULL, updated_at = ?1 WHERE transfer_account_id = ?2"
+    )
+      .bind(now, id)
+      .run();
+  } else if (payload.transactionAction === "reassign" && payload.targetAccountId != null) {
+    await env.DB.prepare("UPDATE transactions SET account_id = ?1, updated_at = ?2 WHERE account_id = ?3")
+      .bind(payload.targetAccountId, now, id)
+      .run();
+    await env.DB.prepare(
+      "UPDATE transactions SET transfer_account_id = ?1, updated_at = ?2 WHERE transfer_account_id = ?3"
+    )
+      .bind(payload.targetAccountId, now, id)
+      .run();
+  }
+
+  await env.DB.prepare("UPDATE accounts SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
+    .bind(now, id)
+    .run();
+  return { status: "ok" };
 }
 
 async function getOrCreateCorrectionCategoryId(

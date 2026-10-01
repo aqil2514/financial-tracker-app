@@ -3,6 +3,7 @@ import type { Env } from "../../shared/env";
 import type { ContactPayload } from "./schema";
 
 export type UpdateContactResult = { status: "ok" } | { status: "not_found" };
+export type DeleteContactResult = { status: "ok" } | { status: "not_found" };
 
 export async function createContact(env: Env, payload: ContactPayload): Promise<{ id: string }> {
   const id = uuidv7();
@@ -25,6 +26,23 @@ export async function updateContact(
     "UPDATE contacts SET name = ?1, note = ?2, updated_at = ?3 WHERE id = ?4 AND deleted_at IS NULL"
   )
     .bind(payload.name, payload.note ?? null, now, id)
+    .run();
+  if (result.meta.changes === 0) return { status: "not_found" };
+  return { status: "ok" };
+}
+
+// Port dari use-delete-contact.ts, soft delete versi Worker (lihat
+// catatan soft-delete di account-groups/service.ts). BEDA dari
+// accounts/categories/account_groups: desktop TIDAK menawarkan
+// reassign/unassign apa pun di sini -- langsung DELETE, FK
+// `transactions.contact_id ON DELETE SET NULL` yg menangani sisanya
+// scr implisit. Port APA ADANYA, TANPA payload action.
+export async function deleteContact(env: Env, id: string): Promise<DeleteContactResult> {
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const result = await env.DB.prepare(
+    "UPDATE contacts SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NULL"
+  )
+    .bind(now, id)
     .run();
   if (result.meta.changes === 0) return { status: "not_found" };
   return { status: "ok" };

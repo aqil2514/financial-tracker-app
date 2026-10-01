@@ -1,8 +1,9 @@
 import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
-import type { CategoryPayload } from "./schema";
+import type { CategoryPayload, DeleteCategoryPayload } from "./schema";
 
 export type UpdateCategoryResult = { status: "ok" } | { status: "not_found" };
+export type DeleteCategoryResult = { status: "ok" } | { status: "not_found" };
 
 // Port dari use-create-category.ts. Default: type='expense' (SAMA dgn
 // desktop, cuma dipakai kalau caller tidak kirim type -- schema MEWAJIBKAN
@@ -52,5 +53,47 @@ export async function updateCategory(
     )
     .run();
   if (result.meta.changes === 0) return { status: "not_found" };
+  return { status: "ok" };
+}
+
+// Port dari use-delete-category.ts, soft delete versi Worker (lihat
+// catatan soft-delete di account-groups/service.ts). DUA relasi
+// ditangani independen, PERSIS urutan desktop: sub-kategori dulu, baru
+// transaksi, baru soft-delete kategori itu sendiri.
+export async function deleteCategory(
+  env: Env,
+  id: string,
+  payload: DeleteCategoryPayload
+): Promise<DeleteCategoryResult> {
+  const existing = await env.DB.prepare("SELECT id FROM categories WHERE id = ?1 AND deleted_at IS NULL")
+    .bind(id)
+    .first<{ id: string }>();
+  if (!existing) return { status: "not_found" };
+
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+
+  if (payload.childAction === "unassign") {
+    await env.DB.prepare("UPDATE categories SET parent_id = NULL, updated_at = ?1 WHERE parent_id = ?2")
+      .bind(now, id)
+      .run();
+  } else if (payload.childAction === "reassign" && payload.targetParentId != null) {
+    await env.DB.prepare("UPDATE categories SET parent_id = ?1, updated_at = ?2 WHERE parent_id = ?3")
+      .bind(payload.targetParentId, now, id)
+      .run();
+  }
+
+  if (payload.transactionAction === "unassign") {
+    await env.DB.prepare("UPDATE transactions SET category_id = NULL, updated_at = ?1 WHERE category_id = ?2")
+      .bind(now, id)
+      .run();
+  } else if (payload.transactionAction === "reassign" && payload.targetCategoryId != null) {
+    await env.DB.prepare("UPDATE transactions SET category_id = ?1, updated_at = ?2 WHERE category_id = ?3")
+      .bind(payload.targetCategoryId, now, id)
+      .run();
+  }
+
+  await env.DB.prepare("UPDATE categories SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
+    .bind(now, id)
+    .run();
   return { status: "ok" };
 }
