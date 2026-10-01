@@ -3,15 +3,16 @@
 import { getDb } from "@/lib/db";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 import { dependentKeysOf } from "@/lib/query-dependencies";
+import { pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 export type DeleteCategoryInput = {
   id: string;
   /** Perlakuan sub-kategori (parent_id = id ini) — wajib diisi kalau masih ada sub-kategori. */
   childAction?: "unassign" | "reassign";
-  targetParentId?: number;
+  targetParentId?: string;
   /** Perlakuan transaksi (category_id = id ini) — wajib diisi kalau masih ada transaksi. */
   transactionAction?: "unassign" | "reassign";
-  targetCategoryId?: number;
+  targetCategoryId?: string;
 };
 
 export function useDeleteCategory() {
@@ -23,6 +24,13 @@ export function useDeleteCategory() {
       transactionAction,
       targetCategoryId,
     }: DeleteCategoryInput) => {
+      await pushDeleteOnWrite("categories", id, {
+        childAction,
+        targetParentId,
+        transactionAction,
+        targetCategoryId,
+      });
+
       const db = await getDb();
 
       if (childAction === "unassign") {

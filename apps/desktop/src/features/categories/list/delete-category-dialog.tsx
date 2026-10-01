@@ -93,12 +93,12 @@ export function DeleteCategoryDialog({ category }: { category: Category }) {
         childAction: hasChildren ? childAction : undefined,
         targetParentId:
           hasChildren && childAction === "reassign" && isTargetParentValid
-            ? Number(targetParentId)
+            ? (targetParentId ?? undefined)
             : undefined,
         transactionAction: hasTransactions ? transactionAction : undefined,
         targetCategoryId:
           hasTransactions && transactionAction === "reassign" && isTargetCategoryValid
-            ? Number(targetCategoryId)
+            ? (targetCategoryId ?? undefined)
             : undefined,
       },
       { onSuccess: () => setOpen(false) }

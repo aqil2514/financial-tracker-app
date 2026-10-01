@@ -6,6 +6,7 @@ import { useEntityForm } from "@/hooks/use-entity-form";
 import { DEFAULT_ACCOUNT_COLOR } from "@/lib/account-colors";
 import { accountSchema, type AccountFormOutput } from "./account.schema";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 export function useCreateAccount() {
   return useEntityForm({
@@ -22,10 +23,11 @@ export function useCreateAccount() {
     }),
     mutationFn: async (values: AccountFormOutput) => {
       const db = await getDb();
+      const id = newId();
       await db.execute(
         "INSERT INTO accounts (id, name, initial_balance, group_id, description, is_active, account_type, icon, color) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
-          newId(),
+          id,
           values.name,
           values.initial_balance,
           values.group_id ? values.group_id : null,
@@ -36,6 +38,7 @@ export function useCreateAccount() {
           values.color,
         ]
       );
+      void pushOnWrite("accounts", id);
     },
     invalidateKey: QUERY_DEPENDENCIES.accounts,
     successMessage: "Akun berhasil ditambahkan",

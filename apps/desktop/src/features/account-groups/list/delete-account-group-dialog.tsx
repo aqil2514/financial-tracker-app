@@ -62,7 +62,7 @@ export function DeleteAccountGroupDialog({ group }: { group: AccountGroup }) {
         memberAction: memberCount > 0 ? memberAction : undefined,
         targetGroupId:
           memberCount > 0 && memberAction === "reassign" && isTargetGroupValid
-            ? Number(targetGroupId)
+            ? (targetGroupId ?? undefined)
             : undefined,
       },
       { onSuccess: () => setOpen(false) }

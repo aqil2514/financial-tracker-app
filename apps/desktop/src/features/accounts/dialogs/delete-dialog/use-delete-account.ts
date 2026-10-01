@@ -3,6 +3,7 @@
 import { getDb } from "@/lib/db";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 import { dependentKeysOf } from "@/lib/query-dependencies";
+import { pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 export type DeleteAccountInput = {
   id: string;
@@ -13,12 +14,14 @@ export type DeleteAccountInput = {
    * sekaligus.
    */
   transactionAction?: "unassign" | "reassign";
-  targetAccountId?: number;
+  targetAccountId?: string;
 };
 
 export function useDeleteAccount() {
   return useDbMutation({
     mutationFn: async ({ id, transactionAction, targetAccountId }: DeleteAccountInput) => {
+      await pushDeleteOnWrite("accounts", id, { transactionAction, targetAccountId });
+
       const db = await getDb();
 
       if (transactionAction === "unassign") {

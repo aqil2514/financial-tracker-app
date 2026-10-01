@@ -9,6 +9,7 @@ import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { useTransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
 import { applyDebtTransactionEdit } from "@/shared/debts/apply-debt-transaction";
 import { transactionSchema, type TransactionFormOutput } from "../schema";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 type UseUpdateTransactionOptions = {
   /** Dialog terbuka atau tidak — datang dari context, dipakai untuk
@@ -119,6 +120,8 @@ export function useUpdateTransaction(
         status: debtStatus,
         dangerousFieldsChanged,
       });
+
+      void pushOnWrite("transactions", transaction.id);
     },
     invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil diperbarui",

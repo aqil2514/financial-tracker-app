@@ -12,6 +12,7 @@ import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
 import { transactionSchema, type TransactionFormOutput } from "../schema";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 function now() {
   const date = new Date();
@@ -109,6 +110,8 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
         debtAction: values.debt_action,
         settleDebtIds: values.settle_debt_ids,
       });
+
+      void pushOnWrite("transactions", transactionId);
 
       return transactionId;
     },

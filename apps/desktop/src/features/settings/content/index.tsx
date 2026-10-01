@@ -1,5 +1,6 @@
 import { AiAssistantSection } from "./ai-assistant/ai-assistant-section";
 import { AttachmentFolderSection } from "./attachment-folder/attachment-folder-section";
+import { CloudSyncSection } from "./cloud-sync/cloud-sync-section";
 import { ImportDataSection } from "./import-data/import-data-section";
 import { RetailkuIntegrationSection } from "./retailku-integration/retailku-integration-section";
 
@@ -10,6 +11,7 @@ export function SettingsContent() {
       <AttachmentFolderSection />
       <AiAssistantSection />
       <RetailkuIntegrationSection />
+      <CloudSyncSection />
     </>
   );
 }

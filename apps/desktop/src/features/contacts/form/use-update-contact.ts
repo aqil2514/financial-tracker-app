@@ -5,6 +5,7 @@ import { useEntityForm } from "@/hooks/use-entity-form";
 import { isEmptyDoc } from "@/components/rich-text";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { contactSchema, type ContactFormOutput } from "./contact.schema";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 export function useUpdateContact(contact: Contact) {
   return useEntityForm({
@@ -21,6 +22,7 @@ export function useUpdateContact(contact: Contact) {
         isEmptyDoc(values.note) ? null : JSON.stringify(values.note),
         contact.id,
       ]);
+      void pushOnWrite("contacts", contact.id);
     },
     invalidateKey: QUERY_DEPENDENCIES.contacts,
     successMessage: "Kontak berhasil diperbarui",

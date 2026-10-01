@@ -4,6 +4,7 @@ import { getDb, type Account } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { accountSchema, type AccountFormOutput } from "./account.schema";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 export function useUpdateAccount(account: Account, onSuccess?: () => void) {
   return useEntityForm({
@@ -36,6 +37,7 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
           account.id,
         ]
       );
+      void pushOnWrite("accounts", account.id);
     },
     invalidateKey: QUERY_DEPENDENCIES.accounts,
     successMessage: "Akun berhasil diperbarui",

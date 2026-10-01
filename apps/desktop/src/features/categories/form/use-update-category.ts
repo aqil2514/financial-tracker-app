@@ -4,6 +4,7 @@ import { getDb, type Category } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { categorySchema, type CategoryFormOutput } from "./category.schema";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 export function useUpdateCategory(category: Category) {
   return useEntityForm({
@@ -27,6 +28,7 @@ export function useUpdateCategory(category: Category) {
           category.id,
         ]
       );
+      void pushOnWrite("categories", category.id);
     },
     invalidateKey: QUERY_DEPENDENCIES.categories,
     successMessage: "Kategori berhasil diperbarui",

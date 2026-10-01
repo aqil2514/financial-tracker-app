@@ -7,6 +7,7 @@ import {
   type AccountGroupFormOutput,
 } from "./account-group.schema";
 import { dependentKeysOf } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 export function useUpdateAccountGroup(group: AccountGroup) {
   return useEntityForm({
@@ -19,6 +20,7 @@ export function useUpdateAccountGroup(group: AccountGroup) {
         "UPDATE account_groups SET name = $1 WHERE id = $2",
         [values.name, group.id]
       );
+      void pushOnWrite("account_groups", group.id);
     },
     // Domain "accounts" ikut di-invalidate karena rename grup mengubah
     // group_name yang di-cache di accountsQueryKey (hasil LEFT JOIN).

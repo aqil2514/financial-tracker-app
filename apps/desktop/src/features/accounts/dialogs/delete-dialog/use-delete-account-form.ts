@@ -59,7 +59,7 @@ export function useDeleteAccountForm(
         transactionAction: hasTransactions ? transactionAction : undefined,
         targetAccountId:
           hasTransactions && transactionAction === "reassign" && isTargetAccountValid
-            ? Number(targetAccountId)
+            ? (targetAccountId ?? undefined)
             : undefined,
       },
       { onSuccess: () => setOpen(false) }

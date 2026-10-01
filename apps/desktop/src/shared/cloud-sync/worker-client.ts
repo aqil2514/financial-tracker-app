@@ -228,3 +228,42 @@ export function pullSync(creds: CloudSyncCredentials, since: string | null): Pro
   const query = since ? `?since=${encodeURIComponent(since)}` : "";
   return request<SyncResponse>(creds, `/sync${query}`);
 }
+
+// --- Delete: soft-delete 1 baris di Worker (DELETE /:path/:id) ---
+// Payload action EKSPLISIT per relasi, PERSIS pola desktop lokal (lihat
+// use-delete-account-group.ts/use-delete-account.ts/use-delete-category.ts) --
+// `contacts` TANPA payload sama sekali (desktop tidak py reassign/
+// unassign di sana). `transactions` BELUM py endpoint DELETE di Worker
+// (sisa kecil Tahap 4, lihat handover) -- TIDAK termasuk di sini.
+
+export type DeleteCloudPayload =
+  | { table: "account_groups"; memberAction?: "unassign" | "reassign"; targetGroupId?: string }
+  | { table: "accounts"; transactionAction?: "unassign" | "reassign"; targetAccountId?: string }
+  | {
+      table: "categories";
+      childAction?: "unassign" | "reassign";
+      targetParentId?: string;
+      transactionAction?: "unassign" | "reassign";
+      targetCategoryId?: string;
+    }
+  | { table: "contacts" };
+
+const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
+  account_groups: "/account-groups",
+  accounts: "/accounts",
+  categories: "/categories",
+  contacts: "/contacts",
+};
+
+export async function deleteCloudRow(
+  creds: CloudSyncCredentials,
+  table: DeleteCloudPayload["table"],
+  id: string,
+  payload?: Omit<Extract<DeleteCloudPayload, { table: typeof table }>, "table">
+): Promise<void> {
+  const body = payload && Object.keys(payload).length > 0 ? JSON.stringify(payload) : undefined;
+  await request(creds, `${DELETE_PATH[table]}/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    ...(body ? { body } : {}),
+  });
+}
