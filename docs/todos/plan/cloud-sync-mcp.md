@@ -43,17 +43,19 @@ Claude — BELUM DIBUAT).
       (**celah ditutup**, dulu over-alokasi gagal senyap — sekarang
       reject 422 keras sebelum tulis apa pun), #7 `dangerousFieldsChanged`.
       Endpoint yang ada: `transactions` (create + update via `PATCH
-      /transactions/:id`), `accounts` (`balance`, `correct-balance`,
-      `DELETE`), `account_groups`/`categories`/`contacts` (create +
-      update + `DELETE`, SEJAK 2026-10-01 — reassign/unassign eksplisit
-      PERSIS pola desktop). **SENGAJA SKIP** endpoint `/debts` &
-      `/debt-payments` langsung — tidak py padanan create/update di
-      desktop (SELALU lewat `transactions`+`applyDebtTransaction`, sudah
-      ter-cover). Belum: `DELETE /transactions/:id` (perlu keputusan
-      guard debt/payment dulu); `POST`/`PATCH` utk `accounts` (gap
-      terpisah, belum pernah di-port); UPSERT+LWW beneran (semua
-      endpoint tulis skrg masih INSERT/UPDATE polos, belum bandingkan
-      `updated_at`); token MCP terpisah dari `PC_SYNC_TOKEN`. Detail:
+      /transactions/:id`), `accounts` (create, update, `balance`,
+      `correct-balance`, `DELETE` — CRUD LENGKAP), `account_groups`/
+      `categories`/`contacts` (create + update + `DELETE` — reassign/
+      unassign eksplisit PERSIS pola desktop). **SEMUA endpoint tulis
+      di atas SEKARANG UPSERT dgn LWW beneran** (SEJAK 2026-10-01,
+      lewat `updatedAt` opsional di payload, bandingkan vs row existing
+      — bukan INSERT/UPDATE polos lagi). **SENGAJA SKIP** endpoint
+      `/debts` & `/debt-payments` langsung — tidak py padanan
+      create/update di desktop (SELALU lewat
+      `transactions`+`applyDebtTransaction`, sudah ter-cover). Belum:
+      endpoint PULL (`GET /sync?since=`, PC blm py cara ambil perubahan
+      dari sisi lain); `DELETE /transactions/:id` (perlu keputusan guard
+      debt/payment dulu); token MCP terpisah dari `PC_SYNC_TOKEN`. Detail:
       [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
 - [ ] **Tahap 5** — MCP server (Vercel + `mcp-handler`) — **BELUM
       DIMULAI**, `apps/mcp-server` belum ada. Detail:

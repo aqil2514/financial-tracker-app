@@ -1,59 +1,60 @@
-import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
 import type { CategoryPayload, DeleteCategoryPayload } from "./schema";
+import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
-export type UpdateCategoryResult = { status: "ok" } | { status: "not_found" };
+export type UpsertCategoryResult = { status: "ok"; id: string } | { status: "stale" };
 export type DeleteCategoryResult = { status: "ok" } | { status: "not_found" };
 
-// Port dari use-create-category.ts. Default: type='expense' (SAMA dgn
-// desktop, cuma dipakai kalau caller tidak kirim type -- schema MEWAJIBKAN
-// type dikirim, beda dari form desktop yg py default value sendiri; TIDAK
-// ADA validasi parent.type === type, lihat catatan di schema.ts.
-export async function createCategory(env: Env, payload: CategoryPayload): Promise<{ id: string }> {
-  const id = uuidv7();
-  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-  await env.DB.prepare(
-    `INSERT INTO categories
-       (id, name, icon, type, parent_id, is_active, created_at, updated_at, sync_source)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, 'mcp')`
-  )
-    .bind(
-      id,
-      payload.name,
-      payload.icon ?? null,
-      payload.type,
-      payload.parentId ?? null,
-      payload.isActive === false ? 0 : 1,
-      now
-    )
-    .run();
-  return { id };
-}
+// UPSERT dgn LWW, port dari use-create-category.ts +
+// use-update-category.ts digabung (lihat shared/lww.ts). TIDAK ADA
+// validasi parent.type === type, lihat catatan di schema.ts.
+export async function upsertCategory(env: Env, payload: CategoryPayload): Promise<UpsertCategoryResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM categories WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
 
-// Port dari use-update-category.ts.
-export async function updateCategory(
-  env: Env,
-  id: string,
-  payload: CategoryPayload
-): Promise<UpdateCategoryResult> {
-  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-  const result = await env.DB.prepare(
-    `UPDATE categories
-     SET name = ?1, icon = ?2, type = ?3, parent_id = ?4, is_active = ?5, updated_at = ?6
-     WHERE id = ?7 AND deleted_at IS NULL`
-  )
-    .bind(
-      payload.name,
-      payload.icon ?? null,
-      payload.type,
-      payload.parentId ?? null,
-      payload.isActive === false ? 0 : 1,
-      now,
-      id
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  if (!existing) {
+    const now = nowText();
+    await env.DB.prepare(
+      `INSERT INTO categories
+         (id, name, icon, type, parent_id, is_active, created_at, updated_at, sync_source)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'mcp')`
     )
-    .run();
-  if (result.meta.changes === 0) return { status: "not_found" };
-  return { status: "ok" };
+      .bind(
+        payload.id,
+        payload.name,
+        payload.icon ?? null,
+        payload.type,
+        payload.parentId ?? null,
+        payload.isActive === false ? 0 : 1,
+        now,
+        decision.updatedAt
+      )
+      .run();
+  } else {
+    // LWW menang CLEAR deleted_at juga, lihat account-groups/service.ts.
+    await env.DB.prepare(
+      `UPDATE categories
+       SET name = ?1, icon = ?2, type = ?3, parent_id = ?4, is_active = ?5, updated_at = ?6, deleted_at = NULL
+       WHERE id = ?7`
+    )
+      .bind(
+        payload.name,
+        payload.icon ?? null,
+        payload.type,
+        payload.parentId ?? null,
+        payload.isActive === false ? 0 : 1,
+        decision.updatedAt,
+        payload.id
+      )
+      .run();
+  }
+
+  return { status: "ok", id: payload.id };
 }
 
 // Port dari use-delete-category.ts, soft delete versi Worker (lihat

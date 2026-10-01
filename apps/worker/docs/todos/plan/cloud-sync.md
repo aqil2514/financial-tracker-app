@@ -232,6 +232,81 @@ terpusat di satu tempat.
         tapi belum di-port — gap terpisah, BUKAN bagian scope delete
         ini.
 
+- [x] **Endpoint create+update utk `accounts`** (2026-10-01, menutup gap
+      yg ditemukan sesi sebelumnya — `accounts` cuma py `balance`,
+      `correct-balance`, `DELETE`): port PERSIS `use-create-account.ts`
+      + `use-update-account.ts`, TIDAK ADA validasi bisnis non-trivial
+      (cuma required `name`). `color` default `"slate"` di form desktop
+      (`DEFAULT_ACCOUNT_COLOR`, konstanta kosmetik UI) — Worker biarkan
+      `null` kalau caller tidak kirim, BEDA kecil dari desktop yg SELALU
+      isi default, SENGAJA krn caller non-UI (tool MCP) wajar tidak
+      peduli warna. **DIVERIFIKASI end-to-end di production**: create →
+      cek `GET /accounts/balance` return `initialBalance` yg sama
+      (bukti integrasi lintas endpoint); update (termasuk `isActive:
+      false`) → cek D1 langsung, semua field tersimpan benar;
+      404-not-found; 400-invalid-payload. Data uji sudah dibersihkan.
+
+- [x] **UPSERT + LWW beneran utk SEMUA endpoint tulis** (2026-10-01) —
+      sebelumnya SEMUA endpoint cuma INSERT/UPDATE polos, `updated_at`
+      selalu ditulis baru TANPA dibandingkan dgn baris existing (push
+      dari PC bisa menimpa perubahan dari HP tanpa conflict resolution
+      apa pun). Helper generik baru `shared/lww.ts`
+      (`decideLww`/`resolveIncomingUpdatedAt`/`nowText`/`isValidUpdatedAt`),
+      dipakai SEMUA modul tulis (`transactions`, `accounts`,
+      `account-groups`, `categories`, `contacts`).
+      - **Keputusan desain** (dikonfirmasi user, urutan): (1) scope
+        dipersempit ke "LWW check di endpoint existing" dulu, endpoint
+        pull (`GET /sync?since=`) BELUM dikerjakan (prematur sebelum
+        Tahap 6/PC py mekanisme memanggilnya); (2) `POST` jadi UPSERT
+        LWW-aware JUGA (bukan cuma `PATCH`) — kalau `id` ternyata sudah
+        ada, treat spt update (bandingkan `updatedAt`), BUKAN error
+        primary-key-constraint; (3) format `updatedAt` payload: TEXT
+        `"YYYY-MM-DD HH:mm:ss"` sama persis dgn kolom `updated_at`
+        (string-compare valid krn zero-padded), opsional — tidak
+        dikirim berarti server pakai `now()` sendiri (backward
+        compatible, SELALU "menang" krn pasti paling baru); (4) `id`
+        WAJIB dari caller utk `account_groups`/`categories`/`contacts`/
+        `accounts` (BREAKING change — sebelumnya server-generate
+        `uuidv7()`) supaya UPSERT bisa tahu row mana yg dimaksud tanpa
+        pull dulu, konsisten dgn pola `transactions` yg sudah terima
+        `id` dari awal & `uuid-migration.md`; (5) LWW menang CLEAR
+        `deleted_at` juga (row yg soft-deleted "hidup lagi" kalau sisi
+        lain edit dgn `updatedAt` lebih baru — semantik LWW murni,
+        timestamp yg menang menang sepenuhnya termasuk status
+        hidup/mati); (6) `POST`/`PATCH` TETAP dua2nya ada (bukan
+        disederhanakan jadi satu `PUT`) — caller bebas pilih yg paling
+        natural, semantik keduanya SAMA (upsert LWW), TIDAK breaking
+        thd kontrak endpoint yg sudah diverifikasi sesi2 sebelumnya.
+      - **`transactions` PALING kompleks** — cek LWW dilakukan PALING
+        AWAL, SEBELUM validasi bisnis apa pun (#4, #3, #2, dst)
+        dijalankan (keputusan eksplisit: payload stale tidak perlu
+        divalidasi, percuma). `insertTransaction` (POST) di-refactor:
+        kalau `id` sudah ada → delegasi ke `updateTransactionRow`
+        (fungsi internal yg SAMA dipakai jalur PATCH, supaya logic #1/
+        #2/#3/#7 tidak terduplikasi) — bukan cuma logic #1/#4 spt kalau
+        dipanggil manual terpisah.
+      - **Bug ditemukan & diperbaiki SAAT verifikasi (bukan dari desain)**:
+        skenario awal "UPSERT menang" sempat mengembalikan `id` BARU
+        (uuidv7) alih2 meng-update row existing — ternyata root cause-nya
+        deploy sebelumnya belum sinkron (Version ID berubah lagi stlh
+        redeploy eksplisit), BUKAN bug logic. Setelah redeploy & retest,
+        semua skenario lolos.
+      - **DIVERIFIKASI end-to-end di production**, skenario lengkap:
+        create baru; UPSERT dgn `updatedAt` LEBIH LAMA → diabaikan
+        (dicek row TIDAK berubah di D1); UPSERT dgn `updatedAt` LEBIH
+        BARU → menang (dicek row BERUBAH sesuai payload baru, `id`
+        TETAP SAMA bukan row baru); un-delete via LWW win (soft-delete
+        dulu → UPSERT menang → `deleted_at` jadi NULL lagi, dicek
+        eksplisit di D1); PATCH jg diuji LWW stale+menang (bukan cuma
+        POST); **regresi 0** utk logic bisnis #1 (FIFO debt, transfer
+        cash→debt tetap bikin piutang benar) & #4 (larangan akun debt
+        tetap 422) di jalur UPSERT baru; spot-check `contacts`/
+        `categories`/`accounts` sama2 lolos pola stale+menang. Data uji
+        sudah dibersihkan (0 baris tersisa).
+      - **BELUM dikerjakan**: endpoint pull (`GET /sync?since=`) — PC
+        msh blm py cara AMBIL baris D1 yg berubah dari sisi lain, cuma
+        bisa PUSH (lewat endpoint2 di atas). Prasyarat Tahap 6.
+
 ## Yang BELUM diputuskan
 
 - [ ] **Arsitektur tool tulis MCP**: apakah `apps/mcp-server` akses D1
@@ -527,9 +602,9 @@ terpusat di satu tempat.
 - [x] Autentikasi PC↔Worker (token terpisah dari OAuth-shim MCP) —
       token statis Bearer, lihat "Progress implementasi". Worker sudah
       DI-DEPLOY ke production (bukan cuma preview dev lagi).
-- [ ] Endpoint sync lengkap: pull (kirim baris D1 sejak checkpoint),
-      push UPSERT dgn LWW per baris (bukan cuma INSERT/UPDATE polos spt
-      sekarang) — endpoint saat ini BELUM menangani konflik LWW.
+- [x] Push UPSERT dgn LWW per baris — SELESAI 2026-10-01, lihat
+      "Progress implementasi".
+- [ ] Endpoint pull (kirim baris D1 sejak checkpoint) — BELUM ADA.
 - [x] Endpoint create+update utk `account_groups`, `categories`,
       `contacts` — lihat "Progress implementasi" utk detail.
       **SENGAJA SKIP** `/debts` & `/debt-payments` langsung (tidak py
@@ -541,11 +616,8 @@ terpusat di satu tempat.
       audit mencatat delete transaksi TIDAK py guard thd debt/payment
       terkait sama sekali, keputusan desain belum diambil (lihat "Yang
       BELUM diputuskan" di `mcp-server-business-logic-audit.md`).
-- [ ] Endpoint create+update utk `accounts` (`POST /accounts`, `PATCH
-      /accounts/:id`) — GAP terpisah ditemukan 2026-10-01, belum pernah
-      di-port padahal `use-create-account.ts`/`use-update-account.ts`
-      ADA di desktop. `accounts` sejauh ini cuma py `balance`,
-      `correct-balance`, `DELETE`.
+- [x] Endpoint create+update utk `accounts` — SELESAI 2026-10-01, lihat
+      "Progress implementasi".
 - [x] Validasi/logic bisnis hasil audit diimplementasikan di Worker —
       lihat checklist porting di `mcp-server-business-logic-audit.md`.
       **PROGRESS: 7 dari 7 SELESAI** (2026-10-01). #1 FIFO debt, #4

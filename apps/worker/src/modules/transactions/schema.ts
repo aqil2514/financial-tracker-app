@@ -1,8 +1,7 @@
-// Payload minimal dari PC utk push satu baris transaksi. SENGAJA belum
-// ada validasi logic bisnis (FIFO debt, formula saldo, dst dari
-// docs/todos/plan/mcp-server-business-logic-audit.md) -- endpoint ini
-// DEVELOPMENT ONLY, cuma utk membuktikan jalur data PC->D1 hidup.
-// JANGAN dipakai dari tool MCP tulis manapun sebelum validasi itu ada.
+import { isValidUpdatedAt } from "../../shared/lww";
+
+// Payload dari PC/MCP utk push satu baris transaksi. `updatedAt`
+// opsional -- lihat shared/lww.ts utk kontrak LWW lengkap.
 export type PushTransactionPayload = {
   id: string;
   type: "income" | "expense" | "transfer";
@@ -22,6 +21,7 @@ export type PushTransactionPayload = {
   // debts.id yang dipilih utk dilunasi, cuma dipakai saat
   // debtAction === 'settlement'.
   settleDebtIds?: string[];
+  updatedAt?: string;
 };
 
 export function isPushTransactionPayload(value: unknown): value is PushTransactionPayload {
@@ -42,7 +42,8 @@ export function isPushTransactionPayload(value: unknown): value is PushTransacti
     typeof v.note === "string" &&
     typeof v.date === "string" &&
     debtActionValid &&
-    settleDebtIdsValid
+    settleDebtIdsValid &&
+    (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
 }
 
@@ -67,6 +68,7 @@ export function isPatchTransactionPayload(value: unknown): value is PatchTransac
     typeof v.note === "string" &&
     typeof v.date === "string" &&
     debtActionValid &&
-    settleDebtIdsValid
+    settleDebtIdsValid &&
+    (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
 }

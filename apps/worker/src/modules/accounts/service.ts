@@ -1,8 +1,70 @@
 import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
-import type { DeleteAccountPayload } from "./schema";
+import type { AccountPayload, DeleteAccountPayload } from "./schema";
+import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
 const CORRECTION_CATEGORY_NAME = "Penyesuaian Saldo";
+
+export type UpsertAccountResult = { status: "ok"; id: string } | { status: "stale" };
+
+// UPSERT dgn LWW, port dari use-create-account.ts + use-update-account.ts
+// digabung (lihat shared/lww.ts).
+export async function upsertAccount(env: Env, payload: AccountPayload): Promise<UpsertAccountResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM accounts WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  if (!existing) {
+    const now = nowText();
+    await env.DB.prepare(
+      `INSERT INTO accounts
+         (id, name, icon, initial_balance, group_id, description, is_active, account_type, color,
+          created_at, updated_at, sync_source)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'mcp')`
+    )
+      .bind(
+        payload.id,
+        payload.name,
+        payload.icon ?? null,
+        payload.initialBalance,
+        payload.groupId ?? null,
+        payload.description ?? null,
+        payload.isActive === false ? 0 : 1,
+        payload.accountType,
+        payload.color ?? null,
+        now,
+        decision.updatedAt
+      )
+      .run();
+  } else {
+    // LWW menang CLEAR deleted_at juga, lihat account-groups/service.ts.
+    await env.DB.prepare(
+      `UPDATE accounts
+       SET name = ?1, icon = ?2, initial_balance = ?3, group_id = ?4, description = ?5,
+           is_active = ?6, account_type = ?7, color = ?8, updated_at = ?9, deleted_at = NULL
+       WHERE id = ?10`
+    )
+      .bind(
+        payload.name,
+        payload.icon ?? null,
+        payload.initialBalance,
+        payload.groupId ?? null,
+        payload.description ?? null,
+        payload.isActive === false ? 0 : 1,
+        payload.accountType,
+        payload.color ?? null,
+        decision.updatedAt,
+        payload.id
+      )
+      .run();
+  }
+
+  return { status: "ok", id: payload.id };
+}
 
 // Logic bisnis #5 (formula saldo akun) dari
 // docs/todos/plan/mcp-server-business-logic-audit.md, port PERSIS dari

@@ -7,13 +7,16 @@ import {
   validateDebtSettlementAmount,
   DebtEditBlockedError,
 } from "../debts/service";
+import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
 export type InsertTransactionResult =
   | { status: "ok" }
+  | { status: "ignored" }
   | { status: "rejected"; reason: string };
 
 export type UpdateTransactionResult =
   | { status: "ok" }
+  | { status: "ignored" }
   | { status: "not_found" }
   | { status: "rejected"; reason: string };
 
@@ -38,12 +41,42 @@ async function violatesDebtAccountRule(
   return row?.account_type === "debt";
 }
 
-// Belum UPSERT dgn LWW (`updated_at` selalu ditulis baru, blm
-// dibandingkan dgn baris existing) -- lihat checklist sisa di
-// docs/todos/plan/mcp-server-business-logic-audit.md.
+// UPSERT dgn LWW (lihat shared/lww.ts). `id` sudah ada di D1 -> delegasi
+// ke updateTransactionRow (logic sama persis dgn jalur PATCH, krn
+// semantiknya memang sama: "tulis baris ini kalau lebih baru dari yg
+// ada"). LWW compare dicek PALING AWAL, SEBELUM validasi bisnis apa pun
+// (#4, #3, dst) -- payload yg toh mau diabaikan tidak perlu divalidasi.
 export async function insertTransaction(
   env: Env,
   payload: PushTransactionPayload
+): Promise<InsertTransactionResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM transactions WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "ignored" };
+
+  if (existing) {
+    // Row sudah ada & payload lebih baru -- PERSIS semantik PATCH,
+    // reuse fungsi yg sama (termasuk #2/#3/#7, bukan cuma #1/#4).
+    const result = await updateTransactionRow(env, payload.id, payload, decision.updatedAt);
+    if (result.status === "not_found") {
+      // Tidak mungkin terjadi (existing sudah dicek barusan), tapi
+      // dipertahankan sbg union type lengkap -- treat spt create gagal.
+      return { status: "rejected", reason: "Transaction vanished during upsert" };
+    }
+    return result;
+  }
+
+  return createTransactionRow(env, payload, decision.updatedAt);
+}
+
+async function createTransactionRow(
+  env: Env,
+  payload: PushTransactionPayload,
+  updatedAt: string
 ): Promise<InsertTransactionResult> {
   if (await violatesDebtAccountRule(env, payload)) {
     return {
@@ -65,7 +98,7 @@ export async function insertTransaction(
     if (precheck.status === "rejected") return precheck;
   }
 
-  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const now = nowText();
   await env.DB.prepare(
     `INSERT INTO transactions
        (id, type, amount, category_id, account_id, transfer_account_id,
@@ -84,7 +117,7 @@ export async function insertTransaction(
       payload.description ?? null,
       payload.contactId ?? null,
       now,
-      now
+      updatedAt
     )
     .run();
 
@@ -135,17 +168,41 @@ function dangerousFieldsChanged(
   );
 }
 
-// Endpoint PATCH /transactions/:id -- port dari use-update-transaction.ts
-// + applyDebtTransactionEdit. SENGAJA belum UPSERT/LWW (`updated_at`
-// selalu ditulis baru, blm dibandingkan dgn checkpoint sync) -- sama
-// spt insertTransaction, lihat checklist sisa di audit.
+// Endpoint PATCH /transactions/:id -- entry point publik, cek LWW +
+// not_found SEBELUM delegasi ke updateTransactionRow (logic inti, jg
+// dipakai dari insertTransaction saat id ternyata sudah ada -- lihat
+// shared/lww.ts). LWW dicek PALING AWAL, SEBELUM validasi bisnis apa pun.
 export async function updateTransaction(
   env: Env,
   id: string,
   payload: PatchTransactionPayload
 ): Promise<UpdateTransactionResult> {
+  const existingMeta = await env.DB.prepare("SELECT updated_at FROM transactions WHERE id = ?1")
+    .bind(id)
+    .first<{ updated_at: string | null }>();
+  if (!existingMeta) return { status: "not_found" };
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existingMeta.updated_at);
+  if (decision.outcome === "stale") return { status: "ignored" };
+
+  return updateTransactionRow(env, id, payload, decision.updatedAt);
+}
+
+// Logic inti UPDATE, port dari use-update-transaction.ts +
+// applyDebtTransactionEdit -- DIPANGGIL dari 2 jalur: updateTransaction
+// (PATCH, existing sudah dicek py caller) DAN insertTransaction (POST
+// yg ternyata id-nya sudah ada, upsert LWW). `updatedAt` SUDAH
+// diputuskan pemenang LWW-nya oleh caller, di sini cuma dipakai apa
+// adanya utk nilai kolom.
+async function updateTransactionRow(
+  env: Env,
+  id: string,
+  payload: PatchTransactionPayload,
+  updatedAt: string
+): Promise<UpdateTransactionResult> {
   const existing = await env.DB.prepare(
-    "SELECT id, type, amount, account_id, transfer_account_id, contact_id FROM transactions WHERE id = ?1 AND deleted_at IS NULL"
+    "SELECT id, type, amount, account_id, transfer_account_id, contact_id FROM transactions WHERE id = ?1"
   )
     .bind(id)
     .first<ExistingTransactionRow>();
@@ -160,7 +217,7 @@ export async function updateTransaction(
 
   const fieldsChanged = dangerousFieldsChanged(existing, payload);
 
-  // Logic #3 pre-check -- sama alasannya dgn insertTransaction: cegah
+  // Logic #3 pre-check -- sama alasannya dgn createTransactionRow: cegah
   // UPDATE transaksi tersimpan sementara settlement-nya ditolak.
   if (payload.type === "transfer" && payload.debtAction === "settlement") {
     const precheck = await validateDebtSettlementAmount(env, {
@@ -181,11 +238,11 @@ export async function updateTransaction(
     };
   }
 
-  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+  // LWW menang CLEAR deleted_at juga, lihat account-groups/service.ts.
   await env.DB.prepare(
     `UPDATE transactions
      SET type = ?1, amount = ?2, category_id = ?3, account_id = ?4, transfer_account_id = ?5,
-         note = ?6, date = ?7, description = ?8, contact_id = ?9, updated_at = ?10
+         note = ?6, date = ?7, description = ?8, contact_id = ?9, updated_at = ?10, deleted_at = NULL
      WHERE id = ?11`
   )
     .bind(
@@ -198,7 +255,7 @@ export async function updateTransaction(
       payload.date,
       payload.description ?? null,
       payload.contactId ?? null,
-      now,
+      updatedAt,
       id
     )
     .run();

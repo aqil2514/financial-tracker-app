@@ -1,3 +1,5 @@
+import { isValidUpdatedAt } from "../../shared/lww";
+
 export type CorrectAccountBalancePayload = {
   accountId: string;
   targetBalance: number;
@@ -9,6 +11,43 @@ export function isCorrectAccountBalancePayload(
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
   return typeof v.accountId === "string" && typeof v.targetBalance === "number";
+}
+
+// Port dari account.schema.ts (Zod) + use-create-account.ts -- TIDAK ADA
+// validasi bisnis non-trivial, cuma required field `name`. `color`
+// default `"slate"` di desktop (DEFAULT_ACCOUNT_COLOR, konstanta
+// KOSMETIK UI, bukan logic bisnis) -- kalau caller tidak kirim, Worker
+// biarkan `null` (BEDA kecil dari desktop yg SELALU isi default di form,
+// tapi caller non-UI spt tool MCP wajar tidak peduli warna).
+export type AccountPayload = {
+  id: string;
+  name: string;
+  initialBalance: number;
+  groupId?: string | null;
+  description?: string | null;
+  isActive?: boolean;
+  accountType: "cash" | "debt";
+  icon?: string | null;
+  color?: string | null;
+  updatedAt?: string;
+};
+
+export function isAccountPayload(value: unknown): value is AccountPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "string" &&
+    typeof v.name === "string" &&
+    v.name.trim().length > 0 &&
+    typeof v.initialBalance === "number" &&
+    (v.groupId === undefined || v.groupId === null || typeof v.groupId === "string") &&
+    (v.description === undefined || v.description === null || typeof v.description === "string") &&
+    (v.isActive === undefined || typeof v.isActive === "boolean") &&
+    (v.accountType === "cash" || v.accountType === "debt") &&
+    (v.icon === undefined || v.icon === null || typeof v.icon === "string") &&
+    (v.color === undefined || v.color === null || typeof v.color === "string") &&
+    (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
+  );
 }
 
 // Port dari use-delete-account.ts (DeleteAccountInput) -- akun dipakai

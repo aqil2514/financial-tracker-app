@@ -1,34 +1,39 @@
 import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
 import type { ContactPayload } from "./schema";
+import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
-export type UpdateContactResult = { status: "ok" } | { status: "not_found" };
+export type UpsertContactResult = { status: "ok"; id: string } | { status: "stale" };
 export type DeleteContactResult = { status: "ok" } | { status: "not_found" };
 
-export async function createContact(env: Env, payload: ContactPayload): Promise<{ id: string }> {
-  const id = uuidv7();
-  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-  await env.DB.prepare(
-    "INSERT INTO contacts (id, name, note, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?4, ?4, 'mcp')"
-  )
-    .bind(id, payload.name, payload.note ?? null, now)
-    .run();
-  return { id };
-}
+// UPSERT dgn LWW, port dari use-create-contact.ts + use-update-contact.ts
+// digabung (lihat shared/lww.ts).
+export async function upsertContact(env: Env, payload: ContactPayload): Promise<UpsertContactResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM contacts WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
 
-export async function updateContact(
-  env: Env,
-  id: string,
-  payload: ContactPayload
-): Promise<UpdateContactResult> {
-  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-  const result = await env.DB.prepare(
-    "UPDATE contacts SET name = ?1, note = ?2, updated_at = ?3 WHERE id = ?4 AND deleted_at IS NULL"
-  )
-    .bind(payload.name, payload.note ?? null, now, id)
-    .run();
-  if (result.meta.changes === 0) return { status: "not_found" };
-  return { status: "ok" };
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  if (!existing) {
+    const now = nowText();
+    await env.DB.prepare(
+      "INSERT INTO contacts (id, name, note, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?4, ?5, 'mcp')"
+    )
+      .bind(payload.id, payload.name, payload.note ?? null, now, decision.updatedAt)
+      .run();
+  } else {
+    // LWW menang CLEAR deleted_at juga, lihat account-groups/service.ts.
+    await env.DB.prepare(
+      "UPDATE contacts SET name = ?1, note = ?2, updated_at = ?3, deleted_at = NULL WHERE id = ?4"
+    )
+      .bind(payload.name, payload.note ?? null, decision.updatedAt, payload.id)
+      .run();
+  }
+
+  return { status: "ok", id: payload.id };
 }
 
 // Port dari use-delete-contact.ts, soft delete versi Worker (lihat

@@ -1,37 +1,50 @@
-import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
 import type { AccountGroupPayload, DeleteAccountGroupPayload } from "./schema";
+import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
-export type UpdateAccountGroupResult = { status: "ok" } | { status: "not_found" };
+export type UpsertAccountGroupResult =
+  | { status: "ok"; id: string }
+  | { status: "stale" };
 export type DeleteAccountGroupResult = { status: "ok" } | { status: "not_found" };
 
-// Port PERSIS dari use-create-account-group.ts -- entity paling
-// sederhana, cuma required field `name`, tidak ada validasi bisnis lain.
-export async function createAccountGroup(env: Env, payload: AccountGroupPayload): Promise<{ id: string }> {
-  const id = uuidv7();
-  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-  await env.DB.prepare(
-    "INSERT INTO account_groups (id, name, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?3, 'mcp')"
-  )
-    .bind(id, payload.name, now)
-    .run();
-  return { id };
-}
-
-// Port PERSIS dari use-update-account-group.ts.
-export async function updateAccountGroup(
+// UPSERT dgn LWW, port dari use-create-account-group.ts +
+// use-update-account-group.ts (digabung -- lihat shared/lww.ts). `id`
+// dari payload (BUKAN server-generate lagi): kalau belum ada row dgn id
+// itu -> INSERT; kalau sudah ada -> bandingkan `updatedAt` masuk vs
+// existing, menang kalau lebih baru, diabaikan (status "stale") kalau
+// tidak. Entity paling sederhana, tidak ada validasi bisnis lain selain
+// required `name`.
+export async function upsertAccountGroup(
   env: Env,
-  id: string,
   payload: AccountGroupPayload
-): Promise<UpdateAccountGroupResult> {
-  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-  const result = await env.DB.prepare(
-    "UPDATE account_groups SET name = ?1, updated_at = ?2 WHERE id = ?3 AND deleted_at IS NULL"
-  )
-    .bind(payload.name, now, id)
-    .run();
-  if (result.meta.changes === 0) return { status: "not_found" };
-  return { status: "ok" };
+): Promise<UpsertAccountGroupResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM account_groups WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  if (!existing) {
+    const now = nowText();
+    await env.DB.prepare(
+      "INSERT INTO account_groups (id, name, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?4, 'mcp')"
+    )
+      .bind(payload.id, payload.name, now, decision.updatedAt)
+      .run();
+  } else {
+    // LWW menang CLEAR deleted_at juga -- row yg sempat soft-delete di
+    // satu sisi "hidup lagi" kalau sisi lain edit dgn updatedAt lebih
+    // baru (lihat keputusan di cloud-sync.md "UPSERT vs soft-deleted row").
+    await env.DB.prepare(
+      "UPDATE account_groups SET name = ?1, updated_at = ?2, deleted_at = NULL WHERE id = ?3"
+    )
+      .bind(payload.name, decision.updatedAt, payload.id)
+      .run();
+  }
+
+  return { status: "ok", id: payload.id };
 }
 
 // Port dari use-delete-account-group.ts (soft delete versi Worker --
