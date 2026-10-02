@@ -112,13 +112,33 @@ async function upsertAccount(db: Database, row: SyncResponse["accounts"][number]
   );
 }
 
+/** true kalau (source, source_ref) baris incoming SUDAH dipakai baris
+ * lokal lain (id beda) -- unique index `idx_*_source_ref` akan menolak
+ * upsert-nya dan menggagalkan SELURUH pull. Kasus nyata: Retailku sync
+ * jalan di 2 PC, baris yg sama punya id beda tapi source_ref sama. Baris
+ * lokal dipertahankan, incoming dilewati (bukan dobel). */
+async function hasLocalSourceRefConflict(
+  db: Database,
+  table: "transactions" | "debts" | "debt_payments",
+  row: { id: string; source: string; sourceRef: string | null }
+): Promise<boolean> {
+  if (!row.sourceRef) return false;
+  const rows = await db.select<{ id: string }[]>(
+    `SELECT id FROM ${table} WHERE source = $1 AND source_ref = $2 AND id <> $3 LIMIT 1`,
+    [row.source, row.sourceRef, row.id]
+  );
+  return rows.length > 0;
+}
+
 async function upsertTransaction(db: Database, row: SyncResponse["transactions"][number]) {
+  if (await hasLocalSourceRefConflict(db, "transactions", row)) return;
   await db.execute(
-    `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, updated_at, deleted_at, sync_source)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULL, 'mcp')
+    `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, source, source_ref, updated_at, deleted_at, sync_source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, 'mcp')
      ON CONFLICT(id) DO UPDATE SET type = excluded.type, amount = excluded.amount, category_id = excluded.category_id,
        account_id = excluded.account_id, transfer_account_id = excluded.transfer_account_id, note = excluded.note,
        description = excluded.description, date = excluded.date, contact_id = excluded.contact_id,
+       source = excluded.source, source_ref = excluded.source_ref,
        updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
     [
       row.id,
@@ -131,18 +151,29 @@ async function upsertTransaction(db: Database, row: SyncResponse["transactions"]
       row.description,
       row.date,
       row.contactId,
+      row.source,
+      row.sourceRef,
       row.updatedAt,
     ]
   );
 }
 
+// `debts`/`debt_payments` di D1 DITURUNKAN Worker sendiri dari transaksi
+// (applyDebtTransaction), belum ada jalur push provenance-nya -- jadi
+// 'manual' dari Worker belum tentu benar. Cabang UPDATE hanya menimpa
+// `source`/`source_ref` kalau incoming 'retailku_sync'; jejak Retailku
+// lokal tidak boleh dihapus oleh 'manual' default dari cloud.
 async function upsertDebt(db: Database, row: SyncResponse["debts"][number]) {
+  if (await hasLocalSourceRefConflict(db, "debts", row)) return;
   await db.execute(
-    `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, status, note, date, updated_at, deleted_at, sync_source)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL, 'mcp')
+    `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, status, note, date, source, source_ref, updated_at, deleted_at, sync_source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NULL, 'mcp')
      ON CONFLICT(id) DO UPDATE SET type = excluded.type, contact_id = excluded.contact_id, amount = excluded.amount,
        account_id = excluded.account_id, transaction_id = excluded.transaction_id, status = excluded.status,
-       note = excluded.note, date = excluded.date, updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
+       note = excluded.note, date = excluded.date,
+       source = CASE WHEN excluded.source = 'retailku_sync' THEN excluded.source ELSE debts.source END,
+       source_ref = CASE WHEN excluded.source = 'retailku_sync' THEN excluded.source_ref ELSE debts.source_ref END,
+       updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
     [
       row.id,
       row.type,
@@ -153,19 +184,35 @@ async function upsertDebt(db: Database, row: SyncResponse["debts"][number]) {
       row.status,
       row.note,
       row.date,
+      row.source,
+      row.sourceRef,
       row.updatedAt,
     ]
   );
 }
 
 async function upsertDebtPayment(db: Database, row: SyncResponse["debtPayments"][number]) {
+  if (await hasLocalSourceRefConflict(db, "debt_payments", row)) return;
   await db.execute(
-    `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, note, date, updated_at, deleted_at, sync_source)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL, 'mcp')
+    `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, note, date, source, source_ref, updated_at, deleted_at, sync_source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL, 'mcp')
      ON CONFLICT(id) DO UPDATE SET debt_id = excluded.debt_id, amount = excluded.amount, account_id = excluded.account_id,
        transaction_id = excluded.transaction_id, note = excluded.note, date = excluded.date,
+       source = CASE WHEN excluded.source = 'retailku_sync' THEN excluded.source ELSE debt_payments.source END,
+       source_ref = CASE WHEN excluded.source = 'retailku_sync' THEN excluded.source_ref ELSE debt_payments.source_ref END,
        updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
-    [row.id, row.debtId, row.amount, row.accountId, row.transactionId, row.note, row.date, row.updatedAt]
+    [
+      row.id,
+      row.debtId,
+      row.amount,
+      row.accountId,
+      row.transactionId,
+      row.note,
+      row.date,
+      row.source,
+      row.sourceRef,
+      row.updatedAt,
+    ]
   );
 }
 

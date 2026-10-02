@@ -111,10 +111,12 @@ export async function pushRowPayload(
           description: string | null;
           date: string;
           contact_id: string | null;
+          source: "manual" | "retailku_sync";
+          source_ref: string | null;
           updated_at: string | null;
         }[]
       >(
-        "SELECT id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, updated_at FROM transactions WHERE id = $1",
+        "SELECT id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, source, source_ref, updated_at FROM transactions WHERE id = $1",
         [id]
       );
       const row = rows[0];
@@ -130,6 +132,8 @@ export async function pushRowPayload(
         description: row.description,
         date: row.date,
         contactId: row.contact_id,
+        source: row.source,
+        sourceRef: row.source_ref,
         updatedAt: row.updated_at ?? undefined,
       });
     }

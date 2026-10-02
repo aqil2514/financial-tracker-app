@@ -104,8 +104,14 @@ export type PushTransactionPayload = {
   contactId?: string | null;
   debtAction?: "settlement" | "payable" | null;
   settleDebtIds?: string[];
+  // Provenance baris (kolom `source`/`source_ref`) -- WAJIB ikut supaya
+  // baris hasil sync Retailku tidak jatuh jadi 'manual' di D1.
+  source?: TransactionSource;
+  sourceRef?: string | null;
   updatedAt?: string;
 };
+
+export type TransactionSource = "manual" | "retailku_sync";
 
 export function pushTransaction(creds: CloudSyncCredentials, payload: PushTransactionPayload) {
   return pushUpsert(creds, "/transactions", payload);
@@ -196,6 +202,8 @@ export type SyncResponse = {
       date: string;
       description: string | null;
       contactId: string | null;
+      source: TransactionSource;
+      sourceRef: string | null;
     }
   >;
   debts: Array<
@@ -208,6 +216,8 @@ export type SyncResponse = {
       status: "ongoing" | "paid" | "written_off";
       note: string | null;
       date: string;
+      source: TransactionSource;
+      sourceRef: string | null;
     }
   >;
   debtPayments: Array<
@@ -218,6 +228,8 @@ export type SyncResponse = {
       transactionId: string | null;
       note: string | null;
       date: string;
+      source: TransactionSource;
+      sourceRef: string | null;
     }
   >;
 };
