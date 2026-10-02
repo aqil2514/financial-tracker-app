@@ -1,13 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AiAssistantForm } from "./ai-assistant-form";
 
 export function AiAssistantSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>API Key AI Assistant</CardTitle>
+        <CardTitle>AI Assistant (MCP)</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-muted-foreground text-sm">Belum ada pengaturan. Menyusul.</p>
+        <AiAssistantForm />
       </CardContent>
     </Card>
   );

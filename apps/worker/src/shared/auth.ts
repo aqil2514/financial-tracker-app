@@ -8,7 +8,7 @@ export function isAuthorized(request: Request, env: Env): boolean {
   // Perbandingan panjang-konstan sederhana -- skala personal single-user,
   // BUKAN sistem multi-tenant kritikal, timing-attack risk diterima sama
   // spt keputusan token plaintext di tabel `settings` PC.
-  return token === env.PC_SYNC_TOKEN;
+  return token === env.PC_SYNC_TOKEN || token === env.MCP_SYNC_TOKEN;
 }
 
 // Middleware Hono -- pasang via `router.use(requireAuth)` di router.ts

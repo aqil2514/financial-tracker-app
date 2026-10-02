@@ -5,4 +5,9 @@ export interface Env {
   // Di-set via `wrangler secret put PC_SYNC_TOKEN`, TIDAK ditulis di
   // wrangler.toml.
   PC_SYNC_TOKEN: string;
+  // Token statis Worker<->apps/mcp-server, terpisah dari PC_SYNC_TOKEN
+  // krn scope beda (mewakili tool MCP dari HP, bukan desktop PC).
+  // Di-set via `wrangler secret put MCP_SYNC_TOKEN`, TIDAK ditulis di
+  // wrangler.toml.
+  MCP_SYNC_TOKEN: string;
 }

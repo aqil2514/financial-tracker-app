@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "./shared/env";
+import { requireAuth } from "./shared/auth";
 import { handleGetHealth } from "./modules/health/controller";
 import { transactionsRouter } from "./modules/transactions/router";
 import { accountsRouter } from "./modules/accounts/router";
@@ -19,6 +20,11 @@ const app = new Hono<{ Bindings: Env }>();
 app.use("*", cors());
 
 app.get("/health", handleGetHealth);
+// Endpoint ringan khusus validasi token (PC_SYNC_TOKEN ATAU
+// MCP_SYNC_TOKEN), tanpa sentuh D1 -- dipakai apps/mcp-server saat
+// proses OAuth authorize utk cek token yg dimasukkan user valid,
+// sebelum code exchange terjadi.
+app.get("/auth/verify", requireAuth, (c) => c.json({ ok: true }));
 app.route("/transactions", transactionsRouter);
 app.route("/accounts", accountsRouter);
 app.route("/account-groups", accountGroupsRouter);
