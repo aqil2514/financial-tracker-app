@@ -50,6 +50,8 @@ export type SyncResponse = {
     date: string;
     description: string | null;
     contactId: string | null;
+    source: "manual" | "retailku_sync";
+    sourceRef: string | null;
     updatedAt: string | null;
     deletedAt: string | null;
   }>;
@@ -63,6 +65,8 @@ export type SyncResponse = {
     status: "ongoing" | "paid" | "written_off";
     note: string | null;
     date: string;
+    source: "manual" | "retailku_sync";
+    sourceRef: string | null;
     updatedAt: string | null;
     deletedAt: string | null;
   }>;
@@ -74,6 +78,8 @@ export type SyncResponse = {
     transactionId: string | null;
     note: string | null;
     date: string;
+    source: "manual" | "retailku_sync";
+    sourceRef: string | null;
     updatedAt: string | null;
     deletedAt: string | null;
   }>;
@@ -137,7 +143,7 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
       }>(),
     env.DB.prepare(
       `SELECT id, type, amount, category_id, account_id, transfer_account_id, note, date, description,
-              contact_id, updated_at, deleted_at
+              contact_id, source, source_ref, updated_at, deleted_at
        FROM transactions ${filter}`
     )
       .bind(...bind)
@@ -152,12 +158,14 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
         date: string;
         description: string | null;
         contact_id: string | null;
+        source: "manual" | "retailku_sync";
+        source_ref: string | null;
         updated_at: string | null;
         deleted_at: string | null;
       }>(),
     env.DB.prepare(
       `SELECT id, type, contact_id, amount, account_id, transaction_id, status, note, date,
-              updated_at, deleted_at
+              source, source_ref, updated_at, deleted_at
        FROM debts ${filter}`
     )
       .bind(...bind)
@@ -171,11 +179,13 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
         status: "ongoing" | "paid" | "written_off";
         note: string | null;
         date: string;
+        source: "manual" | "retailku_sync";
+        source_ref: string | null;
         updated_at: string | null;
         deleted_at: string | null;
       }>(),
     env.DB.prepare(
-      `SELECT id, debt_id, amount, account_id, transaction_id, note, date, updated_at, deleted_at
+      `SELECT id, debt_id, amount, account_id, transaction_id, note, date, source, source_ref, updated_at, deleted_at
        FROM debt_payments ${filter}`
     )
       .bind(...bind)
@@ -187,6 +197,8 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
         transaction_id: string | null;
         note: string | null;
         date: string;
+        source: "manual" | "retailku_sync";
+        source_ref: string | null;
         updated_at: string | null;
         deleted_at: string | null;
       }>(),
@@ -241,6 +253,8 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
       date: r.date,
       description: r.description,
       contactId: r.contact_id,
+      source: r.source,
+      sourceRef: r.source_ref,
       updatedAt: r.updated_at,
       deletedAt: r.deleted_at,
     })),
@@ -254,6 +268,8 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
       status: r.status,
       note: r.note,
       date: r.date,
+      source: r.source,
+      sourceRef: r.source_ref,
       updatedAt: r.updated_at,
       deletedAt: r.deleted_at,
     })),
@@ -265,6 +281,8 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
       transactionId: r.transaction_id,
       note: r.note,
       date: r.date,
+      source: r.source,
+      sourceRef: r.source_ref,
       updatedAt: r.updated_at,
       deletedAt: r.deleted_at,
     })),

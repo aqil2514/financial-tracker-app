@@ -87,23 +87,23 @@ Transaksi hasil sync Retailku (`source='retailku_sync'`, dgn
 
 ## Yang perlu dikerjakan
 
-- [ ] Tambah `source`/`sourceRef` ke `PushTransactionPayload` di
+- [x] Tambah `source`/`sourceRef` ke `PushTransactionPayload` di
       `worker-client.ts`, dan ke `SELECT`+payload construction di
       `push-row.ts` (case `transactions`, jg `debts`/`debt_payments`
       kalau nanti ikut di-push lewat jalur ini).
-- [ ] Tambah `source`/`sourceRef` ke schema payload masuk Worker
+- [x] Tambah `source`/`sourceRef` ke schema payload masuk Worker
       (`apps/worker/src/modules/transactions/schema.ts`, dan modul
       `debts` kalau relevan) -- validasi enum sama dgn migrasi PC
       (`'manual'` | `'retailku_sync'`).
-- [ ] Worker: isi kolom `source`/`source_ref` di
+- [x] Worker: isi kolom `source`/`source_ref` di
       `createTransactionRow`/`updateTransactionRow`
       (`transactions/service.ts`) -- default ke `'manual'`/`NULL`
       HANYA kalau payload benar2 tidak mengirimkannya, bukan selalu.
-- [ ] Tambah `source`/`sourceRef` ke `SyncResponse` type +
+- [x] Tambah `source`/`sourceRef` ke `SyncResponse` type +
       `getSyncSnapshot` (`SELECT` & mapping) di
       `apps/worker/src/modules/sync/service.ts`, utk `transactions`,
       `debts`, `debtPayments`.
-- [ ] Tambah `source`/`sourceRef` ke `upsertTransaction`/`upsertDebt`/
+- [x] Tambah `source`/`sourceRef` ke `upsertTransaction`/`upsertDebt`/
       `upsertDebtPayment` di `pull-sync.ts` (baik cabang INSERT maupun
       `ON CONFLICT DO UPDATE SET`).
 - [ ] Verifikasi: transaksi hasil sync Retailku di PC A, push ke
@@ -113,6 +113,35 @@ Transaksi hasil sync Retailku (`source='retailku_sync'`, dgn
 - [ ] Verifikasi idempotency: push ulang baris yg sama (`source_ref`
       sama) tidak menghasilkan duplikat di D1 (unique index beneran
       dipakai).
+
+## Status implementasi (2026-10-02)
+
+Kode selesai, typecheck worker+desktop dan `vitest` hijau. Dua item
+verifikasi di atas BELUM dicentang -- butuh tes manual end-to-end
+(2 PC/DB + Worker live), tidak bisa dibuktikan dari unit test.
+
+Yang dikerjakan, termasuk gap tambahan yg ketemu saat implementasi:
+
+- **Gap tambahan: sync Retailku tidak pernah memicu push sama sekali.**
+  Insert Retailku (`insert-cashflow-transaction.ts`) tidak lewat hook
+  form, jadi `pushOnWrite` tidak pernah terpanggil -- baris Retailku
+  cuma sampai cloud lewat backfill manual. Sekarang `syncAll()`
+  memanggil `pushRetailkuSyncedTransactions()`
+  (`shared/cloud-sync/push-retailku-sync.ts`) SETELAH sync sukses,
+  fire-and-forget, berurutan, fallback ke antrian retry.
+- Worker UPDATE hanya menimpa `source`/`source_ref` kalau payload
+  EKSPLISIT kirim `source` -- penulis lain (MCP PATCH) tidak menghapus
+  jejak `retailku_sync`. `sourceRef` tanpa `source` ditolak (400).
+- Idempotency: bentrok `(source, source_ref)` dgn id lain -> Worker
+  balas 422 `rejected` (tidak di-retry PC), bukan error constraint 500
+  yg di-retry tanpa akhir. Di sisi pull PC, baris incoming yg bentrok
+  dgn baris lokal (id beda) dilewati supaya pull tidak gagal total.
+- `debts`/`debt_payments`: response pull sekarang bawa `source`/
+  `sourceRef`, tapi cabang UPDATE di PC hanya menimpa kalau incoming
+  `retailku_sync` -- debts di D1 diturunkan Worker dari transaksi
+  (selalu `'manual'`), jadi tidak boleh menghapus provenance lokal.
+  Push provenance debts ke Worker MASIH di luar scope (belum ada
+  endpoint push debts).
 
 ## Catatan implementasi
 

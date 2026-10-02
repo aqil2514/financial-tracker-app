@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import type { RetailkuMcpConfig } from "@/shared/retailku";
+import { pushRetailkuSyncedTransactions } from "@/shared/cloud-sync/push-retailku-sync";
 import { syncCashflow, SyncCashflowPartialError } from "./cashflow";
 import type { RetailkuArApExistingMode, RetailkuCashflowSyncMode } from "./use-retailku-cashflow-sync-settings";
 
@@ -53,6 +54,14 @@ async function syncAllInternal(input: SyncAllInput): Promise<SyncAllResult> {
       mode: input.mode,
       arApExistingMode: input.arApExistingMode,
     });
+
+    // Cloud sync -- fire-and-forget, tidak menahan hasil sync lokal.
+    // insertedSourceRefs = baris cashflow biasa, DP AR/AP juga baris
+    // `transactions` (lihat insert-ar-ap-down-payment.ts).
+    void pushRetailkuSyncedTransactions([
+      ...result.insertedSourceRefs,
+      ...result.arApDownPaymentInsertedSourceRefs,
+    ]);
 
     return {
       cashflowInsertedCount: result.insertedCount,

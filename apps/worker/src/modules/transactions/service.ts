@@ -98,12 +98,17 @@ async function createTransactionRow(
     if (precheck.status === "rejected") return precheck;
   }
 
+  if (await hasSourceRefConflict(env, payload.id, payload)) {
+    return { status: "rejected", reason: SOURCE_REF_CONFLICT_REASON };
+  }
+
   const now = nowText();
   await env.DB.prepare(
     `INSERT INTO transactions
        (id, type, amount, category_id, account_id, transfer_account_id,
-        note, date, description, contact_id, created_at, updated_at, sync_source)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pc')`
+        note, date, description, contact_id, created_at, updated_at, sync_source,
+        source, source_ref)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pc', ?, ?)`
   )
     .bind(
       payload.id,
@@ -117,7 +122,9 @@ async function createTransactionRow(
       payload.description ?? null,
       payload.contactId ?? null,
       now,
-      updatedAt
+      updatedAt,
+      payload.source ?? "manual",
+      payload.source !== undefined ? payload.sourceRef ?? null : null
     )
     .run();
 
@@ -140,6 +147,27 @@ async function createTransactionRow(
   }
 
   return { status: "ok" };
+}
+
+const SOURCE_REF_CONFLICT_REASON =
+  "source_ref ini sudah dipakai transaksi lain di cloud (baris Retailku yg sama ter-sync dari PC berbeda) — baris ini tidak disimpan supaya tidak dobel.";
+
+// Idempotency jalur Retailku: (source, source_ref) UNIQUE di D1
+// (idx_transactions_source_ref). Dicek eksplisit SEBELUM tulis supaya
+// bentrok jadi 'rejected' (422, tidak di-retry PC) alih-alih error
+// constraint mentah (500, di-retry terus tanpa akhir).
+async function hasSourceRefConflict(
+  env: Env,
+  id: string,
+  payload: Pick<PushTransactionPayload, "source" | "sourceRef">
+): Promise<boolean> {
+  if (payload.source === undefined || !payload.sourceRef) return false;
+  const row = await env.DB.prepare(
+    "SELECT id FROM transactions WHERE source = ?1 AND source_ref = ?2 AND id <> ?3"
+  )
+    .bind(payload.source, payload.sourceRef, id)
+    .first<{ id: string }>();
+  return row !== null;
 }
 
 type ExistingTransactionRow = {
@@ -238,11 +266,20 @@ async function updateTransactionRow(
     };
   }
 
+  if (await hasSourceRefConflict(env, id, payload)) {
+    return { status: "rejected", reason: SOURCE_REF_CONFLICT_REASON };
+  }
+
   // LWW menang CLEAR deleted_at juga, lihat account-groups/service.ts.
+  // `source`/`source_ref` cuma ditimpa kalau payload EKSPLISIT kirim
+  // `source` (?12 = 1) -- penulis lain (mis. MCP PATCH) yg tidak tahu
+  // provenance tidak boleh menghapus jejak 'retailku_sync' yg sudah ada.
   await env.DB.prepare(
     `UPDATE transactions
      SET type = ?1, amount = ?2, category_id = ?3, account_id = ?4, transfer_account_id = ?5,
-         note = ?6, date = ?7, description = ?8, contact_id = ?9, updated_at = ?10, deleted_at = NULL
+         note = ?6, date = ?7, description = ?8, contact_id = ?9, updated_at = ?10, deleted_at = NULL,
+         source = CASE WHEN ?12 = 1 THEN ?13 ELSE source END,
+         source_ref = CASE WHEN ?12 = 1 THEN ?14 ELSE source_ref END
      WHERE id = ?11`
   )
     .bind(
@@ -256,7 +293,10 @@ async function updateTransactionRow(
       payload.description ?? null,
       payload.contactId ?? null,
       updatedAt,
-      id
+      id,
+      payload.source !== undefined ? 1 : 0,
+      payload.source ?? "manual",
+      payload.source !== undefined ? payload.sourceRef ?? null : null
     )
     .run();
 

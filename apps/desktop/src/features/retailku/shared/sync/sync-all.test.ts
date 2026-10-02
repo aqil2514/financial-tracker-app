@@ -8,6 +8,10 @@ vi.mock("@/lib/db", () => ({
   getDb: vi.fn(),
 }));
 
+vi.mock("@/shared/cloud-sync/push-retailku-sync", () => ({
+  pushRetailkuSyncedTransactions: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("./cashflow", async () => {
   const actual = await vi.importActual<typeof import("./cashflow")>("./cashflow");
   return {
