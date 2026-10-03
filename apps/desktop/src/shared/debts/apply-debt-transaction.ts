@@ -1,6 +1,6 @@
 import { getDb, type Account } from "@/lib/db";
 import { newId } from "@/lib/id";
-import type { TransactionDebtStatus } from "./use-transaction-debt-status";
+import { getTransactionDebtStatus, type TransactionDebtStatus } from "./use-transaction-debt-status";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
@@ -202,6 +202,58 @@ export async function applyDebtTransactionEdit({
     [status.debtId]
   );
   await applyDebtTransaction(input);
+}
+
+export type DeletedTransactionDebtInfo =
+  | { role: "none" }
+  | { role: "payment"; debtId: string }
+  | { role: "principal"; debtId: string; hadPayments: boolean };
+
+/**
+ * Dipanggil SEBELUM hard-delete baris `transactions` (lihat
+ * `use-delete-transaction.ts`) — port PERSIS dari
+ * `detachDebtForDeletedTransaction` (apps/worker/src/modules/debts/service.ts),
+ * supaya PC TIDAK LAGI diam-diam kehilangan jejak piutang lewat FK
+ * `ON DELETE SET NULL` biasa (gap lama, lihat "Delete transaksi TIDAK
+ * ADA guard sama sekali" di mcp-server-business-logic-audit.md).
+ *
+ * Tindakan TUNGGAL per role, TIDAK ada pilihan user (keputusan
+ * 2026-10-03, dialog tetap 1 tombol konfirmasi generik — lihat
+ * cloud-sync.md "DELETE /transactions/:id"):
+ * - `role: 'none'`: no-op.
+ * - `role: 'payment'`: hapus `debt_payments` ini, revert `debts.status`
+ *   ke `'ongoing'` kalau sempat `'paid'` karena pembayaran ini.
+ * - `role: 'principal'` (BAIK sudah maupun belum dicicil): `debts.
+ *   transaction_id` SET NULL — piutang/cicilan TETAP UTUH scr nominal
+ *   (`remaining` dihitung dari `amount - SUM(debt_payments)`, independen
+ *   dari `transaction_id`), cuma kehilangan jejak transaksi ASAL.
+ */
+export async function detachDebtForDeletedTransaction(
+  db: Db,
+  transactionId: string
+): Promise<DeletedTransactionDebtInfo> {
+  const status = await getTransactionDebtStatus(db, transactionId);
+
+  if (status.role === "none") {
+    return { role: "none" };
+  }
+
+  if (status.role === "payment") {
+    await db.execute("DELETE FROM debt_payments WHERE id = $1", [status.debtPaymentId]);
+    await db.execute(
+      `UPDATE debts SET status = 'ongoing'
+       WHERE id = $1 AND status = 'paid' AND amount > COALESCE(
+         (SELECT SUM(amount) FROM debt_payments WHERE debt_payments.debt_id = debts.id),
+         0
+       )`,
+      [status.debtId]
+    );
+    return { role: "payment", debtId: status.debtId };
+  }
+
+  // status.role === "principal"
+  await db.execute("UPDATE debts SET transaction_id = NULL WHERE id = $1", [status.debtId]);
+  return { role: "principal", debtId: status.debtId, hadPayments: status.hasPayments };
 }
 
 async function settleDebtsFifo({

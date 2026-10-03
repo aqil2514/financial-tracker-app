@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { Env } from "../../shared/env";
 import { isPushTransactionPayload, isPatchTransactionPayload } from "./schema";
-import { insertTransaction, updateTransaction } from "./service";
+import { insertTransaction, updateTransaction, deleteTransaction } from "./service";
 
 // Autentikasi ditangani requireAuth middleware, dipasang di router.ts.
 export async function handlePostTransaction(c: Context<{ Bindings: Env }>) {
@@ -45,4 +45,16 @@ export async function handlePatchTransaction(c: Context<{ Bindings: Env }>) {
   }
 
   return c.json({ status: "ok", id }, 200);
+}
+
+export async function handleDeleteTransaction(c: Context<{ Bindings: Env }>) {
+  const id = c.req.param("id");
+  if (!id) return c.json({ error: "Missing transaction id" }, 400);
+
+  const result = await deleteTransaction(c.env, id);
+  if (result.status === "not_found") {
+    return c.json({ error: "Transaction not found" }, 404);
+  }
+
+  return c.json({ status: "ok", id, debtInfo: result.debtInfo }, 200);
 }

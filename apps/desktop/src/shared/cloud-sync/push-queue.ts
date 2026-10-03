@@ -12,8 +12,14 @@
  * hard-deleted lokal di titik enqueue -- tidak ada apa pun utk dibaca
  * ulang, actionnya keputusan SESAAT user saat klik delete.
  *
- * `transactions` BELUM py endpoint DELETE di Worker (sisa kecil Tahap
- * 4) -- hanya ikut antrian utk op='upsert'.
+ * `transactions` ikut antrian delete jg sejak 2026-10-03 (endpoint
+ * Worker `DELETE /transactions/:id` sudah ada) -- payload action-nya
+ * SELALU kosong (`{}`), beda dari account_groups/accounts/categories
+ * yg py reassign/unassign opsional (tindakan thd debt/debt_payments
+ * terkait di Worker TUNGGAL per role, bukan pilihan client). `debtInfo`
+ * hasil retry delete transaksi DIABAIKAN (bukan ditampilkan via toast)
+ * -- beda dari delete langsung yg dialognya masih terbuka, retry jalan
+ * di background tanpa ada yg menunggu pesan spesifik.
  */
 
 import { getDb } from "@/lib/db";

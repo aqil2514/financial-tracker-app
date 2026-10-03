@@ -339,3 +339,58 @@ export async function applyDebtTransactionEdit(
     .run();
   return applyDebtTransaction(env, rest);
 }
+
+// Info piutang/utang terkait transaksi yg mau dihapus, dibalikin ke
+// caller (transactions/service.ts) spy response DELETE bisa kasih tau
+// client APA yg terjadi -- dialog PC pakai ini utk pesan spesifik
+// SETELAH delete berhasil (bukan "cek dulu baru hapus" dua jalur,
+// lihat keputusan di cloud-sync.md "DELETE /transactions/:id").
+export type DeletedTransactionDebtInfo =
+  | { role: "none" }
+  | { role: "payment"; debtId: string }
+  | { role: "principal"; debtId: string; hadPayments: boolean };
+
+// Dipanggil dari transactions/service.ts SETELAH baris `transactions`
+// di-soft-delete. Tindakan TUNGGAL per role (TIDAK ada pilihan client,
+// beda dari deleteAccount yg py transactionAction opsional) -- piutang/
+// cicilan itu sendiri TIDAK PERNAH dihapus di sini, cuma jejak
+// transaction_id-nya yg dilepas/disesuaikan:
+// - role 'none': no-op.
+// - role 'payment': SAMA PERSIS logic revert di applyDebtTransactionEdit
+//   (role='payment', dangerousFieldsChanged) -- hapus debt_payments,
+//   revert debts.status ke 'ongoing' kalau sempat 'paid'. BEDA dari
+//   edit: di sini TIDAK ada applyDebtTransaction lagi sesudahnya
+//   (transaksinya sudah dihapus, tidak ada transfer baru utk dibuat).
+// - role 'principal': debts.transaction_id SET NULL (BUKAN DELETE
+//   debts) -- piutang/cicilan tetap utuh scr nominal (dihitung dari
+//   debts.amount - SUM(debt_payments), independen dari transaction_id),
+//   cuma kehilangan jejak transaksi ASAL. Aman baik sudah/belum dicicil
+//   (keputusan 2026-10-03, lihat cloud-sync.md).
+export async function detachDebtForDeletedTransaction(
+  env: Env,
+  transactionId: string
+): Promise<DeletedTransactionDebtInfo> {
+  const status = await getTransactionDebtStatus(env, transactionId);
+
+  if (status.role === "none") {
+    return { role: "none" };
+  }
+
+  if (status.role === "payment") {
+    await env.DB.prepare("DELETE FROM debt_payments WHERE id = ?1").bind(status.debtPaymentId).run();
+    await env.DB.prepare(
+      `UPDATE debts SET status = 'ongoing'
+       WHERE id = ?1 AND status = 'paid' AND amount > COALESCE(
+         (SELECT SUM(amount) FROM debt_payments WHERE debt_payments.debt_id = debts.id),
+         0
+       )`
+    )
+      .bind(status.debtId)
+      .run();
+    return { role: "payment", debtId: status.debtId };
+  }
+
+  // status.role === "principal"
+  await env.DB.prepare("UPDATE debts SET transaction_id = NULL WHERE id = ?1").bind(status.debtId).run();
+  return { role: "principal", debtId: status.debtId, hadPayments: status.hasPayments };
+}

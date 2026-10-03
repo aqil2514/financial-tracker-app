@@ -5,7 +5,9 @@ import {
   applyDebtTransactionEdit,
   getTransactionDebtStatus,
   validateDebtSettlementAmount,
+  detachDebtForDeletedTransaction,
   DebtEditBlockedError,
+  type DeletedTransactionDebtInfo,
 } from "../debts/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
@@ -323,4 +325,33 @@ async function updateTransactionRow(
   }
 
   return { status: "ok" };
+}
+
+export type DeleteTransactionResult =
+  | { status: "ok"; debtInfo: DeletedTransactionDebtInfo }
+  | { status: "not_found" };
+
+// Soft delete, pola sama deleteAccount/deleteCategory/dst (`deleted_at`,
+// BUKAN hard DELETE SQL). Tindakan thdp debt/debt_payments terkait
+// TUNGGAL per role, tidak ada payload pilihan dari client -- lihat
+// detachDebtForDeletedTransaction (debts/service.ts) utk detail
+// lengkap tiap kasus & keputusan desain 2026-10-03.
+export async function deleteTransaction(env: Env, id: string): Promise<DeleteTransactionResult> {
+  const existing = await env.DB.prepare("SELECT id FROM transactions WHERE id = ?1 AND deleted_at IS NULL")
+    .bind(id)
+    .first<{ id: string }>();
+  if (!existing) return { status: "not_found" };
+
+  // Debt terkait diselesaikan SEBELUM soft-delete baris transaksi --
+  // urutan tidak signifikan scr data (keduanya independen), tapi
+  // konsisten dgn pola "resolve debt dulu baru commit transaksi" di
+  // updateTransactionRow.
+  const debtInfo = await detachDebtForDeletedTransaction(env, id);
+
+  const now = nowText();
+  await env.DB.prepare("UPDATE transactions SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
+    .bind(now, id)
+    .run();
+
+  return { status: "ok", debtInfo };
 }

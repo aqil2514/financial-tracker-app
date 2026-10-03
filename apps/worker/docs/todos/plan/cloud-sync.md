@@ -448,6 +448,9 @@ terpusat di satu tempat.
       `sqlite_master` sbg gantinya utk cek konektivitas.
 - [x] **Autentikasi PC↔Worker**: token statis Bearer (`PC_SYNC_TOKEN`),
       dicek di `isAuthorized()` sebelum endpoint tulis apa pun jalan.
+      (2026-10-03: `isAuthorized()` kemudian diperluas terima token
+      KEDUA, `MCP_SYNC_TOKEN`, utk `apps/mcp-server` — lihat entri
+      terpisah di bawah, BUKAN mengubah perilaku token ini.)
       Disimpan sbg Cloudflare secret (`wrangler secret put
       PC_SYNC_TOKEN`), TIDAK di `wrangler.toml`. Token production
       digenerate via `openssl rand -hex 32` (32-byte random, bukan
@@ -612,6 +615,90 @@ terpusat di satu tempat.
         PATCH transaksi id tidak ada → 404. Data uji sudah dibersihkan
         (0 baris tersisa di 5 tabel terkait, terverifikasi via COUNT
         query).
+- [x] **`MCP_SYNC_TOKEN` — token MCP terpisah dari `PC_SYNC_TOKEN`**
+      (2026-10-03, menutup gap yg dicatat di akhir sesi Tahap 6) —
+      `Env.MCP_SYNC_TOKEN` baru (`shared/env.ts`), `isAuthorized()`
+      terima KEDUA token (`token === PC_SYNC_TOKEN || token ===
+      MCP_SYNC_TOKEN`). Disimpan sbg Cloudflare secret terpisah
+      (`wrangler secret put MCP_SYNC_TOKEN`), digenerate random 32-byte
+      hex sama spt pola `PC_SYNC_TOKEN` (`openssl rand -hex 32` tidak
+      tersedia di PowerShell user — dipakai `RandomNumberGenerator`
+      .NET sbg gantinya, hasil setara crypto-secure). **Scope SENGAJA
+      dibatasi**: hardcode `sync_source='mcp'` yg tersebar di banyak
+      `service.ts` (`accounts`, `account-groups`, `categories`,
+      `contacts`, `debts`) TIDAK disentuh sesi ini — endpoint2 itu
+      masih cuma dipanggil dari push-on-write PC, belum ada tool TULIS
+      MCP sungguhan yg butuh `sync_source` dinamis berdasarkan token
+      mana yg dipakai. Dicatat sbg gap terpisah, menunggu tool TULIS
+      MCP (lanjutan Tahap 5).
+- [x] **`GET /auth/verify`** (2026-10-03, `src/index.ts`) — endpoint
+      ringan khusus validasi token (PC_SYNC_TOKEN ATAU MCP_SYNC_TOKEN),
+      `requireAuth` lalu balas `{ok:true}` TANPA sentuh D1 sama sekali.
+      Dibutuhkan krn tidak ada endpoint existing yg cocok dipakai utk
+      "cek token valid, tanpa efek samping" (semua endpoint tervalidasi
+      lain adalah operasi data atau `/sync` yg bisa berat) — dipakai
+      `apps/mcp-server` saat proses OAuth authorize utk verifikasi
+      token yg dimasukkan user, SEBELUM code exchange terjadi.
+      **DIVERIFIKASI di production**: tanpa token → 401, token salah →
+      401, `PC_SYNC_TOKEN` ATAU `MCP_SYNC_TOKEN` yg benar → 200
+      `{"ok":true}`.
+- [x] **`apps/mcp-server` — Tahap 5 DIMULAI & deployed** (2026-10-03,
+      lihat detail lengkap di bagian "Tahap 5" di bawah) — skeleton
+      Next.js App Router + `mcp-handler`, OAuth shim custom, 5 tool
+      BACA. **DIVERIFIKASI end-to-end di PRODUCTION SUNGGUHAN** (bukan
+      cuma lokal): deployed ke Vercel
+      (`https://financial-tracker-mcp-server.vercel.app`), full OAuth
+      flow (register → authorize dgn token production → PKCE token
+      exchange) lolos, `tools/list` menampilkan 5 tool, `tools/call`
+      `get_debt_summary` berhasil narik DATA PRODUKSI NYATA dari Worker
+      (98 piutang berjalan, total Rp36.137.014) — bukan data uji.
+- [x] **`DELETE /transactions/:id`** (2026-10-03,
+      `transactions/service.ts` `deleteTransaction()` +
+      `debts/service.ts` `detachDebtForDeletedTransaction()`) — soft
+      delete (`deleted_at`), pola sama endpoint DELETE lain. **Keputusan
+      desain** (dibahas bareng user, BUKAN "guard yang memblokir" spt
+      draft awal "Yang BELUM diputuskan" — direvisi jadi UX yang
+      mempermulus): tindakan TUNGGAL per role dari
+      `getTransactionDebtStatus()` (SUDAH ADA, dipakai jg di jalur
+      PATCH), TIDAK ADA payload pilihan dari client sama sekali (beda
+      dari `DeleteAccountPayload` yg py `transactionAction` opsional):
+      - `role: 'none'` — hapus langsung, tanpa efek samping.
+      - `role: 'payment'` — hapus `debt_payments` terkait + revert
+        `debts.status` ke `'ongoing'` kalau sempat `'paid'` krn
+        pembayaran yg baru dihapus ini (logic SAMA PERSIS dgn cabang
+        `applyDebtTransactionEdit` role='payment' field berubah, di-port
+        jadi fungsi sendiri `detachDebtForDeletedTransaction` spy tidak
+        duplikasi).
+      - `role: 'principal'` (BAIK sudah maupun belum dicicil, SAMA
+        tindakannya) — `debts.transaction_id` SET NULL, BUKAN DELETE
+        `debts`. Piutang/cicilan TETAP UTUH scr nominal (`remaining`
+        dihitung dari `debts.amount - SUM(debt_payments)`, independen
+        dari `transaction_id`) — cuma kehilangan jejak "transaksi mana
+        yg jadi asal". **Alasan desain**: awalnya dipikir perlu tolak
+        keras (422) kalau `hasPayments`, TAPI nominal piutang tidak
+        bergantung sama sekali ke `transaction_id`-nya (beda dari kasus
+        EDIT yg emang berbahaya krn bisa UBAH nominal) — jadi SET NULL
+        aman utk kedua sub-kasus, tidak perlu split jadi 2 keputusan.
+      - Response `{status, id, debtInfo: {role, ...}}` — PC (task
+        menyusul) pakai `debtInfo` ini utk tampilkan pesan SETELAH
+        delete berhasil (dialog tetap 1 tombol konfirmasi generik dulu,
+        BUKAN "cek dulu baru hapus" 2 round-trip — keputusan sadar,
+        krn PC py SQLite lokal sendiri shg bisa cek `getTransactionDebtStatus`
+        versi lokal SEBELUM render dialog kalau nanti mau pesan
+        spesifik di awal, tanpa perlu network call ke Worker).
+      - **DIVERIFIKASI 4 skenario lokal** (akun+kontak+debt uji nyata
+        lewat endpoint HTTP, bukan INSERT manual, supaya
+        `applyDebtTransaction` beneran generate baris `debts`/
+        `debt_payments`): (1) delete transaksi biasa → `debtInfo:
+        {role:'none'}`; (2) delete transaksi payment/cicilan →
+        `debt_payments` terhapus, `debts.amount`/`transaction_id`
+        tidak tersentuh; (3) delete transaksi principal TANPA cicilan
+        → `transaction_id` NULL, `hadPayments:false`; (4) delete
+        transaksi principal DENGAN cicilan existing → `transaction_id`
+        NULL, `hadPayments:true`, `debt_payments` (cicilan dari
+        transaksi LAIN) **TIDAK ikut terhapus/tersentuh**. Error case:
+        id tidak ada/sudah soft-deleted → 404, tanpa token → 401. Data
+        uji sudah dibersihkan.
 
 ## Todo list eksekusi
 
@@ -658,10 +745,9 @@ terpusat di satu tempat.
       implementasi").
 - [x] Endpoint DELETE utk `account_groups`/`accounts`/`categories`/
       `contacts` — SELESAI 2026-10-01, lihat "Progress implementasi".
-- [ ] Endpoint `DELETE /transactions/:id` (soft delete) — belum ada;
-      audit mencatat delete transaksi TIDAK py guard thd debt/payment
-      terkait sama sekali, keputusan desain belum diambil (lihat "Yang
-      BELUM diputuskan" di `mcp-server-business-logic-audit.md`).
+- [x] Endpoint `DELETE /transactions/:id` (soft delete) — SELESAI
+      2026-10-03, lihat "Progress implementasi" utk keputusan desain
+      lengkap + hasil verifikasi.
 - [x] Endpoint create+update utk `accounts` — SELESAI 2026-10-01, lihat
       "Progress implementasi".
 - [x] Validasi/logic bisnis hasil audit diimplementasikan di Worker —
@@ -675,17 +761,69 @@ terpusat di satu tempat.
       SUDAH DITUTUP** — client TIDAK perlu lagi validasi sendiri,
       Worker reject 422 keras sebelum tulis apa pun.
 
-### Tahap 5 — MCP server (Vercel) — BELUM DIMULAI
+### Tahap 5 — MCP server (Vercel) — SEBAGIAN SELESAI (baca), tulis BELUM
 
-- [ ] Setup Next.js App Router + `mcp-handler` di `apps/mcp-server`.
-- [ ] OAuth shim (port dari `mcp-oauth.controller.ts`/`mcp-auth.guard.ts`
-      milik Retailku, disederhanakan single-user).
-- [ ] Tool BACA (5 tool draft awal: saldo akun, ringkasan pengeluaran
-      per kategori, list transaksi, ringkasan utang piutang, riwayat
-      per kontak).
-- [ ] Tool TULIS (daftar final, lihat "Yang belum diputuskan") — tiap
-      tool memanggil Worker (bukan langsung D1) supaya validasi
-      konsisten dipakai.
+- [x] **Setup Next.js App Router + `mcp-handler`** (2026-10-03,
+      `apps/mcp-server`) — App Router polos (`src/app`), paket
+      `mcp-handler@^2` + `@modelcontextprotocol/server@^2` (BUKAN
+      `@modelcontextprotocol/sdk@^1` yg dipakai Retailku — nama paket
+      beda, versi 2.x dari Vercel sendiri, cocok dipasang langsung di
+      route Next.js tanpa `StreamableHTTPServerTransport` manual spt
+      NestJS). `GET /api/mcp` dibungkus `withMcpAuth` bawaan paket ini
+      (BUKAN guard custom spt `McpApiKeyGuard` Retailku) — `verifyToken`
+      callback-nya panggil `GET /auth/verify` ke Worker.
+- [x] **OAuth shim** (2026-10-03) — ADAPTASI pola Retailku
+      (`mcp-oauth.controller.ts`/`mcp-auth.guard.ts`), BUKAN port 1:1:
+      - `app/register/route.ts`, `app/oauth/authorize/route.ts` (form
+        HTML minta token, bukan API key — divalidasi via `GET
+        /auth/verify` ke Worker, bukan query DB spt Retailku),
+        `app/oauth/token/route.ts` (PKCE S256 + tukar code, access_token
+        yg dibalikin = TOKEN WORKER ITU SENDIRI, pola passthrough SAMA
+        persis Retailku).
+      - `app/.well-known/oauth-authorization-server/route.ts` — custom
+        kecil (kita authorization server-nya sendiri).
+      - `app/.well-known/oauth-protected-resource/route.ts` — PAKAI
+        `protectedResourceHandler` BAWAAN `mcp-handler` (Retailku
+        handcode ini manual, paket Vercel sudah sediakan siap pakai).
+      - **Keputusan sadar soal storage code OTP**: in-memory `Map`
+        (`src/lib/oauth-store.ts`), SAMA spt Retailku — BUKAN Cloudflare
+        KV/Vercel KV meski risiko gagal di lingkungan serverless
+        (instance beda antar-request) nyata. Diterima krn flow ini cuma
+        terjadi SEKALI per setup koneksi client MCP (bukan tiap request
+        harian), gagal → user tinggal ulang authorize. Upgrade ke KV
+        kalau ternyata sering gagal di praktik.
+      - **DIVERIFIKASI full flow di PRODUCTION**: register → authorize
+        (token production asli, BUKAN dummy) → redirect dgn `code` →
+        PKCE token exchange (S256, `code_verifier` dicocokkan) → 200
+        `access_token`. Juga diverifikasi reject case: `code_verifier`
+        hilang → 400, token salah saat authorize → 401 + form error.
+- [x] **Tool BACA — 5 tool draft awal SEMUA SELESAI** (2026-10-03,
+      `app/api/mcp/route.ts` + `src/lib/sync-snapshot.ts`): saldo akun
+      (`get_account_balances`), ringkasan pengeluaran per kategori
+      (`get_expense_summary_by_category`), list transaksi
+      (`list_transactions`), ringkasan utang piutang
+      (`get_debt_summary`), riwayat per kontak (`get_contact_history`).
+      **Keputusan desain**: SEMUA tool manggil `GET /sync` (snapshot
+      PENUH, endpoint yg SUDAH ADA) lalu filter/agregasi di
+      `apps/mcp-server` sendiri — BUKAN nambah endpoint baca baru di
+      Worker (mis. `GET /transactions?filter=`) sekarang. Alasan: scope
+      lebih kecil utk skeleton awal, snapshot `/sync` sudah include
+      SEMUA field yg dibutuhkan tiap tool, endpoint Worker baru per
+      kebutuhan laporan bisa menyusul kalau performa jadi masalah nyata
+      (snapshot makin besar seiring data bertambah). Formula saldo akun
+      DIDUPLIKASI persis dari `accounts/service.ts`
+      `getAccountBalance()` (bukan panggil endpoint itu per-akun —
+      N+1 request utk "semua akun" lebih mahal dari 1x `/sync` lalu
+      hitung lokal). **DIVERIFIKASI nyata**: `tools/list` production
+      menampilkan ke-5 tool dgn schema benar (auto-generate dari Zod);
+      `tools/call get_debt_summary` berhasil narik DATA PRODUKSI ASLI
+      (98 piutang berjalan, Rp36.137.014) lewat Worker.
+- [ ] **Tool TULIS** (daftar final BELUM diputuskan) — tiap tool
+      memanggil Worker (bukan langsung D1) supaya validasi konsisten
+      dipakai. Prasyarat sebelum ini: keputusan `sync_source` dinamis
+      per token (lihat catatan `MCP_SYNC_TOKEN` di "Progress
+      implementasi" — hardcode `'mcp'` di banyak `service.ts` perlu
+      dibenahi dulu begitu tool tulis MCP mulai dipakai sungguhan).
 
 ### Tahap 7 — Verifikasi (sisi Worker/MCP)
 

@@ -245,8 +245,10 @@ export function pullSync(creds: CloudSyncCredentials, since: string | null): Pro
 // Payload action EKSPLISIT per relasi, PERSIS pola desktop lokal (lihat
 // use-delete-account-group.ts/use-delete-account.ts/use-delete-category.ts) --
 // `contacts` TANPA payload sama sekali (desktop tidak py reassign/
-// unassign di sana). `transactions` BELUM py endpoint DELETE di Worker
-// (sisa kecil Tahap 4, lihat handover) -- TIDAK termasuk di sini.
+// unassign di sana). `transactions` JUGA tanpa payload (beda dari 3
+// tabel awal: tindakan thd debt/debt_payments terkait TUNGGAL per role,
+// TIDAK ada pilihan dari client -- lihat deleteTransactionCloud di
+// bawah utk fungsi terpisah krn py bentuk response beda, bukan void).
 
 export type DeleteCloudPayload =
   | { table: "account_groups"; memberAction?: "unassign" | "reassign"; targetGroupId?: string }
@@ -258,13 +260,15 @@ export type DeleteCloudPayload =
       transactionAction?: "unassign" | "reassign";
       targetCategoryId?: string;
     }
-  | { table: "contacts" };
+  | { table: "contacts" }
+  | { table: "transactions" };
 
 const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
   account_groups: "/account-groups",
   accounts: "/accounts",
   categories: "/categories",
   contacts: "/contacts",
+  transactions: "/transactions",
 };
 
 export async function deleteCloudRow(
@@ -278,4 +282,28 @@ export async function deleteCloudRow(
     method: "DELETE",
     ...(body ? { body } : {}),
   });
+}
+
+// `debtInfo` SAMA PERSIS bentuknya dgn DeletedTransactionDebtInfo di
+// apps/worker/src/modules/debts/service.ts -- dipakai dialog PC utk
+// pesan informatif SETELAH delete berhasil (bukan "cek dulu baru
+// hapus" 2 round-trip, keputusan 2026-10-03 lihat cloud-sync.md).
+export type TransactionDebtInfo =
+  | { role: "none" }
+  | { role: "payment"; debtId: string }
+  | { role: "principal"; debtId: string; hadPayments: boolean };
+
+// Terpisah dari deleteCloudRow krn py bentuk response beda (bukan
+// void) -- endpoint Worker /transactions/:id balas {status, id,
+// debtInfo}, PC butuh debtInfo itu utk toast informatif.
+export async function deleteTransactionCloud(
+  creds: CloudSyncCredentials,
+  id: string
+): Promise<TransactionDebtInfo> {
+  const result = await request<{ debtInfo: TransactionDebtInfo }>(
+    creds,
+    `/transactions/${encodeURIComponent(id)}`,
+    { method: "DELETE" }
+  );
+  return result.debtInfo;
 }

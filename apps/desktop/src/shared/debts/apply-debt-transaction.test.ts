@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyDebtTransaction,
   applyDebtTransactionEdit,
+  detachDebtForDeletedTransaction,
   DebtEditBlockedError,
 } from "./apply-debt-transaction";
 import type { TransactionDebtStatus } from "./use-transaction-debt-status";
@@ -73,6 +74,21 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
             return da.date === dbb.date ? a.id.localeCompare(b.id) : da.date.localeCompare(dbb.date);
           });
         return rows as T;
+      }
+      if (sql.startsWith("SELECT id FROM debts WHERE transaction_id")) {
+        const [transactionId] = params as [string];
+        const match = debts.find((d) => d.transaction_id === transactionId);
+        return (match ? [{ id: match.id }] : []) as T;
+      }
+      if (sql.startsWith("SELECT EXISTS(SELECT 1 FROM debt_payments WHERE debt_id")) {
+        const [debtId] = params as [string];
+        const found = debtPayments.some((p) => p.debt_id === debtId) ? 1 : 0;
+        return [{ found }] as T;
+      }
+      if (sql.startsWith("SELECT id, debt_id FROM debt_payments WHERE transaction_id")) {
+        const [transactionId] = params as [string];
+        const match = debtPayments.find((p) => p.transaction_id === transactionId);
+        return (match ? [{ id: match.id, debt_id: match.debt_id }] : []) as T;
       }
       throw new Error(`Fake db.select tidak mengenali query: ${sql}`);
     },
@@ -154,6 +170,12 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
         const [date, id] = params as [string, string];
         const payment = debtPayments.find((p) => p.id === id);
         if (payment) payment.date = date;
+        return {};
+      }
+      if (sql.startsWith("UPDATE debts SET transaction_id = NULL")) {
+        const [id] = params as [string];
+        const debt = debts.find((d) => d.id === id);
+        if (debt) debt.transaction_id = null;
         return {};
       }
       throw new Error(`Fake db.execute tidak mengenali query: ${sql}`);
@@ -596,5 +618,133 @@ describe("applyDebtTransactionEdit", () => {
     });
 
     expect(debts.find((d) => d.id === "debt-row-5")?.status).toBe("paid");
+  });
+});
+
+describe("detachDebtForDeletedTransaction", () => {
+  it("role='none': no-op, tidak menyentuh apa pun", async () => {
+    const { db, debts, debtPayments } = createFakeDb({ accounts: [CASH_ACCOUNT, DEBT_ACCOUNT] });
+
+    const result = await detachDebtForDeletedTransaction(db as never, "tx-biasa");
+
+    expect(result).toEqual({ role: "none" });
+    expect(debts).toHaveLength(0);
+    expect(debtPayments).toHaveLength(0);
+  });
+
+  it("role='principal', belum dicicil: transaction_id SET NULL, debt tetap utuh", async () => {
+    const seedDebts: DebtRow[] = [
+      {
+        id: "debt-row-5",
+        type: "receivable",
+        contact_id: "contact-10",
+        amount: 50000,
+        account_id: "debt-1",
+        transaction_id: "tx-42",
+        status: "ongoing",
+        date: "2026-01-01",
+      },
+    ];
+    const { db, debts } = createFakeDb({ accounts: [CASH_ACCOUNT, DEBT_ACCOUNT], debts: seedDebts });
+
+    const result = await detachDebtForDeletedTransaction(db as never, "tx-42");
+
+    expect(result).toEqual({ role: "principal", debtId: "debt-row-5", hadPayments: false });
+    expect(debts).toHaveLength(1);
+    expect(debts[0].transaction_id).toBeNull();
+    expect(debts[0].amount).toBe(50000); // nominal tidak berubah
+    expect(debts[0].status).toBe("ongoing");
+  });
+
+  it("role='principal', SUDAH dicicil dari transaksi lain: transaction_id SET NULL, cicilan TIDAK tersentuh", async () => {
+    const seedDebts: DebtRow[] = [
+      {
+        id: "debt-row-5",
+        type: "receivable",
+        contact_id: "contact-10",
+        amount: 50000,
+        account_id: "debt-1",
+        transaction_id: "tx-42",
+        status: "ongoing",
+        date: "2026-01-01",
+      },
+    ];
+    const seedPayments: DebtPaymentRow[] = [
+      { id: "payment-1", debt_id: "debt-row-5", amount: 20000, account_id: "cash-1", transaction_id: "tx-999", date: "2026-02-01" },
+    ];
+    const { db, debts, debtPayments } = createFakeDb({
+      accounts: [CASH_ACCOUNT, DEBT_ACCOUNT],
+      debts: seedDebts,
+      debtPayments: seedPayments,
+    });
+
+    const result = await detachDebtForDeletedTransaction(db as never, "tx-42");
+
+    expect(result).toEqual({ role: "principal", debtId: "debt-row-5", hadPayments: true });
+    expect(debts[0].transaction_id).toBeNull();
+    expect(debts[0].amount).toBe(50000);
+    // Cicilan dari transaksi LAIN tetap utuh -- bukan CASCADE/dihapus.
+    expect(debtPayments).toHaveLength(1);
+    expect(debtPayments[0].id).toBe("payment-1");
+    expect(debtPayments[0].transaction_id).toBe("tx-999");
+  });
+
+  it("role='payment', debt BELUM lunas: hapus debt_payments ini saja, status tidak berubah", async () => {
+    const seedDebts: DebtRow[] = [
+      {
+        id: "debt-row-5",
+        type: "receivable",
+        contact_id: "contact-10",
+        amount: 50000,
+        account_id: "debt-1",
+        transaction_id: "tx-999",
+        status: "ongoing",
+        date: "2026-01-01",
+      },
+    ];
+    const seedPayments: DebtPaymentRow[] = [
+      { id: "payment-8", debt_id: "debt-row-5", amount: 20000, account_id: "cash-1", transaction_id: "tx-42", date: "2026-02-01" },
+    ];
+    const { db, debts, debtPayments } = createFakeDb({
+      accounts: [CASH_ACCOUNT, DEBT_ACCOUNT],
+      debts: seedDebts,
+      debtPayments: seedPayments,
+    });
+
+    const result = await detachDebtForDeletedTransaction(db as never, "tx-42");
+
+    expect(result).toEqual({ role: "payment", debtId: "debt-row-5" });
+    expect(debtPayments).toHaveLength(0);
+    expect(debts[0].status).toBe("ongoing");
+    expect(debts[0].amount).toBe(50000); // pokok piutang tidak tersentuh
+  });
+
+  it("role='payment', menghapus cicilan yang MELUNASI penuh: debt direvert dari 'paid' ke 'ongoing'", async () => {
+    const seedDebts: DebtRow[] = [
+      {
+        id: "debt-row-5",
+        type: "receivable",
+        contact_id: "contact-10",
+        amount: 50000,
+        account_id: "debt-1",
+        transaction_id: "tx-999",
+        status: "paid",
+        date: "2026-01-01",
+      },
+    ];
+    const seedPayments: DebtPaymentRow[] = [
+      { id: "payment-8", debt_id: "debt-row-5", amount: 50000, account_id: "cash-1", transaction_id: "tx-42", date: "2026-02-01" },
+    ];
+    const { db, debts, debtPayments } = createFakeDb({
+      accounts: [CASH_ACCOUNT, DEBT_ACCOUNT],
+      debts: seedDebts,
+      debtPayments: seedPayments,
+    });
+
+    const result = await detachDebtForDeletedTransaction(db as never, "tx-42");
+
+    expect(result).toEqual({ role: "payment", debtId: "debt-row-5" });
+    expect(debtPayments).toHaveLength(0);
+    expect(debts[0].status).toBe("ongoing"); // direvert, sisa penuh lagi
   });
 });

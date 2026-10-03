@@ -343,27 +343,85 @@ selesai sesi sebelumnya).
       hilang tanpa jejak sama sekali). Perlu `DELETE /transactions/:id`
       dulu (belum ada, lihat Gap) utk kasus transactions.
 
-## Gap yang TERSISA (per 2026-10-01, akhir sesi Tahap 6)
+## Gap yang TERSISA (per 2026-10-03, update sesi Tahap 5 skeleton)
 
 Tahap 6 (integrasi klien PC) **SELESAI secara fungsional** — push
 on-write, pull, retry queue, backfill, UI Settings semua diverifikasi
-jalan di production nyata (push PC→D1 DAN pull D1→PC, dua arah). Sisa
-pekerjaan di luar scope sesi ini:
+jalan di production nyata (push PC→D1 DAN pull D1→PC, dua arah).
+**UPDATE 2026-10-03**: Tahap 5 (`apps/mcp-server`) sekarang SEBAGIAN
+SELESAI (sisi baca) & SUDAH DI-DEPLOY ke production (Vercel), lihat
+detail lengkap di `apps/worker/docs/todos/plan/cloud-sync.md` bagian
+"Tahap 5". Juga ditambah: section Settings PC "AI Assistant (MCP)"
+(`features/settings/content/ai-assistant/`) — sebelumnya placeholder
+kosong sejak 2026-09-22, sekarang diisi form URL+token server MCP
+(murni simpan+tampilkan, PC TIDAK pernah memanggil mcp-server sendiri)
+supaya user gampang copy-paste saat setup client MCP.
 
-1. `DELETE /transactions/:id` di Worker (sisa kecil Tahap 4) — perlu
-   keputusan desain guard debt/payment dulu (desktop sendiri TIDAK py
-   guard delete transaksi sama sekali). Tanpa ini, `useDeleteTransaction`
-   TIDAK push delete ke Worker (baris di D1 tetap ada meski dihapus di
-   PC) — divergence yang diketahui, belum ditutup.
-2. Token MCP terpisah dari `PC_SYNC_TOKEN` — prasyarat sblm `sync_source`
-   endpoint `correct-balance` bisa berhenti hardcode `'mcp'`.
-3. `apps/mcp-server` (Tahap 5) — BELUM disentuh sama sekali, app-nya
-   sendiri belum ada. Tanpa ini, skenario "tambah transaksi dari HP via
-   MCP sungguhan" baru bisa disimulasikan manual (INSERT langsung ke D1
-   via `wrangler d1 execute`), bukan lewat jalur MCP asli.
+Sisa pekerjaan di luar scope sesi ini:
+
+1. `DELETE /transactions/:id` — **SELESAI PENUH 2026-10-03** (Worker +
+   PC, lihat `apps/worker/docs/todos/plan/cloud-sync.md` "Progress
+   implementasi" utk desain lengkap sisi Worker). **Sisi PC**:
+   - `getTransactionDebtStatus()` (`shared/debts/use-transaction-debt-status.ts`)
+     DIUBAH terima `db` sbg parameter (BUKAN lagi `getDb()` dipanggil di
+     dalam) — **bug nyata ditemukan SAAT nulis unit test** (bukan dari
+     baca kode): fungsi ini dipanggil dari `detachDebtForDeletedTransaction`
+     yg terima `db` dari caller (`mutationFn`, tidak bisa pakai hook
+     React), tapi diam-diam buka KONEKSI DB KEDUA via `getDb()` sendiri
+     — 2 koneksi beda utk 1 operasi yg seharusnya pakai koneksi yg sama.
+     Test pertama kali gagal dgn `ReferenceError: window is not defined`
+     (Tauri IPC dipanggil di lingkungan test Node) — barulah ketahuan.
+   - `detachDebtForDeletedTransaction()` baru (`shared/debts/apply-debt-transaction.ts`)
+     — port PERSIS dari `detachDebtForDeletedTransaction` Worker: role
+     `none` no-op, role `payment` hapus `debt_payments`+revert status,
+     role `principal` SET NULL `transaction_id` (piutang/cicilan tetap
+     utuh). 5 unit test baru (fake DB di-extend utk query/UPDATE yg
+     belum dikenali sebelumnya), total 171 test (166 lama+5 baru) 0
+     regresi.
+   - `useDeleteTransaction` (`features/transactions/shared/hooks/`) —
+     panggil `detachDebtForDeletedTransaction` LOKAL sebelum hard-delete
+     (independen dari cloud sync), toast informatif tambahan SETELAH
+     sukses kalau role bukan `none`. **Keputusan desain penting**:
+     toast HARUS berbasis status LOKAL (SQLite PC), BUKAN response
+     Worker (`debtInfo` dari push cloud) — gap yg sempat kelewat saat
+     desain awal: kalau toast numpang ke response Worker, toast TIDAK
+     PERNAH muncul buat user yg cloud sync-nya OFF/offline (mayoritas
+     use-case, krn ini fitur opsional).
+   - `pushDeleteTransactionOnWrite()` baru (`shared/cloud-sync/push-on-write.ts`)
+     + `deleteTransactionCloud()` (`worker-client.ts`) — sinkronisasi ke
+     Worker, TERPISAH dari logic lokal di atas (push SEBELUM hard-delete,
+     pola sama 4 tabel lain, `debtInfo` hasil Worker DIABAIKAN di sisi
+     PC krn sudah py sumber kebenaran lokal sendiri).
+   - **DIVERIFIKASI end-to-end di `tauri dev` SUNGGUHAN** (bukan cuma
+     unit test) — user buat transfer cash→akun debt (piutang baru) +
+     transaksi cicilan parsial lewat UI asli, lalu hapus KEDUANYA satu
+     per satu: toast informatif muncul tepat sesuai role, diverifikasi
+     via query `finance.dev.db` (copy+WAL sesuai
+     `docs/rules/checking-dev-database.md`) — hapus cicilan → baris
+     `debt_payments` bersih terhapus, piutang induk tetap `ongoing`
+     Rp100.000 tidak berubah; hapus principal (setelah cicilan sudah
+     tidak ada, `hadPayments:false`) → `transaction_id` jadi NULL,
+     `amount`/`status` piutang tidak tersentuh.
+2. ~~Token MCP terpisah dari `PC_SYNC_TOKEN`~~ **DITUTUP 2026-10-03** —
+   `MCP_SYNC_TOKEN` sudah ada & di-deploy (lihat
+   `apps/worker/docs/todos/plan/cloud-sync.md`). **TAPI** `sync_source`
+   di endpoint2 spt `correct-balance` MASIH hardcode `'mcp'` — belum
+   dibenahi jadi dinamis per token krn belum ada tool TULIS MCP
+   sungguhan yg butuh itu. Prasyarat token-nya sendiri SUDAH beres.
+3. `apps/mcp-server` (Tahap 5) — **SEBAGIAN SELESAI 2026-10-03**: 5 tool
+   BACA + OAuth shim sudah jalan & diverifikasi di production (termasuk
+   narik data produksi asli lewat `get_debt_summary`). **UPDATE SAMA
+   HARI**: juga sudah DIVERIFIKASI via client MCP SUNGGUHAN (Claude
+   Web, bukan cuma `curl` manual lagi) — connect berhasil, tool baca
+   dipakai utk ringkas pemasukan/pengeluaran bulan berjalan dgn data
+   asli, hasil cocok ekspektasi. **BELUM**: tool TULIS (daftar final
+   belum diputuskan) — tanpa ini, mengelola data dari HP ("tambah/edit
+   transaksi lewat Claude") masih belum bisa, baru sebatas "tanya/lihat
+   data".
 4. Uji skenario konflik nyata (edit baris sama dari 2 sisi hampir
-   bersamaan) dan soft-delete cross-device — perlu Tahap 5 jalan dulu
-   utk skenario yang realistis (bukan simulasi satu sisi).
+   bersamaan) dan soft-delete cross-device — masih BLOCKED, perlu tool
+   TULIS MCP (poin 3) jalan dulu utk skenario yang realistis (bukan
+   simulasi satu sisi).
 5. 25 transaksi historis yang ditolak Worker (lihat "diterima sbg
    divergence historis" di atas) — tidak urgent, TAPI kalau suatu saat
    mau ditutup, opsinya: ubah `account_type` akun terkait jadi `cash`,

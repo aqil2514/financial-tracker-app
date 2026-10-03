@@ -14,8 +14,8 @@
  */
 
 import { getDb } from "@/lib/db";
-import type { CloudSyncCredentials, DeleteCloudPayload } from "./worker-client";
-import { deleteCloudRow } from "./worker-client";
+import type { CloudSyncCredentials, DeleteCloudPayload, TransactionDebtInfo } from "./worker-client";
+import { deleteCloudRow, deleteTransactionCloud } from "./worker-client";
 import {
   enqueueDeletePush,
   enqueueUpsertPush,
@@ -72,6 +72,26 @@ export async function pushDeleteOnWrite(
     await deleteCloudRow(creds, table, id, payload);
   } catch {
     await enqueueDeletePush(table, id, payload);
+  }
+}
+
+/** Khusus `transactions` -- terpisah dari `pushDeleteOnWrite` krn
+ * py bentuk return beda (bukan void): endpoint Worker balas `debtInfo`
+ * (tindakan thd debt/debt_payments terkait, TUNGGAL per role, TANPA
+ * payload pilihan dari client), dipakai dialog PC utk toast informatif
+ * SETELAH delete berhasil. `null` kalau offline/gagal (masuk antrian
+ * retry, sama kebijakan non-blocking dgn pushDeleteOnWrite) ATAU kalau
+ * cloud sync belum aktif -- caller treat sbg "tidak ada info tambahan
+ * utk ditampilkan", BUKAN error. */
+export async function pushDeleteTransactionOnWrite(id: string): Promise<TransactionDebtInfo | null> {
+  const creds = await resolveCredentials();
+  if (!creds) return null;
+
+  try {
+    return await deleteTransactionCloud(creds, id);
+  } catch {
+    await enqueueDeletePush("transactions", id, {});
+    return null;
   }
 }
 
