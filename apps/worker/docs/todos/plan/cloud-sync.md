@@ -948,19 +948,27 @@ terpusat di satu tempat.
          `confirm: z.literal(true)` di level mcp-server, Worker tidak
          berubah.
 
-### Tahap 7 — Verifikasi (sisi Worker/MCP)
+### Tahap 7 — Verifikasi (sisi Worker/MCP) — DITUTUP 2026-10-03
 
-- [ ] Uji skenario inti: tambah transaksi dari HP (via Claude/MCP)
-      SAAT PC mati → nyalakan PC → pastikan transaksi itu muncul
-      setelah pull, TIDAK hilang.
-- [ ] Uji skenario konflik: edit baris sama dari PC (offline) dan dari
-      HP hampir bersamaan → pastikan `updated_at` lebih baru yang
-      menang, bukan silent corruption.
-- [ ] Uji validasi bisnis dari sisi MCP: coba operasi yg SEHARUSNYA
-      ditolak lewat tool MCP, pastikan Worker MENOLAK juga, bukan cuma
-      divalidasi di client PC.
-- [ ] Uji soft delete: hapus dari satu sisi, sisi lain sempat edit
-      sebelum tahu — pastikan resolve masuk akal.
+**Keputusan sadar**: skenario di bawah TIDAK diuji lewat test
+formal/simulasi buatan. Setelah tool TULIS MCP (Tahap 5) selesai, user
+memutuskan ini cukup ketahuan natural lewat dogfooding (pakai aplikasinya
+sehari-hari dari PC+HP) — temuan nyata dicatat manual di
+`Catatan Penggunaan.txt` (root repo) kapan pun muncul, bukan checklist
+test terpisah yang harus dikerjakan preemptive.
+
+Skenario yang tadinya direncanakan (dipertahankan sbg referensi kalau
+nanti ada temuan terkait dari dogfooding):
+- Tambah transaksi dari HP (via Claude/MCP) SAAT PC mati → nyalakan PC
+  → pastikan transaksi itu muncul setelah pull, TIDAK hilang.
+- Konflik: edit baris sama dari PC (offline) dan dari HP hampir
+  bersamaan → pastikan `updated_at` lebih baru yang menang, bukan
+  silent corruption.
+- Validasi bisnis dari sisi MCP: operasi yg SEHARUSNYA ditolak lewat
+  tool MCP, pastikan Worker MENOLAK juga, bukan cuma divalidasi di
+  client PC.
+- Soft delete: hapus dari satu sisi, sisi lain sempat edit sebelum tahu
+  — pastikan resolve masuk akal.
 
 (Tahap 2 — inventarisir logic bisnis, dan Tahap 6 — integrasi klien PC,
 ada di dokumen `apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`.)

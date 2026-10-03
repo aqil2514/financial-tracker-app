@@ -60,17 +60,17 @@ Claude — live, sisi BACA selesai).
       **SELESAI secara fungsional** (2026-10-01), diverifikasi dua arah
       di production nyata. Detail:
       [`apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`](../../../apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md)
-- [ ] **Tahap 7** — Verifikasi end-to-end (sisi Worker/MCP) — **BELUM
-      DIMULAI**, tool TULIS MCP (Tahap 5) sudah selesai jadi tidak lagi
-      terblokir — butuh skenario tulis dari HP yang realistis (konflik,
-      soft-delete cross-device), bukan simulasi satu sisi.
+- [x] **Tahap 7** — Verifikasi end-to-end (sisi Worker/MCP) — **DITUTUP
+      2026-10-03, keputusan sadar: TIDAK via skenario test formal**.
+      Setelah tool TULIS MCP (Tahap 5) selesai, user memutuskan skenario
+      konflik/soft-delete cross-device cukup ketahuan lewat dogfooding
+      nyata (pakai aplikasinya sehari-hari dari PC+HP), bukan simulasi
+      buatan — temuan dicatat manual di `Catatan Penggunaan.txt` (root
+      repo) kapan pun muncul, bukan checklist test terpisah.
 
 ## Gap aktif (per 2026-10-03)
 
-1. **Tahap 7** (verifikasi konflik nyata + soft-delete cross-device) —
-   sekarang jadi pekerjaan terbesar yang tersisa, tidak lagi terblokir
-   sejak tool TULIS MCP selesai.
-2. **25 transaksi historis** yang ditolak aturan validasi Worker — sadar
+1. **25 transaksi historis** yang ditolak aturan validasi Worker — sadar
    dibiarkan terbuka (divergence historis diterima, bukan bug).
 
 **Dokumen historis/rujukan** (tidak perlu dibaca kecuali menelusuri
