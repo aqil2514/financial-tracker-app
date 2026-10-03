@@ -24,13 +24,15 @@ export function useDebtsList(type: "receivable" | "payable") {
            contacts.name AS contact_name,
            accounts.name AS account_name,
            debts.amount - COALESCE(
-             (SELECT SUM(amount) FROM debt_payments WHERE debt_payments.debt_id = debts.id),
+             (SELECT SUM(amount) FROM debt_payments
+              WHERE debt_payments.debt_id = debts.id AND debt_payments.deleted_at IS NULL),
              0
            ) AS remaining
          FROM debts
          LEFT JOIN contacts ON contacts.id = debts.contact_id
          LEFT JOIN accounts ON accounts.id = debts.account_id
          WHERE debts.type = $1
+           AND debts.deleted_at IS NULL
          ORDER BY debts.date DESC, debts.id DESC`,
         [type]
       );

@@ -1,6 +1,6 @@
 "use client";
 
-import type { UseFormReturn } from "react-hook-form";
+import { useWatch, type UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -9,6 +9,7 @@ import {
   FormFieldCurrency,
   FormFieldDate,
   FormFieldText,
+  FormFieldToggleGroup,
 } from "@/components/forms/form-fields";
 import { useAccounts } from "@/features/accounts";
 import { formatCurrency } from "@/lib/format-currency";
@@ -22,8 +23,15 @@ type PayDebtFormProps = {
   isPending: boolean;
 };
 
+const settlementModeOptions = [
+  { value: "cash", label: "Dengan Uang" },
+  { value: "non_cash", label: "Tanpa Uang" },
+];
+
 export function PayDebtForm({ debt, form, onSubmit, isPending }: PayDebtFormProps) {
   const { data: accounts } = useAccounts();
+
+  const settlementMode = useWatch({ control: form.control, name: "settlement_mode" });
 
   const cashAccountOptions =
     accounts
@@ -48,16 +56,41 @@ export function PayDebtForm({ debt, form, onSubmit, isPending }: PayDebtFormProp
       <p className="text-muted-foreground text-sm">
         {debt.contact_name ?? "—"} · Sisa {formatCurrency(debt.remaining, "IDR")}
       </p>
-      <FormFieldCurrency form={form} name="amount" label="Nominal Dibayar" useCalculator />
-      <FormFieldCombobox
+      <FormFieldToggleGroup
         form={form}
-        name="cash_account_id"
-        label="Akun Kas"
-        placeholder="Cari akun kas..."
-        options={cashAccountOptions}
+        name="settlement_mode"
+        label="Cara Menyelesaikan"
+        description={
+          settlementMode === "non_cash"
+            ? "Tidak ada uang yang berpindah (dibayar barang/jasa, dihapuskan, atau dikompensasi) — jelaskan alasannya di Catatan."
+            : "Uang riil berpindah lewat akun kas."
+        }
+        options={settlementModeOptions}
       />
+      <FormFieldCurrency
+        form={form}
+        name="amount"
+        label={settlementMode === "non_cash" ? "Nominal Diselesaikan" : "Nominal Dibayar"}
+        useCalculator
+      />
+      {settlementMode === "cash" && (
+        <FormFieldCombobox
+          form={form}
+          name="cash_account_id"
+          label="Akun Kas"
+          placeholder="Cari akun kas..."
+          options={cashAccountOptions}
+        />
+      )}
       <FormFieldDate form={form} name="date" label="Tanggal" />
-      <FormFieldText form={form} name="note" label="Catatan" placeholder="Mis. Cicilan pertama" />
+      <FormFieldText
+        form={form}
+        name="note"
+        label="Catatan"
+        placeholder={
+          settlementMode === "non_cash" ? "Mis. Dihapuskan, tidak sanggup bayar" : "Mis. Cicilan pertama"
+        }
+      />
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
           {isPending ? "Menyimpan..." : "Simpan"}

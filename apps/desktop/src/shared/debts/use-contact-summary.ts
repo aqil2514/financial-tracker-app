@@ -116,6 +116,7 @@ export function useContactSummary(filters: FilterConfig[] = [], sorts: SortConfi
              WHERE debts.contact_id = contacts.id
                AND debts.type = 'receivable'
                AND debts.status = 'ongoing'
+               AND debts.deleted_at IS NULL
            ), 0) AS receivable_active,
            COALESCE((
              SELECT SUM(debt_payments.amount)
@@ -124,11 +125,14 @@ export function useContactSummary(filters: FilterConfig[] = [], sorts: SortConfi
              WHERE debts.contact_id = contacts.id
                AND debts.type = 'receivable'
                AND debts.status = 'ongoing'
+               AND debts.deleted_at IS NULL
+               AND debt_payments.deleted_at IS NULL
            ), 0) AS receivable_paid,
            COALESCE((
              SELECT SUM(
                debts.amount - COALESCE(
-                 (SELECT SUM(amount) FROM debt_payments WHERE debt_payments.debt_id = debts.id),
+                 (SELECT SUM(amount) FROM debt_payments
+                  WHERE debt_payments.debt_id = debts.id AND debt_payments.deleted_at IS NULL),
                  0
                )
              )
@@ -136,12 +140,14 @@ export function useContactSummary(filters: FilterConfig[] = [], sorts: SortConfi
              WHERE debts.contact_id = contacts.id
                AND debts.type = 'receivable'
                AND debts.status = 'ongoing'
+               AND debts.deleted_at IS NULL
            ), 0) AS receivable_remaining,
            COALESCE((
              SELECT SUM(debts.amount) FROM debts
              WHERE debts.contact_id = contacts.id
                AND debts.type = 'payable'
                AND debts.status = 'ongoing'
+               AND debts.deleted_at IS NULL
            ), 0) AS payable_active,
            COALESCE((
              SELECT SUM(debt_payments.amount)
@@ -150,11 +156,14 @@ export function useContactSummary(filters: FilterConfig[] = [], sorts: SortConfi
              WHERE debts.contact_id = contacts.id
                AND debts.type = 'payable'
                AND debts.status = 'ongoing'
+               AND debts.deleted_at IS NULL
+               AND debt_payments.deleted_at IS NULL
            ), 0) AS payable_paid,
            COALESCE((
              SELECT SUM(
                debts.amount - COALESCE(
-                 (SELECT SUM(amount) FROM debt_payments WHERE debt_payments.debt_id = debts.id),
+                 (SELECT SUM(amount) FROM debt_payments
+                  WHERE debt_payments.debt_id = debts.id AND debt_payments.deleted_at IS NULL),
                  0
                )
              )
@@ -162,9 +171,10 @@ export function useContactSummary(filters: FilterConfig[] = [], sorts: SortConfi
              WHERE debts.contact_id = contacts.id
                AND debts.type = 'payable'
                AND debts.status = 'ongoing'
+               AND debts.deleted_at IS NULL
            ), 0) AS payable_remaining
          FROM contacts
-         WHERE EXISTS (SELECT 1 FROM debts WHERE debts.contact_id = contacts.id)`;
+         WHERE EXISTS (SELECT 1 FROM debts WHERE debts.contact_id = contacts.id AND debts.deleted_at IS NULL)`;
 
       const wrapped = `SELECT *,
            CASE WHEN receivable_active > 0 THEN 1 ELSE 0 END AS has_receivable,

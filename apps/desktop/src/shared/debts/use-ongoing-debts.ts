@@ -42,12 +42,14 @@ export function useOngoingDebts(
            debts.amount - COALESCE(
              (SELECT SUM(amount) FROM debt_payments
               WHERE debt_payments.debt_id = debts.id
+                AND debt_payments.deleted_at IS NULL
                 AND ($3 IS NULL OR debt_payments.transaction_id IS NOT $3)),
              0
            ) AS remaining
          FROM debts
          WHERE debts.contact_id = $1
            AND debts.type = 'receivable'
+           AND debts.deleted_at IS NULL
            AND (debts.status = 'ongoing' OR debts.id = $2)
          ORDER BY debts.date ASC, debts.id ASC`,
         [contactId, excludeDebtId ?? null, excludeTransactionId ?? null]
