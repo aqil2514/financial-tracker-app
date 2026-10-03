@@ -1,6 +1,7 @@
 # Titik Rawan Lintas-Tipe-Akun — Tindak Lanjut
 
-> Status: TEMUAN, solusi belum diputuskan. Lanjutan dari
+> Status: #1 sudah solid sejak awal, #2 dan #3 SUDAH DI-FIX sesi
+> 2026-10-04 (lihat di bawah). Lanjutan dari
 > [audit-kepatuhan-konsep-tipe-akun.md](audit-kepatuhan-konsep-tipe-akun.md)
 > (2026-10-03) — sebagian besar temuan di dokumen itu SUDAH di-fix di
 > commit `572ff59` ("Fix kode yang menyimpang dengan konsep tipe akun"),
@@ -18,8 +19,8 @@
 | # | Titik | Lokasi | Status |
 |---|---|---|---|
 | 1 | Transfer transaksi | `classify-account-pair.ts` (desktop + worker) | Solid — sudah di-fix, fail-safe (throw utk kombinasi tak dikenal) |
-| 2 | Koreksi saldo | `correctAccountBalance` (`accounts/service.ts`) + tool MCP `correct_account_balance` | **Gap — belum pernah ditangani** |
-| 3 | Larangan income/expense langsung ke tipe tertentu | `violatesDebtAccountRule` (`transactions/service.ts`) | **Rawan — hardcoded, fail-silent utk tipe baru** |
+| 2 | Koreksi saldo | `correctAccountBalance` (`accounts/service.ts`) + tool MCP `correct_account_balance` | **Selesai (2026-10-04)** — ditolak total utk tipe akun terlarang |
+| 3 | Larangan income/expense langsung ke tipe tertentu | `violatesDebtAccountRule` (`transactions/service.ts`) | **Selesai (2026-10-04)** — pakai helper terpusat, tidak hardcoded lagi |
 
 Titik #1 dicatat di sini sebagai pembanding/referensi pola yang BENAR
 (fail-safe, eksplisit per kombinasi, throw kalau belum dikenal) — bukan
@@ -28,6 +29,28 @@ untuk ditindaklanjuti lagi, sudah selesai.
 ---
 
 ## 2. Koreksi saldo — bypass total terhadap data turunan
+
+> **FIX (2026-10-04):** `correctAccountBalance` sekarang cek tipe akun
+> SEBELUM hitung diff/insert apa pun — kalau `account_type` termasuk
+> `isAccountTypeRestrictedFromDirectTransaction` (helper baru di
+> `shared/account-types.ts`, saat ini isinya `["debt"]`), langsung
+> `return { status: "rejected", reason: ... }`. Controller
+> (`accounts/controller.ts`) balas 422 dgn pesan alasan. Tool MCP
+> `correct_account_balance` otomatis ikut kebagian (proxy langsung ke
+> endpoint Worker, tidak ada logic sendiri).
+>
+> Keputusan: TOLAK TOTAL, bukan izinkan+warning — karena saldo akun
+> bertipe `debt` derived dari tabel `debts`/`debt_payments`, bukan nilai
+> bebas. Koreksi yg valid lewat: (1) transaksi transfer manual
+> (otomatis sinkron ke `debts` via `applyDebtTransaction`), atau (2)
+> perbaiki transaksi akar penyebabnya. Kasus nyata kemarin (data hasil
+> import dari aplikasi lain, tidak kompatibel dgn skema `debts` di sini)
+> tetap valid ditangani manual via `wrangler d1 execute` — itu data
+> repair utk data migrasi, bukan pola yg akan berulang dari transaksi
+> yang dihasilkan sistem ini sendiri, jadi TIDAK dibuatkan jalur
+> API/tool resmi. Kalau nanti ternyata ada kebutuhan koreksi berulang
+> utk transaksi yang memang dibuat sistem ini, itu sinyal utk desain
+> fitur khusus — bukan buka lagi jalur generik ini.
 
 **File:** `apps/worker/src/modules/accounts/service.ts` (`correctAccountBalance`),
 dipanggil dari tool MCP `correct_account_balance`
@@ -87,6 +110,21 @@ keterbatasan ini sama sekali.
 ---
 
 ## 3. Larangan income/expense langsung ke tipe tertentu — hardcoded, fail-silent
+
+> **FIX (2026-10-04):** `violatesDebtAccountRule` sekarang panggil
+> `isAccountTypeRestrictedFromDirectTransaction` (helper baru,
+> `shared/account-types.ts`) alih-alih `=== "debt"` hardcoded. Daftar
+> tipe terlarang jadi satu sumber kebenaran, dipakai di SINI dan di
+> `correctAccountBalance` (temuan #2) sekaligus — nambah tipe akun baru
+> yg butuh aturan serupa (mis. "investment") = tambah ke 1 array di
+> `account-types.ts`, otomatis kena di kedua jalur tanpa perlu diingat
+> manual.
+>
+> Sentralisasi dgn desktop (`use-transaction-form.ts`) BELUM dilakukan —
+> masih 2 implementasi terpisah (Worker reject keras, desktop
+> auto-correct di form). Diputuskan cukup Worker-side dulu krn itu
+> penjaga akhir semua jalur tulis (PC, MCP) — desktop cuma UX
+> convenience, bukan satu-satunya garda.
 
 **File:** `apps/worker/src/modules/transactions/service.ts:46-60`
 (`violatesDebtAccountRule`).

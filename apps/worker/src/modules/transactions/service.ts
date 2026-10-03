@@ -13,6 +13,7 @@ import {
 } from "../debts/service";
 import { resolveContactId } from "../contacts/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
+import { isAccountTypeRestrictedFromDirectTransaction } from "../../shared/account-types";
 
 // contactId eksplisit SELALU menang; contactName (nama natural dari tool
 // MCP) cuma dipakai kalau contactId kosong -- lihat keputusan desain di
@@ -56,7 +57,7 @@ async function violatesDebtAccountRule(
     .bind(payload.accountId)
     .first<{ account_type: string }>();
 
-  return row?.account_type === "debt";
+  return row !== null && isAccountTypeRestrictedFromDirectTransaction(row.account_type);
 }
 
 // UPSERT dgn LWW (lihat shared/lww.ts). `id` sudah ada di D1 -> delegasi

@@ -80,6 +80,10 @@ export async function handlePostCorrectBalance(c: Context<AppContext>) {
     return c.json({ status: "ok", message: "Balance already matches target" });
   }
 
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
+
   return c.json({ status: "ok", transactionId: result.transactionId }, 201);
 }
 

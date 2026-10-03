@@ -3,6 +3,7 @@ import type { Env } from "../../shared/env";
 import type { SyncSource } from "../../shared/auth";
 import type { AccountPayload, DeleteAccountPayload } from "./schema";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
+import { isAccountTypeRestrictedFromDirectTransaction } from "../../shared/account-types";
 
 const CORRECTION_CATEGORY_NAME = "Penyesuaian Saldo";
 
@@ -166,14 +167,40 @@ export async function getAccountBalance(env: Env, accountId: string): Promise<nu
 export type CorrectAccountBalanceResult =
   | { status: "account_not_found" }
   | { status: "no_change" }
+  | { status: "rejected"; reason: string }
   | { status: "corrected"; transactionId: string };
 
+// Titik rawan #2 (docs/todos/plan/titik-rawan-tipe-akun.md): jalur ini
+// INSERT transaksi income/expense langsung, TIDAK lewat
+// createTransactionRow -- jadi applyDebtTransaction & violatesDebtAccountRule
+// (transactions/service.ts) otomatis tidak pernah terpicu. Utk tipe akun
+// yang saldonya derived dari tabel lain (mis. "debt"), itu bikin saldo
+// akun & data turunan (debts/debt_payments) jadi tidak saling menjelaskan
+// -- SUDAH TERJADI NYATA sesi 2026-10-03 (lihat dokumen). Ditolak total
+// di sini, bukan cuma warning -- koreksi utk tipe ini wajib lewat
+// transaksi transfer manual (yg otomatis sinkron ke debts) atau edit
+// transaksi akar penyebabnya, bukan "koreksi saldo" generik.
 export async function correctAccountBalance(
   env: Env,
   accountId: string,
   targetBalance: number,
   syncSource: SyncSource
 ): Promise<CorrectAccountBalanceResult> {
+  const account = await env.DB.prepare(
+    "SELECT account_type FROM accounts WHERE id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(accountId)
+    .first<{ account_type: string }>();
+  if (!account) return { status: "account_not_found" };
+
+  if (isAccountTypeRestrictedFromDirectTransaction(account.account_type)) {
+    return {
+      status: "rejected",
+      reason:
+        "Saldo akun bertipe 'debt' tidak bisa dikoreksi langsung karena derived dari data piutang/utang -- gunakan transaksi transfer atau perbaiki transaksi akar penyebabnya.",
+    };
+  }
+
   const currentBalance = await getAccountBalance(env, accountId);
   if (currentBalance === null) return { status: "account_not_found" };
 
