@@ -1,21 +1,21 @@
 import type { Context } from "hono";
-import type { Env } from "../../shared/env";
+import type { AppContext } from "../../shared/auth";
 import { isContactPayload } from "./schema";
 import { upsertContact, deleteContact } from "./service";
 
-export async function handlePostContact(c: Context<{ Bindings: Env }>) {
+export async function handlePostContact(c: Context<AppContext>) {
   const body = await c.req.json().catch(() => null);
   if (!isContactPayload(body)) {
     return c.json({ error: "Invalid payload" }, 400);
   }
-  const result = await upsertContact(c.env, body);
+  const result = await upsertContact(c.env, body, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }
   return c.json({ status: "ok", id: result.id }, 201);
 }
 
-export async function handlePatchContact(c: Context<{ Bindings: Env }>) {
+export async function handlePatchContact(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Missing contact id" }, 400);
 
@@ -31,14 +31,14 @@ export async function handlePatchContact(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "Invalid payload" }, 400);
   }
 
-  const result = await upsertContact(c.env, merged);
+  const result = await upsertContact(c.env, merged, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id });
   }
   return c.json({ status: "ok", id: result.id }, 200);
 }
 
-export async function handleDeleteContact(c: Context<{ Bindings: Env }>) {
+export async function handleDeleteContact(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Missing contact id" }, 400);
 

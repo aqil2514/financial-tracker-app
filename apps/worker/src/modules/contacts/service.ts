@@ -1,5 +1,6 @@
 import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
+import type { SyncSource } from "../../shared/auth";
 import type { ContactPayload } from "./schema";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
@@ -8,7 +9,11 @@ export type DeleteContactResult = { status: "ok" } | { status: "not_found" };
 
 // UPSERT dgn LWW, port dari use-create-contact.ts + use-update-contact.ts
 // digabung (lihat shared/lww.ts).
-export async function upsertContact(env: Env, payload: ContactPayload): Promise<UpsertContactResult> {
+export async function upsertContact(
+  env: Env,
+  payload: ContactPayload,
+  syncSource: SyncSource
+): Promise<UpsertContactResult> {
   const existing = await env.DB.prepare("SELECT updated_at FROM contacts WHERE id = ?1")
     .bind(payload.id)
     .first<{ updated_at: string | null }>();
@@ -20,9 +25,9 @@ export async function upsertContact(env: Env, payload: ContactPayload): Promise<
   if (!existing) {
     const now = nowText();
     await env.DB.prepare(
-      "INSERT INTO contacts (id, name, note, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?4, ?5, 'mcp')"
+      "INSERT INTO contacts (id, name, note, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
     )
-      .bind(payload.id, payload.name, payload.note ?? null, now, decision.updatedAt)
+      .bind(payload.id, payload.name, payload.note ?? null, now, decision.updatedAt, syncSource)
       .run();
   } else {
     // LWW menang CLEAR deleted_at juga, lihat account-groups/service.ts.
@@ -60,7 +65,11 @@ export async function deleteContact(env: Env, id: string): Promise<DeleteContact
 // kalau tidak ada baru insert baru TANPA `note`. Dipakai dari modul LAIN
 // (mis. debts manual nanti) sbg PEMICU -- contacts jadi PEMILIK logic ini,
 // lihat module-structure.md "Logic bisnis lintas-modul".
-export async function resolveContactId(env: Env, name: string | null): Promise<string | null> {
+export async function resolveContactId(
+  env: Env,
+  name: string | null,
+  syncSource: SyncSource
+): Promise<string | null> {
   const trimmed = name?.trim();
   if (!trimmed) return null;
 
@@ -74,9 +83,9 @@ export async function resolveContactId(env: Env, name: string | null): Promise<s
   const id = uuidv7();
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
   await env.DB.prepare(
-    "INSERT INTO contacts (id, name, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?3, 'mcp')"
+    "INSERT INTO contacts (id, name, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?3, ?4)"
   )
-    .bind(id, trimmed, now)
+    .bind(id, trimmed, now, syncSource)
     .run();
   return id;
 }

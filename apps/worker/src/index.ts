@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { Env } from "./shared/env";
+import type { AppContext } from "./shared/auth";
 import { requireAuth } from "./shared/auth";
 import { handleGetHealth } from "./modules/health/controller";
 import { transactionsRouter } from "./modules/transactions/router";
@@ -10,7 +10,7 @@ import { categoriesRouter } from "./modules/categories/router";
 import { contactsRouter } from "./modules/contacts/router";
 import { syncRouter } from "./modules/sync/router";
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<AppContext>();
 
 // Izinkan semua origin -- klien (apps/desktop Tauri WebView) origin-nya
 // bisa beda2 (localhost:3000 saat dev, custom scheme saat production

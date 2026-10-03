@@ -1,4 +1,5 @@
 import type { Env } from "../../shared/env";
+import type { SyncSource } from "../../shared/auth";
 import type { CategoryPayload, DeleteCategoryPayload } from "./schema";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
@@ -8,7 +9,11 @@ export type DeleteCategoryResult = { status: "ok" } | { status: "not_found" };
 // UPSERT dgn LWW, port dari use-create-category.ts +
 // use-update-category.ts digabung (lihat shared/lww.ts). TIDAK ADA
 // validasi parent.type === type, lihat catatan di schema.ts.
-export async function upsertCategory(env: Env, payload: CategoryPayload): Promise<UpsertCategoryResult> {
+export async function upsertCategory(
+  env: Env,
+  payload: CategoryPayload,
+  syncSource: SyncSource
+): Promise<UpsertCategoryResult> {
   const existing = await env.DB.prepare("SELECT updated_at FROM categories WHERE id = ?1")
     .bind(payload.id)
     .first<{ updated_at: string | null }>();
@@ -22,7 +27,7 @@ export async function upsertCategory(env: Env, payload: CategoryPayload): Promis
     await env.DB.prepare(
       `INSERT INTO categories
          (id, name, icon, type, parent_id, is_active, created_at, updated_at, sync_source)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'mcp')`
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
     )
       .bind(
         payload.id,
@@ -32,7 +37,8 @@ export async function upsertCategory(env: Env, payload: CategoryPayload): Promis
         payload.parentId ?? null,
         payload.isActive === false ? 0 : 1,
         now,
-        decision.updatedAt
+        decision.updatedAt,
+        syncSource
       )
       .run();
   } else {

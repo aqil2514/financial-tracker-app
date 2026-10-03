@@ -1,16 +1,16 @@
 import type { Context } from "hono";
-import type { Env } from "../../shared/env";
+import type { AppContext } from "../../shared/auth";
 import { isPushTransactionPayload, isPatchTransactionPayload } from "./schema";
 import { insertTransaction, updateTransaction, deleteTransaction } from "./service";
 
 // Autentikasi ditangani requireAuth middleware, dipasang di router.ts.
-export async function handlePostTransaction(c: Context<{ Bindings: Env }>) {
+export async function handlePostTransaction(c: Context<AppContext>) {
   const body = await c.req.json().catch(() => null);
   if (!isPushTransactionPayload(body)) {
     return c.json({ error: "Invalid payload" }, 400);
   }
 
-  const result = await insertTransaction(c.env, body);
+  const result = await insertTransaction(c.env, body, c.get("syncSource"));
 
   if (result.status === "rejected") {
     return c.json({ error: result.reason }, 422);
@@ -22,7 +22,7 @@ export async function handlePostTransaction(c: Context<{ Bindings: Env }>) {
   return c.json({ status: "ok", id: body.id }, 201);
 }
 
-export async function handlePatchTransaction(c: Context<{ Bindings: Env }>) {
+export async function handlePatchTransaction(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) {
     return c.json({ error: "Missing transaction id" }, 400);
@@ -32,7 +32,7 @@ export async function handlePatchTransaction(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "Invalid payload" }, 400);
   }
 
-  const result = await updateTransaction(c.env, id, body);
+  const result = await updateTransaction(c.env, id, body, c.get("syncSource"));
 
   if (result.status === "not_found") {
     return c.json({ error: "Transaction not found" }, 404);
@@ -47,7 +47,7 @@ export async function handlePatchTransaction(c: Context<{ Bindings: Env }>) {
   return c.json({ status: "ok", id }, 200);
 }
 
-export async function handleDeleteTransaction(c: Context<{ Bindings: Env }>) {
+export async function handleDeleteTransaction(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Missing transaction id" }, 400);
 

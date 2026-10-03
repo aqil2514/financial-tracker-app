@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Env } from "../../shared/env";
+import type { AppContext } from "../../shared/auth";
 import { requireAuth } from "../../shared/auth";
 import {
   handlePostAccountGroup,
@@ -7,7 +7,7 @@ import {
   handleDeleteAccountGroup,
 } from "./controller";
 
-export const accountGroupsRouter = new Hono<{ Bindings: Env }>();
+export const accountGroupsRouter = new Hono<AppContext>();
 
 accountGroupsRouter.use(requireAuth);
 accountGroupsRouter.post("/", handlePostAccountGroup);

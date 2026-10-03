@@ -1,5 +1,6 @@
 import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
+import type { SyncSource } from "../../shared/auth";
 
 type OngoingDebtRow = { id: string; remaining: number };
 
@@ -18,6 +19,9 @@ export type ApplyDebtTransactionInput = {
   // debts.id yang dipilih utk dilunasi -- cuma dipakai saat
   // debtAction === 'settlement'.
   settleDebtIds: string[];
+  // Provenance utk baris debts/debt_payments yg di-insert di sini --
+  // derive dari token request (shared/auth.ts), BUKAN dari payload client.
+  syncSource: SyncSource;
 };
 
 export type ApplyDebtTransactionResult =
@@ -148,8 +152,18 @@ export async function applyDebtTransaction(
   env: Env,
   input: ApplyDebtTransactionInput
 ): Promise<ApplyDebtTransactionResult> {
-  const { transactionId, type, accountId, transferAccountId, contactId, amount, date, debtAction, settleDebtIds } =
-    input;
+  const {
+    transactionId,
+    type,
+    accountId,
+    transferAccountId,
+    contactId,
+    amount,
+    date,
+    debtAction,
+    settleDebtIds,
+    syncSource,
+  } = input;
 
   if (type !== "transfer" || transferAccountId == null) return { status: "ok" };
 
@@ -174,9 +188,9 @@ export async function applyDebtTransaction(
     await env.DB.prepare(
       `INSERT INTO debts
          (id, type, contact_id, amount, account_id, transaction_id, date, created_at, updated_at, sync_source)
-       VALUES (?1, 'receivable', ?2, ?3, ?4, ?5, ?6, ?7, ?7, 'mcp')`
+       VALUES (?1, 'receivable', ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8)`
     )
-      .bind(uuidv7(), contactId, amount, transferAccountId, transactionId, date, now)
+      .bind(uuidv7(), contactId, amount, transferAccountId, transactionId, date, now, syncSource)
       .run();
     return { status: "ok" };
   }
@@ -186,16 +200,16 @@ export async function applyDebtTransaction(
     await env.DB.prepare(
       `INSERT INTO debts
          (id, type, contact_id, amount, account_id, transaction_id, date, created_at, updated_at, sync_source)
-       VALUES (?1, 'payable', ?2, ?3, ?4, ?5, ?6, ?7, ?7, 'mcp')`
+       VALUES (?1, 'payable', ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8)`
     )
-      .bind(uuidv7(), contactId, amount, accountId, transactionId, date, now)
+      .bind(uuidv7(), contactId, amount, accountId, transactionId, date, now, syncSource)
       .run();
     return { status: "ok" };
   }
 
   if (debtAction === "settlement") {
     try {
-      await settleDebtsFifo(env, { transactionId, accountId, amount, date, settleDebtIds });
+      await settleDebtsFifo(env, { transactionId, accountId, amount, date, settleDebtIds, syncSource });
     } catch (err) {
       if (err instanceof DebtSettlementExceedsRemainingError) {
         return {
@@ -218,12 +232,14 @@ async function settleDebtsFifo(
     amount,
     date,
     settleDebtIds,
+    syncSource,
   }: {
     transactionId: string;
     accountId: string;
     amount: number;
     date: string;
     settleDebtIds: string[];
+    syncSource: SyncSource;
   }
 ): Promise<void> {
   if (settleDebtIds.length === 0) return;
@@ -261,9 +277,9 @@ async function settleDebtsFifo(
     await env.DB.prepare(
       `INSERT INTO debt_payments
          (id, debt_id, amount, account_id, transaction_id, date, created_at, updated_at, sync_source)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, 'mcp')`
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8)`
     )
-      .bind(uuidv7(), debt.id, allocation, accountId, transactionId, date, now)
+      .bind(uuidv7(), debt.id, allocation, accountId, transactionId, date, now, syncSource)
       .run();
 
     if (allocation >= debt.remaining) {

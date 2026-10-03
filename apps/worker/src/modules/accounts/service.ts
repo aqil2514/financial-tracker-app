@@ -1,5 +1,6 @@
 import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
+import type { SyncSource } from "../../shared/auth";
 import type { AccountPayload, DeleteAccountPayload } from "./schema";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
@@ -9,7 +10,11 @@ export type UpsertAccountResult = { status: "ok"; id: string } | { status: "stal
 
 // UPSERT dgn LWW, port dari use-create-account.ts + use-update-account.ts
 // digabung (lihat shared/lww.ts).
-export async function upsertAccount(env: Env, payload: AccountPayload): Promise<UpsertAccountResult> {
+export async function upsertAccount(
+  env: Env,
+  payload: AccountPayload,
+  syncSource: SyncSource
+): Promise<UpsertAccountResult> {
   const existing = await env.DB.prepare("SELECT updated_at FROM accounts WHERE id = ?1")
     .bind(payload.id)
     .first<{ updated_at: string | null }>();
@@ -24,7 +29,7 @@ export async function upsertAccount(env: Env, payload: AccountPayload): Promise<
       `INSERT INTO accounts
          (id, name, icon, initial_balance, group_id, description, is_active, account_type, color,
           created_at, updated_at, sync_source)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'mcp')`
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`
     )
       .bind(
         payload.id,
@@ -37,7 +42,8 @@ export async function upsertAccount(env: Env, payload: AccountPayload): Promise<
         payload.accountType,
         payload.color ?? null,
         now,
-        decision.updatedAt
+        decision.updatedAt,
+        syncSource
       )
       .run();
   } else {
@@ -126,7 +132,8 @@ export type CorrectAccountBalanceResult =
 export async function correctAccountBalance(
   env: Env,
   accountId: string,
-  targetBalance: number
+  targetBalance: number,
+  syncSource: SyncSource
 ): Promise<CorrectAccountBalanceResult> {
   const currentBalance = await getAccountBalance(env, accountId);
   if (currentBalance === null) return { status: "account_not_found" };
@@ -137,22 +144,18 @@ export async function correctAccountBalance(
   const type: "income" | "expense" = diff > 0 ? "income" : "expense";
   const amount = Math.abs(diff);
 
-  const categoryId = await getOrCreateCorrectionCategoryId(env, type);
+  const categoryId = await getOrCreateCorrectionCategoryId(env, type, syncSource);
 
-  // TODO(sync_source): hardcode 'mcp' krn endpoint ini dianggap dipanggil
-  // dari luar PC (bukan hasil push /transactions dari PC). SEMENTARA --
-  // begitu token MCP terpisah dari PC_SYNC_TOKEN sudah ada (lihat
-  // "Yang belum diputuskan" di apps/worker/docs/todos/plan/cloud-sync.md),
-  // ganti jadi derive dari jenis token yg dipakai request ini, JANGAN
-  // percaya sync_source dari body payload client (bisa dipalsukan).
+  // sync_source derive dari token request (requireAuth), BUKAN dari body
+  // payload client -- lihat shared/auth.ts resolveSyncSource.
   const transactionId = uuidv7();
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
   await env.DB.prepare(
     `INSERT INTO transactions
        (id, type, amount, category_id, account_id, note, date, created_at, updated_at, sync_source)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?7, 'mcp')`
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?7, ?8)`
   )
-    .bind(transactionId, type, amount, categoryId, accountId, "Koreksi saldo", now)
+    .bind(transactionId, type, amount, categoryId, accountId, "Koreksi saldo", now, syncSource)
     .run();
 
   return { status: "corrected", transactionId };
@@ -206,7 +209,8 @@ export async function deleteAccount(
 
 async function getOrCreateCorrectionCategoryId(
   env: Env,
-  type: "income" | "expense"
+  type: "income" | "expense",
+  syncSource: SyncSource
 ): Promise<string> {
   const existing = await env.DB.prepare(
     "SELECT id FROM categories WHERE name = ?1 AND type = ?2 AND deleted_at IS NULL LIMIT 1"
@@ -219,9 +223,9 @@ async function getOrCreateCorrectionCategoryId(
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
   await env.DB.prepare(
     `INSERT INTO categories (id, name, type, is_active, created_at, updated_at, sync_source)
-     VALUES (?1, ?2, ?3, 1, ?4, ?4, 'mcp')`
+     VALUES (?1, ?2, ?3, 1, ?4, ?4, ?5)`
   )
-    .bind(id, CORRECTION_CATEGORY_NAME, type, now)
+    .bind(id, CORRECTION_CATEGORY_NAME, type, now, syncSource)
     .run();
   return id;
 }

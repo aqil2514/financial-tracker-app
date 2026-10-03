@@ -1,21 +1,21 @@
 import type { Context } from "hono";
-import type { Env } from "../../shared/env";
+import type { AppContext } from "../../shared/auth";
 import { isCategoryPayload, isDeleteCategoryPayload } from "./schema";
 import { upsertCategory, deleteCategory } from "./service";
 
-export async function handlePostCategory(c: Context<{ Bindings: Env }>) {
+export async function handlePostCategory(c: Context<AppContext>) {
   const body = await c.req.json().catch(() => null);
   if (!isCategoryPayload(body)) {
     return c.json({ error: "Invalid payload" }, 400);
   }
-  const result = await upsertCategory(c.env, body);
+  const result = await upsertCategory(c.env, body, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }
   return c.json({ status: "ok", id: result.id }, 201);
 }
 
-export async function handlePatchCategory(c: Context<{ Bindings: Env }>) {
+export async function handlePatchCategory(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Missing category id" }, 400);
 
@@ -31,14 +31,14 @@ export async function handlePatchCategory(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "Invalid payload" }, 400);
   }
 
-  const result = await upsertCategory(c.env, merged);
+  const result = await upsertCategory(c.env, merged, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id });
   }
   return c.json({ status: "ok", id: result.id }, 200);
 }
 
-export async function handleDeleteCategory(c: Context<{ Bindings: Env }>) {
+export async function handleDeleteCategory(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Missing category id" }, 400);
 

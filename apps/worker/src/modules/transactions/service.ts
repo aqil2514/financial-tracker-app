@@ -1,4 +1,5 @@
 import type { Env } from "../../shared/env";
+import type { SyncSource } from "../../shared/auth";
 import type { PushTransactionPayload, PatchTransactionPayload } from "./schema";
 import {
   applyDebtTransaction,
@@ -9,7 +10,21 @@ import {
   DebtEditBlockedError,
   type DeletedTransactionDebtInfo,
 } from "../debts/service";
+import { resolveContactId } from "../contacts/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
+
+// contactId eksplisit SELALU menang; contactName (nama natural dari tool
+// MCP) cuma dipakai kalau contactId kosong -- lihat keputusan desain di
+// transactions/schema.ts.
+async function resolveFinalContactId(
+  env: Env,
+  payload: Pick<PushTransactionPayload, "contactId" | "contactName">,
+  syncSource: SyncSource
+): Promise<string | null> {
+  if (payload.contactId) return payload.contactId;
+  if (!payload.contactName) return payload.contactId ?? null;
+  return resolveContactId(env, payload.contactName, syncSource);
+}
 
 export type InsertTransactionResult =
   | { status: "ok" }
@@ -50,7 +65,8 @@ async function violatesDebtAccountRule(
 // (#4, #3, dst) -- payload yg toh mau diabaikan tidak perlu divalidasi.
 export async function insertTransaction(
   env: Env,
-  payload: PushTransactionPayload
+  payload: PushTransactionPayload,
+  syncSource: SyncSource
 ): Promise<InsertTransactionResult> {
   const existing = await env.DB.prepare("SELECT updated_at FROM transactions WHERE id = ?1")
     .bind(payload.id)
@@ -63,7 +79,7 @@ export async function insertTransaction(
   if (existing) {
     // Row sudah ada & payload lebih baru -- PERSIS semantik PATCH,
     // reuse fungsi yg sama (termasuk #2/#3/#7, bukan cuma #1/#4).
-    const result = await updateTransactionRow(env, payload.id, payload, decision.updatedAt);
+    const result = await updateTransactionRow(env, payload.id, payload, decision.updatedAt, syncSource);
     if (result.status === "not_found") {
       // Tidak mungkin terjadi (existing sudah dicek barusan), tapi
       // dipertahankan sbg union type lengkap -- treat spt create gagal.
@@ -72,13 +88,14 @@ export async function insertTransaction(
     return result;
   }
 
-  return createTransactionRow(env, payload, decision.updatedAt);
+  return createTransactionRow(env, payload, decision.updatedAt, syncSource);
 }
 
 async function createTransactionRow(
   env: Env,
   payload: PushTransactionPayload,
-  updatedAt: string
+  updatedAt: string,
+  syncSource: SyncSource
 ): Promise<InsertTransactionResult> {
   if (await violatesDebtAccountRule(env, payload)) {
     return {
@@ -104,13 +121,15 @@ async function createTransactionRow(
     return { status: "rejected", reason: SOURCE_REF_CONFLICT_REASON };
   }
 
+  const resolvedContactId = await resolveFinalContactId(env, payload, syncSource);
+
   const now = nowText();
   await env.DB.prepare(
     `INSERT INTO transactions
        (id, type, amount, category_id, account_id, transfer_account_id,
         note, date, description, contact_id, created_at, updated_at, sync_source,
         source, source_ref)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pc', ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       payload.id,
@@ -122,9 +141,10 @@ async function createTransactionRow(
       payload.note,
       payload.date,
       payload.description ?? null,
-      payload.contactId ?? null,
+      resolvedContactId,
       now,
       updatedAt,
+      syncSource,
       payload.source ?? "manual",
       payload.source !== undefined ? payload.sourceRef ?? null : null
     )
@@ -140,11 +160,12 @@ async function createTransactionRow(
       type: payload.type,
       accountId: payload.accountId,
       transferAccountId: payload.transferAccountId ?? null,
-      contactId: payload.contactId ?? null,
+      contactId: resolvedContactId,
       amount: payload.amount,
       date: payload.date,
       debtAction: payload.debtAction ?? null,
       settleDebtIds: payload.settleDebtIds ?? [],
+      syncSource,
     });
   }
 
@@ -187,14 +208,15 @@ type ExistingTransactionRow = {
 // tidak pernah trigger recreate debt.
 function dangerousFieldsChanged(
   existing: ExistingTransactionRow,
-  payload: PatchTransactionPayload
+  payload: PatchTransactionPayload,
+  resolvedContactId: string | null
 ): boolean {
   return (
     payload.type !== existing.type ||
     (payload.accountId ?? null) !== existing.account_id ||
     (payload.transferAccountId ?? null) !== existing.transfer_account_id ||
     payload.amount !== existing.amount ||
-    (payload.contactId ?? null) !== existing.contact_id
+    resolvedContactId !== existing.contact_id
   );
 }
 
@@ -205,7 +227,8 @@ function dangerousFieldsChanged(
 export async function updateTransaction(
   env: Env,
   id: string,
-  payload: PatchTransactionPayload
+  payload: PatchTransactionPayload,
+  syncSource: SyncSource
 ): Promise<UpdateTransactionResult> {
   const existingMeta = await env.DB.prepare("SELECT updated_at FROM transactions WHERE id = ?1")
     .bind(id)
@@ -216,7 +239,7 @@ export async function updateTransaction(
   const decision = decideLww(incomingUpdatedAt, existingMeta.updated_at);
   if (decision.outcome === "stale") return { status: "ignored" };
 
-  return updateTransactionRow(env, id, payload, decision.updatedAt);
+  return updateTransactionRow(env, id, payload, decision.updatedAt, syncSource);
 }
 
 // Logic inti UPDATE, port dari use-update-transaction.ts +
@@ -229,7 +252,8 @@ async function updateTransactionRow(
   env: Env,
   id: string,
   payload: PatchTransactionPayload,
-  updatedAt: string
+  updatedAt: string,
+  syncSource: SyncSource
 ): Promise<UpdateTransactionResult> {
   const existing = await env.DB.prepare(
     "SELECT id, type, amount, account_id, transfer_account_id, contact_id FROM transactions WHERE id = ?1"
@@ -245,7 +269,8 @@ async function updateTransactionRow(
     };
   }
 
-  const fieldsChanged = dangerousFieldsChanged(existing, payload);
+  const resolvedContactId = await resolveFinalContactId(env, payload, syncSource);
+  const fieldsChanged = dangerousFieldsChanged(existing, payload, resolvedContactId);
 
   // Logic #3 pre-check -- sama alasannya dgn createTransactionRow: cegah
   // UPDATE transaksi tersimpan sementara settlement-nya ditolak.
@@ -293,7 +318,7 @@ async function updateTransactionRow(
       payload.note,
       payload.date,
       payload.description ?? null,
-      payload.contactId ?? null,
+      resolvedContactId,
       updatedAt,
       id,
       payload.source !== undefined ? 1 : 0,
@@ -308,11 +333,12 @@ async function updateTransactionRow(
       type: payload.type,
       accountId: payload.accountId ?? "",
       transferAccountId: payload.transferAccountId ?? null,
-      contactId: payload.contactId ?? null,
+      contactId: resolvedContactId,
       amount: payload.amount,
       date: payload.date,
       debtAction: payload.debtAction ?? null,
       settleDebtIds: payload.settleDebtIds ?? [],
+      syncSource,
       status: debtStatus,
       dangerousFieldsChanged: fieldsChanged,
     });

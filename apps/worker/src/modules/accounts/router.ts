@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Env } from "../../shared/env";
+import type { AppContext } from "../../shared/auth";
 import { requireAuth } from "../../shared/auth";
 import {
   handlePostAccount,
@@ -9,7 +9,7 @@ import {
   handleDeleteAccount,
 } from "./controller";
 
-export const accountsRouter = new Hono<{ Bindings: Env }>();
+export const accountsRouter = new Hono<AppContext>();
 
 accountsRouter.use(requireAuth);
 accountsRouter.post("/", handlePostAccount);

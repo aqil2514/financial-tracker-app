@@ -13,6 +13,12 @@ export type PushTransactionPayload = {
   transferAccountId?: string | null;
   description?: string | null;
   contactId?: string | null;
+  // Alternatif contactId -- nama kontak dalam bahasa natural (dipakai
+  // tool MCP yg terima nama dari Claude, bukan ID siap pakai). HANYA
+  // dipakai kalau contactId kosong -- contactId eksplisit SELALU menang
+  // (lihat resolveContactId call-site di service.ts). Resolve terjadi di
+  // Worker (get-or-create by name case-insensitive), BUKAN di mcp-server.
+  contactName?: string;
   // Hanya relevan saat type='transfer' DAN arah debt->cash (ambigu
   // antara pelunasan piutang existing vs utang baru) -- lihat logic
   // #1 di mcp-server-business-logic-audit.md, port dari
@@ -51,6 +57,7 @@ export function isPushTransactionPayload(value: unknown): value is PushTransacti
   const settleDebtIdsValid =
     v.settleDebtIds === undefined ||
     (Array.isArray(v.settleDebtIds) && v.settleDebtIds.every((id) => typeof id === "string"));
+  const contactNameValid = v.contactName === undefined || typeof v.contactName === "string";
   return (
     typeof v.id === "string" &&
     (v.type === "income" || v.type === "expense" || v.type === "transfer") &&
@@ -59,6 +66,7 @@ export function isPushTransactionPayload(value: unknown): value is PushTransacti
     typeof v.date === "string" &&
     debtActionValid &&
     settleDebtIdsValid &&
+    contactNameValid &&
     isValidSourceFields(v) &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
@@ -79,6 +87,7 @@ export function isPatchTransactionPayload(value: unknown): value is PatchTransac
   const settleDebtIdsValid =
     v.settleDebtIds === undefined ||
     (Array.isArray(v.settleDebtIds) && v.settleDebtIds.every((id) => typeof id === "string"));
+  const contactNameValid = v.contactName === undefined || typeof v.contactName === "string";
   return (
     (v.type === "income" || v.type === "expense" || v.type === "transfer") &&
     typeof v.amount === "number" &&
@@ -86,6 +95,7 @@ export function isPatchTransactionPayload(value: unknown): value is PatchTransac
     typeof v.date === "string" &&
     debtActionValid &&
     settleDebtIdsValid &&
+    contactNameValid &&
     isValidSourceFields(v) &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );

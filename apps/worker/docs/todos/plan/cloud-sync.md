@@ -623,14 +623,16 @@ terpusat di satu tempat.
       (`wrangler secret put MCP_SYNC_TOKEN`), digenerate random 32-byte
       hex sama spt pola `PC_SYNC_TOKEN` (`openssl rand -hex 32` tidak
       tersedia di PowerShell user — dipakai `RandomNumberGenerator`
-      .NET sbg gantinya, hasil setara crypto-secure). **Scope SENGAJA
-      dibatasi**: hardcode `sync_source='mcp'` yg tersebar di banyak
-      `service.ts` (`accounts`, `account-groups`, `categories`,
-      `contacts`, `debts`) TIDAK disentuh sesi ini — endpoint2 itu
-      masih cuma dipanggil dari push-on-write PC, belum ada tool TULIS
-      MCP sungguhan yg butuh `sync_source` dinamis berdasarkan token
-      mana yg dipakai. Dicatat sbg gap terpisah, menunggu tool TULIS
-      MCP (lanjutan Tahap 5).
+      .NET sbg gantinya, hasil setara crypto-secure).
+- [x] **`sync_source` dinamis per token** (2026-10-03, sesi implementasi
+      tool TULIS MCP) — menutup gap yg dicatat di atas. `resolveSyncSource()`
+      baru (`shared/auth.ts`) derive `"pc"|"mcp"` dari token yg dipakai
+      request, di-set ke Hono Context (`AppContext`) oleh `requireAuth`,
+      diteruskan controller→service sbg argumen eksplisit — TIDAK PERNAH
+      dari body payload client. Semua 9 titik hardcode (`transactions`
+      pakai `'pc'`, `accounts`/`account-groups`/`categories`/`contacts`/
+      `debts` pakai `'mcp'`) diganti bind dinamis. UPDATE statement tidak
+      disentuh (kolom ini cuma diisi saat INSERT).
 - [x] **`GET /auth/verify`** (2026-10-03, `src/index.ts`) — endpoint
       ringan khusus validasi token (PC_SYNC_TOKEN ATAU MCP_SYNC_TOKEN),
       `requireAuth` lalu balas `{ok:true}` TANPA sentuh D1 sama sekali.
@@ -761,7 +763,7 @@ terpusat di satu tempat.
       SUDAH DITUTUP** — client TIDAK perlu lagi validasi sendiri,
       Worker reject 422 keras sebelum tulis apa pun.
 
-### Tahap 5 — MCP server (Vercel) — SEBAGIAN SELESAI (baca), tulis BELUM
+### Tahap 5 — MCP server (Vercel) — SELESAI (baca + tulis)
 
 - [x] **Setup Next.js App Router + `mcp-handler`** (2026-10-03,
       `apps/mcp-server`) — App Router polos (`src/app`), paket
@@ -818,13 +820,67 @@ terpusat di satu tempat.
       menampilkan ke-5 tool dgn schema benar (auto-generate dari Zod);
       `tools/call get_debt_summary` berhasil narik DATA PRODUKSI ASLI
       (98 piutang berjalan, Rp36.137.014) lewat Worker.
-- [ ] **Tool TULIS — RISET SELESAI 2026-10-03, IMPLEMENTASI BELUM
-      DIMULAI** (sengaja dipisah jadi sesi tersendiri, biar implementasi
-      + testing bisa fokus tanpa gangguan riset). Inventaris LENGKAP
-      semua operasi tulis `apps/desktop` + pengecekan padanan endpoint
-      Worker sudah dilakukan (lewat eksplorasi kode langsung, BUKAN
-      tebakan) — hasilnya jadi dasar keputusan daftar tool di sesi
-      implementasi nanti:
+- [x] **Tool TULIS — RISET 2026-10-03, IMPLEMENTASI + VERIFIKASI SELESAI
+      2026-10-03 (sesi terpisah, sesuai permintaan user)**. 16 tool
+      terpisah per aksi per tabel (keputusan: granularitas per aksi,
+      BUKAN 1 tool generik dgn parameter `action`), semua lewat
+      `apps/mcp-server/src/app/api/mcp/route.ts` → `workerFetch` →
+      endpoint Worker yg sudah ada (tidak ada endpoint baru di Worker):
+      - **transactions**: `create_transaction`, `update_transaction`,
+        `delete_transaction`.
+      - **accounts**: `create_account`, `update_account`,
+        `delete_account`, `correct_account_balance` (tool terpisah,
+        bukan bagian update_account, krn semantik beda total).
+      - **account_groups**: `create_account_group`,
+        `update_account_group`, `delete_account_group`.
+      - **categories**: `create_category`, `update_category`,
+        `delete_category`.
+      - **contacts**: `create_contact`, `update_contact`,
+        `delete_contact`.
+      Total 21 tool (5 baca + 16 tulis), DIVERIFIKASI terdaftar lengkap
+      via `tools/list` production.
+
+      **3 keputusan desain dari riset, final**:
+      1. **Resolusi `contactName`** — Worker resolve otomatis via
+         `resolveContactId()` (sudah ada di `contacts/service.ts`, kini
+         disambungkan). `transactions/schema.ts` terima `contactName?`
+         opsional sbg alternatif `contactId` (`contactId` eksplisit
+         SELALU menang). Resolusi terjadi di
+         `createTransactionRow`/`updateTransactionRow`
+         (`transactions/service.ts`) SEBELUM dipakai di SQL bind & input
+         `applyDebtTransaction`/`applyDebtTransactionEdit` — termasuk di
+         `dangerousFieldsChanged` (bandingkan `resolvedContactId`, bukan
+         `payload.contactId` mentah, supaya ganti kontak via nama juga
+         kena deteksi field berbahaya yg benar).
+      2. **`sync_source` dinamis** — lihat entry terpisah di atas
+         ("Progress implementasi").
+      3. **Konfirmasi delete** — SEMUA tool `delete_*` di mcp-server
+         wajib `confirm: z.literal(true)`. Worker TIDAK berubah sama
+         sekali (tetap tidak kenal parameter `confirm`) — safety-net ini
+         sengaja cuma di level yg mengizinkan LLM memicu aksi destruktif,
+         bukan bagian kontrak API Worker.
+
+      **DIVERIFIKASI end-to-end di PRODUCTION** via protokol MCP
+      sungguhan (`tools/call` JSON-RPC, bukan curl langsung ke Worker):
+      `create_transaction` dgn `contactName` baru → kontak otomatis
+      terbuat & `contactId` tersambung benar (dicek balik via
+      `list_transactions`); `delete_transaction` TANPA `confirm` →
+      direject Zod SEBELUM request sampai Worker (pesan error dari
+      mcp-server, bukan dari Worker); `delete_transaction` DENGAN
+      `confirm:true` → sukses. Juga diverifikasi di Worker lokal
+      (`wrangler dev` + curl + query SQLite langsung) sblm deploy: akun/
+      kontak/debt/debt_payments yg dibuat via token MCP tersimpan
+      `sync_source='mcp'`, via token PC tersimpan `'pc'` (SEBELUMNYA
+      transactions SELALU hardcode `'pc'` apa pun tokennya); `contactId`
+      eksplisit menang atas `contactName`; regresi existing (debt
+      settlement melebihi sisa → 422, akun debt violation → 422, DELETE
+      transaction dgn debtInfo) semua masih berjalan benar. Worker
+      production di-deploy ulang (`wrangler deploy`) sebelum verifikasi
+      end-to-end, SEMUA data uji coba dibersihkan setelahnya (soft-delete
+      akun/kategori/kontak test di production).
+
+      Inventaris riset asli (sblm implementasi) dipertahankan di bawah
+      ini sbg referensi historis keputusan yg diambil:
 
       **Endpoint Worker yang SUDAH ADA dan tiap tool tulis TINGGAL
       memanggilnya (tidak perlu endpoint baru)**:
@@ -877,21 +933,20 @@ terpusat di satu tempat.
       lokal PC) — kalau nanti dibutuhkan, itu scope terpisah di luar
       tool TULIS fase ini.
 
-      **Belum diputuskan (keputusan utk SESI IMPLEMENTASI nanti,
-      sengaja TIDAK diputuskan sesi ini)**:
-      1. Daftar final tool tulis & prioritas (mis. apakah semua 5 tabel
-         CRUD jadi tool terpisah, atau digabung jadi lebih sedikit tool
-         dgn parameter `action`).
-      2. Resolusi kontak by name (opsi a/b di atas).
-      3. `sync_source` dinamis per token (saat ini hardcode `'mcp'` di
-         banyak `service.ts`, lihat catatan `MCP_SYNC_TOKEN` di
-         "Progress implementasi") — sekarang TIDAK masalah krn belum
-         ada tool tulis MCP yg benar2 jalan, tapi begitu tool tulis
-         mulai dipakai, baris yg ditulis lewat MCP vs lewat PC harus
-         bisa dibedakan dgn benar.
-      4. Validasi tambahan khusus MCP (mis. apakah tool tulis perlu
-         konfirmasi berlapis utk operasi delete, krn tidak ada "UI
-         dialog" di sisi Claude spt di desktop).
+      **Keputusan yg diambil di SESI IMPLEMENTASI (2026-10-03, sesi
+      terpisah dari riset) — semua 4 poin di atas SUDAH DIPUTUSKAN &
+      diimplementasikan, lihat ringkasan lengkap di entry "Tool TULIS"
+      di atas**:
+      1. Daftar final tool tulis & prioritas → tool terpisah per aksi
+         per tabel (BUKAN digabung dgn parameter `action`), semua 5
+         tabel sekaligus (16 tool total).
+      2. Resolusi kontak by name → opsi (a): Worker resolve `contactName`
+         otomatis via `resolveContactId`.
+      3. `sync_source` dinamis per token → selesai, lihat entry
+         terpisah di "Progress implementasi".
+      4. Validasi tambahan khusus MCP → tool `delete_*` wajib
+         `confirm: z.literal(true)` di level mcp-server, Worker tidak
+         berubah.
 
 ### Tahap 7 — Verifikasi (sisi Worker/MCP)
 

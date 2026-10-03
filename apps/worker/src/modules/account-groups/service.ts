@@ -1,4 +1,5 @@
 import type { Env } from "../../shared/env";
+import type { SyncSource } from "../../shared/auth";
 import type { AccountGroupPayload, DeleteAccountGroupPayload } from "./schema";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
@@ -16,7 +17,8 @@ export type DeleteAccountGroupResult = { status: "ok" } | { status: "not_found" 
 // required `name`.
 export async function upsertAccountGroup(
   env: Env,
-  payload: AccountGroupPayload
+  payload: AccountGroupPayload,
+  syncSource: SyncSource
 ): Promise<UpsertAccountGroupResult> {
   const existing = await env.DB.prepare("SELECT updated_at FROM account_groups WHERE id = ?1")
     .bind(payload.id)
@@ -29,9 +31,9 @@ export async function upsertAccountGroup(
   if (!existing) {
     const now = nowText();
     await env.DB.prepare(
-      "INSERT INTO account_groups (id, name, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?4, 'mcp')"
+      "INSERT INTO account_groups (id, name, created_at, updated_at, sync_source) VALUES (?1, ?2, ?3, ?4, ?5)"
     )
-      .bind(payload.id, payload.name, now, decision.updatedAt)
+      .bind(payload.id, payload.name, now, decision.updatedAt, syncSource)
       .run();
   } else {
     // LWW menang CLEAR deleted_at juga -- row yg sempat soft-delete di

@@ -1,14 +1,14 @@
 import type { Context } from "hono";
-import type { Env } from "../../shared/env";
+import type { AppContext } from "../../shared/auth";
 import { isAccountGroupPayload, isDeleteAccountGroupPayload } from "./schema";
 import { upsertAccountGroup, deleteAccountGroup } from "./service";
 
-export async function handlePostAccountGroup(c: Context<{ Bindings: Env }>) {
+export async function handlePostAccountGroup(c: Context<AppContext>) {
   const body = await c.req.json().catch(() => null);
   if (!isAccountGroupPayload(body)) {
     return c.json({ error: "Invalid payload" }, 400);
   }
-  const result = await upsertAccountGroup(c.env, body);
+  const result = await upsertAccountGroup(c.env, body, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }
@@ -18,7 +18,7 @@ export async function handlePostAccountGroup(c: Context<{ Bindings: Env }>) {
 // PATCH /:id -- id dari path, SAMA semantiknya dgn POST (upsert LWW).
 // Kalau body ikut kirim `id`, HARUS cocok dgn path (caller yg beda jadi
 // error eksplisit, bukan diam-diam dipakai salah satu).
-export async function handlePatchAccountGroup(c: Context<{ Bindings: Env }>) {
+export async function handlePatchAccountGroup(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Missing account group id" }, 400);
 
@@ -34,14 +34,14 @@ export async function handlePatchAccountGroup(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "Invalid payload" }, 400);
   }
 
-  const result = await upsertAccountGroup(c.env, merged);
+  const result = await upsertAccountGroup(c.env, merged, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id });
   }
   return c.json({ status: "ok", id: result.id }, 200);
 }
 
-export async function handleDeleteAccountGroup(c: Context<{ Bindings: Env }>) {
+export async function handleDeleteAccountGroup(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Missing account group id" }, 400);
 

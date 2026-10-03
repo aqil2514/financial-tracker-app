@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Env } from "../../shared/env";
+import type { AppContext } from "../../shared/auth";
 import { requireAuth } from "../../shared/auth";
 import {
   handlePostCategory,
@@ -7,7 +7,7 @@ import {
   handleDeleteCategory,
 } from "./controller";
 
-export const categoriesRouter = new Hono<{ Bindings: Env }>();
+export const categoriesRouter = new Hono<AppContext>();
 
 categoriesRouter.use(requireAuth);
 categoriesRouter.post("/", handlePostCategory);

@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { Env } from "../../shared/env";
+import type { AppContext } from "../../shared/auth";
 import { isCorrectAccountBalancePayload, isDeleteAccountPayload, isAccountPayload } from "./schema";
 import {
   correctAccountBalance,
@@ -9,19 +9,19 @@ import {
 } from "./service";
 
 // Autentikasi ditangani requireAuth middleware, dipasang di router.ts.
-export async function handlePostAccount(c: Context<{ Bindings: Env }>) {
+export async function handlePostAccount(c: Context<AppContext>) {
   const body = await c.req.json().catch(() => null);
   if (!isAccountPayload(body)) {
     return c.json({ error: "Invalid payload" }, 400);
   }
-  const result = await upsertAccount(c.env, body);
+  const result = await upsertAccount(c.env, body, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }
   return c.json({ status: "ok", id: result.id }, 201);
 }
 
-export async function handlePatchAccount(c: Context<{ Bindings: Env }>) {
+export async function handlePatchAccount(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Missing account id" }, 400);
 
@@ -37,14 +37,14 @@ export async function handlePatchAccount(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "Invalid payload" }, 400);
   }
 
-  const result = await upsertAccount(c.env, merged);
+  const result = await upsertAccount(c.env, merged, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id });
   }
   return c.json({ status: "ok", id: result.id }, 200);
 }
 
-export async function handleGetAccountBalance(c: Context<{ Bindings: Env }>) {
+export async function handleGetAccountBalance(c: Context<AppContext>) {
   const accountId = c.req.query("accountId");
   if (!accountId) {
     return c.json({ error: "Missing accountId" }, 400);
@@ -58,13 +58,13 @@ export async function handleGetAccountBalance(c: Context<{ Bindings: Env }>) {
   return c.json({ accountId, balance });
 }
 
-export async function handlePostCorrectBalance(c: Context<{ Bindings: Env }>) {
+export async function handlePostCorrectBalance(c: Context<AppContext>) {
   const body = await c.req.json().catch(() => null);
   if (!isCorrectAccountBalancePayload(body)) {
     return c.json({ error: "Invalid payload" }, 400);
   }
 
-  const result = await correctAccountBalance(c.env, body.accountId, body.targetBalance);
+  const result = await correctAccountBalance(c.env, body.accountId, body.targetBalance, c.get("syncSource"));
 
   if (result.status === "account_not_found") {
     return c.json({ error: "Account not found" }, 404);
@@ -77,7 +77,7 @@ export async function handlePostCorrectBalance(c: Context<{ Bindings: Env }>) {
   return c.json({ status: "ok", transactionId: result.transactionId }, 201);
 }
 
-export async function handleDeleteAccount(c: Context<{ Bindings: Env }>) {
+export async function handleDeleteAccount(c: Context<AppContext>) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Missing account id" }, 400);
 

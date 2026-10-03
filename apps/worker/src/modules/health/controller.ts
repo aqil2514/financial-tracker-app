@@ -1,7 +1,7 @@
 import type { Context } from "hono";
-import type { Env } from "../../shared/env";
+import type { AppContext } from "../../shared/auth";
 
-export async function handleGetHealth(c: Context<{ Bindings: Env }>) {
+export async function handleGetHealth(c: Context<AppContext>) {
   const { results } = await c.env.DB.prepare(
     "SELECT name FROM sqlite_master WHERE type = 'table'"
   ).all<{ name: string }>();
