@@ -62,7 +62,14 @@ berdiri di atas bukti yang sudah ada (pola 70 transaksi "minjem"/
 "balikin" yang terjebak tanpa rangkuman di Money Manager). Kedua hal ini
 dijaga tetap terpisah supaya tidak tertukar.
 
-Detail lengkap: `apps/desktop/docs/todos/plan/debt-receivable-tracking.md`.
+**UPDATE 2026-10-03**: penanganan penghapusan transaksi yang berkaitan
+dengan piutang/utang juga diperhalus — menghapus transaksi tidak lagi
+diam-diam merusak jejak piutang (gap lama yang baru ditutup), nominal
+piutang/utang dijamin tidak pernah berubah akibat penghapusan transaksi
+apa pun. Konsep lengkap (ditulis utk audiens non-teknis): lihat
+`docs/concept/konsep-utang-piutang.md`.
+
+Detail teknis lengkap: `apps/desktop/docs/todos/plan/debt-receivable-tracking.md`.
 
 ## 2. Tipe akun (`account_type`) yang mempengaruhi perilaku, bukan cuma label
 
@@ -201,35 +208,49 @@ Ini bukan fitur generik "import CSV" — ada domain accounting logic
 di baliknya (AR/AP, consignment, uang muka pembelian) yang dibangun
 khusus dari kebutuhan nyata mengelola Warung Aqil.
 
-## 4. Offline-first sungguhan, dengan cloud sync yang sadar trade-off (mulai dibangun, belum selesai)
+## 4. Offline-first sungguhan, dengan cloud sync yang sadar trade-off (fungsional, diperluas bertahap)
 
 - Data tersimpan **lokal** (SQLite via Tauri), tidak butuh koneksi untuk
   input/lihat data sehari-hari.
-- Sync dua sumber tulis (PC ↔ Cloudflare Worker, nanti juga MCP server
-  atas nama Claude/HP) secara eksplisit membedakan dirinya dari sync
-  Retailku: di sini **dua arah, banyak sumber tulis**, sehingga butuh
-  strategi conflict resolution (bukan "server selalu benar" seperti
-  kasus Retailku) — last-write-wins via `updated_at` per baris, PC wajib
-  pull sebelum push, soft delete (`deleted_at`) supaya hapus di satu
-  sisi tidak ambigu kalau sisi lain sempat update baris yang sama.
-  Trade-off ini didesain dari awal (termasuk sadar menolak alternatif
+- Sync dua sumber tulis (PC ↔ Cloudflare Worker ↔ MCP server atas nama
+  Claude/HP) secara eksplisit membedakan dirinya dari sync Retailku: di
+  sini **dua arah, banyak sumber tulis**, sehingga butuh strategi
+  conflict resolution (bukan "server selalu benar" seperti kasus
+  Retailku) — last-write-wins via `updated_at` per baris, PC wajib pull
+  sebelum push, soft delete (`deleted_at`) supaya hapus di satu sisi
+  tidak ambigu kalau sisi lain sempat update baris yang sama. Trade-off
+  ini didesain dari awal (termasuk sadar menolak alternatif
   event-sourcing/log terpusat karena effort jangka panjangnya tidak
   sepadan untuk skala personal), bukan ditambal belakangan.
-- **Sudah ada implementasi nyata, bukan cuma dokumen rencana**:
-  `apps/worker` (Cloudflare Worker + D1 + Hono) **live di production**
-  sejak 2026-09-30. 4 dari 7 logic bisnis kritis (formula saldo akun,
-  koreksi saldo manual, FIFO pelunasan utang-piutang, larangan
-  income/expense di akun `debt`) sudah di-port ulang ke Worker dan
-  diverifikasi end-to-end dengan data nyata di production. Endpoint yang
-  sudah jalan: transaksi (create) dan akun; endpoint tulis untuk tabel
-  lain serta UPSERT+LWW yang sesungguhnya masih belum ada.
-- **Batas jujur**: ini motivasinya utamanya bukan multi-device dalam
-  arti umum, tapi jembatan supaya data bisa dikelola dari HP lewat
-  Claude Web + MCP server sebelum `apps/mobile` (masih skeleton) benar
-  dibangun. `apps/mcp-server` sendiri belum disentuh sama sekali, dan
-  ada celah aktif (validasi pelunasan melebihi sisa piutang belum
-  di-port ke Worker) yang harus ditutup sebelum tool MCP tulis
-  dianggap aman dipakai. Detail: `apps/worker/docs/todos/plan/cloud-sync.md`.
+- **UPDATE 2026-10-03 — integrasi klien PC SELESAI secara fungsional,
+  dua arah terverifikasi di production nyata**: push on-write (PC→D1,
+  17 mutation hook), pull otomatis saat app dibuka (D1→PC), retry queue
+  utk kegagalan jaringan, dan UI Settings (toggle, kredensial, tombol
+  "Tes Koneksi", backfill data lama) semua sudah ada & dipakai — bukan
+  lagi tahap "mulai dibangun". Ketujuh logic bisnis kritis (formula
+  saldo, koreksi saldo, FIFO pelunasan, larangan akun `debt`, guard
+  edit, validasi pelunasan, deteksi field berbahaya) **7 dari 7 sudah
+  di-port** ke Worker. Endpoint CRUD penuh utk `transactions`,
+  `accounts`, `account_groups`, `categories`, `contacts` (termasuk
+  DELETE dgn penanganan khusus utk transaksi yg berkaitan piutang/utang
+  — lihat `docs/concept/hapus-transaksi-piutang-utang.md`). Data
+  production sungguhan (bukan data uji) sudah tersinkron: ribuan baris
+  transaksi + seluruh akun/kategori/kontak.
+- **`apps/mcp-server` SUDAH ADA & live di Vercel** (bukan lagi "belum
+  disentuh sama sekali") — OAuth shim custom + 5 tool BACA (saldo akun,
+  ringkasan pengeluaran per kategori, daftar transaksi, ringkasan
+  utang-piutang, riwayat per kontak), **sudah dicoba dari client MCP
+  sungguhan** (Claude Web, bukan simulasi): berhasil connect dan
+  menjawab pertanyaan ringkasan keuangan bulan berjalan memakai data
+  asli. Ini bukti konkret pertama "kelola data dari HP lewat asisten
+  AI" — meski baru sisi BACA, belum TULIS.
+- **Batas jujur yang masih berlaku**: tool MCP yang ada baru bisa
+  MEMBACA data, belum bisa menambah/mengubah/menghapus transaksi dari
+  HP — jadi klaim "kelola data keuangan dari HP" belum genap, baru
+  "tanya & lihat data dari HP". Tool TULIS masih tahap perencanaan
+  (daftar final belum diputuskan). `apps/mobile` sendiri masih
+  skeleton, tidak berubah. Detail lengkap & status terkini:
+  `apps/worker/docs/todos/plan/cloud-sync.md`.
 
 ## 5. Audit histori data, bukan cuma migrasi buta
 
@@ -316,9 +337,10 @@ sebagai fakta di materi portofolio manapun.
 - **Mobile** — belum ada fitur berjalan, baru rencana & skeleton project.
 - **AI assistant** — ada di rencana awal (`finance-app-plan.md`) tapi
   belum diimplementasikan di platform mana pun.
-- **Multi-device sync** — arah final sudah dipilih (Cloudflare Worker +
-  D1 + Hono, bukan Turso/PowerSync) dan `apps/worker` sudah live di
-  production dengan sebagian logic bisnis ter-port (lihat bagian 4),
-  tapi baru 2 dari 7 endpoint tulis yang ada, belum ada UPSERT+LWW
-  sesungguhnya, dan `apps/mcp-server` belum disentuh sama sekali — jadi
-  masih jauh dari selesai, bukan lagi sekadar dokumen rencana.
+- **Multi-device sync** — UPDATE 2026-10-03: integrasi PC↔Worker sudah
+  SELESAI fungsional dua arah (lihat bagian 4), `apps/mcp-server` sudah
+  live dengan 5 tool BACA terverifikasi lewat client MCP sungguhan.
+  Yang masih jadi gap nyata: tool TULIS MCP belum ada (jadi belum bisa
+  diklaim "kelola data dari HP", baru "lihat data dari HP"), dan
+  `apps/mobile` tetap belum tersentuh — jadi masih belum genap, tapi
+  sudah jauh melewati tahap "dokumen rencana".
