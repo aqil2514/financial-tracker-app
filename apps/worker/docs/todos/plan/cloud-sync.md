@@ -818,12 +818,80 @@ terpusat di satu tempat.
       menampilkan ke-5 tool dgn schema benar (auto-generate dari Zod);
       `tools/call get_debt_summary` berhasil narik DATA PRODUKSI ASLI
       (98 piutang berjalan, Rp36.137.014) lewat Worker.
-- [ ] **Tool TULIS** (daftar final BELUM diputuskan) — tiap tool
-      memanggil Worker (bukan langsung D1) supaya validasi konsisten
-      dipakai. Prasyarat sebelum ini: keputusan `sync_source` dinamis
-      per token (lihat catatan `MCP_SYNC_TOKEN` di "Progress
-      implementasi" — hardcode `'mcp'` di banyak `service.ts` perlu
-      dibenahi dulu begitu tool tulis MCP mulai dipakai sungguhan).
+- [ ] **Tool TULIS — RISET SELESAI 2026-10-03, IMPLEMENTASI BELUM
+      DIMULAI** (sengaja dipisah jadi sesi tersendiri, biar implementasi
+      + testing bisa fokus tanpa gangguan riset). Inventaris LENGKAP
+      semua operasi tulis `apps/desktop` + pengecekan padanan endpoint
+      Worker sudah dilakukan (lewat eksplorasi kode langsung, BUKAN
+      tebakan) — hasilnya jadi dasar keputusan daftar tool di sesi
+      implementasi nanti:
+
+      **Endpoint Worker yang SUDAH ADA dan tiap tool tulis TINGGAL
+      memanggilnya (tidak perlu endpoint baru)**:
+      - `transactions`: `POST /`, `PATCH /:id`, `DELETE /:id` — ketiganya
+        lengkap, termasuk field `debtAction`/`settleDebtIds` utk
+        transfer yg menyentuh akun `debt`, dan penanganan
+        piutang/utang terkait saat delete (lihat
+        `docs/concept/konsep-utang-piutang.md`).
+      - `accounts`: `POST /`, `PATCH /:id`, `DELETE /:id` (dgn
+        `transactionAction`/`targetAccountId`), `POST /correct-balance`,
+        `GET /balance`.
+      - `account_groups`, `categories`, `contacts`: masing-masing
+        `POST /`, `PATCH /:id`, `DELETE /:id` (dgn opsi reassign/
+        unassign eksplisit yg relevan).
+
+      **Temuan arsitektural PENTING yg mempengaruhi desain tool "catat
+      utang"/"bayar utang"**: TIDAK ADA endpoint `/debts` atau
+      `/debt-payments` di Worker sama sekali (dikonfirmasi langsung dari
+      `src/index.ts` — cuma 6 router yg di-mount: transactions, accounts,
+      account-groups, categories, contacts, sync). Ini BUKAN celah yg
+      kelewat — SENGAJA begitu krn desktop sendiri pun TIDAK py endpoint
+      terpisah utk ini (`use-create-debt.ts`/`use-pay-debt.ts` di
+      desktop cuma kemudahan UI, di baliknya SELALU membuat transaksi
+      transfer biasa lewat `applyDebtTransaction`). Jadi tool MCP
+      "catat piutang baru" dan "bayar piutang" **WAJIB** diimplementasi
+      sbg pemanggilan `POST /transactions` dgn `type: "transfer"` +
+      `debtAction` + `settleDebtIds` yg sesuai — BUKAN endpoint/tool
+      terpisah yg seolah "/debts" punya API sendiri.
+
+      **Temuan kedua — gap kecil yg perlu diputuskan sebelum tool
+      "tambah transaksi" dibuat**: `resolveContactId()` (get-or-create
+      kontak by nama, case-insensitive) SUDAH di-port penuh ke
+      `modules/contacts/service.ts`, TAPI **belum disambungkan ke
+      endpoint HTTP manapun** — `POST/PATCH /transactions` saat ini
+      HANYA terima `contactId` yg sudah berupa ID final, tidak resolve
+      dari nama. Ini relevan krn tool MCP yg dipanggil Claude akan
+      menerima nama kontak dlm bahasa natural ("bayar utang ke Budi"),
+      bukan ID — PERLU DIPUTUSKAN saat implementasi: (a) tool MCP
+      terima `contactName` lalu Worker resolve via `resolveContactId`
+      sebelum insert transaksi (perlu ubah endpoint `/transactions`
+      utk terima `contactName` opsional sbg alternatif `contactId`),
+      ATAU (b) tool MCP wajib py tool BACA "cari/list kontak" dulu utk
+      dapat ID-nya, baru panggil tool tulis dgn `contactId` (2 panggilan
+      tool, tidak ubah kontrak `/transactions`).
+
+      **Yang TIDAK masuk scope tool TULIS** (sesuai cakupan tool BACA
+      yg sudah ada, konsisten "MCP cuma urus data keuangan inti"):
+      attachment (`transaction_attachments`) — tidak py endpoint Worker
+      sama sekali, dan memang di luar jangkauan D1 (file fisik di disk
+      lokal PC) — kalau nanti dibutuhkan, itu scope terpisah di luar
+      tool TULIS fase ini.
+
+      **Belum diputuskan (keputusan utk SESI IMPLEMENTASI nanti,
+      sengaja TIDAK diputuskan sesi ini)**:
+      1. Daftar final tool tulis & prioritas (mis. apakah semua 5 tabel
+         CRUD jadi tool terpisah, atau digabung jadi lebih sedikit tool
+         dgn parameter `action`).
+      2. Resolusi kontak by name (opsi a/b di atas).
+      3. `sync_source` dinamis per token (saat ini hardcode `'mcp'` di
+         banyak `service.ts`, lihat catatan `MCP_SYNC_TOKEN` di
+         "Progress implementasi") — sekarang TIDAK masalah krn belum
+         ada tool tulis MCP yg benar2 jalan, tapi begitu tool tulis
+         mulai dipakai, baris yg ditulis lewat MCP vs lewat PC harus
+         bisa dibedakan dgn benar.
+      4. Validasi tambahan khusus MCP (mis. apakah tool tulis perlu
+         konfirmasi berlapis utk operasi delete, krn tidak ada "UI
+         dialog" di sisi Claude spt di desktop).
 
 ### Tahap 7 — Verifikasi (sisi Worker/MCP)
 
