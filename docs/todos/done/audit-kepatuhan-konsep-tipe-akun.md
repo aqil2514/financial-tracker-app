@@ -1,8 +1,21 @@
 # Audit: Kepatuhan Kode Terhadap Konsep Tipe Akun
 
-> Status: TEMUAN SAJA, solusi BELUM diputuskan — sengaja ditunda ke sesi
-> berikutnya. Dokumen ini hasil audit lintas `apps/desktop`,
-> `apps/worker`, `apps/mcp-server` terhadap
+> **Status: SELESAI** — 6 dari 7 pertanyaan terbuka DIEKSEKUSI
+> 2026-10-03 (sesi lanjutan, sama hari sebagai audit ini, commit
+> `572ff59`) — lihat "Keputusan & eksekusi" di bagian penutup. Dipindah
+> ke `done/` karena itu.
+>
+> Pertanyaan #2 (sync Retailku) SENGAJA di-skip, dianggap lebih dalam
+> dari perkiraan awal — **dipisah jadi dokumen tersendiri**, starting
+> point sesi audit integrasi Retailku berikutnya:
+> [apps/desktop/docs/todos/plan/retailku-sync-account-type-gap.md](../../../apps/desktop/docs/todos/plan/retailku-sync-account-type-gap.md).
+>
+> Isi temuan asli (di bawah) DIPERTAHANKAN apa adanya sebagai jejak
+> histori — status terkini ditambahkan sebagai anotasi, tidak
+> menghapus narasi audit awal.
+>
+> Dokumen ini hasil audit lintas `apps/desktop`, `apps/worker`,
+> `apps/mcp-server` terhadap
 > [docs/concept/konsep-tipe-akun.md](../../concept/konsep-tipe-akun.md),
 > dilakukan 2026-10-03 setelah dokumen konsep itu dirumuskan.
 >
@@ -13,15 +26,15 @@
 
 ## Ringkasan
 
-| # | Prinsip | Status |
-|---|---|---|
-| 1 | Akun sebagai tumpuan semua data | **Menyimpang** — beberapa jalur |
-| 2 | Satu akun satu tipe | Belum menyimpang langsung, tapi ada asumsi biner rapuh |
-| 3 | Tipe permanen, terkunci setelah dipakai | **Belum diimplementasikan sama sekali** |
-| 4 | Laporan apa adanya (tanpa klasifikasi kekayaan) | Sudah sesuai, tidak ada temuan |
-| 5 | Logic per-tipe tersebar (bukan pelanggaran, tapi peta risiko) | 20+ lokasi teridentifikasi |
-| 6 | Konsistensi desktop vs Worker/MCP | **Tidak paralel** — mode direct cuma ada di desktop |
-| 7 | Skema SQL vs kode TS | Konsisten, tidak ada kontradiksi |
+| # | Prinsip | Status audit | Status solusi |
+|---|---|---|---|
+| 1 | Akun sebagai tumpuan semua data | **Menyimpang** — beberapa jalur | ✅ #1.1 & #1.3 beres · ⏸️ #1.2 (Retailku) ditunda |
+| 2 | Satu akun satu tipe | Belum menyimpang langsung, tapi ada asumsi biner rapuh | ✅ Beres — `classifyAccountPair` + fail-loud |
+| 3 | Tipe permanen, terkunci setelah dipakai | **Belum diimplementasikan sama sekali** | ✅ Beres — guard Worker + UX desktop |
+| 4 | Laporan apa adanya (tanpa klasifikasi kekayaan) | Sudah sesuai, tidak ada temuan | — (tidak perlu solusi) |
+| 5 | Logic per-tipe tersebar (bukan pelanggaran, tapi peta risiko) | 20+ lokasi teridentifikasi | ✅ Beres — disentralisasi per-app |
+| 6 | Konsistensi desktop vs Worker/MCP | **Tidak paralel** — mode direct cuma ada di desktop | ✅ Beres — endpoint + tool MCP baru |
+| 7 | Skema SQL vs kode TS | Konsisten, tidak ada kontradiksi | — (tidak perlu solusi) |
 
 ---
 
@@ -242,30 +255,67 @@ constraint yang pernah menolaknya secara teknis.
 
 ---
 
-## Pertanyaan terbuka untuk sesi solusi berikutnya
+## Keputusan & eksekusi (2026-10-03, sesi lanjutan)
 
-Tidak dijawab di sini (sesuai instruksi — audit dulu, solusi nanti):
+Pertanyaan asli dipertahankan sebagai konteks, diikuti keputusan user
+dan apa yang dieksekusi. Commit: `572ff59` ("Fix kode yang menyimpang
+dengan konsep tipe akun").
 
-1. Fitur "mode direct" (temuan #1.1) — dipertahankan dengan diberi
-   "rumah" di struktur akun (lihat opsi yang sempat disinggung:
-   `debts.account_id` tetap wajib, cuma skip transaksi), atau
-   dirombak/dihapus?
-2. Sync Retailku (temuan #1.2) — ini sudah lama jadi desain sadar
-   (bukan bug baru), apakah tetap dianggap pengecualian yang sah
-   (data dari sistem eksternal, beda konteks dari pencatatan manual),
-   atau perlu diselaraskan juga?
-3. Celah `accountId` opsional di MCP `create_transaction` (temuan #1.3) —
-   disamakan wajib seperti form desktop, atau memang sengaja longgar
-   untuk kasus tertentu?
-4. Asumsi biner cash/debt (temuan #2) — perlu direfactor jadi
-   abstraksi yang lebih generik sebelum tipe ketiga ditambahkan, atau
-   ditambal satu-satu saat tipe baru benar-benar datang?
-5. Guard "tipe terkunci setelah dipakai" (temuan #3) — di-implementasikan
-   di level mana (DB trigger, validasi TS di desktop, validasi di
-   Worker, atau ketiganya)?
-6. Peta 20+ lokasi hardcoded (temuan #5) — perlu disentralisasi jadi
-   satu modul/registry per-tipe sebelum tipe baru ditambahkan, atau
-   tetap tersebar dengan checklist manual?
-7. Paralelitas desktop vs Worker/MCP (temuan #6) — apakah "mode direct"
-   perlu direplikasi ke MCP juga, atau sengaja dibatasi cuma di
-   desktop?
+1. **Fitur "mode direct" (temuan #1.1)** — *Dipertahankan dengan
+   "rumah": `debts.account_id` wajib akun bertipe `debt` (satu akun
+   debt general, tidak per-kontak), `transaction_id` tetap NULL.*
+   Migrasi `0031_seed_default_debt_account.sql` (seed akun debt default
+   + backfill baris lama `source='manual'`). Schema/form/mutation
+   desktop (`new-debt-form`, `pay-debt-form`) diubah agar `account_id`
+   terisi, bukan NULL.
+2. **Sync Retailku (temuan #1.2)** — **DI-SKIP**, dianggap lebih dalam
+   dari perkiraan awal (keputusan user eksplisit: "kita skip dulu").
+   Baris `debts`/`debt_payments` dari `source='retailku_sync'` TETAP
+   boleh `account_id` NULL — belum diselaraskan. Dipisah jadi dokumen
+   tersendiri utk sesi audit integrasi Retailku berikutnya:
+   [apps/desktop/docs/todos/plan/retailku-sync-account-type-gap.md](../../../apps/desktop/docs/todos/plan/retailku-sync-account-type-gap.md).
+3. **`accountId` opsional di MCP (temuan #1.3)** — *Disamakan wajib.*
+   `isValidAccountFields` baru di `apps/worker/src/modules/transactions/schema.ts`
+   (satu titik kontrol, berlaku utk PC push maupun MCP) + Zod MCP
+   `accountId` tidak lagi `.optional()`.
+4. **Asumsi biner cash/debt (temuan #2)** — *Direfactor sekarang.*
+   `classifyAccountPair` baru (`apps/desktop/src/shared/debts/classify-account-pair.ts`
+   + port Worker `apps/worker/src/modules/debts/classify-account-pair.ts`)
+   — throw `UnsupportedAccountPairError` utk kombinasi di luar
+   cash/debt (fail-loud SEBELUM transaksi tersimpan), bukan diam-diam
+   di-no-op-kan. Juga menemukan & memperbaiki bug serupa di
+   `needsDebtAction` (use-transaction-debt-fields.ts) yang TIDAK ada di
+   audit awal.
+5. **Guard "tipe terkunci setelah dipakai" (temuan #3)** — *Kombinasi:
+   Worker sebagai penjaga keras + desktop form sebagai UX.* Definisi
+   "dipakai" = ada baris tidak terhapus di `transactions`
+   (account_id/transfer_account_id), `debts`, atau `debt_payments` —
+   `retailku_sync_field_mapping` SENGAJA dikecualikan (konfigurasi,
+   bukan histori transaksi). `isAccountInUse` di
+   `apps/worker/src/modules/accounts/service.ts` (reject 422), port
+   sama di desktop (`is-account-in-use.ts`) + field `account_type`
+   di-disable di form edit.
+6. **Peta 20+ lokasi hardcoded (temuan #5)** — *Disentralisasi per-app*
+   (bukan shared package lintas-app — itu perubahan infrastruktur besar
+   di luar scope). File baru: `apps/desktop/src/lib/account-types.ts`,
+   `apps/worker/src/shared/account-types.ts`,
+   `apps/mcp-server/src/lib/account-types.ts` — masing-masing jadi
+   satu-satunya tempat `AccountType`/`ACCOUNT_TYPES` didefinisikan di
+   app itu. CHECK constraint SQL (3 lokasi) SENGAJA tidak disentralisasi
+   — tipe baru tetap butuh migrasi sendiri.
+7. **Paralelitas desktop vs Worker/MCP (temuan #6)** — *Ditutup
+   sekarang.* Modul `debts` Worker (sebelumnya cuma `service.ts`)
+   ditambah `schema.ts`, `controller.ts`, `router.ts` — endpoint baru
+   `POST /debts` (mode direct) dan `POST /debts/:id/payments`
+   (settlement non-cash). Tool MCP baru: `create_debt_direct`,
+   `pay_debt_non_cash`. Mode "transfer"/settlement "cash" SENGAJA tidak
+   diduplikasi — sudah bisa lewat `POST /transactions` + `debtAction`.
+
+**Terverifikasi**: type-check bersih di 3 app, 172 test desktop lolos
+(termasuk test baru utk kombinasi tipe akun fiktif "investment"), dan
+manual end-to-end test lewat `wrangler dev`/`tauri dev` utk tiap poin
+(detail ada di histori percakapan sesi ini, tidak diulang di sini).
+
+**Sisa utk sesi berikutnya**: pertanyaan #2 (sync Retailku) belum
+dijawab — lihat dokumen tersendiri
+[apps/desktop/docs/todos/plan/retailku-sync-account-type-gap.md](../../../apps/desktop/docs/todos/plan/retailku-sync-account-type-gap.md).

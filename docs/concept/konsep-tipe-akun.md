@@ -137,6 +137,45 @@ riwayatnya ke sana. Lebih merepotkan dibanding sekadar mengganti field,
 tapi menjamin laporan historis tidak pernah berubah makna tanpa alasan
 yang jelas.
 
+## Koreksi saldo TIDAK menyentuh data turunan — berlaku untuk semua tipe
+
+Fitur "Koreksi Saldo" (`correctAccountBalance`, dipakai lewat UI
+maupun tool MCP `correct_account_balance`) bekerja dengan menghitung
+selisih antara saldo target dan saldo saat ini, lalu membuat SATU
+transaksi `income`/`expense` penutup senilai selisih itu — ditulis
+**langsung** ke tabel `transactions`, TIDAK lewat jalur pencatatan
+transaksi normal (`createTransactionRow`/`insertTransaction`).
+
+Ini bukan sekadar detail teknis satu fitur, tapi konsekuensi struktural
+dari "akun sebagai tumpuan": begitu sebuah tipe akun punya data
+turunan yang biasanya ikut terpicu otomatis dari transaksi (lewat
+logic bisnis spesifik tipe itu), koreksi saldo **selalu** melewati
+logic itu, apa pun tipe akunnya — karena koreksi saldo memang dirancang
+generik di level "akun + transaksi penutup", bukan disadari tiap tipe.
+Jadi ini pola yang akan berulang untuk SETIAP tipe akun yang membawa
+data turunan, bukan cuma kasus yang kebetulan sudah terjadi sekarang.
+
+Kasus yang sudah terbukti nyata (bukan hipotesis): tipe **Utang/Piutang**
+punya logic `applyDebtTransaction` yang biasanya membuat/memutakhirkan
+baris `debts` dari transfer cash↔debt (lihat
+[konsep-utang-piutang.md](konsep-utang-piutang.md)). Koreksi saldo pada
+akun bertipe ini mengubah **saldo akunnya** tanpa membuat atau
+menyesuaikan **satu pun baris `debts`** — saldo akun dan rincian
+"siapa berutang berapa" jadi tidak lagi saling menjelaskan, dan harus
+diperbaiki terpisah secara manual.
+
+**Implikasi praktis**: sebelum memakai koreksi saldo di sebuah akun,
+tanya dulu "tipe akun ini punya data turunan yang biasanya ikut
+terpicu dari transaksi normal?" — kalau tidak (seperti tipe Kas
+sekarang, belum ada data turunan apa pun yang bergantung padanya),
+koreksi saldo aman dipakai apa adanya. Kalau ya (seperti Utang/Piutang
+sekarang, dan berpotensi tipe lain nanti — misalnya Investasi dengan
+riwayat nilai beli/jual), koreksi saldo cuma memperbaiki angka
+**total** di permukaan; data turunannya tetap harus diperiksa dan
+diperbaiki terpisah kalau memang perlu tetap konsisten dengan saldo
+barunya. Jangan pernah berasumsi koreksi saldo otomatis menjaga
+konsistensi turunan apa pun, utk tipe akun apa pun.
+
 ## Kenapa prinsip ini penting dijaga
 
 Begitu sebuah data (misalnya satu piutang) tidak jelas menempel ke akun

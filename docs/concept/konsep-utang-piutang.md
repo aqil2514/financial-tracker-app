@@ -15,6 +15,25 @@ kalau nama orangnya ditulis tidak konsisten (kadang "Budi", kadang
 Aplikasi ini dibuat untuk bisa langsung menjawab pertanyaan seperti
 itu, tanpa harus menjumlah manual.
 
+## Arti angka positif/negatif pada saldo akun Utang/Piutang
+
+Saldo akun bertipe Utang/Piutang punya makna terbalik dari intuisi
+"kas" biasa, karena tanda angkanya ditentukan dari sudut pandang
+**pemilik aplikasi**, bukan dari sudut pandang uangnya sendiri:
+
+- **Negatif** — pemilik aplikasi yang **berutang** ke pihak lain (uang
+  pihak lain yang sedang "dipegang").
+- **Positif** — pemilik aplikasi yang **berpiutang** (orang lain yang
+  berutang ke pemilik aplikasi).
+
+Konsekuensinya: transfer **kas → Utang/Piutang** (meminjamkan uang)
+membuat saldo akun itu makin **positif** (piutang baru ditambahkan),
+sedangkan transfer **Utang/Piutang → kas** yang berarti utang baru
+(meminjam dari orang lain) membuat saldo makin **negatif**. Pelunasan
+piutang mengurangi saldo (ke arah nol), pelunasan utang menambah saldo
+(juga ke arah nol) — baik piutang maupun utang sama-sama *mengarah ke
+nol* saat diselesaikan, tinggal arah awalnya saja yang beda.
+
 ## Bagaimana piutang/utang "lahir" — otomatis dari arah transfer
 
 Alih-alih membuat form terpisah khusus "Catat Piutang Baru" (yang
