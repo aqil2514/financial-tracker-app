@@ -7,6 +7,8 @@ on:
 
 jobs:
   release:
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -38,12 +40,7 @@ jobs:
           workspaces: apps/desktop/src-tauri -> target
 
       - name: Install dependencies
-        # npm ci strict ngikutin optionalDependencies platform yang
-        # tercatat di lockfile saat generate (Windows) -- native binding
-        # @tauri-apps/cli utk macOS/Linux jadi tidak ikut ter-resolve
-        # (bug npm/cli#4828). npm install re-resolve sesuai platform
-        # runner saat ini.
-        run: npm install
+        run: npm ci
 
       - uses: tauri-apps/tauri-action@v0
         env:
