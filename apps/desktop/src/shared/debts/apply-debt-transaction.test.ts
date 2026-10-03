@@ -228,6 +228,31 @@ describe("applyDebtTransaction", () => {
     expect(debts).toHaveLength(0);
   });
 
+  it("melempar UnsupportedAccountPairError untuk kombinasi tipe akun di luar cash/debt", async () => {
+    // Tipe fiktif "investment" -- simulasi tipe akun ketiga yang belum
+    // ditambahkan ke union account_type sungguhan (lihat
+    // classify-account-pair.ts dan audit-kepatuhan-konsep-tipe-akun.md
+    // pertanyaan #4: kombinasi tak dikenal harus fail loud, bukan
+    // diam-diam dianggap no-op/cash).
+    const investmentAccount = { id: "inv-1", account_type: "investment" } as unknown as AccountRow;
+    const { db } = createFakeDb({ accounts: [CASH_ACCOUNT, investmentAccount] });
+
+    await expect(
+      applyDebtTransaction({
+        db: db as never,
+        transactionId: "tx-1",
+        type: "transfer",
+        accountId: "cash-1",
+        transferAccountId: "inv-1",
+        contactId: null,
+        amount: 1000,
+        date: "2026-01-01",
+        debtAction: null,
+        settleDebtIds: [],
+      })
+    ).rejects.toThrow(/belum didukung/);
+  });
+
   it("tidak melakukan apa pun untuk transfer debt ke debt", async () => {
     const debtB: AccountRow = { id: "debt-2", account_type: "debt" };
     const { db, debts } = createFakeDb({ accounts: [DEBT_ACCOUNT, debtB] });

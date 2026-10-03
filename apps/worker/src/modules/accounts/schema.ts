@@ -1,4 +1,5 @@
 import { isValidUpdatedAt } from "../../shared/lww";
+import { isAccountType, type AccountType } from "../../shared/account-types";
 
 export type CorrectAccountBalancePayload = {
   accountId: string;
@@ -26,7 +27,7 @@ export type AccountPayload = {
   groupId?: string | null;
   description?: string | null;
   isActive?: boolean;
-  accountType: "cash" | "debt";
+  accountType: AccountType;
   icon?: string | null;
   color?: string | null;
   updatedAt?: string;
@@ -43,7 +44,7 @@ export function isAccountPayload(value: unknown): value is AccountPayload {
     (v.groupId === undefined || v.groupId === null || typeof v.groupId === "string") &&
     (v.description === undefined || v.description === null || typeof v.description === "string") &&
     (v.isActive === undefined || typeof v.isActive === "boolean") &&
-    (v.accountType === "cash" || v.accountType === "debt") &&
+    isAccountType(v.accountType) &&
     (v.icon === undefined || v.icon === null || typeof v.icon === "string") &&
     (v.color === undefined || v.color === null || typeof v.color === "string") &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))

@@ -182,5 +182,11 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0030_cloud_sync_queue_payload.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 31,
+            description: "seed_default_debt_account",
+            sql: include_str!("../migrations/0031_seed_default_debt_account.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

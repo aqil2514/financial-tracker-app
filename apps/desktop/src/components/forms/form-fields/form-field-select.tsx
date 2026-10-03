@@ -30,6 +30,7 @@ type FormFieldSelectProps<TFieldValues extends FieldValues> = {
   /** Show a "Tanpa ..." item that clears the field back to null. */
   allowClear?: boolean;
   clearLabel?: string;
+  disabled?: boolean;
 };
 
 const CLEAR_VALUE = "__none__";
@@ -42,6 +43,7 @@ export function FormFieldSelect<TFieldValues extends FieldValues>({
   options,
   allowClear = false,
   clearLabel = "Tanpa pilihan",
+  disabled = false,
 }: FormFieldSelectProps<TFieldValues>) {
   return (
     <Controller
@@ -55,6 +57,7 @@ export function FormFieldSelect<TFieldValues extends FieldValues>({
             onValueChange={(value) =>
               field.onChange(value === CLEAR_VALUE ? null : value)
             }
+            disabled={disabled}
           >
             <SelectTrigger id={name} className="w-full">
               <SelectValue placeholder={placeholder}>

@@ -1,5 +1,6 @@
 import { getDb, type Account } from "@/lib/db";
 import { newId } from "@/lib/id";
+import { classifyAccountPair } from "./classify-account-pair";
 import { getTransactionDebtStatus, type TransactionDebtStatus } from "./use-transaction-debt-status";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
@@ -44,6 +45,9 @@ async function getAccountType(db: Db, accountId: string): Promise<Account["accou
  *   'payable' (utang baru) atau 'settlement' (lunasi piutang existing,
  *   FIFO berdasar `settleDebtIds`).
  * - debt -> debt: tidak melakukan apa-apa (di luar scope, lihat dok).
+ * - kombinasi lain (melibatkan tipe akun ketiga spt investment, kalau
+ *   sudah ditambahkan nanti): classifyAccountPair throw, lihat
+ *   classify-account-pair.ts.
  *
  * Dipanggil SETELAH insert/update baris `transactions` selesai (butuh
  * `transactionId` untuk jejak `debts.transaction_id`/
@@ -70,16 +74,25 @@ export async function applyDebtTransaction({
     getAccountType(db, transferAccountId),
   ]);
 
-  const sourceIsDebt = sourceType === "debt";
-  const destinationIsDebt = destinationType === "debt";
+  // null berarti akun sudah terhapus di antara submit form dan titik ini
+  // (race, bukan tipe akun baru) -- beda kasus dari UnsupportedAccountPairError.
+  if (sourceType == null || destinationType == null) {
+    throw new Error("Akun sumber/tujuan transfer tidak ditemukan.");
+  }
 
-  if (sourceIsDebt === destinationIsDebt) {
-    // Baik "kas -> kas" (bukan urusan debt) maupun "debt -> debt"
-    // (di luar scope, lihat dokumen desain) — tidak melakukan apa-apa.
+  // classifyAccountPair throw UnsupportedAccountPairError utk kombinasi
+  // di luar cash/debt (lihat classify-account-pair.ts) -- seharusnya
+  // sudah dicegat lebih dulu oleh validasi form
+  // (use-transaction-debt-fields.ts), ini safety net.
+  const pairKind = classifyAccountPair(sourceType, destinationType);
+
+  if (pairKind === "cash-cash" || pairKind === "debt-debt") {
+    // "kas -> kas" (bukan urusan debt) maupun "debt -> debt" (di luar
+    // scope, lihat dokumen desain) — tidak melakukan apa-apa.
     return;
   }
 
-  if (destinationIsDebt) {
+  if (pairKind === "cash-debt") {
     // Kas -> Debt: piutang baru, tidak ambigu.
     await db.execute(
       `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)
@@ -89,7 +102,7 @@ export async function applyDebtTransaction({
     return;
   }
 
-  // Debt -> Kas: butuh keputusan eksplisit dari form.
+  // pairKind === "debt-cash": butuh keputusan eksplisit dari form.
   if (debtAction === "payable") {
     await db.execute(
       `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)

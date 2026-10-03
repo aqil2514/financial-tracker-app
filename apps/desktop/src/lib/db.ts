@@ -1,4 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
+import type { AccountType } from "./account-types";
 
 let dbPromise: Promise<Database> | null = null;
 
@@ -55,7 +56,7 @@ export type Account = {
   description: string | null;
   created_at: string;
   is_active: number;
-  account_type: "cash" | "debt";
+  account_type: AccountType;
 };
 
 export type Transaction = {

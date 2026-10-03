@@ -1,5 +1,6 @@
 import type { Env } from "../../shared/env";
 import { nowText } from "../../shared/lww";
+import type { AccountType } from "../../shared/account-types";
 
 // Bentuk baris tiap tabel di response pull -- camelCase, KONSISTEN dgn
 // payload endpoint tulis (lihat keputusan desain di
@@ -34,7 +35,7 @@ export type SyncResponse = {
     groupId: string | null;
     description: string | null;
     isActive: boolean;
-    accountType: "cash" | "debt";
+    accountType: AccountType;
     color: string | null;
     updatedAt: string | null;
     deletedAt: string | null;
@@ -136,7 +137,7 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
         group_id: string | null;
         description: string | null;
         is_active: number;
-        account_type: "cash" | "debt";
+        account_type: AccountType;
         color: string | null;
         updated_at: string | null;
         deleted_at: string | null;

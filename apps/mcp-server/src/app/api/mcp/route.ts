@@ -12,6 +12,7 @@ import {
   summarizeDebts,
   listContactHistory,
 } from "@/lib/sync-snapshot";
+import { ACCOUNT_TYPES } from "@/lib/account-types";
 
 function getToken(ctx: { http?: { authInfo?: AuthInfo } }): string {
   const token = ctx.http?.authInfo?.token;
@@ -139,8 +140,8 @@ const handler = createMcpHandler((server) => {
     note: z.string(),
     date: z.string().describe("Format YYYY-MM-DD"),
     categoryId: z.string().optional(),
-    accountId: z.string().optional().describe("Akun sumber/utama"),
-    transferAccountId: z.string().optional().describe("Akun tujuan, hanya utk type=transfer"),
+    accountId: z.string().min(1, "Akun wajib diisi").describe("Akun sumber/utama, wajib diisi"),
+    transferAccountId: z.string().optional().describe("Akun tujuan, wajib diisi utk type=transfer"),
     description: z.string().optional(),
     contactId: z.string().optional().describe("ID kontak, menang kalau diisi bareng contactName"),
     contactName: z
@@ -210,6 +211,64 @@ const handler = createMcpHandler((server) => {
     }
   );
 
+  // create_debt_direct & pay_debt_non_cash -- menutup gap paralelitas
+  // desktop vs MCP (audit-kepatuhan-konsep-tipe-akun.md pertanyaan #7).
+  // Mode 'transfer'/'cash' SUDAH bisa lewat create_transaction +
+  // debtAction -- dua tool ini KHUSUS jalur yang belum ada padanannya:
+  // piutang/utang tanpa transaksi apa pun, dan pelunasan tanpa uang
+  // berpindah (barter/pemutihan/offset).
+  server.registerTool(
+    "create_debt_direct",
+    {
+      title: "Catat Piutang/Utang Langsung",
+      description:
+        "Catat piutang/utang BARU tanpa transaksi kas apa pun -- untuk uang yang sudah berpindah DI LUAR app (pinjam tunai, barter, piutang lama). accountId wajib menunjuk akun bertipe 'debt'. Untuk piutang/utang yang lahir dari transfer kas<->debt, gunakan create_transaction dengan type=transfer.",
+      inputSchema: z.object({
+        type: z.enum(["receivable", "payable"]).describe("receivable = saya meminjamkan, payable = saya berutang"),
+        amount: z.number().positive(),
+        accountId: z.string().min(1, "Akun wajib diisi").describe("Akun bertipe 'debt'"),
+        date: z.string().describe("Format YYYY-MM-DD"),
+        note: z.string().optional(),
+        contactId: z.string().optional().describe("ID kontak, menang kalau diisi bareng contactName"),
+        contactName: z
+          .string()
+          .optional()
+          .describe("Nama kontak bahasa natural, di-resolve Worker (get-or-create) kalau contactId kosong"),
+      }),
+    },
+    async (args, ctx) => {
+      const token = getToken(ctx);
+      const result = await workerFetch(token, "/debts", {
+        method: "POST",
+        body: JSON.stringify({ id: newId(), ...args }),
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "pay_debt_non_cash",
+    {
+      title: "Lunasi Piutang/Utang Tanpa Uang",
+      description:
+        "Lunasi (sebagian/seluruh) piutang/utang TANPA uang berpindah sama sekali -- barter, pemutihan, atau saling-offset. Catat alasannya di note. Untuk pelunasan dengan uang riil, gunakan create_transaction dengan type=transfer dan debtAction=settlement.",
+      inputSchema: z.object({
+        debtId: z.string().describe("ID piutang/utang (debts.id) yang dilunasi"),
+        amount: z.number().positive(),
+        date: z.string().describe("Format YYYY-MM-DD"),
+        note: z.string().optional().describe("Alasan pelunasan non-cash, mis. 'barter jasa desain'"),
+      }),
+    },
+    async ({ debtId, ...rest }, ctx) => {
+      const token = getToken(ctx);
+      const result = await workerFetch(token, `/debts/${debtId}/payments`, {
+        method: "POST",
+        body: JSON.stringify({ id: newId(), ...rest }),
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
   server.registerTool(
     "create_contact",
     {
@@ -272,7 +331,7 @@ const handler = createMcpHandler((server) => {
   const accountFields = {
     name: z.string(),
     initialBalance: z.number(),
-    accountType: z.enum(["cash", "debt"]),
+    accountType: z.enum(ACCOUNT_TYPES),
     groupId: z.string().optional(),
     description: z.string().optional(),
     isActive: z.boolean().optional(),

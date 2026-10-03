@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -45,13 +46,26 @@ export function NewDebtForm({ form, onSubmit, isPending }: NewDebtFormProps) {
         label: account.group_name ? `${account.name} — ${account.group_name}` : account.name,
       })) ?? [];
 
+  const debtAccounts = accounts?.filter(
+    (account) => account.account_type === "debt" && account.is_active
+  );
   const debtAccountOptions =
-    accounts
-      ?.filter((account) => account.account_type === "debt" && account.is_active)
-      .map((account) => ({
-        value: String(account.id),
-        label: account.group_name ? `${account.name} — ${account.group_name}` : account.name,
-      })) ?? [];
+    debtAccounts?.map((account) => ({
+      value: String(account.id),
+      label: account.group_name ? `${account.name} — ${account.group_name}` : account.name,
+    })) ?? [];
+
+  const debtAccountId = useWatch({ control: form.control, name: "debt_account_id" });
+
+  // Prefill akun utang piutang dengan akun debt pertama begitu daftar
+  // akun termuat — kebanyakan user cuma punya 1 akun debt (default seed,
+  // migrasi 0031), jadi tidak perlu pilih manual setiap kali.
+  useEffect(() => {
+    if (!debtAccountId && debtAccounts && debtAccounts.length > 0) {
+      form.setValue("debt_account_id", String(debtAccounts[0].id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debtAccounts, debtAccountId]);
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
@@ -75,23 +89,21 @@ export function NewDebtForm({ form, onSubmit, isPending }: NewDebtFormProps) {
       <ContactField control={form.control} label="Nama Kontak (wajib)" />
       <FormFieldCurrency form={form} name="amount" label="Nominal" useCalculator />
       {recordMode === "transfer" && (
-        <>
-          <FormFieldCombobox
-            form={form}
-            name="cash_account_id"
-            label="Akun Kas"
-            placeholder="Cari akun kas..."
-            options={cashAccountOptions}
-          />
-          <FormFieldCombobox
-            form={form}
-            name="debt_account_id"
-            label="Akun Utang Piutang"
-            placeholder="Cari akun utang piutang..."
-            options={debtAccountOptions}
-          />
-        </>
+        <FormFieldCombobox
+          form={form}
+          name="cash_account_id"
+          label="Akun Kas"
+          placeholder="Cari akun kas..."
+          options={cashAccountOptions}
+        />
       )}
+      <FormFieldCombobox
+        form={form}
+        name="debt_account_id"
+        label="Akun Utang Piutang"
+        placeholder="Cari akun utang piutang..."
+        options={debtAccountOptions}
+      />
       <FormFieldDate form={form} name="date" label="Tanggal" />
       <FormFieldText
         form={form}

@@ -1,6 +1,10 @@
 import { uuidv7 } from "uuidv7";
 import type { Env } from "../../shared/env";
 import type { SyncSource } from "../../shared/auth";
+import { classifyAccountPair, UnsupportedAccountPairError } from "./classify-account-pair";
+import { resolveContactId } from "../contacts/service";
+import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
+import type { CreateDirectDebtPayload, CreateNonCashPaymentPayload } from "./schema";
 
 type OngoingDebtRow = { id: string; remaining: number };
 
@@ -94,6 +98,39 @@ export async function validateDebtSettlementAmount(
   return { status: "ok" };
 }
 
+// Pre-check REJECT SEBELUM SIMPAN (lihat
+// audit-kepatuhan-konsep-tipe-akun.md pertanyaan #4) -- dipanggil dari
+// transactions/service.ts SEBELUM insert/update baris `transactions`,
+// sama pola dgn validateDebtSettlementAmount di atas. Kombinasi tipe
+// akun di luar cash/debt (misal investment, kalau sudah ditambahkan
+// nanti) WAJIB ditolak di sini dulu -- applyDebtTransaction di bawah
+// cuma jadi safety net (sudah terlambat utk reject-sebelum-simpan kalau
+// baru ketahuan di situ).
+export async function validateAccountPairSupported(
+  env: Env,
+  { type, accountId, transferAccountId }: Pick<ApplyDebtTransactionInput, "type" | "accountId" | "transferAccountId">
+): Promise<ApplyDebtTransactionResult> {
+  if (type !== "transfer" || transferAccountId == null) return { status: "ok" };
+
+  const [sourceType, destinationType] = await Promise.all([
+    getAccountType(env, accountId),
+    getAccountType(env, transferAccountId),
+  ]);
+  if (sourceType == null || destinationType == null) {
+    return { status: "rejected", reason: "Akun sumber/tujuan transfer tidak ditemukan." };
+  }
+
+  try {
+    classifyAccountPair(sourceType, destinationType);
+    return { status: "ok" };
+  } catch (err) {
+    if (err instanceof UnsupportedAccountPairError) {
+      return { status: "rejected", reason: err.message };
+    }
+    throw err;
+  }
+}
+
 export async function getTransactionDebtStatus(
   env: Env,
   transactionId: string
@@ -171,11 +208,16 @@ export async function applyDebtTransaction(
     getAccountType(env, accountId),
     getAccountType(env, transferAccountId),
   ]);
+  if (sourceType == null || destinationType == null) {
+    return { status: "rejected", reason: "Akun sumber/tujuan transfer tidak ditemukan." };
+  }
 
-  const sourceIsDebt = sourceType === "debt";
-  const destinationIsDebt = destinationType === "debt";
+  // Sudah dicegat lebih dulu oleh validateAccountPairSupported (dipanggil
+  // SEBELUM insert/update transaksi di transactions/service.ts) -- throw
+  // di sini murni safety net, seharusnya tidak pernah tercapai.
+  const pairKind = classifyAccountPair(sourceType, destinationType);
 
-  if (sourceIsDebt === destinationIsDebt) {
+  if (pairKind === "cash-cash" || pairKind === "debt-debt") {
     // "kas -> kas" (bukan urusan debt) ATAU "debt -> debt" (di luar
     // scope) -- tidak melakukan apa-apa.
     return { status: "ok" };
@@ -183,7 +225,7 @@ export async function applyDebtTransaction(
 
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
 
-  if (destinationIsDebt) {
+  if (pairKind === "cash-debt") {
     // Kas -> Debt: piutang baru, tidak ambigu.
     await env.DB.prepare(
       `INSERT INTO debts
@@ -195,7 +237,8 @@ export async function applyDebtTransaction(
     return { status: "ok" };
   }
 
-  // Debt -> Kas: butuh keputusan eksplisit dari caller.
+  // pairKind === "debt-cash" (satu-satunya variant tersisa): butuh
+  // keputusan eksplisit dari caller.
   if (debtAction === "payable") {
     await env.DB.prepare(
       `INSERT INTO debts
@@ -409,4 +452,165 @@ export async function detachDebtForDeletedTransaction(
   // status.role === "principal"
   await env.DB.prepare("UPDATE debts SET transaction_id = NULL WHERE id = ?1").bind(status.debtId).run();
   return { role: "principal", debtId: status.debtId, hadPayments: status.hasPayments };
+}
+
+export type CreateDirectDebtResult =
+  | { status: "ok"; id: string }
+  | { status: "stale" }
+  | { status: "rejected"; reason: string };
+
+// Port dari new-debt-form/use-create-debt.ts (record_mode === 'direct') --
+// lihat audit-kepatuhan-konsep-tipe-akun.md pertanyaan #7 (paralelitas
+// desktop vs Worker/MCP, gap ditutup 2026-10-03). Piutang/utang TANPA
+// transaksi apa pun -- account_id WAJIB akun bertipe 'debt' (prinsip #1
+// konsep-tipe-akun.md), transaction_id selalu NULL. Mode 'transfer' SUDAH
+// bisa lewat insertTransaction (transactions/service.ts) + debtAction --
+// TIDAK diulang di sini.
+export async function createDirectDebt(
+  env: Env,
+  payload: CreateDirectDebtPayload,
+  syncSource: SyncSource
+): Promise<CreateDirectDebtResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM debts WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  const accountType = await getAccountType(env, payload.accountId);
+  if (accountType == null) {
+    return { status: "rejected", reason: "Akun tidak ditemukan." };
+  }
+  if (accountType !== "debt") {
+    return {
+      status: "rejected",
+      reason: "Piutang/utang mode langsung wajib menunjuk ke akun bertipe 'debt'.",
+    };
+  }
+
+  const resolvedContactId = payload.contactId ?? (await resolveContactId(env, payload.contactName ?? null, syncSource));
+
+  const now = nowText();
+  if (existing) {
+    await env.DB.prepare(
+      `UPDATE debts
+       SET type = ?1, contact_id = ?2, amount = ?3, account_id = ?4, date = ?5, note = ?6,
+           updated_at = ?7, deleted_at = NULL
+       WHERE id = ?8`
+    )
+      .bind(
+        payload.type,
+        resolvedContactId,
+        payload.amount,
+        payload.accountId,
+        payload.date,
+        payload.note ?? null,
+        decision.updatedAt,
+        payload.id
+      )
+      .run();
+    return { status: "ok", id: payload.id };
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO debts
+       (id, type, contact_id, amount, account_id, transaction_id, date, note, created_at, updated_at, sync_source)
+     VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, ?9, ?10)`
+  )
+    .bind(
+      payload.id,
+      payload.type,
+      resolvedContactId,
+      payload.amount,
+      payload.accountId,
+      payload.date,
+      payload.note ?? null,
+      now,
+      decision.updatedAt,
+      syncSource
+    )
+    .run();
+
+  return { status: "ok", id: payload.id };
+}
+
+export type CreateNonCashPaymentResult =
+  | { status: "ok"; id: string }
+  | { status: "stale" }
+  | { status: "not_found" }
+  | { status: "rejected"; reason: string };
+
+// Port dari pay-debt-form/use-pay-debt.ts (settlement_mode === 'non_cash')
+// -- pelunasan TANPA uang berpindah sama sekali (barter/pemutihan/offset).
+// transaction_id selalu NULL, account_id ikut debts.account_id (akun
+// bertipe 'debt' milik baris ini -- bisa NULL utk debt dari sync Retailku,
+// lihat use-pay-debt.ts). Settlement 'cash' SUDAH bisa lewat
+// insertTransaction + debtAction=settlement -- TIDAK diulang di sini.
+export async function createNonCashPayment(
+  env: Env,
+  debtId: string,
+  payload: CreateNonCashPaymentPayload,
+  syncSource: SyncSource
+): Promise<CreateNonCashPaymentResult> {
+  const debt = await env.DB.prepare(
+    "SELECT account_id, amount FROM debts WHERE id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(debtId)
+    .first<{ account_id: string | null; amount: number }>();
+  if (!debt) return { status: "not_found" };
+
+  const existing = await env.DB.prepare("SELECT updated_at FROM debt_payments WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  const { results: payments } = await env.DB.prepare(
+    "SELECT COALESCE(SUM(amount), 0) AS paid FROM debt_payments WHERE debt_id = ?1 AND deleted_at IS NULL AND id <> ?2"
+  )
+    .bind(debtId, payload.id)
+    .all<{ paid: number }>();
+  const alreadyPaid = payments[0]?.paid ?? 0;
+  const remaining = debt.amount - alreadyPaid;
+  if (payload.amount > remaining) {
+    return {
+      status: "rejected",
+      reason: "Nominal pelunasan melebihi sisa piutang/utang.",
+    };
+  }
+
+  const now = nowText();
+  if (existing) {
+    await env.DB.prepare(
+      "UPDATE debt_payments SET amount = ?1, date = ?2, note = ?3, updated_at = ?4, deleted_at = NULL WHERE id = ?5"
+    )
+      .bind(payload.amount, payload.date, payload.note ?? null, decision.updatedAt, payload.id)
+      .run();
+  } else {
+    await env.DB.prepare(
+      `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date, note, created_at, updated_at, sync_source)
+       VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7, ?8, ?9)`
+    )
+      .bind(
+        payload.id,
+        debtId,
+        payload.amount,
+        debt.account_id,
+        payload.date,
+        payload.note ?? null,
+        now,
+        decision.updatedAt,
+        syncSource
+      )
+      .run();
+  }
+
+  if (payload.amount >= remaining) {
+    await env.DB.prepare("UPDATE debts SET status = 'paid' WHERE id = ?1").bind(debtId).run();
+  }
+
+  return { status: "ok", id: payload.id };
 }

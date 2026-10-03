@@ -5,6 +5,7 @@ import { useEntityForm } from "@/hooks/use-entity-form";
 import { accountSchema, type AccountFormOutput } from "./account.schema";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
+import { isAccountInUse } from "./is-account-in-use";
 
 export function useUpdateAccount(account: Account, onSuccess?: () => void) {
   return useEntityForm({
@@ -23,6 +24,19 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
     onSuccess,
     mutationFn: async (values: AccountFormOutput) => {
       const db = await getDb();
+
+      // Safety net (lihat docs/concept/konsep-tipe-akun.md prinsip #3) --
+      // form sudah disable field account_type via useAccountIsUsed
+      // (edit-dialog/index.tsx), ini jaga-jaga kalau ada race (query
+      // belum selesai saat submit, atau field ter-enable sesaat).
+      // Worker (accounts/service.ts isAccountInUse) tetap penjaga akhir
+      // utk SEMUA jalur tulis (push PC ini juga, MCP, dst).
+      if (values.account_type !== account.account_type && (await isAccountInUse(db, account.id))) {
+        throw new Error(
+          "Tipe akun tidak bisa diubah karena akun ini sudah punya transaksi/piutang-utang terkait."
+        );
+      }
+
       await db.execute(
         "UPDATE accounts SET name = $1, initial_balance = $2, group_id = $3, description = $4, is_active = $5, account_type = $6, icon = $7, color = $8 WHERE id = $9",
         [

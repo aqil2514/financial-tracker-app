@@ -9,8 +9,9 @@ export const newDebtSchema = z
     /** 'transfer' = jalur lama, piutang/utang lahir dari 1 transaksi
      * transfer kas<->debt (menyentuh saldo akun). 'direct' = piutang/utang
      * murni informasional (uang sudah berpindah DI LUAR app — pinjam
-     * tunai, barter, piutang lama), tidak ada transaksi/saldo yang
-     * tersentuh sama sekali. Lihat
+     * tunai, barter, piutang lama) — tidak ada transaksi/saldo KAS yang
+     * tersentuh, TAPI debt_account_id tetap wajib (akun bertipe 'debt'
+     * sebagai tumpuan, lihat docs/concept/konsep-tipe-akun.md). Lihat
      * docs/todos/plan/debts-sync-and-non-transfer-debts.md. */
     record_mode: z.enum(["transfer", "direct"]),
     contact_name: z.string().min(1, "Nama kontak wajib diisi").nullable(),
@@ -25,7 +26,7 @@ export const newDebtSchema = z
     { message: "Akun kas wajib dipilih", path: ["cash_account_id"] }
   )
   .refine(
-    (values) => values.record_mode !== "transfer" || values.debt_account_id,
+    (values) => values.debt_account_id,
     { message: "Akun utang piutang wajib dipilih", path: ["debt_account_id"] }
   )
   .refine(

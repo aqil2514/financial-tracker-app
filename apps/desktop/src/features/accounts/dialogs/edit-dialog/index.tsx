@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { AccountForm } from "../../form/account-form";
 import { useUpdateAccount } from "../../form/use-update-account";
+import { useAccountIsUsed } from "../../form/use-account-is-used";
 
 export function AccountEditDialog({
   account,
@@ -38,6 +39,7 @@ export function AccountEditDialog({
     account,
     () => setControlledOpen?.(false)
   );
+  const { data: accountTypeLocked } = useAccountIsUsed(account.id);
 
   useEffect(() => {
     if (isControlled) setOpen(controlledOpen);
@@ -70,6 +72,7 @@ export function AccountEditDialog({
         onSubmit={onSubmit}
         isPending={isPending}
         submitLabel="Simpan Perubahan"
+        accountTypeLocked={accountTypeLocked ?? false}
       />
     </EntityFormDialog>
   );

@@ -6,7 +6,34 @@ import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
 const CORRECTION_CATEGORY_NAME = "Penyesuaian Saldo";
 
-export type UpsertAccountResult = { status: "ok"; id: string } | { status: "stale" };
+export type UpsertAccountResult =
+  | { status: "ok"; id: string }
+  | { status: "stale" }
+  | { status: "rejected"; reason: string };
+
+// Prinsip #3 docs/concept/konsep-tipe-akun.md ("tipe akun permanen
+// setelah dipakai") -- lihat audit-kepatuhan-konsep-tipe-akun.md
+// pertanyaan #5: SEBELUM perubahan ini, guard ini TIDAK ADA di lapisan
+// manapun (desktop/Worker/MCP). "Dipakai" = ada baris TIDAK terhapus di
+// salah satu dari 3 tabel finansial yg FK ke accounts (transactions via
+// account_id ATAU transfer_account_id, debts, debt_payments) --
+// retailku_sync_field_mapping SENGAJA tidak dihitung, itu konfigurasi
+// mapping bukan histori transaksi (keputusan 2026-10-03).
+async function isAccountInUse(env: Env, accountId: string): Promise<boolean> {
+  const row = await env.DB.prepare(
+    `SELECT EXISTS(
+       SELECT 1 FROM transactions
+       WHERE (account_id = ?1 OR transfer_account_id = ?1) AND deleted_at IS NULL
+       UNION ALL
+       SELECT 1 FROM debts WHERE account_id = ?1 AND deleted_at IS NULL
+       UNION ALL
+       SELECT 1 FROM debt_payments WHERE account_id = ?1 AND deleted_at IS NULL
+     ) AS used`
+  )
+    .bind(accountId)
+    .first<{ used: number }>();
+  return row?.used === 1;
+}
 
 // UPSERT dgn LWW, port dari use-create-account.ts + use-update-account.ts
 // digabung (lihat shared/lww.ts).
@@ -15,13 +42,25 @@ export async function upsertAccount(
   payload: AccountPayload,
   syncSource: SyncSource
 ): Promise<UpsertAccountResult> {
-  const existing = await env.DB.prepare("SELECT updated_at FROM accounts WHERE id = ?1")
+  const existing = await env.DB.prepare("SELECT updated_at, account_type FROM accounts WHERE id = ?1")
     .bind(payload.id)
-    .first<{ updated_at: string | null }>();
+    .first<{ updated_at: string | null; account_type: string }>();
 
   const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
   const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
   if (decision.outcome === "stale") return { status: "stale" };
+
+  // Guard SEBELUM tulis -- hanya relevan kalau account_type BERUBAH dari
+  // nilai existing (payload selalu kirim objek penuh, bukan partial,
+  // jadi caller yg tidak sengaja mengubah tipe tetap kirim nilai lama
+  // yg identik dan lolos tanpa perlu query isAccountInUse).
+  if (existing && payload.accountType !== existing.account_type && (await isAccountInUse(env, payload.id))) {
+    return {
+      status: "rejected",
+      reason:
+        "Tipe akun tidak bisa diubah karena akun ini sudah punya transaksi/piutang-utang terkait.",
+    };
+  }
 
   if (!existing) {
     const now = nowText();

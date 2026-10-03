@@ -52,7 +52,6 @@ export function useTransactionForm({
     (account) => String(account.id) === transferAccountId
   );
   const sourceIsDebt = sourceAccount?.account_type === "debt";
-  const destinationIsDebt = destinationAccount?.account_type === "debt";
 
   // Akun `debt` cuma bisa disentuh lewat transfer (lihat
   // apply-debt-transaction.ts — dipilih di income/expense akan
@@ -86,8 +85,8 @@ export function useTransactionForm({
       transactionId,
       contactId,
       type,
-      sourceIsDebt,
-      destinationIsDebt,
+      sourceAccountType: sourceAccount?.account_type,
+      destinationAccountType: destinationAccount?.account_type,
     });
 
   const { accountOptions, categoryOptions, renderAccountOption } = useAccountCategoryOptions({

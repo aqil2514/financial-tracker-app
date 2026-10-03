@@ -9,7 +9,10 @@ export type PushTransactionPayload = {
   note: string;
   date: string;
   categoryId?: string | null;
-  accountId?: string | null;
+  // Wajib (lihat isValidAccountFields) -- akun adalah tumpuan semua data,
+  // docs/concept/konsep-tipe-akun.md. transferAccountId wajib tambahan
+  // kalau type='transfer'.
+  accountId: string;
   transferAccountId?: string | null;
   description?: string | null;
   contactId?: string | null;
@@ -46,6 +49,20 @@ function isValidSourceFields(v: Record<string, unknown>): boolean {
   return sourceValid && sourceRefValid && pairValid;
 }
 
+// Akun adalah tumpuan semua data (docs/concept/konsep-tipe-akun.md) --
+// accountId WAJIB utk semua type, transferAccountId WAJIB tambahan utk
+// type='transfer'. Sebelumnya accountId opsional di sini (beda dari form
+// desktop yg selalu mewajibkan) -- celah yg memungkinkan transaksi
+// income/expense tercatat tanpa akun lewat MCP/push PC, lihat
+// audit-kepatuhan-konsep-tipe-akun.md pertanyaan #3.
+function isValidAccountFields(v: Record<string, unknown>): boolean {
+  if (typeof v.accountId !== "string" || v.accountId.length === 0) return false;
+  if (v.type === "transfer") {
+    return typeof v.transferAccountId === "string" && v.transferAccountId.length > 0;
+  }
+  return true;
+}
+
 export function isPushTransactionPayload(value: unknown): value is PushTransactionPayload {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -64,6 +81,7 @@ export function isPushTransactionPayload(value: unknown): value is PushTransacti
     typeof v.amount === "number" &&
     typeof v.note === "string" &&
     typeof v.date === "string" &&
+    isValidAccountFields(v) &&
     debtActionValid &&
     settleDebtIdsValid &&
     contactNameValid &&
@@ -93,6 +111,7 @@ export function isPatchTransactionPayload(value: unknown): value is PatchTransac
     typeof v.amount === "number" &&
     typeof v.note === "string" &&
     typeof v.date === "string" &&
+    isValidAccountFields(v) &&
     debtActionValid &&
     settleDebtIdsValid &&
     contactNameValid &&

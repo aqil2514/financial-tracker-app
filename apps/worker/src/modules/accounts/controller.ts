@@ -18,6 +18,9 @@ export async function handlePostAccount(c: Context<AppContext>) {
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
   return c.json({ status: "ok", id: result.id }, 201);
 }
 
@@ -40,6 +43,9 @@ export async function handlePatchAccount(c: Context<AppContext>) {
   const result = await upsertAccount(c.env, merged, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id });
+  }
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
   }
   return c.json({ status: "ok", id: result.id }, 200);
 }

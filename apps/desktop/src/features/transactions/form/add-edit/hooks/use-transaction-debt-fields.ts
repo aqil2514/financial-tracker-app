@@ -1,15 +1,21 @@
 "use client";
 
+import {
+  classifyAccountPair,
+  UnsupportedAccountPairError,
+  type AccountPairKind,
+} from "@/shared/debts/classify-account-pair";
 import { useTransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
 import { useOngoingDebts } from "@/shared/debts/use-ongoing-debts";
+import type { Account } from "@/lib/db";
 import type { TransactionFormOutput } from "../schema";
 
 type UseTransactionDebtFieldsParams = {
   transactionId: string | undefined;
   contactId: string | null;
   type: "income" | "expense" | "transfer";
-  sourceIsDebt: boolean;
-  destinationIsDebt: boolean;
+  sourceAccountType: Account["account_type"] | undefined;
+  destinationAccountType: Account["account_type"] | undefined;
 };
 
 /**
@@ -22,8 +28,8 @@ export function useTransactionDebtFields({
   transactionId,
   contactId,
   type,
-  sourceIsDebt,
-  destinationIsDebt,
+  sourceAccountType,
+  destinationAccountType,
 }: UseTransactionDebtFieldsParams) {
   // debtStatus dipakai DUA kali: mengunci field berbahaya (di bawah) DAN
   // memastikan piutang yang jadi target pembayaran transaksi ini SENDIRI
@@ -37,6 +43,29 @@ export function useTransactionDebtFields({
     excludeTransactionId: debtStatus?.role === "payment" ? transactionId : undefined,
   });
 
+  // pairKind null kalau type !== 'transfer' ATAU salah satu akun belum
+  // dipilih — belum ada apa pun utk diklasifikasikan. classifyAccountPair
+  // throw UnsupportedAccountPairError utk kombinasi di luar cash/debt
+  // (lihat classify-account-pair.ts) — ditangkap di sini jadi pesan
+  // validasi form (REJECT SEBELUM SIMPAN, lihat
+  // audit-kepatuhan-konsep-tipe-akun.md pertanyaan #4), bukan dibiarkan
+  // lolos sampai apply-debt-transaction.ts.
+  let pairKind: AccountPairKind | null = null;
+  let unsupportedPairMessage: string | null = null;
+  if (type === "transfer" && sourceAccountType != null && destinationAccountType != null) {
+    try {
+      pairKind = classifyAccountPair(sourceAccountType, destinationAccountType);
+    } catch (err) {
+      if (err instanceof UnsupportedAccountPairError) {
+        unsupportedPairMessage = err.message;
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  const sourceIsDebt = sourceAccountType === "debt";
+  const destinationIsDebt = destinationAccountType === "debt";
   const involvesDebtAccount = sourceIsDebt || destinationIsDebt;
 
   // Transaksi (mode edit) yang berperan sebagai piutang INDUK dan SUDAH
@@ -53,11 +82,11 @@ export function useTransactionDebtFields({
   // vs utang baru) — lihat "Deteksi otomatis debts dari transfer" di
   // debt-receivable-tracking.md. debt -> debt sengaja TIDAK termasuk
   // (di luar scope, tidak trigger apa pun).
-  const needsDebtAction =
-    !debtFieldsLocked && type === "transfer" && sourceIsDebt && !destinationIsDebt;
+  const needsDebtAction = !debtFieldsLocked && pairKind === "debt-cash";
 
   function validateDebtFields(values: TransactionFormOutput): string | null {
     if (debtFieldsLocked) return null;
+    if (unsupportedPairMessage) return unsupportedPairMessage;
     if (involvesDebtAccount && !values.contact_name?.trim()) {
       return "Nama kontak wajib diisi untuk transaksi yang melibatkan akun utang piutang";
     }

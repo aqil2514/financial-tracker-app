@@ -6,6 +6,7 @@ import {
   applyDebtTransactionEdit,
   getTransactionDebtStatus,
   validateDebtSettlementAmount,
+  validateAccountPairSupported,
   detachDebtForDeletedTransaction,
   DebtEditBlockedError,
   type DeletedTransactionDebtInfo,
@@ -103,6 +104,17 @@ async function createTransactionRow(
       reason: "Transaksi income/expense tidak boleh menyentuh akun bertipe 'debt' — gunakan transfer.",
     };
   }
+
+  // Pertanyaan #4 audit-kepatuhan-konsep-tipe-akun.md: kombinasi tipe
+  // akun di luar cash/debt (misal cash->investment) HARUS ditolak SEBELUM
+  // insert, bukan ketahuan belakangan di applyDebtTransaction (sama
+  // alasan atomicity dgn precheck settlement di bawah).
+  const accountPairPrecheck = await validateAccountPairSupported(env, {
+    type: payload.type,
+    accountId: payload.accountId,
+    transferAccountId: payload.transferAccountId ?? null,
+  });
+  if (accountPairPrecheck.status === "rejected") return accountPairPrecheck;
 
   // Logic #3 dicek SEBELUM insert baris transaksi -- kalau reject
   // terjadi SETELAH insert (di dalam applyDebtTransaction), baris
@@ -268,6 +280,16 @@ async function updateTransactionRow(
       reason: "Transaksi income/expense tidak boleh menyentuh akun bertipe 'debt' — gunakan transfer.",
     };
   }
+
+  // Pertanyaan #4 audit-kepatuhan-konsep-tipe-akun.md -- sama alasannya
+  // dgn createTransactionRow: cegah UPDATE tersimpan dgn kombinasi tipe
+  // akun yang belum didukung.
+  const accountPairPrecheck = await validateAccountPairSupported(env, {
+    type: payload.type,
+    accountId: payload.accountId,
+    transferAccountId: payload.transferAccountId ?? null,
+  });
+  if (accountPairPrecheck.status === "rejected") return accountPairPrecheck;
 
   const resolvedContactId = await resolveFinalContactId(env, payload, syncSource);
   const fieldsChanged = dangerousFieldsChanged(existing, payload, resolvedContactId);

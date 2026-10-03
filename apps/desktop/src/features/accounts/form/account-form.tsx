@@ -14,6 +14,7 @@ import {
   FormFieldColorPicker,
 } from "@/components/forms/form-fields";
 import { useAccountGroups } from "@/features/account-groups";
+import { ACCOUNT_TYPE_OPTIONS } from "@/lib/account-types";
 import type { AccountFormOutput, AccountFormValues } from "./account.schema";
 
 type AccountFormProps = {
@@ -21,6 +22,13 @@ type AccountFormProps = {
   onSubmit: (values: AccountFormOutput) => void;
   isPending: boolean;
   submitLabel?: string;
+  /** true kalau akun ini sudah punya transaksi/piutang-utang terkait —
+   * field "Tipe Akun" dikunci read-only (lihat
+   * docs/concept/konsep-tipe-akun.md prinsip #3: tipe permanen setelah
+   * dipakai). Worker tetap jadi penjaga akhir (accounts/service.ts
+   * isAccountInUse) — ini murni UX supaya user tidak perlu gagal submit
+   * dulu baru tahu. */
+  accountTypeLocked?: boolean;
 };
 
 export function AccountForm({
@@ -28,6 +36,7 @@ export function AccountForm({
   onSubmit,
   isPending,
   submitLabel = "Simpan",
+  accountTypeLocked = false,
 }: AccountFormProps) {
   const { data: groups } = useAccountGroups();
 
@@ -68,18 +77,13 @@ export function AccountForm({
         form={form}
         name="account_type"
         label="Tipe Akun"
-        options={[
-          {
-            value: "cash",
-            label: "Kas/Bank",
-            description: "Akun uang sungguhan, seperti dompet, rekening bank, atau kartu kredit.",
-          },
-          {
-            value: "debt",
-            label: "Utang Piutang",
-            description: "Akun virtual untuk melacak pinjaman ke/dari orang lain — bukan uang sungguhan.",
-          },
-        ]}
+        disabled={accountTypeLocked}
+        options={ACCOUNT_TYPE_OPTIONS.map((option) => ({
+          ...option,
+          description: accountTypeLocked
+            ? `${option.description} Tipe terkunci karena akun ini sudah punya transaksi/piutang-utang terkait.`
+            : option.description,
+        }))}
       />
       <FormFieldToggleGroup
         form={form}

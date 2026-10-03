@@ -26,9 +26,12 @@ function now() {
  *   ditentukan dari `debt_type`, jadi TIDAK ambigu — tidak butuh
  *   `DebtActionField`.
  * - `'direct'` (baru): insert langsung ke `debts` TANPA transaksi apa
- *   pun — `transaction_id`/`account_id` NULL sejak lahir, tidak
- *   menyentuh saldo akun manapun. Untuk kasus uang yang sudah
- *   berpindah DI LUAR app (pinjam tunai, barter, piutang lama). Lihat
+ *   pun — `transaction_id` NULL, tapi `account_id` tetap diisi (akun
+ *   bertipe 'debt' yang dipilih di `debt_account_id`, lihat
+ *   docs/concept/konsep-tipe-akun.md: akun tetap jadi tumpuan meski
+ *   tidak ada transaksi). Tidak menyentuh saldo akun manapun. Untuk
+ *   kasus uang yang sudah berpindah DI LUAR app (pinjam tunai, barter,
+ *   piutang lama). Lihat
  *   docs/todos/plan/debts-sync-and-non-transfer-debts.md.
  */
 export function useCreateDebt() {
@@ -50,11 +53,14 @@ export function useCreateDebt() {
       const db = await getDb();
 
       if (values.record_mode === "direct") {
+        // Sudah divalidasi wajib terisi oleh schema.ts (refine kedua,
+        // berlaku utk semua record_mode).
+        const debtAccountId = values.debt_account_id as string;
         const debtId = newId();
         await db.execute(
           `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date, note)
-           VALUES ($1, $2, $3, $4, NULL, NULL, $5, $6)`,
-          [debtId, values.debt_type, contactId, values.amount, values.date, values.note]
+           VALUES ($1, $2, $3, $4, $5, NULL, $6, $7)`,
+          [debtId, values.debt_type, contactId, values.amount, debtAccountId, values.date, values.note]
         );
         return debtId;
       }

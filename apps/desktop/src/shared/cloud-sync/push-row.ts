@@ -7,6 +7,7 @@
  */
 
 import { getDb } from "@/lib/db";
+import type { AccountType } from "@/lib/account-types";
 import type { CloudSyncCredentials, PushUpsertResult } from "./worker-client";
 import {
   pushAccount,
@@ -76,7 +77,7 @@ export async function pushRowPayload(
           group_id: string | null;
           description: string | null;
           is_active: number;
-          account_type: "cash" | "debt";
+          account_type: AccountType;
           updated_at: string | null;
         }[]
       >(

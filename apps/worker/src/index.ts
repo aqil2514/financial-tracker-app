@@ -4,6 +4,7 @@ import type { AppContext } from "./shared/auth";
 import { requireAuth } from "./shared/auth";
 import { handleGetHealth } from "./modules/health/controller";
 import { transactionsRouter } from "./modules/transactions/router";
+import { debtsRouter } from "./modules/debts/router";
 import { accountsRouter } from "./modules/accounts/router";
 import { accountGroupsRouter } from "./modules/account-groups/router";
 import { categoriesRouter } from "./modules/categories/router";
@@ -26,6 +27,7 @@ app.get("/health", handleGetHealth);
 // sebelum code exchange terjadi.
 app.get("/auth/verify", requireAuth, (c) => c.json({ ok: true }));
 app.route("/transactions", transactionsRouter);
+app.route("/debts", debtsRouter);
 app.route("/accounts", accountsRouter);
 app.route("/account-groups", accountGroupsRouter);
 app.route("/categories", categoriesRouter);

@@ -2,6 +2,8 @@
 // (tidak ada package bersama lintas-app), harus di-update manual kalau
 // bentuk response /sync berubah di Worker.
 
+import type { AccountType } from "./account-types";
+
 export type AccountGroup = { id: string; name: string; updatedAt: string | null; deletedAt: string | null };
 
 export type Category = {
@@ -25,7 +27,7 @@ export type Account = {
   groupId: string | null;
   description: string | null;
   isActive: boolean;
-  accountType: "cash" | "debt";
+  accountType: AccountType;
   color: string | null;
   updatedAt: string | null;
   deletedAt: string | null;

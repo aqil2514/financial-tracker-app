@@ -11,6 +11,8 @@
  * resolve kredensial dulu.
  */
 
+import type { AccountType } from "@/lib/account-types";
+
 export type CloudSyncCredentials = {
   workerUrl: string;
   token: string;
@@ -124,7 +126,7 @@ export type PushAccountPayload = {
   groupId?: string | null;
   description?: string | null;
   isActive?: boolean;
-  accountType: "cash" | "debt";
+  accountType: AccountType;
   icon?: string | null;
   color?: string | null;
   updatedAt?: string;
@@ -187,7 +189,7 @@ export type SyncResponse = {
       groupId: string | null;
       description: string | null;
       isActive: boolean;
-      accountType: "cash" | "debt";
+      accountType: AccountType;
       color: string | null;
     }
   >;
