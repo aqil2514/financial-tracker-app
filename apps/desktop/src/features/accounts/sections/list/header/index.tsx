@@ -44,7 +44,7 @@ export function AccountsCardHeader() {
       <CardTitle>Daftar Akun</CardTitle>
       <div className="flex flex-wrap items-center gap-4">
         <Label className="flex items-center gap-2 text-sm font-normal">
-          <Switch checked={showInactive} onCheckedChange={setShowInactive} />
+          <Switch checked={showInactive} onCheckedChange={(checked) => setShowInactive(checked)} />
           Tampilkan nonaktif
         </Label>
         <div className="flex flex-wrap items-center gap-2">

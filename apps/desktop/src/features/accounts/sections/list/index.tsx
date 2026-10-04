@@ -1,12 +1,14 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AccountDetailDialog,
   AccountBalanceCorrectionDialog,
   AccountEditDialog,
   DeleteAccountDialog,
 } from "../../dialogs";
+import { AccountBalancePieChart } from "../balance-pie-chart";
 import { AccountsProvider, useAccountsList } from "./context";
 import { AccountsCardHeader } from "./header";
 import { AccountListContent } from "./content";
@@ -15,13 +17,32 @@ import { AccountsCardFooter } from "./footer";
 export function AccountList() {
   return (
     <AccountsProvider>
-      <Card>
-        <AccountsCardHeader />
-        <AccountListContent />
-        <AccountsCardFooter />
-      </Card>
+      <AccountListTabs />
       <AccountListDialogs />
     </AccountsProvider>
+  );
+}
+
+function AccountListTabs() {
+  const { activeTab, setActiveTab } = useAccountsList();
+
+  return (
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+      <TabsList>
+        <TabsTrigger value="ringkasan">Ringkasan</TabsTrigger>
+        <TabsTrigger value="detail">Detail</TabsTrigger>
+      </TabsList>
+      <TabsContent value="ringkasan">
+        <AccountBalancePieChart />
+      </TabsContent>
+      <TabsContent value="detail">
+        <Card>
+          <AccountsCardHeader />
+          <AccountListContent />
+          <AccountsCardFooter />
+        </Card>
+      </TabsContent>
+    </Tabs>
   );
 }
 

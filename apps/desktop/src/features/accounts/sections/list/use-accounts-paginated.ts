@@ -39,15 +39,29 @@ const BALANCE_EXPRESSION = `(
 type AccountRow = Account & { balance: number; group_name: string | null };
 
 // Kolom accounts yang boleh muncul sebagai filterKey — harus
-// sinkron dengan FILTER_CONFIG di header/index.tsx.
-const FILTERABLE_COLUMNS = ["name", "group_id", "initial_balance", "is_active"] as const;
+// sinkron dengan FILTER_CONFIG di header/index.tsx. `name` di-qualify
+// `accounts.name` karena base select JOIN account_groups, yang juga
+// punya kolom `name` — tanpa prefix SQLite melempar "ambiguous column".
+const FILTERABLE_COLUMNS = ["accounts.name", "group_id", "initial_balance", "is_active"] as const;
 const BALANCE_FILTER_COLUMN = "balance" as const;
 
 // Kolom accounts yang boleh muncul sebagai sortKey — harus
 // sinkron dengan SORT_CONFIG di header/index.tsx. `group_name` adalah
 // alias dari LEFT JOIN account_groups, bukan kolom tabel accounts, tapi
-// tetap valid dipakai di ORDER BY.
+// tetap valid dipakai di ORDER BY. ORDER BY beroperasi di level subquery
+// luar (lihat selectWithBalance) tempat accounts.* sudah di-flatten jadi
+// kolom polos tanpa prefix tabel — "name" di sini TIDAK perlu (dan TIDAK
+// BOLEH) di-qualify `accounts.name`, beda dengan FILTERABLE_COLUMNS.
 const SORTABLE_COLUMNS = ["name", "initial_balance", "created_at", "balance", "group_name"] as const;
+
+// FILTER_CONFIG di header/index.tsx mengirim filterKey "name" apa adanya
+// (nama kolom generik dari sudut pandang UI) — dipetakan ke bentuk
+// qualified di FILTERABLE_COLUMNS supaya tidak ambigu terhadap
+// account_groups.name di base select (WHERE beroperasi di situ, beda
+// scope dengan ORDER BY — lihat catatan SORTABLE_COLUMNS di atas).
+function qualifyAccountsName(key: string): string {
+  return key === "name" ? "accounts.name" : key;
+}
 
 export interface AccountsListResult {
   accounts: AccountWithBalance[];
@@ -65,7 +79,9 @@ export function useAccountsPaginated(
     queryFn: async (): Promise<AccountsListResult> => {
       const db = await getDb();
 
-      const columnFilters = filters.filter((f) => f.filterKey !== BALANCE_FILTER_COLUMN);
+      const columnFilters = filters
+        .filter((f) => f.filterKey !== BALANCE_FILTER_COLUMN)
+        .map((f) => ({ ...f, filterKey: qualifyAccountsName(f.filterKey) }));
       const balanceFilters = filters.filter((f) => f.filterKey === BALANCE_FILTER_COLUMN);
 
       const { whereClause, params } = buildWhereClause(columnFilters, FILTERABLE_COLUMNS);
