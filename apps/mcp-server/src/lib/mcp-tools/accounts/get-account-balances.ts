@@ -22,11 +22,19 @@ export function registerGetAccountBalances(server: McpServer) {
         ? listAliveAccounts(snapshot).filter((a) => a.id === accountId)
         : listAliveAccounts(snapshot);
 
+      const groupNameById = new Map(
+        snapshot.accountGroups.filter((g) => g.deletedAt === null).map((g) => [g.id, g.name])
+      );
+
       const result = accounts.map((a) => ({
         id: a.id,
         name: a.name,
         accountType: a.accountType,
+        isActive: a.isActive,
+        groupName: a.groupId ? (groupNameById.get(a.groupId) ?? null) : null,
+        description: a.description,
         balance: computeAccountBalance(snapshot, a.id),
+        updatedAt: a.updatedAt,
       }));
 
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

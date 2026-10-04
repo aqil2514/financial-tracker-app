@@ -22,6 +22,7 @@ export function useAccountBalances() {
              + COALESCE((SELECT SUM(amount) FROM transactions WHERE transfer_account_id = a.id AND type = 'transfer'), 0)
              as balance
          FROM accounts a
+         WHERE a.is_active = 1
          ORDER BY balance DESC`
       );
     },
