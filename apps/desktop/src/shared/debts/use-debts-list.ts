@@ -23,8 +23,14 @@ export interface DebtsListPaginatedResult {
 const DEFAULT_ORDER_CLAUSE = "debts.date DESC, debts.id DESC";
 
 // Kolom `debts` yang boleh muncul sebagai filterKey — harus sinkron
-// dengan FILTER_CONFIG di header tabel.
+// dengan FILTER_CONFIG di header tabel. "has_payments" SENGAJA TIDAK
+// masuk sini — bukan kolom biasa, ditangani manual lewat EXISTS/NOT
+// EXISTS di bawah (lihat HAS_PAYMENTS_FILTER_KEY), karena
+// buildWhereClause generik cuma bisa bandingkan satu kolom dengan
+// operator biasa (eq/gt/between/dst), bukan subquery.
 const FILTERABLE_COLUMNS = ["status", "contact_id", "account_id"] as const;
+
+const HAS_PAYMENTS_FILTER_KEY = "has_payments";
 
 // Kolom yang boleh muncul sebagai sortKey — harus sinkron dengan
 // SORT_CONFIG di header tabel. `remaining` bukan kolom asli (alias
@@ -86,6 +92,31 @@ export function useDebtsList(
     queryFn: async (): Promise<DebtsListPaginatedResult> => {
       const db = await getDb();
 
+      // "Status Cicilan" (Sudah/Belum Dicicil) dipisah dari filters
+      // biasa — ditangani manual sebagai EXISTS/NOT EXISTS, bukan
+      // lewat buildWhereClause (lihat HAS_PAYMENTS_FILTER_KEY).
+      // filterValue-nya array (FilterSelect mendukung multi-select &
+      // operator eq/neq generik), tapi untuk filter biner ini cukup
+      // ambil elemen pertama — operator neq/is_null/is_not_null/
+      // multi-value TIDAK didukung di sini, sengaja disederhanakan
+      // sampai memang ada kebutuhan nyata lebih dari "yes"/"no".
+      const hasPaymentsFilter = filters.find((f) => f.filterKey === HAS_PAYMENTS_FILTER_KEY);
+      const hasPaymentsValue = Array.isArray(hasPaymentsFilter?.filterValue)
+        ? hasPaymentsFilter.filterValue[0]
+        : undefined;
+      const columnFilters = filters.filter((f) => f.filterKey !== HAS_PAYMENTS_FILTER_KEY);
+
+      const EXISTS_PAYMENTS = `EXISTS (
+        SELECT 1 FROM debt_payments
+        WHERE debt_payments.debt_id = debts.id AND debt_payments.deleted_at IS NULL
+      )`;
+      const hasPaymentsCondition: ExtraCondition[] =
+        hasPaymentsValue === "yes"
+          ? [{ condition: EXISTS_PAYMENTS }]
+          : hasPaymentsValue === "no"
+            ? [{ condition: `NOT ${EXISTS_PAYMENTS}` }]
+            : [];
+
       const typeCondition: ExtraCondition = { condition: "debts.type = $1", params: [type] };
       const deletedCondition: ExtraCondition = { condition: "debts.deleted_at IS NULL" };
       const dateRangeCondition: ExtraCondition[] = dateRange
@@ -98,9 +129,9 @@ export function useDebtsList(
         : [];
 
       const { whereClause, params } = buildWhereClause(
-        filters,
+        columnFilters,
         FILTERABLE_COLUMNS,
-        [typeCondition, deletedCondition, ...dateRangeCondition],
+        [typeCondition, deletedCondition, ...dateRangeCondition, ...hasPaymentsCondition],
         1
       );
 

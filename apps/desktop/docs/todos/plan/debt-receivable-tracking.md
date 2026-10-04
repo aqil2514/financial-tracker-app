@@ -18,14 +18,18 @@ dan "BELUM ditulis / batasan yang diketahui" di bawah.
       tak terbatas saat riwayat di-expand.
 - [x] `DebtListTable` — dipaginasi (SQL `LIMIT/OFFSET`), kolom aksi (`⋯`)
       dipindah ke kiri.
-- [x] `DebtListTable` — filter (Status/Kontak/Akun), sort (Tanggal/
-      Pokok/Sisa/Kontak/Akun), rentang tanggal via `PeriodPicker`, dan
-      tombol Reset untuk mengosongkan semuanya sekaligus.
+- [x] `DebtListTable` — filter (Status/Kontak/Akun/Status Cicilan), sort
+      (Tanggal/Pokok/Sisa/Kontak/Akun), rentang tanggal via
+      `PeriodPicker`, dan tombol Reset untuk mengosongkan semuanya
+      sekaligus.
 - [x] Aksi manual "Tandai Dihapuskan" (`written_off`) di `DebtListTable`
       — lihat catatan khusus soal saldo akun debt di bawah.
+- [x] `DebtListTable` — baris bisa diklik untuk expand riwayat
+      `debt_payments` langsung di tabel (`PaymentsList` diekstrak jadi
+      shared component, dipakai juga di dialog detail kontak).
 - [ ] Jatuh tempo & reminder — belum diputuskan masuk scope awal atau tidak.
-- [ ] Poles UI lanjutan `/debts`: detail riwayat `debt_payments` per
-      piutang di tabel list, empty state.
+- [ ] Poles UI lanjutan `/debts`: empty state (ilustrasi/pesan ramah
+      saat tabel kosong — bukan sekadar teks polos yang sudah ada).
 - [ ] Write-off untuk `debts` dari sync Retailku (`account_id` NULL) —
       sengaja DITOLAK dulu di `useWriteOffDebt`, butuh tindak lanjut
       terpisah (lihat catatan di bawah).
@@ -681,6 +685,32 @@ BELUM ditulis / batasan yang diketahui:
        KECUALI `account_id` NULL (baris sync Retailku — satu-satunya
        kasus tersisa yang tetap `transaction_id: NULL`, sama keputusan
        dengan write-off).
+    5. **Filter "Status Cicilan"** (Sudah/Belum Dicicil) di
+       `DebtListTable` — muncul dari pertanyaan nyata "piutang mana yang
+       sudah mulai dicicil vs yang belum tersentuh sama sekali", BEDA
+       dari filter Status yang sudah ada (piutang bisa `status='ongoing'`
+       DAN sudah dicicil sebagian, atau `ongoing` dan belum dicicil
+       sama sekali — dua potongan informasi independen). Ditangani
+       TERPISAH dari `buildWhereClause` generik (`use-debts-list.ts`,
+       `HAS_PAYMENTS_FILTER_KEY`) karena butuh `EXISTS`/`NOT EXISTS`
+       subquery ke `debt_payments`, bukan perbandingan kolom biasa —
+       filter ini di-strip dari `filters` SEBELUM diteruskan ke
+       `buildWhereClause`, diterjemahkan manual jadi `extraConditions`
+       (pola sama dengan `dateRangeCondition`). Tetap muncul di
+       `FilterPanel` yang sama (UI konsisten), disederhanakan jadi
+       binary select — operator `neq`/`is_null`/multi-value dari
+       `FilterSelect` generik SENGAJA diabaikan (ambil elemen pertama
+       array saja) sampai memang ada kebutuhan nyata lebih dari
+       "yes"/"no".
+    6. **Riwayat `debt_payments` langsung di `DebtListTable`** — baris
+       tabel sekarang bisa diklik utk expand (chevron + baris detail
+       `colSpan={8}`, klik di kolom aksi `⋯` TIDAK ikut trigger expand
+       lewat `stopPropagation`). `PaymentsList` (sebelumnya inline di
+       `debt-row.tsx` milik dialog detail kontak) diekstrak jadi shared
+       component (`shared/debts/payments-list.tsx`) supaya dipakai di
+       KEDUA tempat tanpa duplikasi — `debt-row.tsx` disederhanakan
+       jadi cuma pakai `PaymentsList` yang sama, tanpa perubahan
+       perilaku.
 - ~~Alur "Debt→Kas" arah "Utang baru" DAN "Pelunasan" dari FORM
   TRANSAKSI (`DebtActionField`)~~ **SUDAH DIUJI LIVE** (dikonfirmasi
   belakangan, sempat salah tercatat BELUM di draf sebelumnya) — transaksi

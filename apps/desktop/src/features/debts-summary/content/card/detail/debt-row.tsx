@@ -9,7 +9,7 @@ import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
 import { DEBT_STATUS_LABEL, DEBT_STATUS_VARIANT } from "@/shared/debts/status-labels";
 import type { ContactDebtRow } from "@/shared/debts/use-contact-debts";
-import { useDebtPayments } from "@/shared/debts/use-debt-payments";
+import { PaymentsList } from "@/shared/debts/payments-list";
 
 /** Satu baris piutang/utang di dialog detail kontak — expandable, cicilan
  * (`debt_payments`) di-fetch LAZY lewat `useDebtPayments` cuma SETELAH
@@ -39,37 +39,9 @@ export function DebtRow({ debt }: { debt: ContactDebtRow }) {
           <Badge variant={DEBT_STATUS_VARIANT[debt.status]}>{DEBT_STATUS_LABEL[debt.status]}</Badge>
         </div>
       </CollapsibleTrigger>
-      <CollapsibleContent>
+      <CollapsibleContent className="border-t">
         {hasOpened && <PaymentsList debtId={debt.id} />}
       </CollapsibleContent>
     </Collapsible>
-  );
-}
-
-function PaymentsList({ debtId }: { debtId: string }) {
-  const { data: payments, isLoading } = useDebtPayments(debtId);
-
-  if (isLoading) {
-    return <p className="text-muted-foreground border-t p-3 text-sm">Memuat cicilan...</p>;
-  }
-
-  if (!payments || payments.length === 0) {
-    return (
-      <p className="text-muted-foreground border-t p-3 text-sm">Belum ada cicilan tercatat.</p>
-    );
-  }
-
-  return (
-    <ul className="divide-y border-t">
-      {payments.map((payment) => (
-        <li key={payment.id} className="flex items-center justify-between gap-2 p-3 text-sm">
-          <div>
-            <p>{formatDate(payment.date, "date-time")}</p>
-            <p className="text-muted-foreground text-xs">{payment.account_name ?? "—"}</p>
-          </div>
-          <p className="font-medium">{formatCurrency(payment.amount, "IDR")}</p>
-        </li>
-      ))}
-    </ul>
   );
 }

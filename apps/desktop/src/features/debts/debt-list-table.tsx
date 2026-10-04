@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
-import { Ban, HandCoins, X } from "lucide-react";
+import { Ban, ChevronDown, HandCoins, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,18 +28,24 @@ import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useContacts } from "@/shared/contacts/use-contacts";
 import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
+import { cn } from "@/lib/utils";
 import { useDebtsList, type DebtListRow } from "@/shared/debts/use-debts-list";
 import { PayDebtDialog } from "@/shared/debts/pay-debt-form/pay-debt-dialog";
+import { PaymentsList } from "@/shared/debts/payments-list";
 import { useWriteOffDebt } from "@/shared/debts/use-write-off-debt";
 import { DEBT_STATUS_LABEL, DEBT_STATUS_VARIANT } from "@/shared/debts/status-labels";
 
 const DEFAULT_LIMIT = 10;
 
-// Harus sinkron dengan FILTERABLE_COLUMNS di use-debts-list.ts.
+// Harus sinkron dengan FILTERABLE_COLUMNS + HAS_PAYMENTS_FILTER_KEY di
+// use-debts-list.ts. "has_payments" BUKAN kolom biasa (ditangani manual
+// lewat EXISTS/NOT EXISTS di sana), tapi tetap muncul di FilterPanel
+// yang sama supaya UI-nya konsisten dengan filter lain.
 const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "status", label: "Status", type: "select" },
   { key: "contact_id", label: "Kontak", type: "combobox" },
   { key: "account_id", label: "Akun", type: "combobox" },
+  { key: "has_payments", label: "Status Cicilan", type: "select" },
 ];
 
 // Harus sinkron dengan SORTABLE_COLUMNS di use-debts-list.ts.
@@ -61,6 +67,7 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
   const [payingDebt, setPayingDebt] = useState<DebtListRow | null>(null);
   const [writingOffDebt, setWritingOffDebt] = useState<DebtListRow | null>(null);
   const writeOffDebt = useWriteOffDebt();
+  const [expandedDebtId, setExpandedDebtId] = useState<string | null>(null);
 
   const { data: contacts } = useContacts();
   const { data: accounts } = useAccounts();
@@ -80,6 +87,10 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
         value: String(account.id),
         label: account.name,
       })),
+      has_payments: [
+        { value: "yes", label: "Sudah Dicicil" },
+        { value: "no", label: "Belum Dicicil" },
+      ],
     }),
     [contacts, accounts]
   );
@@ -139,6 +150,7 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-0" />
+                <TableHead className="w-0" />
                 <TableHead>Tanggal</TableHead>
                 <TableHead>Kontak</TableHead>
                 <TableHead>Akun</TableHead>
@@ -148,41 +160,67 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.debts.map((debt) => (
-                <TableRow key={debt.id}>
-                  <TableCell>
-                    {debt.status === "ongoing" && (
-                      <ListItemActionsMenu
-                        actions={[
-                          {
-                            label: type === "receivable" ? "Catat Pelunasan" : "Catat Pembayaran",
-                            icon: HandCoins,
-                            onClick: () => setPayingDebt(debt),
-                          },
-                          {
-                            label: "Tandai Dihapuskan",
-                            icon: Ban,
-                            variant: "destructive",
-                            onClick: () => setWritingOffDebt(debt),
-                          },
-                        ]}
-                      />
+              {data.debts.map((debt) => {
+                const isExpanded = expandedDebtId === debt.id;
+                return (
+                  <Fragment key={debt.id}>
+                    <TableRow
+                      className="cursor-pointer"
+                      onClick={() => setExpandedDebtId(isExpanded ? null : debt.id)}
+                    >
+                      <TableCell>
+                        <ChevronDown
+                          className={cn(
+                            "text-muted-foreground size-4 transition-transform",
+                            isExpanded && "rotate-180"
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {debt.status === "ongoing" && (
+                          <ListItemActionsMenu
+                            actions={[
+                              {
+                                label:
+                                  type === "receivable" ? "Catat Pelunasan" : "Catat Pembayaran",
+                                icon: HandCoins,
+                                onClick: () => setPayingDebt(debt),
+                              },
+                              {
+                                label: "Tandai Dihapuskan",
+                                icon: Ban,
+                                variant: "destructive",
+                                onClick: () => setWritingOffDebt(debt),
+                              },
+                            ]}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDate(debt.date, "date-time")}</TableCell>
+                      <TableCell>{debt.contact_name ?? "—"}</TableCell>
+                      <TableCell>{debt.account_name ?? "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(debt.amount, "IDR")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(debt.remaining, "IDR")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={DEBT_STATUS_VARIANT[debt.status]}>
+                          {DEBT_STATUS_LABEL[debt.status]}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-muted/30 p-0">
+                          <PaymentsList debtId={debt.id} />
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </TableCell>
-                  <TableCell>{formatDate(debt.date, "date-time")}</TableCell>
-                  <TableCell>{debt.contact_name ?? "—"}</TableCell>
-                  <TableCell>{debt.account_name ?? "—"}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(debt.amount, "IDR")}</TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(debt.remaining, "IDR")}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={DEBT_STATUS_VARIANT[debt.status]}>
-                      {DEBT_STATUS_LABEL[debt.status]}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+                  </Fragment>
+                );
+              })}
             </TableBody>
           </Table>
           <TablePagination
@@ -217,7 +255,7 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
         }}
         isPending={writeOffDebt.isPending}
         title={`Tandai ${type === "receivable" ? "piutang" : "utang"} ini dihapuskan?`}
-        description="Dipakai untuk kasus yang bukan pelunasan penuh (mis. diikhlaskan) — tidak ada transaksi yang dibuat, sisa berhenti dihitung aktif. Tindakan ini tidak bisa dibatalkan."
+        description="Dipakai untuk kasus yang bukan pelunasan penuh (mis. diikhlaskan) — sisa berhenti dihitung aktif, saldo akun ikut disesuaikan ke nol. Tindakan ini tidak bisa dibatalkan."
       />
     </>
   );
