@@ -81,7 +81,7 @@ export function NewDebtForm({ form, onSubmit, isPending }: NewDebtFormProps) {
         label="Cara Mencatat"
         description={
           recordMode === "direct"
-            ? "Uang sudah berpindah di luar app (pinjam tunai, barter, dll) — tidak menyentuh saldo akun manapun."
+            ? "Uang sudah berpindah di luar app (pinjam tunai, barter, dll) — tidak menyentuh saldo akun kas, tapi saldo akun utang piutang tetap bertambah/berkurang."
             : "Mencatat lewat transaksi transfer kas <-> akun utang piutang, saldo akun kas ikut berubah."
         }
         options={recordModeOptions}
