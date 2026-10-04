@@ -188,5 +188,11 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0031_seed_default_debt_account.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 32,
+            description: "backfill_null_transaction_ids",
+            sql: include_str!("../migrations/0032_backfill_null_transaction_ids.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }

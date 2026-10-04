@@ -59,9 +59,9 @@ export function useCorrectAccountBalance() {
       const categoryId = await getOrCreateCorrectionCategoryId(db, type);
 
       await db.execute(
-        `INSERT INTO transactions (type, amount, category_id, account_id, note, date)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [type, amount, categoryId, accountId, "Koreksi saldo", now()]
+        `INSERT INTO transactions (id, type, amount, category_id, account_id, note, date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [newId(), type, amount, categoryId, accountId, "Koreksi saldo", now()]
       );
     },
     invalidateKey: dependentKeysOf("transactions", "accounts", "categories"),
