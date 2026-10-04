@@ -5,7 +5,7 @@ import { CategoryList, CategoryFormDialog } from "@/features/categories";
 
 export default function CategoriesPage() {
   return (
-    <PageContainer>
+    <PageContainer maxWidth="6xl">
       <PageHeader title="Kategori" description="Kelola kategori transaksi Anda" />
       <Card>
         <CardHeader>

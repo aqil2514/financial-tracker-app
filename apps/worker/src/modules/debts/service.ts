@@ -461,11 +461,25 @@ export type CreateDirectDebtResult =
 
 // Port dari new-debt-form/use-create-debt.ts (record_mode === 'direct') --
 // lihat audit-kepatuhan-konsep-tipe-akun.md pertanyaan #7 (paralelitas
-// desktop vs Worker/MCP, gap ditutup 2026-10-03). Piutang/utang TANPA
-// transaksi apa pun -- account_id WAJIB akun bertipe 'debt' (prinsip #1
-// konsep-tipe-akun.md), transaction_id selalu NULL. Mode 'transfer' SUDAH
+// desktop vs Worker/MCP, gap ditutup 2026-10-03). account_id WAJIB akun
+// bertipe 'debt' (prinsip #1 konsep-tipe-akun.md). Mode 'transfer' SUDAH
 // bisa lewat insertTransaction (transactions/service.ts) + debtAction --
 // TIDAK diulang di sini.
+//
+// CATATAN KOREKSI (2026-10-04): versi SEBELUMNYA fungsi ini SELALU
+// transaction_id:NULL (tanpa transaksi apa pun), mereplikasi bug yang
+// sama dengan createNonCashPayment/writeOffDebt SEBELUM diperbaiki --
+// saldo akun debt tidak pernah ikut bertambah/berkurang padahal piutang/
+// utangnya tercatat. Ditemukan telat (fix createNonCashPayment/
+// writeOffDebt di hari yang sama sempat tidak ikut menyentuh fungsi ini).
+// Sekarang reuse createDebtClosingTransaction yang sama, arah tanda
+// KEBALIKAN dari closing (closing membawa ke nol, ini MENCIPTAKAN
+// piutang/utang baru): receivable -> income (+), payable -> expense (-)
+// pada akun debt itu sendiri -- lihat docs/concept/konsep-utang-piutang.md.
+// Transaksi penutup HANYA dibuat saat INSERT baris baru (bukan saat
+// UPDATE existing lewat LWW retry) -- transaksinya sudah dibuat sekali
+// saat insert pertama, UPDATE di sini cuma menyesuaikan field non-transaksi
+// (idempotent, tidak menyentuh/reset transaction_id).
 export async function createDirectDebt(
   env: Env,
   payload: CreateDirectDebtPayload,
@@ -492,7 +506,6 @@ export async function createDirectDebt(
 
   const resolvedContactId = payload.contactId ?? (await resolveContactId(env, payload.contactName ?? null, syncSource));
 
-  const now = nowText();
   if (existing) {
     await env.DB.prepare(
       `UPDATE debts
@@ -514,10 +527,20 @@ export async function createDirectDebt(
     return { status: "ok", id: payload.id };
   }
 
+  const transactionId = await createDebtClosingTransaction(env, {
+    debt: { type: payload.type, contact_id: resolvedContactId, account_id: payload.accountId },
+    amount: payload.amount,
+    date: payload.date,
+    note: payload.note ?? null,
+    syncSource,
+    closingDirection: "create",
+  });
+
+  const now = nowText();
   await env.DB.prepare(
     `INSERT INTO debts
        (id, type, contact_id, amount, account_id, transaction_id, date, note, created_at, updated_at, sync_source)
-     VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, ?9, ?10)`
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`
   )
     .bind(
       payload.id,
@@ -525,6 +548,7 @@ export async function createDirectDebt(
       resolvedContactId,
       payload.amount,
       payload.accountId,
+      transactionId,
       payload.date,
       payload.note ?? null,
       now,
@@ -542,17 +566,21 @@ type DebtForClosingRow = {
   account_id: string | null;
 };
 
-// Transaksi "penutup" LANGSUNG pada akun debt itu sendiri -- TIDAK ada
-// uang riil berpindah ke akun kas mana pun, tapi TETAP wajib lewat
-// `transactions` (satu-satunya jalur sah mengubah accounts.balance,
+// Transaksi "penutup"/"pembuka" LANGSUNG pada akun debt itu sendiri --
+// TIDAK ada uang riil berpindah ke akun kas mana pun, tapi TETAP wajib
+// lewat `transactions` (satu-satunya jalur sah mengubah accounts.balance,
 // lihat docs/concept/konsep-transaksi.md "Kenapa prinsip ini sempat
-// dilanggar, dan kenapa itu salah") supaya saldo akun debt ikut
-// mengarah ke nol. Port PERSIS dari pay-debt-form/use-pay-debt.ts
-// (cabang non_cash dgn account_id terisi) & use-write-off-debt.ts --
-// KEDUANYA pakai logic identik, makanya di-share di sini. Dipanggil
-// SETELAH caller memastikan `debt.account_id` tidak null (satu-satunya
-// kasus tanpa transaksi penutup adalah baris sync Retailku, lihat
-// komentar di use-pay-debt.ts).
+// dilanggar, dan kenapa itu salah") supaya saldo akun debt ikut berubah.
+// Dua arah (`closingDirection`), KEBALIKAN satu sama lain:
+// - 'close' (default pelunasan/write-off): membawa saldo MENUJU NOL.
+//   receivable -> expense (-), payable -> income (+). Port PERSIS dari
+//   pay-debt-form/use-pay-debt.ts (cabang non_cash) & use-write-off-debt.ts.
+// - 'create' (piutang/utang BARU, record_mode='direct'): MENCIPTAKAN
+//   nilai baru yang "dipegang" akun debt. receivable -> income (+),
+//   payable -> expense (-). Port dari new-debt-form/use-create-debt.ts.
+// Dipanggil SETELAH caller memastikan `debt.account_id` tidak null
+// (satu-satunya kasus tanpa transaksi penutup/pembuka adalah baris sync
+// Retailku, lihat komentar di use-pay-debt.ts).
 async function createDebtClosingTransaction(
   env: Env,
   {
@@ -561,10 +589,26 @@ async function createDebtClosingTransaction(
     date,
     note,
     syncSource,
-  }: { debt: DebtForClosingRow & { account_id: string }; amount: number; date: string; note: string | null; syncSource: SyncSource }
+    closingDirection = "close",
+  }: {
+    debt: DebtForClosingRow & { account_id: string };
+    amount: number;
+    date: string;
+    note: string | null;
+    syncSource: SyncSource;
+    closingDirection?: "close" | "create";
+  }
 ): Promise<string> {
   const transactionId = uuidv7();
-  const transactionType: "income" | "expense" = debt.type === "receivable" ? "expense" : "income";
+  const isReceivable = debt.type === "receivable";
+  const transactionType: "income" | "expense" =
+    closingDirection === "close"
+      ? isReceivable
+        ? "expense"
+        : "income"
+      : isReceivable
+        ? "income"
+        : "expense";
   const now = nowText();
 
   await env.DB.prepare(

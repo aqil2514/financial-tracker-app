@@ -3,6 +3,7 @@ import React, { useMemo } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { QueryState } from "@/components/query-state";
 import { CardContent } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/format-currency";
 import { useRetailkuAccountMapping } from "@/shared/retailku";
 import { AccountWithBalance } from "../../../calculate-balance";
 import { useAccountsList } from "../context";
@@ -17,6 +18,7 @@ interface AccountGroupSection {
   key: string;
   name: string;
   accounts: AccountWithBalance[];
+  totalBalance: number;
 }
 
 export function AccountListContent() {
@@ -42,8 +44,9 @@ function AccountGroupedList() {
       const section = byGroup.get(key);
       if (section) {
         section.accounts.push(account);
+        section.totalBalance += account.balance;
       } else {
-        byGroup.set(key, { key, name, accounts: [account] });
+        byGroup.set(key, { key, name, accounts: [account], totalBalance: account.balance });
       }
     }
 
@@ -86,9 +89,16 @@ function AccountGroupedList() {
           className="not-last:border-b-0 rounded-lg border bg-muted/30 px-4"
         >
           <AccordionTrigger className="py-3 text-base font-semibold hover:no-underline">
-            {group.name}
-            <span className="text-muted-foreground ml-2 text-sm font-normal">
-              {group.accounts.length} akun
+            <span className="flex flex-1 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pr-2">
+              <span>
+                {group.name}
+                <span className="text-muted-foreground ml-2 text-sm font-normal">
+                  {group.accounts.length} akun
+                </span>
+              </span>
+              <span className="text-sm font-normal">
+                {formatCurrency(group.totalBalance, "IDR")}
+              </span>
             </span>
           </AccordionTrigger>
           <AccordionContent>
