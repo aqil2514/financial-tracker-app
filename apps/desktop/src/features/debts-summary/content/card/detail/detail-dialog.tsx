@@ -27,7 +27,8 @@ export function ContactDetailDialog({
       title={`Detail — ${contactName}`}
       open={open}
       onOpenChange={onOpenChange}
-      contentClassName="sm:!max-w-3xl max-h-[85vh] overflow-y-auto"
+      contentClassName="sm:!max-w-3xl max-h-[85vh]"
+      scrollBody
     >
       <ContactDetailContent contactId={contactId} />
     </EntityFormDialog>

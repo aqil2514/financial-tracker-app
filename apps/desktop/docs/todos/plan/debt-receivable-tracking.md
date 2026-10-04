@@ -1,5 +1,40 @@
 # Fitur Utang Piutang: Entitas Sendiri, Bukan Sekadar Transaksi
 
+## Status & TODO saat ini (ringkas)
+
+Penjelasan lengkap kenapa tiap poin ada di sini — lihat bagian "Catatan"
+dan "BELUM ditulis / batasan yang diketahui" di bawah.
+
+- [x] Skema `debts`/`debt_payments`/`contacts` + migrasi teregistrasi.
+- [x] Deteksi otomatis `debts` dari arah transfer (kas↔debt), termasuk
+      FIFO multi-debt settlement.
+- [x] Form transaksi: field kontak + `DebtActionField` (pelunasan/utang
+      baru), validasi overpay.
+- [x] 2 form khusus di halaman `/debts`: "Tambah Utang/Piutang Baru" dan
+      "Bayar" per baris.
+- [x] Edit transaksi dengan logic granular (blokir kalau sudah dicicil,
+      recreate kalau aman).
+- [x] Dialog detail kontak — scroll terkunci `85vh`, tidak lagi tumbuh
+      tak terbatas saat riwayat di-expand.
+- [x] `DebtListTable` — dipaginasi (SQL `LIMIT/OFFSET`), kolom aksi (`⋯`)
+      dipindah ke kiri.
+- [x] `DebtListTable` — filter (Status/Kontak/Akun), sort (Tanggal/
+      Pokok/Sisa/Kontak/Akun), rentang tanggal via `PeriodPicker`, dan
+      tombol Reset untuk mengosongkan semuanya sekaligus.
+- [x] Aksi manual "Tandai Dihapuskan" (`written_off`) di `DebtListTable`
+      — lihat catatan khusus soal saldo akun debt di bawah.
+- [ ] Jatuh tempo & reminder — belum diputuskan masuk scope awal atau tidak.
+- [ ] Poles UI lanjutan `/debts`: detail riwayat `debt_payments` per
+      piutang di tabel list, empty state.
+- [ ] Write-off untuk `debts` dari sync Retailku (`account_id` NULL) —
+      sengaja DITOLAK dulu di `useWriteOffDebt`, butuh tindak lanjut
+      terpisah (lihat catatan di bawah).
+- [ ] Revert `debts.status` `'paid'` → `'ongoing'` saat edit pembayaran
+      yang sebelumnya melunasi penuh — variasi kecil, risiko rendah,
+      belum sempat diuji langsung.
+- [ ] Transfer ke akun `debt` non-personal (mis. "Modal") — untuk sekarang
+      diperlakukan sama seperti piutang personal, belum ada pengecualian.
+
 ## Latar belakang
 
 Muncul dari obrolan santai (bukan permintaan implementasi) soal
@@ -530,6 +565,122 @@ BELUM ditulis / batasan yang diketahui:
   `Table` polos, belum ada empty state ilustrasi dsb). Sudah TIDAK
   murni read-only lagi (lihat "Aksi tulis dari halaman /debts" di atas),
   tapi poles visual/filter di atas masih belum digarap.
+  - **SUDAH dikerjakan** sebagian (bukan filter/empty state, tapi 2 gap
+    konkret yang ditemukan dari pemakaian nyata):
+    1. **Dialog "Detail — {kontak}"** (`features/debts-summary/content/card/detail/`)
+       dulu bisa tumbuh tak terbatas tingginya tiap kali baris riwayat
+       (`DebtRow`, expandable) di-expand/collapse — sekarang dikunci
+       `max-h-[85vh]` dengan body scroll terpisah dari header
+       (`EntityFormDialog` dapat opsi baru `scrollBody`, lihat
+       `components/forms/entity-form-dialog.tsx`). Akar masalahnya
+       cukup berliku: `DialogContent` dasarnya `grid`, dan constraint
+       tinggi via `flex flex-col` + `ScrollArea` (`flex-1`) GAGAL
+       diteruskan ke `ScrollAreaPrimitive.Viewport` (base-ui) — Viewport
+       selalu auto-grow ke `scrollHeight` kontennya sendiri alih-alih
+       dibatasi parent, walau computed height Root sudah benar
+       (diverifikasi lewat DevTools: Root 611px tapi Viewport tetap
+       902px). Fix yang akhirnya bekerja: `DialogContent` pakai
+       `grid-rows-[auto_1fr]` (bukan flex) — grid row `1fr` memberi
+       child height yang definite dengan cara yang lebih reliable untuk
+       kasus nested percentage-height ini. Komponen `ScrollArea` global
+       (dipakai 10+ tempat lain dengan tinggi fixed) TIDAK disentuh.
+    2. **`DebtListTable`** (`features/debts/debt-list-table.tsx`) — tombol
+       aksi (`⋯`) dipindah dari kolom PALING KANAN ke kolom PALING KIRI.
+       Daftarnya sekarang DIPAGINASI di SQL (`LIMIT/OFFSET` + `COUNT(*)`,
+       pola sama dengan `useAccountsPaginated`) alih-alih fetch semua
+       baris sekaligus — `useDebtsList` (hook lama, fetch-semua) dipecah
+       jadi `useAllDebtsList` (dipertahankan untuk `DebtsSummaryPageProvider`
+       yang butuh seluruh data buat agregasi `findOldestOngoing` per
+       kontak) dan `useDebtsList` baru yang paginated (dipakai
+       `DebtListTable` saja, default 10 baris/halaman via
+       `TablePagination` yang sudah ada).
+    3. **Filter/sort/rentang tanggal** di `DebtListTable` — pakai
+       infrastruktur `components/query/` yang sudah ada (bukan bangun
+       baru), persis pola `useAccountsPaginated`/`AccountDetailHeader`:
+       - Filter: Status, Kontak, Akun (`FilterPanel` + `buildWhereClause`,
+         `allowedColumns` baru di `use-debts-list.ts`).
+       - Sort: Tanggal, Pokok, Sisa (`remaining`), Kontak, Akun
+         (`SortDropdown` + `buildOrderClause`) — `remaining` BUKAN kolom
+         asli (alias subquery), tapi tetap valid dipakai di `ORDER BY`
+         SQLite walau tidak valid dipakai di `WHERE` tanpa wrap subquery
+         (beda dari kasus `balance` di `useAccountsPaginated` yang
+         butuh di-wrap karena dipakai di filter, bukan cuma sort).
+       - Rentang tanggal: `PeriodPicker` (BUKAN lewat `FilterPanel` tipe
+         `date` — tipe itu belum diimplementasikan di UI, komponen
+         `FilterDate` masih di-comment-out di `panel/content.tsx`),
+         dikonsumsi lewat `extraConditions` terpisah di
+         `buildWhereClause`, pola sama dengan
+         `build-where-conditions.ts` milik halaman transaksi.
+       - Tombol "Reset" — mengosongkan filter+sort+rentang tanggal
+         sekaligus dalam satu klik, cuma muncul kalau salah satu sedang
+         aktif.
+    4. **Aksi "Tandai Dihapuskan" (`written_off`)** di `DebtListTable`
+       (`shared/debts/use-write-off-debt.ts`) — item menu baru
+       (`variant: "destructive"`) di `ListItemActionsMenu`, dipicu lewat
+       `ConfirmDeleteDialog` yang sudah ada (dikontrol dari luar, sama
+       pola dengan `PayDebtDialog`).
+
+       **Bug ditemukan & diperbaiki SEBELUM dirilis** (lewat diskusi,
+       bukan dari testing manual): implementasi pertama cuma `UPDATE
+       debts SET status = 'written_off'`, TANPA transaksi apa pun —
+       ternyata MENYALAHI `docs/concept/konsep-utang-piutang.md`
+       ("Arti angka positif/negatif pada saldo akun Utang/Piutang":
+       *"baik piutang maupun utang sama-sama mengarah ke nol saat
+       diselesaikan"* — "Dihapuskan" termasuk salah satu dari 3 status
+       yang setara "diselesaikan", sejajar dengan "Lunas"). Akibatnya:
+       saldo akun `debt` (mis. "Keluarga") akan terus menumpuk setiap
+       ada piutang yang di-write-off, karena `accounts.balance` di
+       aplikasi ini SELALU hasil agregasi SUM dari tabel `transactions`
+       (BUKAN kolom tersimpan, lihat `use-accounts.ts`) — write-off
+       yang tidak membuat transaksi apa pun otomatis TIDAK PERNAH bisa
+       menyentuh saldo, apa pun caranya.
+
+       **Fix**: write-off sekarang MEMBUAT 1 transaksi `expense`
+       (receivable)/`income` (payable) sebesar `debt.remaining`,
+       LANGSUNG pada akun `debt` itu sendiri (BUKAN transfer ke akun
+       kas — tidak ada uang riil yang diterima kembali) + 1
+       `debt_payments` sebesar sisa (supaya `remaining` otomatis 0,
+       sama pola dengan pelunasan penuh biasa). Pola ini SENGAJA
+       konsisten dengan `correctAccountBalance` yang sudah ada (lihat
+       "Koreksi saldo TIDAK menyentuh data turunan" di
+       `konsep-tipe-akun.md`) — keduanya sama-sama transaksi
+       `income`/`expense` "penutup" untuk penyesuaian saldo, BUKAN
+       representasi uang fisik berpindah ke pihak lain saat itu juga.
+       Insight yang dikonfirmasi lewat diskusi: `transactions` di
+       aplikasi ini TIDAK SELALU merepresentasikan uang riil berpindah
+       tangan secara fisik/digital pada momen itu — tapi tetap WAJIB
+       "berkaitan dengan uang" (`type` tetap `income`/`expense`/
+       `transfer`, TIDAK ada kategori transaksi "non-uang"/abstrak baru)
+       supaya saldo akun (satu-satunya jalur sah mengubahnya) tetap
+       akurat secara akuntansi, walau bukan representasi pergerakan
+       uang fisik di momen itu.
+
+       **Kasus `debt.account_id == null`** (data dari sync Retailku,
+       lihat komentar di `use-pay-debt.ts`) — write-off DITOLAK
+       (`throw Error` dengan pesan jelas, otomatis muncul di toast
+       lewat `useDbMutation`), BUKAN diizinkan tanpa transaksi seperti
+       semula. Alasan: tidak ada akun `debt` yang bisa "dinolkan"
+       transaksinya untuk baris ini — butuh keputusan/tindak lanjut
+       terpisah (lihat `retailku-sync-account-type-gap.md`), BUKAN
+       jalan pintas diam-diam di sini.
+
+       **Bug yang SAMA PERSIS ditemukan & diperbaiki sekaligus di
+       tempat lain** (lewat diskusi lanjutan, bukan testing terpisah):
+       pelunasan `settlement_mode: 'non_cash'` di
+       `shared/debts/pay-debt-form/use-pay-debt.ts` (barter/pemutihan/
+       offset, lihat `debts-sync-and-non-transfer-debts.md`) PUNYA AKAR
+       MASALAH IDENTIK — awalnya `debt_payments` di-insert dengan
+       `transaction_id: NULL`, TANPA transaksi apa pun, MENYALAHI
+       prinsip "diselesaikan = saldo akun ke nol" yang sama. Keputusan
+       lama di `debts-sync-and-non-transfer-debts.md` ("written_off
+       TIDAK perlu dibangun terpisah, paid+note sudah cukup") juga ikut
+       **SUPERSEDED** oleh pembangunan `written_off` di atas — lihat
+       catatan revisi di dokumen itu. **Fix non_cash**: pola identik
+       dengan write-off — transaksi `expense`(receivable)/
+       `income`(payable) penutup LANGSUNG pada `debt.account_id`,
+       KECUALI `account_id` NULL (baris sync Retailku — satu-satunya
+       kasus tersisa yang tetap `transaction_id: NULL`, sama keputusan
+       dengan write-off).
 - ~~Alur "Debt→Kas" arah "Utang baru" DAN "Pelunasan" dari FORM
   TRANSAKSI (`DebtActionField`)~~ **SUDAH DIUJI LIVE** (dikonfirmasi
   belakangan, sempat salah tercatat BELUM di draf sebelumnya) — transaksi

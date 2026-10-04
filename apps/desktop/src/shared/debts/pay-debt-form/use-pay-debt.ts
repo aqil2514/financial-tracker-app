@@ -23,29 +23,49 @@ function now() {
  * Dua sumbu independen yang menentukan jalur:
  *
  * 1. `settlement_mode` ('cash'/'non_cash') — apakah ada uang yang
- *    berpindah sama sekali. 'non_cash' (barter/pemutihan/offset,
+ *    berpindah LEWAT AKUN KAS. 'non_cash' (barter/pemutihan/offset,
  *    disimplifikasi jadi SATU jalur, lihat
  *    docs/todos/plan/debts-sync-and-non-transfer-debts.md): TIDAK ADA
- *    transaksi kas yang terlibat — `debt_payments` di-insert LANGSUNG
- *    dengan `transaction_id` NULL (`account_id` tetap ikut `debt.account_id`,
- *    lihat poin 2). Alasan (diikhlaskan/barter/dst) cukup di `note`,
- *    tidak ada status terpisah dari `'paid'`.
- * 2. `debt.account_id` — HANYA relevan kalau `settlement_mode === 'cash'`.
- *    Sejak migrasi 0031, `debts.account_id` manual SELALU terisi (mode
+ *    akun kas yang terlibat, TAPI (REVISI — lihat "Bug ditemukan &
+ *    diperbaiki" di debt-receivable-tracking.md, sama akar masalah
+ *    dengan `use-write-off-debt.ts`) TETAP membuat 1 transaksi
+ *    `expense`(receivable)/`income`(payable) LANGSUNG pada
+ *    `debt.account_id` sebagai transaksi "penutup" — BUKAN
+ *    `transaction_id: NULL` seperti sebelumnya. Alasannya:
+ *    `docs/concept/konsep-utang-piutang.md` ("baik piutang maupun utang
+ *    sama-sama mengarah ke nol saat diselesaikan") TIDAK mengecualikan
+ *    penyelesaian non-cash — `accounts.balance` SELALU hasil agregasi
+ *    `transactions` (bukan kolom tersimpan, lihat use-accounts.ts),
+ *    jadi `debt_payments` dengan `transaction_id: NULL` membuat
+ *    `debts.remaining` jadi 0 TAPI saldo akun `debt` tetap nyangkut
+ *    selamanya — bug yang sama persis dengan write-off sebelum
+ *    diperbaiki. Alasan (diikhlaskan/barter/dst) tetap di `note`, tidak
+ *    ada status terpisah dari `'paid'`.
+ * 2. `debt.account_id` — relevan utk KEDUA `settlement_mode`. Sejak
+ *    migrasi 0031, `debts.account_id` manual SELALU terisi (mode
  *    'transfer' maupun 'direct' sama-sama wajib akun bertipe 'debt',
  *    lihat new-debt-form/schema.ts) — NULL cuma tersisa utk baris dari
  *    sync Retailku (`source = 'retailku_sync'`, keputusan terpisah,
  *    lihat audit-kepatuhan-konsep-tipe-akun.md pertanyaan #2):
- *    - **Ada `account_id`**: membuat 1 transaksi transfer debt->kas
- *      lalu reuse `applyDebtTransaction` dengan `debtAction: 'settlement'`
- *      (jalur FIFO yang sudah ada, walau di sini kandidatnya cuma 1 debt).
- *    - **`account_id` NULL** (data sync Retailku): TIDAK ADA akun debt
- *      yang bisa jadi sisi transfer. Uang pelunasan tetap riil
- *      masuk/keluar akun kas, jadi dicatat sbg transaksi income
+ *    - **Ada `account_id`**, `cash`: membuat 1 transaksi transfer
+ *      debt->kas lalu reuse `applyDebtTransaction` dengan
+ *      `debtAction: 'settlement'` (jalur FIFO yang sudah ada, walau di
+ *      sini kandidatnya cuma 1 debt).
+ *    - **Ada `account_id`**, `non_cash`: transaksi `expense`/`income`
+ *      penutup LANGSUNG pada `debt.account_id` (lihat poin 1) +
+ *      `debt_payments` dengan `transaction_id` menunjuk transaksi itu.
+ *    - **`account_id` NULL** (data sync Retailku), `cash`: TIDAK ADA
+ *      akun debt yang bisa jadi sisi transfer. Uang pelunasan tetap
+ *      riil masuk/keluar akun kas, jadi dicatat sbg transaksi income
  *      (receivable)/expense (payable) BIASA (bukan transfer), lalu
  *      `debt_payments` di-insert LANGSUNG (bukan lewat
  *      `applyDebtTransaction`/FIFO — kandidatnya sudah pasti cuma
  *      `debt.id` ini).
+ *    - **`account_id` NULL**, `non_cash`: TIDAK ADA akun debt yang bisa
+ *      dibuatkan transaksi penutup — tetap `transaction_id: NULL`
+ *      seperti semula (satu-satunya sisa kasus satu ini, bukan
+ *      perilaku default lagi), sama keputusan dengan write-off utk
+ *      baris Retailku (butuh tindak lanjut terpisah).
  */
 export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
   return useEntityForm({
@@ -63,20 +83,57 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
 
       if (values.settlement_mode === "non_cash") {
         // debt.account_id (akun bertipe 'debt') tetap jadi tumpuan
-        // pembayaran meski tidak ada transaksi uang — lihat
-        // docs/concept/konsep-tipe-akun.md. Bisa NULL kalau debt ini
-        // dari sync Retailku (lihat komentar di atas use-pay-debt.ts).
+        // pembayaran — lihat docs/concept/konsep-tipe-akun.md. Bisa
+        // NULL kalau debt ini dari sync Retailku (lihat komentar di
+        // atas use-pay-debt.ts) — SATU-SATUNYA kasus tanpa transaksi
+        // penutup, karena tidak ada akun debt yang bisa dituju.
+        if (debt.account_id == null) {
+          await db.execute(
+            `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date, note)
+             VALUES ($1, $2, $3, NULL, NULL, $4, $5)`,
+            [newId(), debt.id, values.amount, values.date, values.note]
+          );
+
+          if (values.amount >= debt.remaining) {
+            await db.execute("UPDATE debts SET status = 'paid' WHERE id = $1", [debt.id]);
+          }
+
+          return null;
+        }
+
+        // Transaksi "penutup" LANGSUNG pada akun debt itu sendiri —
+        // TIDAK ada uang riil berpindah ke akun kas mana pun, tapi
+        // tetap WAJIB lewat transactions (satu-satunya jalur sah
+        // mengubah accounts.balance, lihat use-accounts.ts) supaya
+        // saldo akun debt ikut mengarah ke nol seperti pelunasan cash.
+        const transactionId = newId();
+        const transactionType = debt.type === "receivable" ? "expense" : "income";
+
+        await db.execute(
+          `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
+           VALUES ($1, $2, $3, NULL, $4, NULL, $5, NULL, $6, $7)`,
+          [
+            transactionId,
+            transactionType,
+            values.amount,
+            debt.account_id,
+            values.note,
+            values.date,
+            debt.contact_id,
+          ]
+        );
+
         await db.execute(
           `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date, note)
-           VALUES ($1, $2, $3, $4, NULL, $5, $6)`,
-          [newId(), debt.id, values.amount, debt.account_id, values.date, values.note]
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [newId(), debt.id, values.amount, debt.account_id, transactionId, values.date, values.note]
         );
 
         if (values.amount >= debt.remaining) {
           await db.execute("UPDATE debts SET status = 'paid' WHERE id = $1", [debt.id]);
         }
 
-        return null;
+        return transactionId;
       }
 
       // Sudah divalidasi wajib terisi oleh schema.ts untuk settlement_mode === 'cash'.

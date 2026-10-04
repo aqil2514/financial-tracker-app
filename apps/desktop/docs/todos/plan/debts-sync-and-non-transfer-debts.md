@@ -14,15 +14,27 @@
   piutang mode `direct` (`debt.account_id === null`): pelunasan dicatat
   sbg transaksi income/expense BIASA (bukan transfer) + `debt_payments`
   insert langsung. Lihat `shared/debts/pay-debt-form/use-pay-debt.ts`.
-- [x] **SELESAI** — Pelunasan TANPA transaksi keuangan sama sekali
-  (barter, pemutihan, offset — SATU jalur sama, disimplifikasi
-  2026-10-03): toggle "Cara Menyelesaikan" (Dengan Uang/Tanpa Uang) di
-  form Bayar, mode `non_cash` insert `debt_payments` dengan
-  `account_id`/`transaction_id` NULL, TANPA transaksi apa pun. Lihat
-  "Pelunasan tanpa TRANSAKSI KEUANGAN sama sekali" di bawah &
-  `shared/debts/pay-debt-form/`. `written_off` TIDAK jadi dibangun
-  terpisah — `'paid'` + `note` sudah cukup utk semua alasan (termasuk
-  diikhlaskan).
+- [x] **SELESAI, LALU DIREVISI** — Pelunasan tanpa akun kas (barter,
+  pemutihan, offset — SATU jalur sama, disimplifikasi 2026-10-03):
+  toggle "Cara Menyelesaikan" (Dengan Uang/Tanpa Uang) di form Bayar,
+  mode `non_cash`. **Implementasi awal** (TANPA transaksi sama sekali,
+  `transaction_id: NULL`) **TERNYATA MENYALAHI**
+  `docs/concept/konsep-utang-piutang.md` ("diselesaikan = saldo akun
+  mengarah ke nol") — direvisi belakangan (lihat
+  `debt-receivable-tracking.md`, sub-poin "Aksi 'Tandai Dihapuskan'")
+  supaya TETAP membuat 1 transaksi `expense`/`income` penutup LANGSUNG
+  pada `debt.account_id`, KECUALI `account_id` NULL (baris sync
+  Retailku — satu-satunya kasus tersisa tanpa transaksi). Lihat
+  `shared/debts/pay-debt-form/use-pay-debt.ts`.
+- [x] **SUPERSEDED** — ~~`written_off` TIDAK jadi dibangun terpisah,
+  `'paid'` + `note` sudah cukup~~ — keputusan ini DIBATALKAN di sesi
+  lain: `written_off` AKHIRNYA dibangun sebagai aksi terpisah
+  ("Tandai Dihapuskan" di `DebtListTable`, lihat
+  `shared/debts/use-write-off-debt.ts` & `debt-receivable-tracking.md`)
+  karena secara UX "sisa piutang masih kelihatan aktif" (status
+  `'ongoing'` dengan `remaining > 0`) beda dari "sudah selesai/lunas"
+  — enum `written_off` yang tadinya "dibiarkan tidak dipakai" sekarang
+  benar-benar dipakai.
 - [ ] Putuskan: `debts` transfer-based ikut sync-langsung juga, atau
   tetap derivatif + jalur non-transfer sync-langsung berdampingan.
 - [ ] Endpoint Worker `/debts` (create/update/delete) — belum ada.

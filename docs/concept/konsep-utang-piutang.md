@@ -34,6 +34,13 @@ piutang mengurangi saldo (ke arah nol), pelunasan utang menambah saldo
 (juga ke arah nol) — baik piutang maupun utang sama-sama *mengarah ke
 nol* saat diselesaikan, tinggal arah awalnya saja yang beda.
 
+Ini berlaku untuk **SEMUA** cara penyelesaian, termasuk yang tidak
+melibatkan uang berpindah lewat akun kas (mis. "Dihapuskan"/
+diikhlaskan, atau diselesaikan lewat barter) — lihat
+[konsep-transaksi.md](konsep-transaksi.md) untuk penjelasan kenapa
+kasus-kasus itu tetap wajib direpresentasikan sebagai transaksi
+penutup, bukan sekadar perubahan status.
+
 ## Bagaimana piutang/utang "lahir" — otomatis dari arah transfer
 
 Alih-alih membuat form terpisah khusus "Catat Piutang Baru" (yang

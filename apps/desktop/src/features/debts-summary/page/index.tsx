@@ -5,7 +5,7 @@ import { createContext, useContext, useState } from "react";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
 import { useContactSummary, type ContactDebtSummary } from "@/shared/debts/use-contact-summary";
-import { useDebtsList, type DebtListRow } from "@/shared/debts/use-debts-list";
+import { useAllDebtsList, type DebtListRow } from "@/shared/debts/use-debts-list";
 
 interface DebtsSummaryPageContextType {
   summary: ContactDebtSummary[] | undefined;
@@ -38,8 +38,8 @@ export function DebtsSummaryPageProvider({ children }: { children: React.ReactNo
   const [filters, setFilters] = useState<FilterConfig[]>([]);
   const [sorts, setSorts] = useState<SortConfig[]>([]);
   const { data: summary, isLoading } = useContactSummary(filters, sorts);
-  const { data: receivables } = useDebtsList("receivable");
-  const { data: payables } = useDebtsList("payable");
+  const { data: receivables } = useAllDebtsList("receivable");
+  const { data: payables } = useAllDebtsList("payable");
 
   return (
     <DebtsSummaryPageContext.Provider

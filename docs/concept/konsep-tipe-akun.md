@@ -144,7 +144,9 @@ maupun tool MCP `correct_account_balance`) bekerja dengan menghitung
 selisih antara saldo target dan saldo saat ini, lalu membuat SATU
 transaksi `income`/`expense` penutup senilai selisih itu — ditulis
 **langsung** ke tabel `transactions`, TIDAK lewat jalur pencatatan
-transaksi normal (`createTransactionRow`/`insertTransaction`).
+transaksi normal (`createTransactionRow`/`insertTransaction`). Ini
+contoh pertama dari pola "transaksi penutup" yang dibahas lebih umum
+di [konsep-transaksi.md](konsep-transaksi.md).
 
 Ini bukan sekadar detail teknis satu fitur, tapi konsekuensi struktural
 dari "akun sebagai tumpuan": begitu sebuah tipe akun punya data
