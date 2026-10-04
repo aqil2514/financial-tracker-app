@@ -9,6 +9,31 @@
 > integrasi UI Settings) TETAP di dokumen `apps/desktop`. Lihat
 > `docs/todos/plan/` di root repo utk index/navigasi lintas-app.
 
+## Status & TODO saat ini (ringkas)
+
+Penjelasan lengkap kenapa tiap poin ada di sini — lihat "Todo list
+eksekusi" (Tahap 0-8) di bawah.
+
+- [x] Riset arsitektur dasar (hosting, autentikasi, akses D1).
+- [x] Keputusan conflict resolution (LWW via `updated_at`, soft delete,
+      `sync_source`).
+- [x] Skema D1 (replika skema lokal PC + kolom sync).
+- [x] Endpoint Worker: `transactions`/`accounts`/`account_groups`/
+      `categories`/`contacts` — create/update/delete lengkap, termasuk
+      soft-delete + LWW per baris.
+- [x] 7 dari 7 validasi/logic bisnis hasil audit (FIFO debt, larangan
+      akun debt, formula saldo, koreksi saldo, guard edit, validasi
+      pelunasan, `dangerousFieldsChanged`) diimplementasikan di Worker.
+- [x] MCP server (`apps/mcp-server`): setup + OAuth shim + 5 tool BACA +
+      16 tool TULIS, diverifikasi end-to-end di production.
+- [x] Verifikasi sisi Worker/MCP — DITUTUP sadar sbg dogfooding manual
+      (bukan test formal), lihat Tahap 7.
+- [ ] **BARU** Port write-off (`written_off`) ke Worker + MCP-server —
+      belum ada endpoint/service/tool sama sekali, lihat Tahap 8.
+- [ ] **BARU** Port edit/hapus 1 `debt_payments` langsung ke Worker +
+      MCP-server — cuma ada `POST` (create), belum ada `PATCH`/`DELETE`,
+      lihat Tahap 8.
+
 ## Latar belakang
 
 Kebutuhan intinya: kelola data keuangan dari HP lewat Claude Web + MCP
@@ -972,6 +997,66 @@ nanti ada temuan terkait dari dogfooding):
 
 (Tahap 2 — inventarisir logic bisnis, dan Tahap 6 — integrasi klien PC,
 ada di dokumen `apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`.)
+
+### Tahap 8 — Gap BARU ditemukan 2026-10-04: write-off & edit/hapus cicilan belum di-port ke Worker/MCP
+
+Ditemukan saat audit konsistensi logic `debts` lintas-app, dipicu oleh
+2 fitur baru yang baru selesai di `apps/desktop`:
+`docs/todos/done/debt-receivable-tracking.md` ("Aksi manual 'Tandai
+Dihapuskan'" DAN "Aksi cepat Edit/Hapus cicilan langsung di
+`PaymentsList`").
+
+**Catatan koreksi dulu**: "Temuan arsitektural PENTING" di Tahap 5
+(baris ~899-911 di atas, "TIDAK ADA endpoint `/debts` sama sekali...
+WAJIB sbg pemanggilan `POST /transactions`") sudah **USANG** — itu
+rencana desain SEBELUM `src/modules/debts/service.ts` dan endpoint
+`POST /debts/:id/payments` (non-cash settlement) dibangun. Implementasi
+aktual SEKARANG punya modul `debts` tersendiri dengan business logic
+cukup lengkap (`applyDebtTransaction`, `applyDebtTransactionEdit`,
+`detachDebtForDeletedTransaction`, `createNonCashPayment` — semua port
+manual dari `apps/desktop/src/shared/debts/`), BUKAN cuma "selalu lewat
+`/transactions`" seperti ditulis dulu. Dibiarkan apa adanya di baris
+lama (bukan dihapus) sbg jejak sejarah keputusan, tapi pembaca JANGAN
+percaya itu sbg kondisi SEKARANG — rujuk ke bagian ini.
+
+**Audit dilakukan** (agent Explore, baca kode aktual, bukan asumsi):
+
+| Fitur desktop (SUDAH matang) | Status di Worker | Status di MCP-server |
+|---|---|---|
+| Revert `debts.status` `'paid'`→`'ongoing'` saat edit/hapus cicilan | **SUDAH ADA**, konsisten — `service.ts` fungsi `applyDebtTransactionEdit` (~baris 386-398) dan `detachDebtForDeletedTransaction` (~baris 438-449) | N/A (passthrough murni ke Worker, tidak re-implementasi logic) |
+| Write-off (`written_off`) dengan transaksi penutup WAJIB di `debt.account_id` | **TIDAK ADA SAMA SEKALI** — tidak ada endpoint/service utk status `written_off` | **Tidak ada tool** (karena Worker-nya sendiri belum ada) |
+| Edit/Hapus 1 baris `debt_payments` langsung (bukan hapus transaksi induk) | **TIDAK ADA endpoint** `PATCH`/`DELETE /debts/:id/payments/:paymentId` — cuma ada `POST /:id/payments` (create) | **Tidak ada tool** (`pay_debt_non_cash` cuma create, tidak ada `update_debt_payment`/`delete_debt_payment`) |
+
+**PENTING — ini BUKAN bug/drift**: tidak ditemukan implementasi
+setengah jadi yang lupa revert status atau lupa bikin transaksi penutup
+di Worker. Gap-nya murni **belum pernah diimplementasikan** di kedua
+layer — fitur yang memang belum ada, bukan fitur yang ada tapi salah.
+Konsekuensi praktis: user TIDAK BISA melakukan write-off atau
+edit/hapus 1 cicilan dari HP/Claude (MCP) — kedua aksi itu cuma bisa
+dari aplikasi desktop sampai gap ini digarap.
+
+**BELUM diputuskan** (scope utk sesi lanjutan):
+- Prioritas: apakah write-off atau edit/hapus cicilan yang lebih
+  mendesak di-port duluan ke Worker+MCP?
+- Kalau write-off di-port: **HARUS niru pola `use-write-off-debt.ts`
+  desktop** (insert transaksi penutup DULU, baru `debt_payments` +
+  `UPDATE status`) — **JANGAN niru pola `createNonCashPayment`** yang
+  sengaja `transaction_id: NULL` (itu kasus settlement BIASA tanpa
+  uang, beda konteks dari write-off yang WAJIB py transaksi penutup
+  sesuai `docs/concept/konsep-transaksi.md`).
+- Kalau edit/hapus `debt_payments` di-port: desain endpoint-nya perlu
+  tentukan role-based logic yang SAMA dgn `applyDebtTransactionEdit`
+  (field "berbahaya" vs aman, blokir kalau ada dependency), bukan
+  `UPDATE`/`DELETE` polos — reuse logic Worker yang sudah ada
+  (`applyDebtTransactionEdit` sendiri sebenarnya SUDAH generic, cuma
+  belum ada endpoint HTTP yang memanggilnya utk kasus "edit SATU
+  debt_payment tanpa lewat transaksi induk").
+- Perlu diputuskan juga: apakah mengikuti pola lama "SELALU lewat
+  `/transactions`" (edit transaksi transfer/income/expose yang jadi
+  jejak `debt_payments`, BUKAN endpoint debt_payments langsung) —
+  konsisten dgn desktop yang edit-cicilannya pun ujung-ujungnya
+  `UPDATE transactions` dulu (lihat `use-edit-payment.ts`) — ATAU bikin
+  endpoint `debt_payments` dedicated yang baru.
 
 ## Terkait
 
