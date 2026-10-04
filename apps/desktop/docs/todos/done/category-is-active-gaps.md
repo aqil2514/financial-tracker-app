@@ -8,19 +8,23 @@
 
 ## Status & TODO saat ini (ringkas)
 
-- [ ] `use-category-breakdown.ts` (laporan breakdown kategori per bulan,
-      `apps/desktop`) tidak filter `is_active` — kategori nonaktif bisa
-      tetap muncul di laporan. Lihat bagian "Temuan" di bawah.
-- [ ] Opsi kategori di mapping Retailku (`use-resources.ts`, `apps/desktop`)
-      tidak filter `is_active` — kategori nonaktif tetap jadi pilihan
-      valid saat mapping field Retailku. Butuh sesi khusus Retailku
-      (lihat catatan di bawah), bukan fix satu baris berdiri sendiri.
-- [ ] Filter status di list kategori (`category-list.tsx`) masih
-      client-side in-memory, BEDA pola dari Akun yang sudah SQL `WHERE`
-      + persist di URL (nuqs). Belum diputuskan apakah ini perlu
-      disamakan atau dibiarkan (list kategori biasanya jauh lebih
-      sedikit baris daripada akun, jadi in-memory filter mungkin memang
-      cukup) — keputusan ditunda ke sesi ini.
+- [x] `use-category-breakdown.ts` (laporan breakdown kategori per bulan,
+      `apps/desktop`) — difix 2026-10-05, tambah `AND c.is_active = 1`.
+      Lihat bagian "Temuan" di bawah untuk konteks awal.
+- [x] Opsi kategori di mapping Retailku (`use-resources.ts`) tidak
+      filter `is_active` — dipindah ke dokumen tersendiri 2026-10-05,
+      lihat
+      [retailku-mapping-category-inactive-gap.md](../plan/retailku-mapping-category-inactive-gap.md)
+      (butuh sesi khusus Retailku, bukan bagian dari audit umum ini).
+- [x] Filter status di list kategori (`category-list.tsx`) — diputuskan
+      2026-10-05: TETAP in-memory (BUKAN disamakan ke SQL `WHERE` +
+      pagination seperti Akun), karena data kategori hierarkis
+      (parent-child, accordion) & kecil, grouping-nya butuh seluruh
+      pohon di client sehingga bertentangan dengan pagination SQL per
+      baris. Satu gap nyata yang tersisa dari pola in-memory ini (filter
+      hilang saat navigasi) sudah diperbaiki dengan persist
+      search/type/status ke URL lewat nuqs (`?search=&type=&status=`),
+      tanpa mengubah ke SQL `WHERE`.
 
 ## Latar belakang
 
@@ -48,21 +52,14 @@ sebelum eksekusi):
 - `apps/desktop/src/features/reports/use-category-breakdown.ts` — JOIN
   ke `categories` tanpa `WHERE is_active = 1`, padahal
   `use-account-balances.ts` (counterpart akun) memfilternya.
-- `apps/desktop/src/shared/retailku/mcp-hooks` atau modul resources
-  Retailku terkait (`use-resources.ts`) — `categoryOptions` dari
-  `categories` apa adanya, tanpa filter `is_active`; bandingkan dengan
-  opsi akun Retailku yang sudah filter `is_active` eksplisit.
 - `apps/desktop/src/hooks/resources/use-categories.ts` — query dasarnya
   `SELECT * FROM categories ORDER BY name`, tanpa `WHERE` sama sekali
   (konsisten dgn keputusan "filter di client", tapi jadi akar kenapa
   laporan & mapping gampang lupa filter ulang di tempat pakainya).
 
-## Kenapa ditunda ke sesi khusus Retailku
+## Catatan
 
-Perbaikan opsi mapping Retailku bukan sekadar nambah `.filter(c =>
-c.is_active)` satu baris — perlu dipikirkan juga: bagaimana kalau ada
-mapping LAMA yang sudah menunjuk ke kategori yang KEMUDIAN dinonaktifkan
-(pola exception "tetap muncul kalau sedang dipakai", sama seperti
-dropdown kategori form transaksi)? Itu butuh pengecekan behavior
-mapping existing dulu sebelum tahu bentuk fix yang benar — user sudah
-bilang bagian Retailku butuh sesi khusus terpisah.
+Gap mapping Retailku (opsi kategori belum filter `is_active`) sudah
+dipindah ke dokumen tersendiri — lihat
+[retailku-mapping-category-inactive-gap.md](../plan/retailku-mapping-category-inactive-gap.md)
+untuk detail & alasan kenapa butuh sesi khusus.

@@ -11,6 +11,10 @@ di `docs/rules/`. Baca folder itu sebelum menulis atau mengubah kode di sini.
 - [docs/rules/dialog-pattern.md](docs/rules/dialog-pattern.md) — pemisahan
   trigger vs dialog, dan `useDialogState` untuk state "dialog mana yang
   aktif".
+- [docs/rules/sqlite-copy-and-rename-migration.md](docs/rules/sqlite-copy-and-rename-migration.md) —
+  cara menulis migrasi SQLite yang mengubah `CHECK`/foreign key (SQLite
+  tidak izinkan `ALTER TABLE` untuk itu), termasuk urutan wajib saat
+  tabel yang diubah direferensikan FK oleh tabel lain.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

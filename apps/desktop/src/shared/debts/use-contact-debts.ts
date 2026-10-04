@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getDb, type Debt } from "@/lib/db";
+import { remainingDebtSql } from "./remaining-debt-sql";
 
 export const contactDebtsQueryKey = ["debts", "contact-debts"];
 
@@ -22,11 +23,7 @@ export function useContactDebts(contactId: string | undefined) {
         `SELECT
            debts.*,
            accounts.name AS account_name,
-           debts.amount - COALESCE(
-             (SELECT SUM(amount) FROM debt_payments
-              WHERE debt_payments.debt_id = debts.id AND debt_payments.deleted_at IS NULL),
-             0
-           ) AS remaining
+           ${remainingDebtSql()} AS remaining
          FROM debts
          LEFT JOIN accounts ON accounts.id = debts.account_id
          WHERE debts.contact_id = $1

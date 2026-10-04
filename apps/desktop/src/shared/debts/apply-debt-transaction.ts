@@ -2,6 +2,7 @@ import { getDb, type Account } from "@/lib/db";
 import { newId } from "@/lib/id";
 import { classifyAccountPair } from "./classify-account-pair";
 import { getTransactionDebtStatus, type TransactionDebtStatus } from "./use-transaction-debt-status";
+import { remainingDebtSql } from "./remaining-debt-sql";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
@@ -290,10 +291,7 @@ async function settleDebtsFifo({
   const debts = await db.select<OngoingDebtRow[]>(
     `SELECT
        debts.id,
-       debts.amount - COALESCE(
-         (SELECT SUM(amount) FROM debt_payments WHERE debt_payments.debt_id = debts.id),
-         0
-       ) AS remaining
+       ${remainingDebtSql()} AS remaining
      FROM debts
      WHERE debts.id IN (${placeholders})
      ORDER BY debts.date ASC, debts.id ASC`,

@@ -1,4 +1,38 @@
-# Audit Logic Bisnis yang Perlu Direplikasi ke Server (MCP CRUD)
+# Audit Logic Bisnis yang Perlu Direplikasi ke Server (MCP CRUD) — SELESAI
+
+## Status & TODO saat ini (ringkas)
+
+Audit + SEMUA item porting-nya SELESAI & diverifikasi (lihat
+"Checklist porting" di bawah utk detail per item, termasuk 2 bug nyata
+yang ditemukan sambil jalan: drift `settleDebtsFifo` & auto-null
+`category_id` transfer).
+
+- [x] Audit logic bisnis `apps/desktop` yang harus direplikasi ke
+      Worker (7 risiko tinggi, beberapa risiko sedang/rendah).
+- [x] Port `applyDebtTransaction`/`settleDebtsFifo`,
+      `applyDebtTransactionEdit`, validasi nominal pelunasan, larangan
+      income/expense di akun debt, formula saldo akun, koreksi saldo
+      manual, `dangerousFieldsChanged` — semua ke Worker, diverifikasi
+      end-to-end production.
+- [x] Putuskan & implementasi kebijakan reassign/unassign saat delete
+      account/category/account-group.
+- [x] Port dedup kontak (`resolveContactId`) ke Worker.
+- [x] Filter `category.type === transaction.type` dipaksakan di
+      Worker (2026-10-05) — sekaligus temukan & fix bug auto-null
+      `category_id` transfer yang hilang di jalur CREATE.
+- [x] Definisi tunggal formula `remaining` (shared util/VIEW) —
+      SELESAI 2026-10-05 (sisi desktop; Worker masih punya definisi
+      sendiri, lihat catatan di bawah). **Bug DRIFT NYATA ditemukan &
+      diperbaiki**: `settleDebtsFifo` lupa filter
+      `debt_payments.deleted_at IS NULL`.
+- [x] Guard delete transaksi terhadap debt/payment terkait — SUDAH
+      SELESAI sejak 2026-10-03 (ketinggalan dicoret di sini, lihat
+      detail di `mcp-server-cloud-mirror.md` poin 1 & catatan di
+      bawah) — `detachDebtForDeletedTransaction` ada di desktop DAN
+      Worker.
+- [x] Format tanggal tool MCP divalidasi — SELESAI 2026-10-05, TAPI
+      ternyata kekhawatiran asli audit ("harus SAMA PERSIS dgn `now()`
+      desktop") salah premis, lihat catatan koreksi di bawah.
 
 > Dipecah dari `mcp-server-cloud-mirror.md` Tahap 2 (2026-09-30) supaya
 > dokumen utama tidak terlalu panjang. Dokumen ini KHUSUS berisi hasil
@@ -140,10 +174,20 @@ kehilangan uang.
   terkait (`use-delete-transaction.ts:7-17`) — beda dari edit (#2), FK
   cuma SET NULL. Piutang yang sudah dicicil bisa kehilangan jejak
   transaksi pokoknya tanpa peringatan apa pun di jalur delete manapun
-  (baik dari PC maupun rencana tool MCP). Juga: delete transaksi TIDAK
-  menghapus file attachment fisik di disk (row `transaction_attachments`
-  CASCADE, file-nya orphan) — relevan dicatat karena file lokal di luar
-  jangkauan D1 sama sekali.
+  (baik dari PC maupun rencana tool MCP). **DITUTUP 2026-10-03** (lihat
+  `mcp-server-cloud-mirror.md` poin 1) — `detachDebtForDeletedTransaction`
+  sekarang ada di desktop (`apply-debt-transaction.ts`, dipanggil dari
+  `use-delete-transaction.ts` + toast informatif berbasis status lokal)
+  DAN Worker (`debts/service.ts`, dipanggil dari `deleteTransaction`):
+  role `payment` → hapus `debt_payments` + kembalikan status `ongoing`
+  kalau masih ada sisa; role `principal` → `transaction_id` SET NULL,
+  piutang/utangnya TETAP ADA (tidak hilang, cuma kehilangan jejak
+  transaksi asal) — diverifikasi end-to-end di `tauri dev` sungguhan.
+  Juga: delete transaksi TIDAK menghapus file attachment fisik di disk
+  (row `transaction_attachments` CASCADE, file-nya orphan) — relevan
+  dicatat karena file lokal di luar jangkauan D1 sama sekali. **Poin
+  attachment orphan ini BELUM ditutup** (beda dari guard debt/payment
+  di atas yang sudah).
 
 ## Boleh diabaikan / ditangani longgar (risiko RENDAH)
 
@@ -164,6 +208,20 @@ kehilangan uang.
   string yang sama persis, karena `formatDate()` di UI desktop
   mendeteksi ada/tidaknya komponen waktu lewat cek literal `"T"` pada
   string — format beda bisa merusak parsing tanggal secara senyap.
+  **KOREKSI 2026-10-05 — premis "harus SAMA PERSIS" SALAH**: `now()`
+  yang disebut di sini dipakai utk timestamp AKSI (kapan transaksi
+  DIBUAT), BUKAN field `date` (kapan transaksi TERJADI, yang diisi
+  user via `<FormFieldDate>`, `type="datetime-local"` — selalu
+  mengandung `"T"`). Juga `nowText()` Worker (`shared/lww.ts`) itu utk
+  kolom `updated_at`/metadata sync, dibandingkan sbg string LWW, TIDAK
+  PERNAH lewat `formatDate()` — beda keperluan total dari field `date`.
+  Yang sebenarnya relevan: field `date` DARI TOOL MCP cuma
+  `z.string().describe("Format YYYY-MM-DD")` DI apps/mcp-server, bukan
+  divalidasi beneran (describe cuma hint prompt), dan Worker cuma cek
+  `typeof === "string"` — string APA PUN dari Claude lolos, bukan cuma
+  beda format dgn desktop tapi bisa jadi string yang sama sekali bukan
+  tanggal valid (`new Date(value)` jadi Invalid Date saat di-pull ke
+  desktop). INI bug nyatanya, bukan soal "harus sama persis dgn PC".
 - Attachment lifecycle (upload async setelah transaksi sukses, gagal
   non-fatal) — di luar D1 sama sekali (file lokal PC), tidak relevan
   utk tool MCP kecuali nanti ada fitur upload attachment dari HP.
@@ -230,11 +288,83 @@ kehilangan uang.
       (fungsi `dangerousFieldsChanged`), dipanggil dari
       `updateTransaction` sebelum UPDATE baris `transactions` dijalankan.
 - [x] Putuskan & implementasikan kebijakan reassign/unassign delete account/category/group — SELESAI 2026-10-01.
-- [ ] Putuskan & implementasikan filter `category.type === transaction.type` di Worker.
-- [ ] Port auto-null `category_id` pada transfer ke Worker.
-- [ ] Putuskan & implementasikan definisi tunggal formula `remaining`/`balance` (shared util/VIEW) sebelum port lanjut.
-- [ ] Putuskan & implementasikan (atau sadar-terima ketiadaan) guard delete transaksi terhadap debt/payment terkait.
-- [ ] Pastikan format tanggal MCP tool sama persis dgn `now()` lokal desktop.
+- [x] Putuskan & implementasikan filter `category.type === transaction.type` di Worker —
+      SELESAI 2026-10-05, `apps/worker/src/modules/transactions/service.ts`
+      (`getCategoryType`/`validateCategoryExists`, digabung dgn precheck
+      exists yg sudah ada karena sama-sama butuh baca row `categories` yg
+      sama). Berlaku di jalur CREATE dan UPDATE, income/expense ditolak
+      422 kalau `category.type` beda dari `transaction.type`; transfer
+      dikecualikan (tidak pernah divalidasi type-nya, cuma exists).
+      **Bug ditemukan sambil lewat**: `createTransactionRow` masih INSERT
+      `payload.categoryId` mentah tanpa null-kan untuk transfer (beda
+      dari `updateTransactionRow` yg sudah benar) — item checklist
+      "Port auto-null `category_id` pada transfer" DITUTUP SEKALIGUS,
+      diperbaiki jadi `payload.type === "transfer" ? null : payload.categoryId`
+      persis pola UPDATE. `tsc --noEmit` lolos bersih, TIDAK ADA test
+      suite Worker (belum ada framework test terpasang) jadi belum
+      diverifikasi end-to-end production — PR lanjutan kalau mau
+      memverifikasi lewat `wrangler dev`/curl manual.
+- [x] Putuskan & implementasikan definisi tunggal formula `remaining` —
+      SELESAI 2026-10-05, `apps/desktop/src/shared/debts/remaining-debt-sql.ts`
+      (`remainingDebtSql()`/`sumDebtPaymentsSql()`, generator fragment SQL
+      — BUKAN computed di JS, supaya tetap bisa di-SORT/FILTER di level
+      SQL seperti sebelumnya; SQLite di sini tidak dipakai lewat ORM/VIEW,
+      jadi "sumber tunggal" diwujudkan sbg satu fungsi TS yang
+      di-generate ulang di tiap query). Dipakai di SEMUA 5 titik yang
+      disebut audit: `use-ongoing-debts.ts`, `use-debts-list.ts`,
+      `use-contact-debts.ts` (TIDAK disebut eksplisit di audit tapi
+      ternyata py rumus sama), `use-contact-summary.ts` (2 titik,
+      `receivable_remaining`/`payable_remaining`), dan
+      `apply-debt-transaction.ts` (`settleDebtsFifo`).
+      **DRIFT NYATA ditemukan tepat seperti yang diprediksi audit**:
+      subquery `remaining` di `settleDebtsFifo` (dipakai alokasi FIFO
+      saat pelunasan) LUPA filter `debt_payments.deleted_at IS NULL` —
+      beda dari 4 tempat lain yang sudah benar. Artinya kalau ada
+      `debt_payments` yang soft-deleted, `remaining` yang dipakai utk
+      alokasi FIFO bisa lebih kecil dari seharusnya (payment terhapus
+      masih ikut dikurangkan), piutang/utang bisa teralokasi salah.
+      Diperbaiki otomatis begitu diganti ke `remainingDebtSql()`.
+      Full test suite desktop (172 test, 23 file, termasuk
+      `apply-debt-transaction.test.ts`) + `tsc --noEmit` 0 regresi.
+      **BELUM dikerjakan**: Worker (`apps/worker/src/modules/debts/service.ts`)
+      punya definisi `remaining`/`getAccountBalance` SENDIRI (port
+      manual, BUKAN shared code dgn desktop — lihat keputusan "logic
+      ditulis ulang di server" di atas), jadi util ini BELUM
+      menghilangkan risiko drift desktop↔Worker, cuma drift ANTAR-FILE
+      di desktop sendiri. Formula `balance` (bukan `remaining`) juga
+      belum disentuh sesi ini — scope sesi ini cuma `remaining`
+      piutang/utang.
+- [x] Putuskan & implementasikan guard delete transaksi terhadap
+      debt/payment terkait — SELESAI 2026-10-03 (lihat catatan di
+      bagian "Perlu keputusan desain eksplisit" di atas) —
+      `detachDebtForDeletedTransaction` di desktop & Worker.
+- [x] Validasi format tanggal MCP tool — SELESAI 2026-10-05,
+      `apps/mcp-server/src/lib/date-field.ts` (`dateField`, Zod
+      `z.string().regex(/^\d{4}-\d{2}-\d{2}$/)`), dipasang di 4 titik:
+      `transactionFields.date` (dipakai `create_transaction` DAN
+      `update_transaction` lewat shared field), `create_debt_direct`,
+      `pay_debt_non_cash`. **BUKAN "samakan dgn `now()` desktop"**
+      seperti dugaan awal audit (premis itu salah, lihat koreksi di
+      atas) — field `date` dari PC (datetime-local, selalu ada `"T"`)
+      dan dari MCP (date-only, `YYYY-MM-DD`) TETAP beda format scr
+      desain, keduanya sama-sama valid utk `formatDate()` (yang
+      fallback `${value}T00:00` kalau tidak ada `"T"`). Yang diperbaiki
+      murni: Claude sebelumnya bisa kirim string APA PUN (termasuk yang
+      sama sekali bukan tanggal valid) tanpa ditolak — sekarang ditolak
+      di titik masuk (MCP, Zod) sebelum sempat terkirim ke Worker.
+      Worker SENGAJA TIDAK diketatkan (masih `typeof === "string"`
+      polos) krn dia menerima dari 2 sumber dgn kontrak format beda
+      (PC vs MCP) — mengetatkan ke salah satu format akan menolak data
+      sah dari sumber lain. `tsc --noEmit` mcp-server lolos bersih,
+      BELUM diverifikasi end-to-end (belum ada test suite mcp-server).
+      **Temuan sampingan (BELUM ditutup, di luar scope item ini)**:
+      `apps/mcp-server/src/lib/sync-snapshot.ts` (`summarizeDebts`,
+      `listDebtDetails`) ternyata py rumus `remaining` SENDIRI (`amount -
+      paid`), tempat KE-6 yang belum ikut dipakaikan `remainingDebtSql()`
+      — util itu cuma dipakai sisi desktop (SQL fragment utk SQLite
+      lewat Tauri), sedangkan sync-snapshot.ts murni JS di atas data
+      JSON hasil `/sync` Worker, jadi tidak bisa reuse langsung. Dicatat
+      sbg potensi drift lanjutan, belum dikerjakan sesi ini.
 
 ## Terkait
 

@@ -2,10 +2,25 @@
 
 ## Status & TODO saat ini (ringkas)
 
-- [ ] Audit semua query agregasi saldo (`use-account-balances.ts`
-      dikonfirmasi, lainnya BELUM) — tambahkan filter `is_active = 1`
-      atau putuskan desain alternatif (lihat "Pertanyaan yang belum
-      dijawab" di bawah).
+Audit ulang 2026-10-05 — lihat bagian "Hasil audit" di bawah untuk detail
+per query.
+
+- [x] `use-account-balances.ts` (laporan "Saldo per Akun") — SUDAH filter
+      `WHERE a.is_active = 1`. Catatan "Latar belakang" di bawah soal file
+      ini SUDAH TIDAK AKURAT (stale), dipertahankan untuk riwayat.
+- [x] `use-account-group-balances.ts` (pie chart "Ringkasan" di halaman
+      akun) — gap BARU ditemukan (tidak filter `is_active` sama sekali,
+      tidak terhubung ke toggle "Tampilkan nonaktif"), sudah difix
+      tambah `WHERE a.is_active = 1`.
+- [x] `use-accounts.ts` — dikonfirmasi DISENGAJA tidak filter
+      `is_active` di level SQL; caller yang butuh (list akun "Detail")
+      filter sendiri lewat `FilterConfig` + toggle "Tampilkan nonaktif".
+      Caller lain (dashboard recent-transactions, dsb) pakai hook ini
+      cuma untuk lookup nama akun by id, bukan agregasi saldo — di luar
+      scope todo ini.
+- [ ] Belum ada keputusan desain seragam (filter SQL vs tampilkan+label
+      vs toggle) untuk query saldo BARU yang mungkin ditambahkan ke
+      depan — lihat "Pertanyaan yang belum dijawab".
 
 ## Latar belakang
 

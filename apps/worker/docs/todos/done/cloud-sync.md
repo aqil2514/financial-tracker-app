@@ -142,7 +142,7 @@ RUJUKAN LANGSUNG di sini karena kasusnya mirip (dua sumber tulis).
   tool tulis yg logic-nya SEPADAN dgn validasi yg sudah ada di app
   desktop. Ini berarti sebagian LOGIC BISNIS dari `src/features/*` app
   desktop perlu di-port/direplikasi ke Worker — lihat
-  [`../../../../desktop/docs/todos/plan/mcp-server-business-logic-audit.md`](../../../../desktop/docs/todos/plan/mcp-server-business-logic-audit.md)
+  [`../../../../desktop/docs/todos/done/mcp-server-business-logic-audit.md`](../../../../desktop/docs/todos/done/mcp-server-business-logic-audit.md)
   utk daftar lengkap (dokumen itu TETAP di `apps/desktop` krn isinya
   audit kode desktop — file:baris spesifik di sana — meski dipakai
   sbg checklist porting ke Worker ini).
@@ -512,7 +512,7 @@ terpusat di satu tempat.
         akal utk tool MCP yg dipanggil ulang tiap request dari Claude.
 - [x] ~~Inventarisir logic bisnis yang perlu di-port ke server~~ —
       SELESAI, lihat
-      [`mcp-server-business-logic-audit.md`](../../../../desktop/docs/todos/plan/mcp-server-business-logic-audit.md)
+      [`mcp-server-business-logic-audit.md`](../../../../desktop/docs/todos/done/mcp-server-business-logic-audit.md)
       utk daftar lengkap (7 logic risiko TINGGI wajib, +5 keputusan
       desain risiko SEDANG).
 - [x] Logic bisnis DITULIS ULANG di Worker (bukan diekstrak jadi shared
@@ -1273,13 +1273,14 @@ jadi bug saat riset lanjutan (bukan cuma gap) — lihat poin "Bug
 - [`../../../../desktop/docs/todos/plan/mcp-server-cloud-mirror.md`](../../../../desktop/docs/todos/plan/mcp-server-cloud-mirror.md)
   — dokumen sisi PC: latar belakang fitur, titik integrasi UI Settings,
   migrasi lokal, Tahap 6 (integrasi klien PC).
-- [`../../../../desktop/docs/todos/plan/mcp-server-business-logic-audit.md`](../../../../desktop/docs/todos/plan/mcp-server-business-logic-audit.md)
+- [`../../../../desktop/docs/todos/done/mcp-server-business-logic-audit.md`](../../../../desktop/docs/todos/done/mcp-server-business-logic-audit.md)
   — checklist LENGKAP logic bisnis yang wajib di-port ke Worker ini
   sebelum endpoint tulis dianggap aman dipakai sungguhan.
 - [`../../../../../docs/todos/done/cloud-sync-mcp.md`](../../../../../docs/todos/done/cloud-sync-mcp.md) — index
   navigasi lintas-app di root repo.
-- `apps/desktop/docs/todos/plan/mcp-server-for-claude.md` — riset
-  paling awal, opsi hosting/autentikasi/tooling dasar (masih berlaku).
+- `apps/desktop/docs/todos/done/mcp-server-for-claude.md` — riset
+  paling awal, opsi hosting/autentikasi/tooling dasar (sudah usang,
+  dipindah ke `done/` — lihat ringkasan status di dokumen itu).
 - `apps/desktop/docs/todos/plan/multi-device-sync-engine.md` —
   DISIMPAN utk nanti, kasus BERBEDA (mobile app nativ sungguhan) — TAPI
   keputusan LWW/soft-delete di sana jadi RUJUKAN LANGSUNG di sini.

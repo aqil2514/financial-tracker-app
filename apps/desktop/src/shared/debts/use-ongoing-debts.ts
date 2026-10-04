@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getDb, type Debt } from "@/lib/db";
+import { remainingDebtSql } from "./remaining-debt-sql";
 
 export const ongoingDebtsQueryKey = ["debts", "ongoing"];
 
@@ -39,13 +40,7 @@ export function useOngoingDebts(
       return db.select<OngoingDebt[]>(
         `SELECT
            debts.*,
-           debts.amount - COALESCE(
-             (SELECT SUM(amount) FROM debt_payments
-              WHERE debt_payments.debt_id = debts.id
-                AND debt_payments.deleted_at IS NULL
-                AND ($3 IS NULL OR debt_payments.transaction_id IS NOT $3)),
-             0
-           ) AS remaining
+           ${remainingDebtSql({ excludeTransactionIdParam: "$3" })} AS remaining
          FROM debts
          WHERE debts.contact_id = $1
            AND debts.type = 'receivable'

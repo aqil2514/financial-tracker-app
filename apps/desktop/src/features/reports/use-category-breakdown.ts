@@ -19,6 +19,7 @@ export function useCategoryBreakdown(months: number, type: "income" | "expense")
          JOIN categories c ON t.category_id = c.id
          WHERE t.type = $1
            AND t.date >= strftime('%Y-%m', 'now', '-' || $2 || ' months') || '-01'
+           AND c.is_active = 1
          GROUP BY c.name
          ORDER BY total DESC`,
         [type, months]

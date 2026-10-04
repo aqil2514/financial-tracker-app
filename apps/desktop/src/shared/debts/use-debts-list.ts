@@ -6,6 +6,7 @@ import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import { buildOrderClause } from "@/components/query/sort/builders/sql";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
 import { toPagination, type Pagination } from "@/lib/pagination";
+import { remainingDebtSql } from "./remaining-debt-sql";
 
 export const debtsListQueryKey = ["debts", "list"];
 
@@ -49,11 +50,7 @@ const SELECT_WITH_REMAINING = `SELECT
      debts.*,
      contacts.name AS contact_name,
      accounts.name AS account_name,
-     debts.amount - COALESCE(
-       (SELECT SUM(amount) FROM debt_payments
-        WHERE debt_payments.debt_id = debts.id AND debt_payments.deleted_at IS NULL),
-       0
-     ) AS remaining
+     ${remainingDebtSql()} AS remaining
    FROM debts
    LEFT JOIN contacts ON contacts.id = debts.contact_id
    LEFT JOIN accounts ON accounts.id = debts.account_id`;

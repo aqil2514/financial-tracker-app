@@ -21,7 +21,7 @@ Claude — live, sisi BACA selesai).
       [`apps/worker/docs/todos/done/cloud-sync.md`](../../../apps/worker/docs/todos/done/cloud-sync.md)
 - [x] **Tahap 2** — Audit logic bisnis yang wajib direplikasi ke Worker
       — **SELESAI** (audit + porting, 7 dari 7 logic). Detail:
-      [`apps/desktop/docs/todos/plan/mcp-server-business-logic-audit.md`](../../../apps/desktop/docs/todos/plan/mcp-server-business-logic-audit.md)
+      [`apps/desktop/docs/todos/done/mcp-server-business-logic-audit.md`](../../../apps/desktop/docs/todos/done/mcp-server-business-logic-audit.md)
 - [x] **Tahap 3** — Skema kolom sync (`updated_at`/`deleted_at`/`sync_source`)
       — **SELESAI** di kedua sisi (PC + D1), termasuk checkpoint sync PC.
       Detail sisi PC:
@@ -74,7 +74,7 @@ Claude — live, sisi BACA selesai).
    dibiarkan terbuka (divergence historis diterima, bukan bug).
 
 **Dokumen historis/rujukan** (tidak perlu dibaca kecuali menelusuri
-alasan suatu keputusan): `apps/desktop/docs/todos/plan/mcp-server-for-claude.md`
+alasan suatu keputusan): `apps/desktop/docs/todos/done/mcp-server-for-claude.md`
 (riset paling awal), `apps/desktop/docs/todos/plan/multi-device-sync-engine.md`
 (rencana TERPISAH untuk `apps/mobile` native nanti, disimpan untuk
 masa depan — bukan bagian dari fitur MCP ini).

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Controller,
   type FieldPath,
@@ -22,6 +22,8 @@ type FormFieldComboboxOption = {
   label: string;
 };
 
+const CREATE_OPTION_VALUE = "__create-new__";
+
 type FormFieldComboboxProps<TFieldValues extends FieldValues> = {
   form: UseFormReturn<TFieldValues>;
   name: FieldPath<TFieldValues>;
@@ -36,6 +38,14 @@ type FormFieldComboboxProps<TFieldValues extends FieldValues> = {
    * (`ComboboxInput` adalah text input native, tidak mendukung custom
    * render). Default: `item.label` seperti biasa. */
   renderOption?: (item: FormFieldComboboxOption) => ReactNode;
+  /** Kalau diisi, tampilkan opsi "Buat baru: ..." di baris paling bawah
+   * saat ketikan tidak cocok persis dengan opsi manapun — dipanggil
+   * dengan teks yang sedang diketik user. Dipakai utk entitas yang
+   * butuh form lengkap (akun/kategori punya atribut wajib seperti tipe)
+   * sehingga TIDAK bisa di-create on-the-fly cuma dari nama seperti
+   * kontak — caller yang membuka dialog create-nya sendiri (lihat
+   * `AccountComboboxField`/`CategoryComboboxField`). */
+  onCreateNew?: (query: string) => void;
 };
 
 export function FormFieldCombobox<TFieldValues extends FieldValues>({
@@ -47,8 +57,19 @@ export function FormFieldCombobox<TFieldValues extends FieldValues>({
   allowClear = false,
   disabled,
   renderOption,
+  onCreateNew,
 }: FormFieldComboboxProps<TFieldValues>) {
   const anchor = useComboboxAnchor();
+  const [query, setQuery] = useState("");
+
+  const trimmedQuery = query.trim();
+  const hasExactMatch = options.some(
+    (option) => option.label.toLowerCase() === trimmedQuery.toLowerCase()
+  );
+  const showCreateOption = Boolean(onCreateNew) && trimmedQuery.length > 0 && !hasExactMatch;
+  const displayOptions: FormFieldComboboxOption[] = showCreateOption
+    ? [...options, { value: CREATE_OPTION_VALUE, label: trimmedQuery }]
+    : options;
 
   return (
     <Controller
@@ -64,11 +85,20 @@ export function FormFieldCombobox<TFieldValues extends FieldValues>({
             <Label htmlFor={name}>{label}</Label>
             <div ref={anchor}>
               <Combobox
-                items={options}
+                items={displayOptions}
                 value={selected}
-                onValueChange={(item: FormFieldComboboxOption | null) =>
-                  field.onChange(item ? item.value : null)
-                }
+                onValueChange={(item: FormFieldComboboxOption | null) => {
+                  if (!item) {
+                    field.onChange(null);
+                    return;
+                  }
+                  if (item.value === CREATE_OPTION_VALUE) {
+                    onCreateNew?.(item.label);
+                    return;
+                  }
+                  field.onChange(item.value);
+                }}
+                onInputValueChange={onCreateNew ? (value: string) => setQuery(value) : undefined}
               >
                 <ComboboxInput
                   id={name}
@@ -81,7 +111,11 @@ export function FormFieldCombobox<TFieldValues extends FieldValues>({
                   <ComboboxList>
                     {(item: FormFieldComboboxOption) => (
                       <ComboboxItem key={item.value} value={item}>
-                        {renderOption ? renderOption(item) : item.label}
+                        {item.value === CREATE_OPTION_VALUE
+                          ? `Buat baru: "${item.label}"`
+                          : renderOption
+                            ? renderOption(item)
+                            : item.label}
                       </ComboboxItem>
                     )}
                   </ComboboxList>

@@ -26,6 +26,7 @@ export function useAccountGroupBalances() {
            ) as balance
          FROM accounts a
          LEFT JOIN account_groups g ON g.id = a.group_id
+         WHERE a.is_active = 1
          GROUP BY COALESCE(g.id, -1)
          ORDER BY balance DESC`
       );

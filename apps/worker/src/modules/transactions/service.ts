@@ -45,23 +45,41 @@ export type UpdateTransactionResult =
 // mentah yang lolos jadi 500 tak terduga, bukan 422 yang jelas. Lihat
 // investigasi 2026-10-04 (3 baris di cloud_sync_queue stuck retry
 // dengan last_error='HTTP 500', reproduced di wrangler dev local).
-async function categoryExists(env: Env, categoryId: string): Promise<boolean> {
-  const row = await env.DB.prepare("SELECT 1 FROM categories WHERE id = ?1 AND deleted_at IS NULL")
+//
+// Sekaligus validasi logic #category-type dari
+// mcp-server-business-logic-audit.md: desktop cuma memfilter kategori
+// via UI (use-account-category-options.tsx, category.type === type),
+// TIDAK ADA constraint DB -- tool MCP/push yg lewat Worker langsung
+// bisa kirim category_id expense utk transaksi income tanpa ketahuan.
+// Digabung dalam satu query (bukan precheck terpisah) krn sama-sama
+// butuh baca row categories yang sama.
+async function getCategoryType(env: Env, categoryId: string): Promise<"income" | "expense" | null> {
+  const row = await env.DB.prepare("SELECT type FROM categories WHERE id = ?1 AND deleted_at IS NULL")
     .bind(categoryId)
-    .first();
-  return row !== null;
+    .first<{ type: "income" | "expense" }>();
+  return row?.type ?? null;
 }
 
 async function validateCategoryExists(
   env: Env,
-  categoryId: string | null | undefined
+  categoryId: string | null | undefined,
+  transactionType: "income" | "expense" | "transfer"
 ): Promise<{ status: "ok" } | { status: "rejected"; reason: string }> {
   if (!categoryId) return { status: "ok" };
-  if (await categoryExists(env, categoryId)) return { status: "ok" };
-  return {
-    status: "rejected",
-    reason: "Kategori belum ditemukan di cloud (kemungkinan belum ter-sync) — coba lagi setelah kategori tersinkron.",
-  };
+  const categoryType = await getCategoryType(env, categoryId);
+  if (categoryType === null) {
+    return {
+      status: "rejected",
+      reason: "Kategori belum ditemukan di cloud (kemungkinan belum ter-sync) — coba lagi setelah kategori tersinkron.",
+    };
+  }
+  if (transactionType !== "transfer" && categoryType !== transactionType) {
+    return {
+      status: "rejected",
+      reason: `Kategori ini bertipe '${categoryType}', tidak bisa dipakai untuk transaksi '${transactionType}'.`,
+    };
+  }
+  return { status: "ok" };
 }
 
 // Sama alasannya dgn validateCategoryExists -- tapi khusus contactId
@@ -134,7 +152,7 @@ async function createTransactionRow(
   });
   if (accountPairPrecheck.status === "rejected") return accountPairPrecheck;
 
-  const categoryPrecheck = await validateCategoryExists(env, payload.categoryId);
+  const categoryPrecheck = await validateCategoryExists(env, payload.categoryId, payload.type);
   if (categoryPrecheck.status === "rejected") return categoryPrecheck;
 
   // Logic #3 dicek SEBELUM insert baris transaksi -- kalau reject
@@ -170,7 +188,7 @@ async function createTransactionRow(
       payload.id,
       payload.type,
       payload.amount,
-      payload.categoryId ?? null,
+      payload.type === "transfer" ? null : payload.categoryId ?? null,
       payload.accountId ?? null,
       payload.transferAccountId ?? null,
       payload.note,
@@ -307,10 +325,8 @@ async function updateTransactionRow(
   });
   if (accountPairPrecheck.status === "rejected") return accountPairPrecheck;
 
-  if (payload.type !== "transfer") {
-    const categoryPrecheck = await validateCategoryExists(env, payload.categoryId);
-    if (categoryPrecheck.status === "rejected") return categoryPrecheck;
-  }
+  const categoryPrecheck = await validateCategoryExists(env, payload.categoryId, payload.type);
+  if (categoryPrecheck.status === "rejected") return categoryPrecheck;
 
   const resolvedContactId = await resolveFinalContactId(env, payload, syncSource);
   const contactPrecheck = await validateResolvedContactExists(env, resolvedContactId);

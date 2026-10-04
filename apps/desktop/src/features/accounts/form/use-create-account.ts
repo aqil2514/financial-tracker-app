@@ -8,11 +8,23 @@ import { accountSchema, type AccountFormOutput } from "./account.schema";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
-export function useCreateAccount() {
+type UseCreateAccountOptions = {
+  /** Prefill nama (mis. dari query combobox saat "buat baru" dipicu dari
+   * form lain). */
+  initialValues?: { name?: string };
+  /** Dipanggil dengan id akun yang baru dibuat — dipakai caller (mis.
+   * combobox akun di form transaksi) untuk langsung memilih akun baru
+   * itu tanpa user perlu cari ulang. */
+  onCreated?: (id: string) => void;
+};
+
+export function useCreateAccount(options: UseCreateAccountOptions = {}) {
+  const { initialValues, onCreated } = options;
+
   return useEntityForm({
     schema: accountSchema,
     defaultValues: () => ({
-      name: "",
+      name: initialValues?.name ?? "",
       initial_balance: 0,
       group_id: null,
       description: null,
@@ -21,6 +33,7 @@ export function useCreateAccount() {
       icon: null,
       color: DEFAULT_ACCOUNT_COLOR,
     }),
+    resetOnOpen: true,
     mutationFn: async (values: AccountFormOutput) => {
       const db = await getDb();
       const id = newId();
@@ -39,9 +52,13 @@ export function useCreateAccount() {
         ]
       );
       void pushOnWrite("accounts", id);
+      return id;
     },
     invalidateKey: QUERY_DEPENDENCIES.accounts,
     successMessage: "Akun berhasil ditambahkan",
     errorMessage: "Gagal menambahkan akun",
+    onSuccess: (id) => {
+      onCreated?.(id);
+    },
   });
 }

@@ -1,5 +1,13 @@
 # Optimalisasi Import: Kategori Duplikat dari Money Manager
 
+## Status & TODO saat ini (ringkas)
+
+- [x] Diputuskan 2026-10-05: DIABAIKAN — dampak (dropdown filter agak
+      membingungkan untuk kasus langka) tidak sepadan dengan proses
+      (ketiga arah perbaikan di bawah semua butuh kerja non-trivial,
+      salah satunya berisiko migrasi `category_id`). Tidak akan
+      dikerjakan kecuali ada alasan baru yang mengubah kalkulasi ini.
+
 ## Latar belakang
 
 Import data dari Money Manager (`import_money_manager`, lihat

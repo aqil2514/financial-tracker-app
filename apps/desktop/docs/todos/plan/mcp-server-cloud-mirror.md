@@ -434,16 +434,16 @@ Sisa pekerjaan di luar scope sesi ini:
   — dokumen UTAMA: keputusan desain lengkap (LWW, soft delete,
   `sync_source`), skema D1, endpoint Worker, autentikasi, roadmap
   Tahap 0/1/4/5/7, progress implementasi terkini.
-- [`mcp-server-business-logic-audit.md`](./mcp-server-business-logic-audit.md)
+- [`../done/mcp-server-business-logic-audit.md`](../done/mcp-server-business-logic-audit.md)
   — hasil audit LENGKAP logic bisnis `apps/desktop` yang wajib
   direplikasi ke Worker sebelum tool tulis MCP aktif. TETAP di sini
   (bukan pindah ke `apps/worker`) krn isinya murni audit kode desktop
   (file:baris spesifik), meski dipakai sbg checklist porting Worker.
-- [`docs/todos/plan/cloud-sync-mcp.md`](../../../../../docs/todos/plan/cloud-sync-mcp.md) — index navigasi
+- [`docs/todos/done/cloud-sync-mcp.md`](../../../../../docs/todos/done/cloud-sync-mcp.md) — index navigasi
   lintas-app di root repo.
-- `mcp-server-for-claude.md` — riset paling awal, opsi hosting/
-  autentikasi/tooling dasar (masih berlaku, lihat "Riset autentikasi &
-  hosting" di dokumen `apps/worker`).
+- `docs/todos/done/mcp-server-for-claude.md` — riset paling awal,
+  opsi hosting/autentikasi/tooling dasar (sudah usang, lihat ringkasan
+  status di dokumen itu — rencana aktif sekarang ada di dokumen ini).
 - `multi-device-sync-engine.md` — DISIMPAN utk nanti, kasus BERBEDA
   (mobile app nativ sungguhan, bukan tool MCP) — TAPI keputusan
   LWW/soft-delete di sana jadi RUJUKAN LANGSUNG utk dokumen

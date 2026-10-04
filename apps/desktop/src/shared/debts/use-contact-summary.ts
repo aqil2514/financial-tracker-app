@@ -4,6 +4,7 @@ import { buildWhereClause, type ExtraCondition } from "@/components/query/filter
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import { buildOrderClause } from "@/components/query/sort/builders/sql";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
+import { remainingDebtSql } from "./remaining-debt-sql";
 
 export const contactSummaryQueryKey = ["debts", "contact-summary"];
 
@@ -129,13 +130,7 @@ export function useContactSummary(filters: FilterConfig[] = [], sorts: SortConfi
                AND debt_payments.deleted_at IS NULL
            ), 0) AS receivable_paid,
            COALESCE((
-             SELECT SUM(
-               debts.amount - COALESCE(
-                 (SELECT SUM(amount) FROM debt_payments
-                  WHERE debt_payments.debt_id = debts.id AND debt_payments.deleted_at IS NULL),
-                 0
-               )
-             )
+             SELECT SUM(${remainingDebtSql()})
              FROM debts
              WHERE debts.contact_id = contacts.id
                AND debts.type = 'receivable'
@@ -160,13 +155,7 @@ export function useContactSummary(filters: FilterConfig[] = [], sorts: SortConfi
                AND debt_payments.deleted_at IS NULL
            ), 0) AS payable_paid,
            COALESCE((
-             SELECT SUM(
-               debts.amount - COALESCE(
-                 (SELECT SUM(amount) FROM debt_payments
-                  WHERE debt_payments.debt_id = debts.id AND debt_payments.deleted_at IS NULL),
-                 0
-               )
-             )
+             SELECT SUM(${remainingDebtSql()})
              FROM debts
              WHERE debts.contact_id = contacts.id
                AND debts.type = 'payable'

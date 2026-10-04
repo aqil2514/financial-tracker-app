@@ -1,4 +1,22 @@
-# MCP Server: Ekspos Data Keuangan ke Claude Web
+# MCP Server: Ekspos Data Keuangan ke Claude Web — ARSIP RISET AWAL
+
+## Status & TODO saat ini (ringkas)
+
+Dokumen ini riset AWAL (opsi hosting, Turso vs alternatif) yang sudah
+SEPENUHNYA di-supersede — disimpan sbg sejarah keputusan saja, BUKAN
+rencana aktif. Lihat bagian "Catatan" (update 2026-09-30) di bawah utk
+kronologi lengkap kenapa arahnya berubah.
+
+- [x] Riset opsi hosting (PC+tunnel vs Turso+Vercel) — opsi Turso+Vercel
+      sempat dipilih, lihat detail di bawah.
+- [x] Turso DITOLAK sbg tooling final (ganti driver DB, LWW tidak
+      built-in) — diganti push satu-arah PC → Cloudflare D1, rencana
+      konkret lanjut di `mcp-server-cloud-mirror.md`.
+- [x] `apps/mcp-server` SUDAH ADA & SUDAH DI-DEPLOY ke Vercel (per
+      2026-10-03) — 5 tool BACA + OAuth, diverifikasi dari Claude Web
+      sungguhan. Lihat `mcp-server-cloud-mirror.md` dan
+      `apps/worker/docs/todos/done/cloud-sync.md` utk status terkini &
+      progress lanjutan (tool TULIS, dst).
 
 > **Update (2026-09-29): Opsi 2 (Turso + Vercel) DIPILIH, riset teknis
 > konkret sudah dilakukan** — lihat bagian "Setup Turso + MCP server —

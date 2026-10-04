@@ -202,3 +202,131 @@ pub fn get() -> Vec<Migration> {
         },
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Menjalankan SELURUH migration lewat rusqlite, mereplikasi konteks
+    // eksekusi sqlx yang sesungguhnya (satu transaksi + PRAGMA
+    // foreign_keys = ON) — bukan sekadar menjalankan file .sql apa
+    // adanya lewat sqlite3 CLI (autocommit per statement), yang pernah
+    // memberi hasil false-positive di migrasi 0009 (lihat
+    // docs/rules/sqlite-copy-and-rename-migration.md). Test ini TIDAK
+    // menjamin migration bebas bug data (lihat rule di atas: row count
+    // yang tetap benar tidak berarti data tidak ter-SET-NULL secara
+    // tidak sengaja), tapi menjamin seluruh urutan migration bisa
+    // dijalankan dari nol tanpa error SQL/FK di CI, sebelum ketahuan
+    // di device pengguna nyata.
+    fn run_all_migrations(conn: &rusqlite::Connection) {
+        conn.execute_batch("PRAGMA foreign_keys = ON;")
+            .expect("gagal mengaktifkan foreign_keys");
+
+        for migration in get() {
+            conn.execute_batch(migration.sql).unwrap_or_else(|e| {
+                panic!(
+                    "migration {} ({}) gagal: {e}",
+                    migration.version, migration.description
+                )
+            });
+        }
+    }
+
+    #[test]
+    fn semua_migration_berhasil_dijalankan_dari_nol() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        let violations: i64 = conn
+            .query_row("SELECT COUNT(*) FROM pragma_foreign_key_check()", [], |row| {
+                row.get(0)
+            })
+            .expect("gagal menjalankan foreign_key_check");
+        assert_eq!(violations, 0, "ada foreign key yang melanggar setelah migrasi");
+    }
+
+    #[test]
+    fn skema_akhir_punya_tabel_dan_kolom_inti() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        // Daftar minimal — bukan audit skema lengkap, cukup penjaga
+        // supaya migration berikutnya yang typo nama tabel/kolom inti
+        // ketahuan di CI, bukan di device pengguna.
+        let expected_tables = [
+            "accounts",
+            "account_groups",
+            "categories",
+            "transactions",
+            "transaction_attachments",
+            "debts",
+            "debt_payments",
+            "contacts",
+        ];
+        for table in expected_tables {
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                    [table],
+                    |row| row.get(0),
+                )
+                .unwrap_or_else(|e| panic!("gagal cek tabel {table}: {e}"));
+            assert_eq!(count, 1, "tabel {table} tidak ditemukan setelah migrasi");
+        }
+
+        let accounts_has_is_active: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('accounts') WHERE name = 'is_active'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("gagal cek kolom accounts.is_active");
+        assert_eq!(accounts_has_is_active, 1, "accounts.is_active tidak ditemukan");
+
+        let transactions_account_id_is_uuid: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name = 'account_id' AND type = 'TEXT'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("gagal cek tipe transactions.account_id");
+        assert_eq!(
+            transactions_account_id_is_uuid, 1,
+            "transactions.account_id diharapkan TEXT (UUID) setelah migrasi 0027"
+        );
+    }
+
+    // Reproduksi bug nyata migrasi 0022 (lihat
+    // docs/rules/sqlite-copy-and-rename-migration.md, poin #3): migrasi
+    // yang me-rebuild sebuah tabel TAPI lupa ikut me-rebuild tabel lain
+    // yang FK-nya menunjuk ke situ akan LOLOS test "migration jalan
+    // tanpa error" maupun cek skema (CREATE TABLE-nya tetap valid) —
+    // baru ketahuan saat ada INSERT baru ke tabel yang FK-nya basi,
+    // gagal dengan "no such table: main.<tabel>_old". Test ini sengaja
+    // INSERT ke seluruh rantai FK (accounts -> transactions ->
+    // transaction_attachments/debts -> debt_payments) supaya regresi
+    // sejenis 0022 ketahuan di CI.
+    #[test]
+    fn insert_baru_di_seluruh_rantai_fk_tidak_gagal() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        conn.execute_batch(
+            "
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-1', 'Kas Test', 'cash');
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-debt-1', 'Utang Test', 'debt');
+            INSERT INTO categories (id, name, type) VALUES ('cat-1', 'Kategori Test', 'expense');
+            INSERT INTO transactions (id, type, amount, category_id, account_id, note, date)
+                VALUES ('tx-1', 'expense', 1000, 'cat-1', 'acc-1', 'catatan', '2026-01-01');
+            INSERT INTO transaction_attachments (id, transaction_id, file_path)
+                VALUES ('att-1', 'tx-1', '/tmp/foo.png');
+            INSERT INTO contacts (id, name) VALUES ('contact-1', 'Kontak Test');
+            INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)
+                VALUES ('debt-1', 'receivable', 'contact-1', 500, 'acc-debt-1', 'tx-1', '2026-01-01');
+            INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date)
+                VALUES ('pay-1', 'debt-1', 100, 'acc-1', 'tx-1', '2026-01-02');
+            ",
+        )
+        .expect("insert ke rantai FK accounts->transactions->debts->debt_payments gagal");
+    }
+}

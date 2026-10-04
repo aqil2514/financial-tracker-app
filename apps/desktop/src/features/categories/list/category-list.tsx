@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { parseAsString, parseAsStringEnum, useQueryState } from "nuqs";
 
 import type { Category } from "@/lib/db";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -37,9 +38,15 @@ interface CategoryGroup {
 
 export function CategoryList() {
   const { data: categories, isLoading, error } = useCategories();
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [search, setSearch] = useQueryState("search", parseAsString.withDefault(""));
+  const [typeFilter, setTypeFilter] = useQueryState(
+    "type",
+    parseAsStringEnum<TypeFilter>(["all", "income", "expense"]).withDefault("all")
+  );
+  const [statusFilter, setStatusFilter] = useQueryState(
+    "status",
+    parseAsStringEnum<StatusFilter>(["all", "active", "inactive"]).withDefault("all")
+  );
 
   const filtered = useMemo(() => {
     return categories?.filter((category) => {

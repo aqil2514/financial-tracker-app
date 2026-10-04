@@ -209,6 +209,7 @@ alasan detail di "Keputusan desain" di atas).
 - `docs/todos/done/uuid-migration.md` — prasyarat, SUDAH SELESAI.
 - `docs/todos/plan/multi-device-sync.md` — ide awal, latar belakang
   lengkap kenapa sync ini dibutuhkan.
-- `docs/todos/plan/mcp-server-for-claude.md` — MENUNGGU sync ini
-  selesai duluan sebelum bisa mulai (integrasi Claude Web butuh titik
-  akses data terpusat, yang baru ada setelah sync ini jalan).
+- `docs/todos/done/mcp-server-for-claude.md` — riset AWAL (sudah
+  usang, lihat ringkasan status di dokumen itu) — rencana aktif MCP
+  server pindah ke `mcp-server-cloud-mirror.md`, TIDAK lagi menunggu
+  sync multi-device ini (ternyata tidak diperlukan, lihat dokumen itu).

@@ -1,5 +1,21 @@
 # Audit Integritas Skema Database
 
+## Status & TODO saat ini (ringkas)
+
+- [x] Temuan #1 — FK tidak ditegakkan sama sekali. Sudah dieksekusi
+      (`0009_enforce_fk_set_null.sql` + `PRAGMA foreign_keys = ON` di
+      `db.ts`), lihat detail di bawah.
+- [x] Temuan #2 — pola migration "copy-and-rename" (sudah dipakai 5x:
+      migration 0004, 0009, 0019, 0022, 0027). Ditulis 2026-10-05 jadi
+      rule tertulis:
+      [docs/rules/sqlite-copy-and-rename-migration.md](../../../rules/sqlite-copy-and-rename-migration.md),
+      terdaftar di `apps/desktop/CLAUDE.md`.
+- [x] Temuan #3 — belum ada test otomatis yang menjalankan seluruh
+      urutan migration. Ditulis 2026-10-05: 3 test Rust di
+      `src-tauri/src/migrations.rs` (`mod tests`), jalan lewat
+      `cargo test --lib migrations`. Lihat detail & keterbatasan yang
+      disadari di bawah.
+
 ## Latar belakang
 
 Menyusul audit kode lintas fitur (`scalability-audit.md`) dan perbaikan
@@ -99,34 +115,69 @@ baik, tapi karena SQLite tidak mengecek sama sekali.
   + FK ON), bukan sekadar menjalankan file `.sql` apa adanya lewat CLI —
   keduanya bisa memberi hasil yang sangat berbeda.
 
-### 2. Pola migration "copy-and-rename" belum punya template tertulis
+### 2. Pola migration "copy-and-rename" belum punya template tertulis — SELESAI
+
+**Status: dieksekusi 2026-10-05.** Lihat
+[docs/rules/sqlite-copy-and-rename-migration.md](../../../rules/sqlite-copy-and-rename-migration.md),
+terdaftar di `apps/desktop/CLAUDE.md`.
 
 `0004_allow_transfer_type.sql` menunjukkan pola nyata untuk menambah
 varian `CHECK` constraint (SQLite tidak izinkan `ALTER TABLE ... CHECK`
 pada constraint yang sudah ada) — bikin tabel `_new`, copy data, drop,
-rename. Ini sudah diantisipasi secara naratif di
-`docs/todos/plan/account-type.md` untuk `account_type` mendatang, tapi
-belum ada file referensi/template SQL yang bisa langsung disalin saat
-menulis migration serupa (mis. untuk `ON DELETE` di temuan #1 di atas,
-yang juga butuh pola sama).
+rename. Audit ulang menemukan pola ini sudah dipakai di 5 migration
+(0004, 0009, 0019, 0022, 0027), termasuk DUA bug nyata yang pernah
+terjadi akibat urutan yang salah (`0009`: drop tabel lama sambil FK
+`ON DELETE SET NULL` baru masih aktif menunjuk ke situ, meng-NULL-kan
+data; `0022`: FK tabel lain yang tidak ikut direbuild tetap menunjuk ke
+nama tabel `_old` yang sudah didrop). Rule yang ditulis mencakup kapan
+pola sederhana (`_new`, satu tabel) cukup vs kapan wajib pakai pola
+"rename semua dulu, baru drop semua di akhir" (kalau tabel yang diubah
+direferensikan FK oleh tabel lain), plus cara verifikasi yang benar
+(replikasi transaksi sqlx, bukan `sqlite3` CLI autocommit).
 
-Kemungkinan arah: dokumentasikan pola ini di satu tempat (mis.
-`docs/rules/` mengikuti pola `state-lifting-vs-context.md`) sebagai rule
-tertulis "cara menambah/mengubah CHECK constraint di SQLite", supaya
-migration berikutnya (untuk transfer type dulu, account_type nanti, atau
-ON DELETE) tidak menulis ulang pola yang sama dari nol tiap kali.
+### 3. Tidak ada test otomatis untuk migration — SELESAI
 
-### 3. Tidak ada test otomatis untuk migration
+**Status: dieksekusi 2026-10-05.** Lihat `src-tauri/src/migrations.rs`,
+`mod tests` di bagian bawah file (dijalankan lewat `cargo test --lib
+migrations` dari direktori `src-tauri/`).
 
 Ada 53 unit test untuk logic aplikasi (filter builder, pagination), tapi
-tidak ada test yang menjalankan seluruh urutan migration SQL dan
-memverifikasi skema akhir (kolom yang diharapkan ada, `CHECK` constraint
-yang berlaku, index yang terbentuk). Migration adalah kode yang juga bisa
-salah — typo SQL di migration berikutnya baru ketahuan saat app dijalankan
-di device pengguna nyata, bukan saat development/CI.
+sebelumnya tidak ada test yang menjalankan seluruh urutan migration SQL.
+Ditambahkan 3 test yang memanggil `migrations::get()` langsung (urutan
+yang BENAR-BENAR dipakai app, bukan asumsi sort nama file) dan
+menjalankannya ke koneksi `rusqlite` in-memory, mereplikasi konteks
+eksekusi sqlx yang sesungguhnya (`PRAGMA foreign_keys = ON` di luar
+transaksi test — rusqlite `execute_batch` per migration tidak
+membungkusnya sendiri, konsisten dengan catatan di
+[sqlite-copy-and-rename-migration.md](../../../rules/sqlite-copy-and-rename-migration.md)
+soal PRAGMA jadi no-op di dalam transaksi):
 
-Prioritas lebih rendah dari #1 dan #2 — worth dipertimbangkan kalau jumlah
-migration terus bertambah dan risiko regresi skema makin nyata.
+1. `semua_migration_berhasil_dijalankan_dari_nol` — seluruh 33 migration
+   jalan tanpa error SQL, lalu `PRAGMA foreign_key_check` harus kosong.
+2. `skema_akhir_punya_tabel_dan_kolom_inti` — tabel & kolom kunci (mis.
+   `accounts.is_active`, `transactions.account_id` bertipe TEXT/UUID
+   pasca migrasi 0027) benar-benar ada di skema akhir.
+3. `insert_baru_di_seluruh_rantai_fk_tidak_gagal` — INSERT nyata ke
+   rantai FK penuh (`accounts` → `transactions` →
+   `transaction_attachments`/`debts` → `debt_payments`) harus berhasil;
+   test ini secara spesifik ditulis untuk menangkap kelas bug `0022`
+   (FK tabel lain yang tidak ikut direbuild tetap menunjuk ke tabel
+   `_old` yang sudah didrop — baru ketahuan saat ADA INSERT baru, bukan
+   saat migration-nya sendiri dijalankan).
+
+**Keterbatasan yang disadari (diverifikasi langsung saat menulis test
+ini)**: ketiga test ini menjalankan SELURUH migration sampai versi
+terbaru, jadi menguji state SKEMA AKHIR — bukan replay "bagaimana kalau
+migration berhenti di versi X". Dicoba sengaja skip migration 0022
+(filter sementara di loop test) untuk membuktikan test #3 menangkap
+bug sejenisnya — hasilnya TETAP lolos, karena migration 0027
+(beberapa versi setelah 0022) me-rebuild ulang SEMUA tabel termasuk
+`debts`/`debt_payments` dari nol dengan FK yang benar, sehingga efek
+bug 0022 "tertimpa" otomatis oleh 0027 di state akhir. Jadi test ini
+efektif mendeteksi migration BARU yang menulis ulang pola ini secara
+salah ke depan (skema akhir akan langsung rusak), TAPI tidak bisa
+dipakai untuk memverifikasi riwayat historis tiap versi migration satu
+per satu — itu di luar scope yang wajar untuk test ini.
 
 ## Catatan
 
@@ -137,4 +188,5 @@ tanpa peringatan apa pun ke pengguna. **Sudah dieksekusi** (lihat Temuan
 #1 di atas) setelah keputusan `ON DELETE SET NULL` per relasi diambil,
 konsisten dengan pola smart-delete yang sudah ada di UI.
 
-Temuan #2 dan #3 masih terbuka.
+Temuan #2 dan #3 sudah dieksekusi (lihat di atas). Semua temuan di
+dokumen ini selesai.

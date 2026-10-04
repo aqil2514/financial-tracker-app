@@ -36,7 +36,7 @@ cuma dipakai satu modul, taruh di modul itu sendiri, JANGAN naik ke
 sulit dirawat begitu jumlah tabel/operasi bertambah — rencana penuh
 proyek ini py 7 tabel × beberapa operasi (create/update/delete) ×
 validasi bisnis per operasi (lihat
-`apps/desktop/docs/todos/plan/mcp-server-business-logic-audit.md`),
+`apps/desktop/docs/todos/done/mcp-server-business-logic-audit.md`),
 polanya akan berulang puluhan kali kalau tetap di satu file.
 
 Pemisahan controller/service juga penting krn **logic bisnis (`service.ts`)
@@ -206,5 +206,5 @@ struktur wajib dari awal.
 
 - `apps/worker/docs/todos/done/cloud-sync.md` — progress implementasi,
   daftar modul yang sudah/belum ada.
-- `apps/desktop/docs/todos/plan/mcp-server-business-logic-audit.md` —
+- `apps/desktop/docs/todos/done/mcp-server-business-logic-audit.md` —
   checklist logic bisnis yang di-port ke `service.ts` tiap modul.
