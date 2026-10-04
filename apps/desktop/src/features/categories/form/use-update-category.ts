@@ -23,7 +23,7 @@ export function useUpdateCategory(category: Category) {
         [
           values.name,
           values.type,
-          values.parent_id ? Number(values.parent_id) : null,
+          values.parent_id ? values.parent_id : null,
           Number(values.is_active),
           category.id,
         ]

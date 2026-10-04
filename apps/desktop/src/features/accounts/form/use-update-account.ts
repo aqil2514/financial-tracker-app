@@ -42,7 +42,7 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
         [
           values.name,
           values.initial_balance,
-          values.group_id ? Number(values.group_id) : null,
+          values.group_id ? values.group_id : null,
           values.description,
           Number(values.is_active),
           values.account_type,
