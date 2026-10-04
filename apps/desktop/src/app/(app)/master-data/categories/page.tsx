@@ -1,3 +1,7 @@
+"use client";
+
+import { Suspense } from "react";
+
 import { PageContainer } from "@/components/page-container";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +19,9 @@ export default function CategoriesPage() {
           </CardAction>
         </CardHeader>
         <CardContent>
-          <CategoryList />
+          <Suspense fallback={null}>
+            <CategoryList />
+          </Suspense>
         </CardContent>
       </Card>
     </PageContainer>

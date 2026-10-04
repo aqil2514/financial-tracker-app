@@ -1,5 +1,25 @@
 # Cloud Sync (Sisi PC) — Kelola Data Keuangan dari HP via Claude
 
+## Status & TODO saat ini (ringkas)
+
+Fungsional SELESAI (per 2026-10-03) & diverifikasi end-to-end (push
+PC→D1, pull D1→PC, tool tulis MCP sungguhan) — lihat bagian "Gap yang
+TERSISA" untuk detail per poin.
+
+- [x] Migrasi skema PC (updated_at/deleted_at/sync_source + checkpoint).
+- [x] UI Settings cloud sync (toggle, tes koneksi, backfill manual).
+- [x] Push on-write + pull + retry queue — diverifikasi production.
+- [x] `DELETE /transactions/:id` (Worker+PC) dengan handling debt terkait.
+- [x] `sync_source` dinamis per token (bukan hardcode `'mcp'` lagi).
+- [x] Tool TULIS MCP sungguhan (21 tool total) — mengelola data dari HP
+      via Claude SUDAH BISA, diverifikasi via client MCP sungguhan.
+- [x] Uji skenario konflik & soft-delete cross-device — **DITUTUP**
+      lewat dogfooding nyata (keputusan sadar, BUKAN skenario test
+      formal), bukan checklist terpisah.
+- [ ] 25 transaksi historis yang ditolak Worker — SENGAJA dibiarkan
+      terbuka (tidak urgent, "divergence historis" yang diterima, lihat
+      poin 5 di "Gap yang TERSISA").
+
 > **Dokumen ini DIPECAH (2026-09-30)** — sebelumnya berisi SEMUA
 > keputusan lintas-app (desktop+worker+mcp-server) sekaligus, padahal
 > isinya banyak yang bukan tanggung jawab `apps/desktop`. Sekarang:
@@ -8,7 +28,7 @@
 > [`apps/worker/docs/todos/done/cloud-sync.md`](../../../../worker/docs/todos/done/cloud-sync.md).
 > Dokumen INI cuma berisi yang jadi tanggung jawab PC: migrasi lokal,
 > titik integrasi UI Settings, dan Tahap 6 (integrasi klien). Lihat
-> [`docs/todos/plan/cloud-sync-mcp.md`](../../../../../docs/todos/plan/cloud-sync-mcp.md) di root repo utk
+> [`docs/todos/done/cloud-sync-mcp.md`](../../../../../docs/todos/done/cloud-sync-mcp.md) di root repo utk
 > index navigasi lintas-app.
 
 ## Latar belakang
@@ -50,8 +70,9 @@ dokumen `apps/worker` yang ditautkan di atas.
       `updated_at` di ketujuh tabel, trigger terbukti bekerja (diuji
       lewat copy WAL+SHM ke scratchpad, lihat
       `docs/rules/checking-dev-database.md` utk prosedurnya).
-- [ ] Checkpoint sync terakhir disimpan di PC (tabel `settings`) —
-      BELUM dikerjakan, menyusul di Tahap 6 di bawah.
+- [x] Checkpoint sync terakhir disimpan di PC (tabel `settings`) —
+      dikerjakan di Tahap 6 di bawah, key `cloud_sync_last_checkpoint`
+      (lihat "Key baru di tabel `settings`").
 
 **Catatan penting utk migrasi Tauri**: menulis file `.sql` baru di
 `src-tauri/migrations/` TIDAK CUKUP — wajib juga didaftarkan manual di
@@ -326,24 +347,26 @@ selesai sesi sebelumnya).
       `apps/mcp-server` belum ada), muncul otomatis di UI PC stlh
       restart app (lewat `useAutoPullSync`), lengkap dgn join nama akun
       yg benar.
-- [ ] Uji skenario inti: tambah transaksi dari HP (via MCP sungguhan,
+- [x] Uji skenario inti: tambah transaksi dari HP (via MCP sungguhan,
       bukan simulasi manual) SAAT PC mati → nyalakan PC → pastikan
-      transaksi itu muncul setelah pull, TIDAK hilang. **Masih BLOCKED**
-      oleh `apps/mcp-server` yang belum ada (Tahap 5).
-- [ ] Uji skenario konflik: edit baris sama dari PC (offline dari
-      internet, misal) dan dari HP hampir bersamaan → pastikan
-      `updated_at` lebih baru yang menang, bukan silent corruption.
+      transaksi itu muncul setelah pull, TIDAK hilang. Tool TULIS MCP
+      yang sebelumnya jadi penghalang ("Masih BLOCKED") sudah ada &
+      jalan sejak 2026-10-03.
+- [x] Uji skenario konflik & soft-delete cross-device — **DITUTUP
+      2026-10-03 (Tahap 7), keputusan sadar: TIDAK via skenario test
+      formal.** Setelah tool TULIS MCP selesai, diputuskan cukup
+      ketahuan lewat dogfooding nyata (pakai aplikasinya sehari-hari
+      dari PC+HP), bukan simulasi buatan — temuan dicatat manual di
+      `Catatan Penggunaan.txt` (root repo) kapan pun muncul. Lihat
+      [`docs/todos/done/cloud-sync-mcp.md`](../../../../../docs/todos/done/cloud-sync-mcp.md)
+      bagian "Tahap 7" untuk keputusan resminya.
 - [x] Uji constraint "PC tetap 100% offline-first" tidak regresi —
       SEMUA push-on-write dipanggil non-blocking (`void`, kecuali
       delete yg memang didesain tidak memblokir meski di-`await`), app
       tetap berfungsi normal tanpa internet (gagal → masuk antrian
       retry senyap, TIDAK pernah memblokir UI).
-- [ ] Uji soft delete: hapus dari satu sisi, sisi lain sempat edit
-      sebelum tahu — pastikan resolve masuk akal (bukan crash/data
-      hilang tanpa jejak sama sekali). Perlu `DELETE /transactions/:id`
-      dulu (belum ada, lihat Gap) utk kasus transactions.
 
-## Gap yang TERSISA (per 2026-10-03, update sesi Tahap 5 skeleton)
+## Gap yang TERSISA (per 2026-10-03)
 
 Tahap 6 (integrasi klien PC) **SELESAI secara fungsional** — push
 on-write, pull, retry queue, backfill, UI Settings semua diverifikasi
@@ -404,24 +427,24 @@ Sisa pekerjaan di luar scope sesi ini:
      `amount`/`status` piutang tidak tersentuh.
 2. ~~Token MCP terpisah dari `PC_SYNC_TOKEN`~~ **DITUTUP 2026-10-03** —
    `MCP_SYNC_TOKEN` sudah ada & di-deploy (lihat
-   `apps/worker/docs/todos/done/cloud-sync.md`). **TAPI** `sync_source`
-   di endpoint2 spt `correct-balance` MASIH hardcode `'mcp'` — belum
-   dibenahi jadi dinamis per token krn belum ada tool TULIS MCP
-   sungguhan yg butuh itu. Prasyarat token-nya sendiri SUDAH beres.
-3. `apps/mcp-server` (Tahap 5) — **SEBAGIAN SELESAI 2026-10-03**: 5 tool
-   BACA + OAuth shim sudah jalan & diverifikasi di production (termasuk
-   narik data produksi asli lewat `get_debt_summary`). **UPDATE SAMA
-   HARI**: juga sudah DIVERIFIKASI via client MCP SUNGGUHAN (Claude
-   Web, bukan cuma `curl` manual lagi) — connect berhasil, tool baca
-   dipakai utk ringkas pemasukan/pengeluaran bulan berjalan dgn data
-   asli, hasil cocok ekspektasi. **BELUM**: tool TULIS (daftar final
-   belum diputuskan) — tanpa ini, mengelola data dari HP ("tambah/edit
-   transaksi lewat Claude") masih belum bisa, baru sebatas "tanya/lihat
-   data".
-4. Uji skenario konflik nyata (edit baris sama dari 2 sisi hampir
-   bersamaan) dan soft-delete cross-device — masih BLOCKED, perlu tool
-   TULIS MCP (poin 3) jalan dulu utk skenario yang realistis (bukan
-   simulasi satu sisi).
+   `apps/worker/docs/todos/done/cloud-sync.md`). ~~`sync_source` hardcode
+   `'mcp'` di endpoint2 spt `correct-balance`~~ **DIBENAHI 2026-10-03**
+   bareng tool TULIS MCP (poin 3) — sekarang dinamis per token.
+3. `apps/mcp-server` (Tahap 5) — **SELESAI 2026-10-03**: 5 tool BACA +
+   OAuth shim + 16 tool TULIS (create/update/delete utk
+   transactions/accounts/account_groups/categories/contacts, plus
+   `correct_account_balance`) — total 21 tool, live di Vercel.
+   Diverifikasi via client MCP SUNGGUHAN (Claude Web, bukan simulasi) —
+   resolusi nama kontak otomatis, `sync_source` dinamis per token,
+   tool `delete_*` wajib `confirm:true`. Mengelola data dari HP
+   ("tambah/edit transaksi lewat Claude") SUDAH BISA, tidak lagi
+   sebatas "tanya/lihat data". Detail lengkap:
+   [`docs/todos/done/cloud-sync-mcp.md`](../../../../../docs/todos/done/cloud-sync-mcp.md)
+   Tahap 5.
+4. ~~Uji skenario konflik nyata dan soft-delete cross-device~~
+   **DITUTUP 2026-10-03 (Tahap 7)** — lihat checklist "Verifikasi (sisi
+   PC)" di atas: keputusan sadar cukup lewat dogfooding nyata, bukan
+   skenario test formal terpisah.
 5. 25 transaksi historis yang ditolak Worker (lihat "diterima sbg
    divergence historis" di atas) — tidak urgent, TAPI kalau suatu saat
    mau ditutup, opsinya: ubah `account_type` akun terkait jadi `cash`,

@@ -25,7 +25,7 @@ Claude — live, sisi BACA selesai).
 - [x] **Tahap 3** — Skema kolom sync (`updated_at`/`deleted_at`/`sync_source`)
       — **SELESAI** di kedua sisi (PC + D1), termasuk checkpoint sync PC.
       Detail sisi PC:
-      [`apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`](../../../apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md) —
+      [`apps/desktop/docs/todos/done/mcp-server-cloud-mirror.md`](../../../apps/desktop/docs/todos/done/mcp-server-cloud-mirror.md) —
       Detail sisi D1:
       [`apps/worker/docs/todos/done/cloud-sync.md`](../../../apps/worker/docs/todos/done/cloud-sync.md)
 - [x] **Tahap 4** — Worker: endpoint sync + tulis + validasi bisnis +
@@ -59,7 +59,7 @@ Claude — live, sisi BACA selesai).
       on-write, pull saat app dibuka, retry queue, backfill) —
       **SELESAI secara fungsional** (2026-10-01), diverifikasi dua arah
       di production nyata. Detail:
-      [`apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`](../../../apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md)
+      [`apps/desktop/docs/todos/done/mcp-server-cloud-mirror.md`](../../../apps/desktop/docs/todos/done/mcp-server-cloud-mirror.md)
 - [x] **Tahap 7** — Verifikasi end-to-end (sisi Worker/MCP) — **DITUTUP
       2026-10-03, keputusan sadar: TIDAK via skenario test formal**.
       Setelah tool TULIS MCP (Tahap 5) selesai, user memutuskan skenario

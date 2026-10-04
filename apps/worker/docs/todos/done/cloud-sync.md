@@ -1,6 +1,6 @@
 # Cloud Sync Worker — Sync Dua-Arah PC ↔ D1 + CRUD via MCP — SELESAI
 
-> Dipisah dari `apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`
+> Dipisah dari `apps/desktop/docs/todos/done/mcp-server-cloud-mirror.md`
 > (2026-09-30) — dokumen itu awalnya berisi keputusan lintas-app
 > (desktop+worker+mcp-server) sekaligus, padahal lokasinya di
 > `apps/desktop`. Sekarang dipecah: bagian yang jadi TANGGUNG JAWAB
@@ -1077,7 +1077,7 @@ nanti ada temuan terkait dari dogfooding):
   — pastikan resolve masuk akal.
 
 (Tahap 2 — inventarisir logic bisnis, dan Tahap 6 — integrasi klien PC,
-ada di dokumen `apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`.)
+ada di dokumen `apps/desktop/docs/todos/done/mcp-server-cloud-mirror.md`.)
 
 ### Tahap 8 — Gap ditemukan 2026-10-04: write-off & edit/hapus cicilan, ditutup sesi yang sama
 
@@ -1270,7 +1270,7 @@ jadi bug saat riset lanjutan (bukan cuma gap) — lihat poin "Bug
 
 ## Terkait
 
-- [`../../../../desktop/docs/todos/plan/mcp-server-cloud-mirror.md`](../../../../desktop/docs/todos/plan/mcp-server-cloud-mirror.md)
+- [`../../../../desktop/docs/todos/done/mcp-server-cloud-mirror.md`](../../../../desktop/docs/todos/done/mcp-server-cloud-mirror.md)
   — dokumen sisi PC: latar belakang fitur, titik integrasi UI Settings,
   migrasi lokal, Tahap 6 (integrasi klien PC).
 - [`../../../../desktop/docs/todos/done/mcp-server-business-logic-audit.md`](../../../../desktop/docs/todos/done/mcp-server-business-logic-audit.md)
