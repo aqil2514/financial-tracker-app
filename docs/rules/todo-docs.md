@@ -43,5 +43,5 @@ Penjelasan lengkap kenapa tiap poin ada di sini — lihat bagian
 ...
 ```
 
-Lihat `apps/desktop/docs/todos/plan/debt-receivable-tracking.md` sebagai
+Lihat `apps/desktop/docs/todos/done/debt-receivable-tracking.md` sebagai
 contoh penerapan nyata.

@@ -1,4 +1,4 @@
-# Fitur Utang Piutang: Entitas Sendiri, Bukan Sekadar Transaksi
+# Fitur Utang Piutang: Entitas Sendiri, Bukan Sekadar Transaksi — SELESAI
 
 ## Status & TODO saat ini (ringkas)
 
@@ -27,21 +27,25 @@ dan "BELUM ditulis / batasan yang diketahui" di bawah.
 - [x] `DebtListTable` — baris bisa diklik untuk expand riwayat
       `debt_payments` langsung di tabel (`PaymentsList` diekstrak jadi
       shared component, dipakai juga di dialog detail kontak).
-- [ ] Jatuh tempo & reminder — belum diputuskan masuk scope awal atau tidak.
+- [x] ~~Jatuh tempo & reminder~~ DITUTUP — diputuskan TIDAK digarap,
+      lihat catatan di bawah.
 - [x] Poles UI lanjutan `/debts`: empty state `DebtListTable` — beda
       pesan+icon untuk "belum ada data sama sekali" vs "tidak ada hasil
       setelah filter" (dengan tombol reset), lihat catatan di bawah.
-- [ ] Write-off untuk `debts` dari sync Retailku (`account_id` NULL) —
-      sengaja DITOLAK dulu di `useWriteOffDebt`, butuh tindak lanjut
-      terpisah (lihat catatan di bawah).
+- [x] ~~Write-off untuk `debts` dari sync Retailku (`account_id` NULL)~~
+      DIPINDAH — tracking-nya sepenuhnya di
+      `retailku-sync-account-type-gap.md`, bukan gap terbuka di dokumen
+      ini lagi (lihat catatan di bawah).
 - [x] Revert `debts.status` `'paid'` → `'ongoing'` saat edit pembayaran
       yang sebelumnya melunasi penuh — sudah diuji live, lihat catatan
       di bawah.
-- [ ] Transfer ke akun `debt` non-personal (mis. "Modal") — untuk sekarang
-      diperlakukan sama seperti piutang personal, belum ada pengecualian.
-- [ ] **BARU** Backfill `debt_payments` lama dengan `transaction_id IS
-      NULL` tapi `account_id` TERISI (data dari SEBELUM fix non_cash) —
-      saldo akun `debt` terkait kemungkinan masih menumpuk salah, lihat
+- [x] ~~Transfer ke akun `debt` non-personal (mis. "Modal")~~ DITUTUP —
+      ternyata cuma data lama dari sebelum akun `debt` terstandarisasi,
+      lihat catatan di bawah.
+- [x] ~~Backfill `debt_payments` lama dengan `transaction_id IS NULL`~~
+      DITUTUP — akun terkait sudah dinonaktifkan user di production,
+      tidak worth effort. Gap LAIN yang lebih tepat sasaran ditemukan
+      sebagai gantinya (laporan saldo tidak filter akun nonaktif), lihat
       catatan di bawah.
 - [x] **BARU** Aksi cepat Edit/Hapus per baris riwayat cicilan di
       `PaymentsList` — tidak perlu lagi pindah ke halaman Transaksi,
@@ -276,8 +280,15 @@ dibuat di skema `transactions` saat ini.
 
 ## Pertanyaan desain yang MASIH belum dijawab
 
-- Jatuh tempo & reminder — apakah masuk scope awal, atau menyusul setelah
-  rangkuman dasar per kontak selesai?
+- ~~Jatuh tempo & reminder — apakah masuk scope awal, atau menyusul
+  setelah rangkuman dasar per kontak selesai?~~ **DITUTUP** (2026-10-04,
+  sesi lanjutan) — diputuskan TIDAK perlu digarap sama sekali, bukan
+  cuma ditunda. Alasan user: aplikasi ini murni catatan keuangan
+  personal (bukan alat penagihan formal/bisnis), jadi fitur jatuh
+  tempo/reminder dinilai tidak memberi dampak signifikan sepadan dengan
+  kompleksitas yang ditambahkan (field `due_date` baru, mekanisme
+  notifikasi, dst). Tidak ada rencana membuka ulang kecuali kebutuhan
+  nyata muncul di pemakaian sehari-hari.
 - ~~UI: halaman baru (`/debts`)? Card ringkasan di dashboard? Filter
   khusus di halaman akun/transaksi yang sudah ada?~~ **SUDAH DIJAWAB**
   di sesi terpisah — halaman `/debts` + accordion sidebar "Utang
@@ -299,14 +310,26 @@ dibuat di skema `transactions` saat ini.
   fuzzy-match (`find-similar-contacts.ts`, substring + Levenshtein ≤2),
   keputusan akhir pakai yang sudah ada / tetap buat baru diserahkan ke
   user, TIDAK ada pencegahan otomatis.
-- **BARU**: transaksi transfer ke akun `debt` yang BUKAN utang-piutang
+- ~~**BARU**: transaksi transfer ke akun `debt` yang BUKAN utang-piutang
   personal (ditemukan di data: "Balikin Modal", "Minjem Modal",
-  "Dipinjem Cor" — lebih ke modal bisnis) — apakah tetap otomatis
-  dianggap `debts` (dengan kontak = nama modal/proyek), atau perlu
-  pengecualian/opsi "jangan catat sebagai debt" saat submit? **BELUM
-  DIJAWAB** — untuk implementasi awal, kasus ini tetap diperlakukan
-  sama seperti piutang personal (kontak = nama modal/proyek yang
-  diketik di field Nama Kontak), tidak ada pengecualian khusus.
+  "Dipinjem Cor" — lebih ke modal bisnis)~~ **DITUTUP** (2026-10-04,
+  sesi lanjutan) — dicek ulang ke `finance.dev.db`: SEMUA transaksi
+  "Modal"/"Cor" yang melibatkan akun `debt` ("Dipinjem Cor", "Modal air
+  vit" kas→"Keluarga"; "Balikin Modal" x2 "Keluarga"→kas) adalah DATA
+  LAMA dari SEBELUM akun `debt`/fitur `debts` dibangun — waktu itu akun
+  "Keluarga" dipakai dgn 2 makna campur aduk (piutang-utang personal
+  SEKALIGUS pos modal/kas bersama keluarga, bukan ke orang tertentu),
+  makanya arah/maknanya janggal kalau diinterpretasikan pakai logic
+  `applyDebtTransaction` sekarang (mis. "Dipinjem Cor" scr makna asli =
+  SAYA pinjam DARI Cor, tapi arah kas->debt SELALU dibaca sistem sbg
+  "piutang baru" = kebalikannya). **Dikonfirmasi user TIDAK relevan lagi
+  ke depan**: di database production, praktik pencatatan SUDAH
+  distandarisasi — seluruh utang-piutang personal ditampung ke SATU akun
+  "Piutang" (`account_type='debt'`), tidak ada lagi pola "akun debt
+  dipakai rangkap sbg pos modal". Gap ini DITUTUP sbg non-issue, bukan
+  diimplementasikan — kalau pola serupa muncul lagi di masa depan
+  (akun `debt` baru dipakai utk sesuatu yang bukan person-to-person),
+  baru relevan dibuka ulang sbg pertanyaan desain baru.
 
 ## Deteksi otomatis debts dari transfer — keputusan implementasi (final)
 
@@ -733,7 +756,7 @@ BELUM ditulis / batasan yang diketahui:
        jadi cuma pakai `PaymentsList` yang sama, tanpa perubahan
        perilaku.
 
-## Temuan BARU: data lama `debt_payments` dengan `transaction_id NULL` yang belum di-backfill — ADA di dev DAN production
+## Temuan BARU (DITUTUP): data lama `debt_payments` dengan `transaction_id NULL` yang belum di-backfill — ADA di dev DAN production
 
 Muncul dari diskusi "mau tambah aksi cepat edit/hapus cicilan langsung
 di `PaymentsList`" (belum diimplementasikan) — sebelum desain, perlu tahu
@@ -801,6 +824,38 @@ bertambah dari pemakaian normal sehari-hari selama kasus Retailku+
 non_cash di atas belum terjadi. Aman dijadikan dasar keputusan desain
 "sembunyikan aksi edit/hapus kalau `transaction_id == null`" di
 `PaymentsList` tanpa khawatir jumlahnya akan terus membengkak diam-diam.
+
+**KEPUTUSAN AKHIR (2026-10-04, sesi lanjutan): backfill TIDAK dikerjakan.**
+Dihitung dulu dampaknya biar keputusan berdasar angka, bukan tebakan:
+- **Dev**: 4 baris NULL nyangkut di akun "Keluarga" (Rp2.236.243) +
+  "Orang Lain" (Rp346.243) — dibandingkan saldo akun "Keluarga" saat ini
+  (Rp2.232.500, dihitung pakai query SAMA PERSIS dgn `use-accounts.ts`)
+  dan total piutang `ongoing` riil di akun itu (Rp34.544.826, 70 baris)
+  — proporsinya kecil (~6.5%) tapi nominalnya tidak kecil.
+- **Production**: user cek LANGSUNG ke D1 Studio — akun "Keluarga"
+  (sumber baris NULL Rp2.000.000 itu) ternyata **`is_active = 0`**
+  (dinonaktifkan user sendiri, BUKAN dihapus) sejak "mulai dengan yang
+  bersih" pakai akun "Piutang" tunggal yang baru. Akun aktif sekarang:
+  "Piutang" (Rp2.300.000), "Piutang Dagang" (Rp26.000), "Utang Dagang"
+  (-Rp10.500) — "Keluarga"/"Bisnis"/"Orang Lain" semua nonaktif.
+- **Tapi**: dicek `useAccountBalances` (`features/reports/use-account-
+  balances.ts`) TERNYATA TIDAK filter `is_active` sama sekali — akun
+  nonaktif tetap ikut dihitung di laporan "Saldo per Akun". Jadi gap
+  Rp2 juta ini SECARA TEKNIS masih bisa nongol di laporan, walau
+  akunnya sudah "dipensiunkan" dari pemakaian sehari-hari.
+- **Keputusan user**: TIDAK perlu backfill — akar masalah yang lebih
+  tepat sasaran BUKAN data `debt_payments`-nya (itu toh akun yang sudah
+  ditinggalkan), melainkan **laporan saldo yang tidak memfilter akun
+  nonaktif sama sekali** — itu gap LEBIH LUAS (berlaku utk akun nonaktif
+  APA PUN, tidak terbatas ke kasus `debt`/`transaction_id NULL` ini)
+  yang lebih pantas diperbaiki. "Laporan saldo nanti yang perlu
+  diupdate" — dicatat sbg gap BARU terpisah di bawah, BUKAN
+  diimplementasikan sesi ini.
+
+Gap LAIN yang ditemukan selama investigasi ini (laporan saldo tidak
+filter akun nonaktif) BUKAN tanggung jawab fitur utang-piutang — sudah
+dipindah jadi dokumen tersendiri:
+`docs/todos/plan/account-balance-report-inactive-accounts.md`.
 
 ## Aksi cepat Edit/Hapus cicilan langsung di `PaymentsList`
 

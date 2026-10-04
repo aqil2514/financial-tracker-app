@@ -1,7 +1,7 @@
 # Checklist Manual Testing: Utang Piutang (Debts)
 
 Uji coba di `tauri dev`, mengikuti logic yang didesain di
-`docs/todos/plan/debt-receivable-tracking.md`. Setelah tiap langkah,
+`docs/todos/done/debt-receivable-tracking.md`. Setelah tiap langkah,
 cek data aktual di DB (`finance.dev.db`) kalau hasil di UI meragukan —
 lihat query contoh di akhir dokumen ini.
 

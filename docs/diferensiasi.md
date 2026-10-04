@@ -69,7 +69,7 @@ piutang/utang dijamin tidak pernah berubah akibat penghapusan transaksi
 apa pun. Konsep lengkap (ditulis utk audiens non-teknis): lihat
 `docs/concept/konsep-utang-piutang.md`.
 
-Detail teknis lengkap: `apps/desktop/docs/todos/plan/debt-receivable-tracking.md`.
+Detail teknis lengkap: `apps/desktop/docs/todos/done/debt-receivable-tracking.md`.
 
 ## 2. Tipe akun (`account_type`) yang mempengaruhi perilaku, bukan cuma label
 

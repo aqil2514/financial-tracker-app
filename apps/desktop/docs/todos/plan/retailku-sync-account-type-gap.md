@@ -69,6 +69,39 @@ dijawab SEBELUM implementasi (bukan di sesi ini):
    `insert-ar-ap-transaction.ts`, atau dibolehkan lolos karena ini
    jalur internal PC yang tidak lewat Worker)?
 
+## Dampak baru: fitur "Tandai Dihapuskan" (write-off) menolak baris ini
+
+Ditemukan 2026-10-04 saat membangun aksi manual "Tandai Dihapuskan"
+(`written_off`) untuk `debts` di `DebtListTable` — lihat
+`docs/todos/done/debt-receivable-tracking.md`, bagian "Aksi manual
+'Tandai Dihapuskan'" (fitur utang-piutang ini sendiri sudah SELESAI,
+dipindah ke `done/` — dokumen ini yang tetap jadi tracking AKTIF untuk
+gap Retailku-nya). Write-off (`shared/debts/use-write-off-debt.ts`)
+SELALU butuh `debt.account_id` terisi (dipakai sebagai sisi akun debt
+yang kena transaksi penutup `expense`/`income`, supaya saldo akun debt
+ikut mengarah ke nol sesuai `docs/concept/konsep-utang-piutang.md`) —
+kalau `debt.account_id == null`, mutation ini SENGAJA `throw Error`
+dengan pesan jelas ("Piutang/utang dari sinkronisasi Retailku belum
+bisa dihapuskan dari sini"), BUKAN jalan pintas diam-diam yang
+melanggar prinsip "diselesaikan = saldo ke nol".
+
+Pola IDENTIK juga berlaku di `usePayDebt`
+(`shared/debts/pay-debt-form/use-pay-debt.ts`, settlement_mode
+`'non_cash'`) — kombinasi `debt.account_id == null` DAN
+`settlement_mode: 'non_cash'` adalah SATU-SATUNYA jalur di seluruh
+codebase yang MASIH bisa menghasilkan `debt_payments.transaction_id:
+NULL` untuk data BARU (lihat catatan "Temuan BARU" di
+`debt-receivable-tracking.md` soal data lama `transaction_id NULL`
+yang sudah dikonfirmasi TIDAK terkait gap ini — itu data historis
+pra-fix non_cash, bukan dari Retailku).
+
+Kedua tempat ini sama-sama DITOLAK secara eksplisit, bukan dibiarkan
+lolos diam-diam — menunggu jawaban pertanyaan #1/#2 di atas (akun debt
+Retailku terpisah atau berbagi dengan manual?) sebelum bisa
+diimplementasikan dengan benar. Dokumen INI (bukan
+`debt-receivable-tracking.md`, yang sudah selesai & dipindah ke
+`done/`) yang jadi rujukan detail teknis DAN tracking aktif gap ini.
+
 ## Status terkait yang relevan (sudah beres, untuk referensi)
 
 - `docs/todos/plan/audit-kepatuhan-konsep-tipe-akun.md` — 6 dari 7
