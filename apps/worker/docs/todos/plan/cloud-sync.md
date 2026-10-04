@@ -28,11 +28,39 @@ eksekusi" (Tahap 0-8) di bawah.
       16 tool TULIS, diverifikasi end-to-end di production.
 - [x] Verifikasi sisi Worker/MCP — DITUTUP sadar sbg dogfooding manual
       (bukan test formal), lihat Tahap 7.
-- [ ] **BARU** Port write-off (`written_off`) ke Worker + MCP-server —
-      belum ada endpoint/service/tool sama sekali, lihat Tahap 8.
-- [ ] **BARU** Port edit/hapus 1 `debt_payments` langsung ke Worker +
-      MCP-server — cuma ada `POST` (create), belum ada `PATCH`/`DELETE`,
-      lihat Tahap 8.
+- [x] Edit/hapus 1 cicilan (`debt_payments`) dari HP/Claude — TERNYATA
+      SUDAH BISA lewat `update_transaction`/`delete_transaction` yang
+      generic (reuse `applyDebtTransactionEdit`/
+      `detachDebtForDeletedTransaction`, sama persis pola
+      `use-edit-payment.ts` desktop) — gap SEBENARNYA cuma di sisi BACA
+      (Claude tidak bisa menemukan `transactionId` 1 cicilan tertentu),
+      ditutup via tool baru `get_debt_detail` (2026-10-04). TIDAK perlu
+      endpoint `PATCH`/`DELETE /debts/:id/payments/:paymentId`
+      dedicated — lihat Tahap 8 utk detail lengkap.
+- [x] **Bug ditemukan & diperbaiki (2026-10-04)**: `createNonCashPayment`
+      Worker SELALU `transaction_id: NULL`, mereplikasi pola LAMA
+      desktop yg sudah terbukti salah (`docs/concept/konsep-transaksi.md`)
+      — saldo akun debt tidak pernah berkurang via pelunasan non-cash.
+      Diperbaiki niru `use-pay-debt.ts` revisi: transaksi penutup dibuat
+      kalau `account_id` terisi. Lihat Tahap 8.
+- [x] Port write-off (`written_off`) ke Worker — endpoint baru
+      `POST /debts/:id/write-off`, reuse helper `createDebtClosingTransaction`
+      yg sama dgn fix `createNonCashPayment` di atas (logic identik,
+      di-share). Lihat Tahap 8.
+- [x] Tool MCP `write_off_debt` (`apps/mcp-server`,
+      `src/lib/mcp-tools/debts/write-off-debt.ts`) — DIVERIFIKASI
+      end-to-end LOKAL (`wrangler dev` tanpa `--remote`, D1 simulasi
+      lokal + data uji manual via HTTP, kode tool ASLI dipanggil via
+      `tsx` bukan reimplementasi): fix `createNonCashPayment`
+      (transaksi penutup + saldo akun debt berkurang benar),
+      `writeOffDebt` (transaksi penutup, status `written_off`, saldo ke
+      0, idempotent no-op pada panggilan ulang, 404/422 sesuai desain),
+      tool `write_off_debt` sukses DAN error case ter-propagate benar.
+      Lihat Tahap 8.
+- [ ] **BARU** Deploy perubahan Worker (fix `createNonCashPayment` +
+      endpoint write-off) ke PRODUCTION + verifikasi end-to-end dgn data
+      uji nyata di sana — BELUM dilakukan (yang sudah diverifikasi di
+      atas baru LOKAL), lihat Tahap 8.
 
 ## Latar belakang
 
@@ -998,13 +1026,15 @@ nanti ada temuan terkait dari dogfooding):
 (Tahap 2 — inventarisir logic bisnis, dan Tahap 6 — integrasi klien PC,
 ada di dokumen `apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`.)
 
-### Tahap 8 — Gap BARU ditemukan 2026-10-04: write-off & edit/hapus cicilan belum di-port ke Worker/MCP
+### Tahap 8 — Gap ditemukan 2026-10-04: write-off & edit/hapus cicilan, ditutup sesi yang sama
 
 Ditemukan saat audit konsistensi logic `debts` lintas-app, dipicu oleh
 2 fitur baru yang baru selesai di `apps/desktop`:
 `docs/todos/done/debt-receivable-tracking.md` ("Aksi manual 'Tandai
 Dihapuskan'" DAN "Aksi cepat Edit/Hapus cicilan langsung di
-`PaymentsList`").
+`PaymentsList`"). Ketiga gap di tabel awal (di bawah) ditutup dalam
+sesi lanjutan yang SAMA (2026-10-04) — lihat "Progress implementasi
+Tahap 8" setelah tabel utk apa yang sebenarnya dikerjakan.
 
 **Catatan koreksi dulu**: "Temuan arsitektural PENTING" di Tahap 5
 (baris ~899-911 di atas, "TIDAK ADA endpoint `/debts` sama sekali...
@@ -1019,44 +1049,138 @@ manual dari `apps/desktop/src/shared/debts/`), BUKAN cuma "selalu lewat
 lama (bukan dihapus) sbg jejak sejarah keputusan, tapi pembaca JANGAN
 percaya itu sbg kondisi SEKARANG — rujuk ke bagian ini.
 
-**Audit dilakukan** (agent Explore, baca kode aktual, bukan asumsi):
+**Audit awal** (agent Explore, baca kode aktual, bukan asumsi) — status
+SEBELUM sesi lanjutan 2026-10-04:
 
-| Fitur desktop (SUDAH matang) | Status di Worker | Status di MCP-server |
+| Fitur desktop (SUDAH matang) | Status di Worker (SEBELUM) | Status di MCP-server (SEBELUM) |
 |---|---|---|
 | Revert `debts.status` `'paid'`→`'ongoing'` saat edit/hapus cicilan | **SUDAH ADA**, konsisten — `service.ts` fungsi `applyDebtTransactionEdit` (~baris 386-398) dan `detachDebtForDeletedTransaction` (~baris 438-449) | N/A (passthrough murni ke Worker, tidak re-implementasi logic) |
 | Write-off (`written_off`) dengan transaksi penutup WAJIB di `debt.account_id` | **TIDAK ADA SAMA SEKALI** — tidak ada endpoint/service utk status `written_off` | **Tidak ada tool** (karena Worker-nya sendiri belum ada) |
 | Edit/Hapus 1 baris `debt_payments` langsung (bukan hapus transaksi induk) | **TIDAK ADA endpoint** `PATCH`/`DELETE /debts/:id/payments/:paymentId` — cuma ada `POST /:id/payments` (create) | **Tidak ada tool** (`pay_debt_non_cash` cuma create, tidak ada `update_debt_payment`/`delete_debt_payment`) |
 
-**PENTING — ini BUKAN bug/drift**: tidak ditemukan implementasi
-setengah jadi yang lupa revert status atau lupa bikin transaksi penutup
-di Worker. Gap-nya murni **belum pernah diimplementasikan** di kedua
-layer — fitur yang memang belum ada, bukan fitur yang ada tapi salah.
-Konsekuensi praktis: user TIDAK BISA melakukan write-off atau
-edit/hapus 1 cicilan dari HP/Claude (MCP) — kedua aksi itu cuma bisa
-dari aplikasi desktop sampai gap ini digarap.
+**PENTING — ini BUKAN bug/drift (temuan awal)**: tidak ditemukan
+implementasi setengah jadi yang lupa revert status atau lupa bikin
+transaksi penutup di Worker. Gap-nya murni **belum pernah
+diimplementasikan** di kedua layer — fitur yang memang belum ada, bukan
+fitur yang ada tapi salah. **KECUALI** satu hal yang ketahuan BENERAN
+jadi bug saat riset lanjutan (bukan cuma gap) — lihat poin "Bug
+`createNonCashPayment`" di bawah.
 
-**BELUM diputuskan** (scope utk sesi lanjutan):
-- Prioritas: apakah write-off atau edit/hapus cicilan yang lebih
-  mendesak di-port duluan ke Worker+MCP?
-- Kalau write-off di-port: **HARUS niru pola `use-write-off-debt.ts`
-  desktop** (insert transaksi penutup DULU, baru `debt_payments` +
-  `UPDATE status`) — **JANGAN niru pola `createNonCashPayment`** yang
-  sengaja `transaction_id: NULL` (itu kasus settlement BIASA tanpa
-  uang, beda konteks dari write-off yang WAJIB py transaksi penutup
-  sesuai `docs/concept/konsep-transaksi.md`).
-- Kalau edit/hapus `debt_payments` di-port: desain endpoint-nya perlu
-  tentukan role-based logic yang SAMA dgn `applyDebtTransactionEdit`
-  (field "berbahaya" vs aman, blokir kalau ada dependency), bukan
-  `UPDATE`/`DELETE` polos — reuse logic Worker yang sudah ada
-  (`applyDebtTransactionEdit` sendiri sebenarnya SUDAH generic, cuma
-  belum ada endpoint HTTP yang memanggilnya utk kasus "edit SATU
-  debt_payment tanpa lewat transaksi induk").
-- Perlu diputuskan juga: apakah mengikuti pola lama "SELALU lewat
-  `/transactions`" (edit transaksi transfer/income/expose yang jadi
-  jejak `debt_payments`, BUKAN endpoint debt_payments langsung) —
-  konsisten dgn desktop yang edit-cicilannya pun ujung-ujungnya
-  `UPDATE transactions` dulu (lihat `use-edit-payment.ts`) — ATAU bikin
-  endpoint `debt_payments` dedicated yang baru.
+**Progress implementasi Tahap 8 (sesi lanjutan 2026-10-04):**
+
+- [x] **Keputusan: edit/hapus 1 cicilan TIDAK butuh endpoint dedicated**
+      — riset lebih dalam menunjukkan `update_transaction`/
+      `delete_transaction` yang SUDAH ADA (hit `PATCH`/`DELETE
+      /transactions/:id` Worker) SUDAH generic dan BENAR utk kasus ini:
+      `updateTransactionRow`/`deleteTransaction` Worker reuse
+      `applyDebtTransactionEdit`/`detachDebtForDeletedTransaction` utk
+      role `'payment'`, PERSIS logic yang dipakai `use-edit-payment.ts`
+      desktop (edit cicilan = `UPDATE transactions` pada transaksi
+      induknya, BUKAN `UPDATE debt_payments` langsung). Gap
+      SEBENARNYA ada di sisi BACA: Claude tidak punya cara menemukan
+      `transactionId` 1 baris cicilan tertentu.
+- [x] **Tool baru `get_debt_detail`** (`apps/mcp-server`,
+      `src/lib/mcp-tools/debts/get-debt-detail.ts`) — menutup gap BACA
+      di atas: expose `debts` + `debt_payments` (termasuk
+      `transactionId` tiap cicilan) per piutang/utang, opsional filter
+      `debtId`/`contactId`. Fungsi helper baru `listDebtDetails`
+      (`src/lib/sync-snapshot.ts`). **DIVERIFIKASI logic BENAR** scr
+      manual terhadap snapshot PRODUCTION nyata (replikasi fungsi di
+      Node, cocok 100% dgn data asli: 3 debt alive, `remaining`
+      terhitung tepat) — TAPI skenario "edit/hapus cicilan via
+      `update_transaction`/`delete_transaction`" sendiri BELUM dites
+      end-to-end krn data production saat ini tidak punya cicilan
+      dgn `transactionId` terisi (satu-satunya `debt_payment` alive
+      datanya lama, `transactionId: NULL`) — akan otomatis valid
+      begitu ada cicilan baru yg lahir dari transfer settlement biasa.
+- [x] **Refactor struktur `apps/mcp-server`** — `route.ts` (585 baris,
+      17 tool dalam 1 file) dipecah jadi pola 3-level PERSIS
+      `D:\Programming\Pribadi\retail-multitenant\apps\api\src\helpers\mcp\`
+      (direktif eksplisit dari user): `src/lib/mcp-tools/index.ts`
+      (orchestrator top, `registerAllMcpTools`) → 6 folder per domain
+      (`accounts`, `transactions`, `debts`, `contacts`, `categories`,
+      `account-groups`) masing-masing `index.ts`
+      (`registerXMcpTools`) → 1 file per tool (`registerToolName`).
+      Helper baru `src/lib/mcp-context.ts` (`getToken`/`newId`, shared
+      lintas file tool). `route.ts` sekarang cuma setup OAuth + panggil
+      `registerAllMcpTools(server)`. Field schema yang dishare antar
+      create/update (`accountFields`, `transactionFields`,
+      `categoryFields`) diekspor dari file `create-*.ts`, diimpor di
+      `update-*.ts`. **Murni pemindahan kode, 0 perubahan perilaku**
+      (diverifikasi via diff). Typecheck+build lulus, commit `ef2c98a`
+      sudah di-push & auto-deploy ke Vercel production (status READY,
+      0 runtime error).
+- [x] **Bug ditemukan & diperbaiki: `createNonCashPayment` SELALU
+      `transaction_id: NULL`** — ketahuan saat riset pola write-off yg
+      BENAR (poin di bawah). `use-pay-debt.ts` desktop versi SEKARANG
+      (`settlement_mode: 'non_cash'`) SUDAH diperbaiki beberapa sesi
+      lalu: kalau `debt.account_id` terisi, WAJIB bikin transaksi
+      penutup `income`/`expense` langsung ke akun debt itu (persis
+      alasan yg sama dgn write-off, lihat
+      `docs/concept/konsep-transaksi.md` "Kenapa prinsip ini sempat
+      dilanggar, dan kenapa itu salah") — `transaction_id: NULL` cuma
+      tersisa utk baris sync Retailku (`account_id` NULL). Tapi
+      `createNonCashPayment` Worker (dibangun sebelum revisi desktop
+      itu) masih niru pola LAMA yg sudah terbukti salah: SELALU NULL,
+      TIDAK PERNAH bikin transaksi penutup — akibatnya saldo akun debt
+      tidak pernah berkurang via `pay_debt_non_cash` (tool MCP) ATAU
+      jalur non-cash dari PC kalau pernah dipanggil. **Ini bug nyata di
+      Worker, bukan cuma gap "belum diimplementasikan"** — kontradiksi
+      langsung dgn prinsip aktif di `konsep-transaksi.md`.
+      Diperbaiki: helper baru `createDebtClosingTransaction`
+      (`debts/service.ts`) — insert transaksi penutup
+      `income`(payable)/`expense`(receivable) LANGSUNG ke
+      `debt.account_id`, dipanggil `createNonCashPayment` kalau
+      `account_id` tidak null (baik cabang INSERT baru maupun UPDATE
+      LWW-win existing).
+- [x] **Endpoint baru `POST /debts/:id/write-off`** (`writeOffDebt` di
+      `debts/service.ts`, `handlePostDebtWriteOff` di
+      `controller.ts`/`router.ts`) — port PERSIS `use-write-off-debt.ts`
+      desktop, reuse `createDebtClosingTransaction` yg SAMA dgn fix
+      `createNonCashPayment` di atas (logic identik: hitung `remaining`
+      → transaksi penutup → insert `debt_payments` → `UPDATE
+      status='written_off'`). **Beda sengaja dari `createNonCashPayment`**:
+      `account_id == null` di-reject KERAS (422) di write-off (PERSIS
+      `use-write-off-debt.ts` baris 31-35 yg `throw Error`), BUKAN
+      diam-diam skip transaksi penutup spt `createNonCashPayment` — dua
+      fitur beda keputusan sengaja soal baris tanpa akun debt (sync
+      Retailku), bukan inkonsistensi. `remaining <= 0` = no-op
+      idempotent (BUKAN error), PERSIS `use-write-off-debt.ts` baris 36.
+      Typecheck lulus. Worker TIDAK punya test suite otomatis (hanya
+      `tsc --noEmit`).
+- [x] **Tool MCP `write_off_debt`** (`apps/mcp-server`,
+      `src/lib/mcp-tools/debts/write-off-debt.ts`, didaftarkan di
+      `debts/index.ts`) — payload cuma `debtId` + `confirm:true` (TIDAK
+      kirim `amount`/`date`/`note`, beda dari `pay_debt_non_cash`,
+      karena Worker yang hitung semuanya sendiri). Typecheck+build lulus.
+- [x] **Verifikasi end-to-end LOKAL** (2026-10-04, menggantikan
+      dogfooding production sementara krn kode belum di-deploy) —
+      `wrangler dev` TANPA `--remote` (D1 simulasi lokal kosong, data uji
+      dibuat manual via HTTP: akun cash + akun debt + kontak + piutang
+      Rp1.000.000 lewat transfer biasa). Skenario: (1) non-cash payment
+      parsial Rp400rb → `transaction_id` TERISI (bukan NULL lagi),
+      saldo akun debt turun jadi Rp600rb — bug `createNonCashPayment`
+      TERBUKTI fixed; (2) write-off sisa Rp600rb → transaksi penutup
+      `expense` dibuat, `debts.status` jadi `written_off`, saldo akun
+      debt balik ke 0; (3) write-off ulang (sudah settled) → idempotent
+      no-op (`transactionId: null`, bukan transaksi ganda); (4)
+      write-off id tidak ada → 404; (5) write-off debt `account_id`
+      NULL (simulasi baris sync Retailku, insert manual) → 422 reject,
+      pesan sama persis `use-write-off-debt.ts`; (6) tool MCP
+      `write_off_debt` — kode ASLI (bukan reimplementasi logic)
+      dipanggil via `tsx` dgn `McpServer` palsu yg menangkap handler,
+      `WORKER_URL` diarahkan ke `localhost:8787` — sukses membuat
+      write-off piutang KEDUA (Rp250rb) end-to-end LEWAT tool, dan error
+      case (`account_id` NULL) ter-propagate sbg `WorkerRequestError`
+      status 422 dgn benar. File test sementara (`test-write-off-tool.mts`
+      dkk) sudah dibersihkan, `wrangler dev` sudah dimatikan, data uji
+      HANYA di D1 lokal (TIDAK menyentuh production).
+- [ ] **BELUM dikerjakan**: deploy perubahan Worker (fix
+      `createNonCashPayment` + endpoint write-off) ke PRODUCTION +
+      verifikasi ulang end-to-end di sana dgn data uji nyata (dibersihkan
+      sesudahnya) — yang di atas baru LOKAL, production masih pakai kode
+      LAMA (`createNonCashPayment` masih bug, endpoint write-off belum
+      ada sama sekali) sampai deploy ini dilakukan.
 
 ## Terkait
 

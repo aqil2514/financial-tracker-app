@@ -536,6 +536,49 @@ export async function createDirectDebt(
   return { status: "ok", id: payload.id };
 }
 
+type DebtForClosingRow = {
+  type: "receivable" | "payable";
+  contact_id: string | null;
+  account_id: string | null;
+};
+
+// Transaksi "penutup" LANGSUNG pada akun debt itu sendiri -- TIDAK ada
+// uang riil berpindah ke akun kas mana pun, tapi TETAP wajib lewat
+// `transactions` (satu-satunya jalur sah mengubah accounts.balance,
+// lihat docs/concept/konsep-transaksi.md "Kenapa prinsip ini sempat
+// dilanggar, dan kenapa itu salah") supaya saldo akun debt ikut
+// mengarah ke nol. Port PERSIS dari pay-debt-form/use-pay-debt.ts
+// (cabang non_cash dgn account_id terisi) & use-write-off-debt.ts --
+// KEDUANYA pakai logic identik, makanya di-share di sini. Dipanggil
+// SETELAH caller memastikan `debt.account_id` tidak null (satu-satunya
+// kasus tanpa transaksi penutup adalah baris sync Retailku, lihat
+// komentar di use-pay-debt.ts).
+async function createDebtClosingTransaction(
+  env: Env,
+  {
+    debt,
+    amount,
+    date,
+    note,
+    syncSource,
+  }: { debt: DebtForClosingRow & { account_id: string }; amount: number; date: string; note: string | null; syncSource: SyncSource }
+): Promise<string> {
+  const transactionId = uuidv7();
+  const transactionType: "income" | "expense" = debt.type === "receivable" ? "expense" : "income";
+  const now = nowText();
+
+  await env.DB.prepare(
+    `INSERT INTO transactions
+       (id, type, amount, category_id, account_id, transfer_account_id, note, date, description, contact_id,
+        created_at, updated_at, sync_source)
+     VALUES (?1, ?2, ?3, NULL, ?4, NULL, ?5, ?6, NULL, ?7, ?8, ?8, ?9)`
+  )
+    .bind(transactionId, transactionType, amount, debt.account_id, note, date, debt.contact_id, now, syncSource)
+    .run();
+
+  return transactionId;
+}
+
 export type CreateNonCashPaymentResult =
   | { status: "ok"; id: string }
   | { status: "stale" }
@@ -544,10 +587,16 @@ export type CreateNonCashPaymentResult =
 
 // Port dari pay-debt-form/use-pay-debt.ts (settlement_mode === 'non_cash')
 // -- pelunasan TANPA uang berpindah sama sekali (barter/pemutihan/offset).
-// transaction_id selalu NULL, account_id ikut debts.account_id (akun
-// bertipe 'debt' milik baris ini -- bisa NULL utk debt dari sync Retailku,
-// lihat use-pay-debt.ts). Settlement 'cash' SUDAH bisa lewat
-// insertTransaction + debtAction=settlement -- TIDAK diulang di sini.
+// account_id ikut debts.account_id (akun bertipe 'debt' milik baris ini).
+// Settlement 'cash' SUDAH bisa lewat insertTransaction + debtAction=settlement
+// -- TIDAK diulang di sini.
+//
+// CATATAN KOREKSI (2026-10-04): versi SEBELUMNYA fungsi ini SELALU
+// transaction_id:NULL, mereplikasi pola LAMA desktop yang sudah terbukti
+// salah (lihat docs/concept/konsep-transaksi.md) -- saldo akun debt tidak
+// pernah berkurang via jalur ini. Sekarang PERSIS niru use-pay-debt.ts
+// revisi: ada transaksi penutup kalau account_id terisi, transaction_id
+// NULL cuma tersisa utk baris dari sync Retailku (account_id NULL).
 export async function createNonCashPayment(
   env: Env,
   debtId: string,
@@ -555,10 +604,10 @@ export async function createNonCashPayment(
   syncSource: SyncSource
 ): Promise<CreateNonCashPaymentResult> {
   const debt = await env.DB.prepare(
-    "SELECT account_id, amount FROM debts WHERE id = ?1 AND deleted_at IS NULL"
+    "SELECT type, contact_id, account_id, amount FROM debts WHERE id = ?1 AND deleted_at IS NULL"
   )
     .bind(debtId)
-    .first<{ account_id: string | null; amount: number }>();
+    .first<DebtForClosingRow & { amount: number }>();
   if (!debt) return { status: "not_found" };
 
   const existing = await env.DB.prepare("SELECT updated_at FROM debt_payments WHERE id = ?1")
@@ -582,6 +631,17 @@ export async function createNonCashPayment(
     };
   }
 
+  const transactionId =
+    debt.account_id != null
+      ? await createDebtClosingTransaction(env, {
+          debt: { ...debt, account_id: debt.account_id },
+          amount: payload.amount,
+          date: payload.date,
+          note: payload.note ?? null,
+          syncSource,
+        })
+      : null;
+
   const now = nowText();
   if (existing) {
     await env.DB.prepare(
@@ -592,13 +652,14 @@ export async function createNonCashPayment(
   } else {
     await env.DB.prepare(
       `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date, note, created_at, updated_at, sync_source)
-       VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7, ?8, ?9)`
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`
     )
       .bind(
         payload.id,
         debtId,
         payload.amount,
         debt.account_id,
+        transactionId,
         payload.date,
         payload.note ?? null,
         now,
@@ -613,4 +674,75 @@ export async function createNonCashPayment(
   }
 
   return { status: "ok", id: payload.id };
+}
+
+export type WriteOffDebtResult =
+  | { status: "ok"; transactionId: string | null }
+  | { status: "not_found" }
+  | { status: "rejected"; reason: string };
+
+// Port PERSIS dari use-write-off-debt.ts -- tandai piutang/utang
+// `status='written_off'` (diikhlaskan, BUKAN pelunasan penuh biasa).
+// Reuse createDebtClosingTransaction (logic identik dgn cabang non_cash
+// di createNonCashPayment) -- transaksi penutup WAJIB dibuat sebesar
+// sisa, supaya saldo akun debt ikut ke nol.
+//
+// BEDA dari createNonCashPayment: account_id NULL (baris sync Retailku)
+// di SINI direject KERAS (422), BUKAN diam-diam skip transaksi penutup
+// -- desktop (use-write-off-debt.ts baris 31-35) throw Error eksplisit
+// utk kasus ini, jadi PERSIS diikuti di sini, BUKAN disamakan dgn
+// keputusan createNonCashPayment yg sengaja mengizinkan tanpa transaksi.
+export async function writeOffDebt(
+  env: Env,
+  debtId: string,
+  syncSource: SyncSource
+): Promise<WriteOffDebtResult> {
+  const debt = await env.DB.prepare(
+    "SELECT type, contact_id, account_id, amount FROM debts WHERE id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(debtId)
+    .first<DebtForClosingRow & { amount: number }>();
+  if (!debt) return { status: "not_found" };
+
+  if (debt.account_id == null) {
+    return {
+      status: "rejected",
+      reason: "Piutang/utang dari sinkronisasi Retailku belum bisa dihapuskan dari sini.",
+    };
+  }
+
+  const { results: payments } = await env.DB.prepare(
+    "SELECT COALESCE(SUM(amount), 0) AS paid FROM debt_payments WHERE debt_id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(debtId)
+    .all<{ paid: number }>();
+  const remaining = debt.amount - (payments[0]?.paid ?? 0);
+
+  // No-op kalau sudah lunas/habis, PERSIS use-write-off-debt.ts baris 36
+  // (bukan reject -- caller mungkin memanggil ulang tanpa tahu status
+  // terbaru, biarkan idempotent).
+  if (remaining <= 0) {
+    await env.DB.prepare("UPDATE debts SET status = 'written_off' WHERE id = ?1").bind(debtId).run();
+    return { status: "ok", transactionId: null };
+  }
+
+  const now = nowText();
+  const transactionId = await createDebtClosingTransaction(env, {
+    debt: { ...debt, account_id: debt.account_id },
+    amount: remaining,
+    date: now,
+    note: "Penutup piutang/utang dihapuskan",
+    syncSource,
+  });
+
+  await env.DB.prepare(
+    `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date, created_at, updated_at, sync_source)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?6, ?7)`
+  )
+    .bind(uuidv7(), debtId, remaining, debt.account_id, transactionId, now, syncSource)
+    .run();
+
+  await env.DB.prepare("UPDATE debts SET status = 'written_off' WHERE id = ?1").bind(debtId).run();
+
+  return { status: "ok", transactionId };
 }
