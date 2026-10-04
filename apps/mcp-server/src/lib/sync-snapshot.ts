@@ -137,6 +137,10 @@ export function listAliveAccounts(snapshot: SyncSnapshot): Account[] {
   return snapshot.accounts.filter(isAlive);
 }
 
+export function listAliveCategories(snapshot: SyncSnapshot): Category[] {
+  return snapshot.categories.filter(isAlive);
+}
+
 export function summarizeExpenseByCategory(
   snapshot: SyncSnapshot,
   options: { from?: string; to?: string } = {}

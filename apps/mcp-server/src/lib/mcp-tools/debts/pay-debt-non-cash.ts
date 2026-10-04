@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken, newId } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
+import { dateField } from "@/lib/date-field";
 
 export function registerPayDebtNonCash(server: McpServer) {
   server.registerTool(
@@ -13,7 +14,7 @@ export function registerPayDebtNonCash(server: McpServer) {
       inputSchema: z.object({
         debtId: z.string().describe("ID piutang/utang (debts.id) yang dilunasi"),
         amount: z.number().positive(),
-        date: z.string().describe("Format YYYY-MM-DD"),
+        date: dateField,
         note: z.string().optional().describe("Alasan pelunasan non-cash, mis. 'barter jasa desain'"),
       }),
     },

@@ -2,12 +2,13 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken, newId } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
+import { dateField } from "@/lib/date-field";
 
 export const transactionFields = {
   type: z.enum(["income", "expense", "transfer"]),
   amount: z.number().positive(),
   note: z.string(),
-  date: z.string().describe("Format YYYY-MM-DD"),
+  date: dateField,
   categoryId: z.string().optional(),
   accountId: z.string().min(1, "Akun wajib diisi").describe("Akun sumber/utama, wajib diisi"),
   transferAccountId: z.string().optional().describe("Akun tujuan, wajib diisi utk type=transfer"),

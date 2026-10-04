@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken, newId } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
+import { dateField } from "@/lib/date-field";
 
 // create_debt_direct & pay_debt_non_cash -- menutup gap paralelitas
 // desktop vs MCP (audit-kepatuhan-konsep-tipe-akun.md pertanyaan #7).
@@ -20,7 +21,7 @@ export function registerCreateDebtDirect(server: McpServer) {
         type: z.enum(["receivable", "payable"]).describe("receivable = saya meminjamkan, payable = saya berutang"),
         amount: z.number().positive(),
         accountId: z.string().min(1, "Akun wajib diisi").describe("Akun bertipe 'debt'"),
-        date: z.string().describe("Format YYYY-MM-DD"),
+        date: dateField,
         note: z.string().optional(),
         contactId: z.string().optional().describe("ID kontak, menang kalau diisi bareng contactName"),
         contactName: z
