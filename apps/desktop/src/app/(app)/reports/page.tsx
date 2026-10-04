@@ -17,7 +17,7 @@ export default function ReportsPage() {
     <PageContainer>
       <PageHeader title="Laporan" description="Analisis dan tren keuangan Anda" />
 
-      <Tabs defaultValue="monthly">
+      {/* <Tabs defaultValue="monthly">
         <TabsList>
           <TabsTrigger value="monthly">Ringkasan Bulanan</TabsTrigger>
           <TabsTrigger value="category">Per Kategori</TabsTrigger>
@@ -32,7 +32,7 @@ export default function ReportsPage() {
         <TabsContent value="account">
           <AccountBalanceChart />
         </TabsContent>
-      </Tabs>
+      </Tabs> */}
     </PageContainer>
   );
 }
