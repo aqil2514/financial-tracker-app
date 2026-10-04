@@ -7,7 +7,7 @@
 > (file:baris spesifik di `src/features/*` dst) — meski dipakai sbg
 > checklist porting ke Worker. Semua keputusan sync/conflict
 > resolution/arsitektur MCP ada di
-> [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../../worker/docs/todos/plan/cloud-sync.md)
+> [`apps/worker/docs/todos/done/cloud-sync.md`](../../../../worker/docs/todos/done/cloud-sync.md)
 > (dipecah lagi dari `mcp-server-cloud-mirror.md` supaya tiap app py
 > dokumen sendiri, lihat [`docs/todos/plan/cloud-sync-mcp.md`](../../../../../docs/todos/plan/cloud-sync-mcp.md)
 > di root utk index lintas-app). `mcp-server-cloud-mirror.md` sekarang
@@ -118,7 +118,7 @@ kehilangan uang.
     Worker WAJIB menerima parameter aksi eksplisit per relasi (field
     `*Action: "unassign"|"reassign"` + target id), PERSIS pola desktop
     — BUKAN default "unassign" diam-diam. Lihat
-    `apps/worker/docs/todos/plan/cloud-sync.md` bagian endpoint
+    `apps/worker/docs/todos/done/cloud-sync.md` bagian endpoint
     `DELETE` utk detail lengkap + temuan soft-delete `contacts`.
 - **Filter `category.type === transaction.type` TIDAK dipaksakan di DB**
   (`use-account-category-options.tsx:37-81`) — hanya filter dropdown
@@ -155,7 +155,7 @@ kehilangan uang.
   2026-10-01 ke `apps/worker/src/modules/contacts/service.ts`
   (`resolveContactId`), DIVERIFIKASI secara statis (belum ada entry
   point HTTP yg memanggilnya — `debts` manual SENGAJA di-skip, lihat
-  `apps/worker/docs/todos/plan/cloud-sync.md`).
+  `apps/worker/docs/todos/done/cloud-sync.md`).
 - Format tanggal lokal custom (`now()` ISO-lokal tanpa offset,
   BEDA dari `datetime('now')` SQLite yg pakai spasi bukan `"T"`) —
   dipakai konsisten di 4 titik (`use-create-transaction.ts`,
@@ -188,7 +188,7 @@ kehilangan uang.
       (risiko drift diterima, sama seperti trade-off LWW vs log —
       konsisten dgn preferensi "jangan over-engineer").
 
-## Checklist porting (belum dikerjakan — untuk Tahap 4/5 di `apps/worker/docs/todos/plan/cloud-sync.md`)
+## Checklist porting (belum dikerjakan — untuk Tahap 4/5 di `apps/worker/docs/todos/done/cloud-sync.md`)
 
 - [x] Port `applyDebtTransaction`/`settleDebtsFifo` ke Worker —
       `apps/worker/src/modules/debts/service.ts`, dipanggil dari
@@ -211,7 +211,7 @@ kehilangan uang.
       dalam `settleDebtsFifo` spt dugaan awal — dipindah krn temuan
       atomicity: reject SETELAH tulis akan menyisakan baris transaksi
       yatim, lihat catatan lengkap di
-      `apps/worker/docs/todos/plan/cloud-sync.md`). DIVERIFIKASI: amount
+      `apps/worker/docs/todos/done/cloud-sync.md`). DIVERIFIKASI: amount
       jauh > sisa → 422, 0 baris transaksi tersimpan; amount pas = sisa
       → 201 ok, status piutang jadi `paid`.
 - [x] Port larangan income/expense di akun `debt` ke Worker —
@@ -238,7 +238,7 @@ kehilangan uang.
 
 ## Terkait
 
-- [`../../../../worker/docs/todos/plan/cloud-sync.md`](../../../../worker/docs/todos/plan/cloud-sync.md)
+- [`../../../../worker/docs/todos/done/cloud-sync.md`](../../../../worker/docs/todos/done/cloud-sync.md)
   — dokumen UTAMA: semua keputusan sync/arsitektur/conflict resolution,
   progress implementasi Worker, checklist Tahap 4/5 yang merujuk ke
   checklist porting di dokumen ini.

@@ -18,7 +18,7 @@ Claude — live, sisi BACA selesai).
 
 - [x] **Tahap 0-1** — Riset arsitektur & keputusan conflict resolution
       — **SELESAI**. Detail:
-      [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
+      [`apps/worker/docs/todos/done/cloud-sync.md`](../../../apps/worker/docs/todos/done/cloud-sync.md)
 - [x] **Tahap 2** — Audit logic bisnis yang wajib direplikasi ke Worker
       — **SELESAI** (audit + porting, 7 dari 7 logic). Detail:
       [`apps/desktop/docs/todos/plan/mcp-server-business-logic-audit.md`](../../../apps/desktop/docs/todos/plan/mcp-server-business-logic-audit.md)
@@ -27,7 +27,7 @@ Claude — live, sisi BACA selesai).
       Detail sisi PC:
       [`apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`](../../../apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md) —
       Detail sisi D1:
-      [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
+      [`apps/worker/docs/todos/done/cloud-sync.md`](../../../apps/worker/docs/todos/done/cloud-sync.md)
 - [x] **Tahap 4** — Worker: endpoint sync + tulis + validasi bisnis +
       autentikasi — **SELESAI** (2026-10-03, termasuk token MCP
       terpisah). Worker live di production
@@ -42,7 +42,7 @@ Claude — live, sisi BACA selesai).
       /auth/verify` utk validasi token ringan. **SENGAJA SKIP** endpoint
       `/debts`/`/debt-payments` langsung (tidak py padanan create/update
       di desktop). Detail:
-      [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
+      [`apps/worker/docs/todos/done/cloud-sync.md`](../../../apps/worker/docs/todos/done/cloud-sync.md)
 - [x] **Tahap 5** — MCP server (Vercel + `mcp-handler`) — **SELESAI**
       (2026-10-03): `apps/mcp-server` live di Vercel, OAuth shim custom,
       5 tool BACA (saldo akun, ringkasan pengeluaran per kategori,
@@ -54,7 +54,7 @@ Claude — live, sisi BACA selesai).
       `delete_*` wajib `confirm:true`. **Diverifikasi via protokol MCP
       sungguhan di production** (bukan simulasi) — "kelola data dari HP"
       sekarang genap: bisa lihat DAN ubah data. Detail:
-      [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../apps/worker/docs/todos/plan/cloud-sync.md)
+      [`apps/worker/docs/todos/done/cloud-sync.md`](../../../apps/worker/docs/todos/done/cloud-sync.md)
 - [x] **Tahap 6** — Integrasi klien PC (toggle Settings, hook push
       on-write, pull saat app dibuka, retry queue, backfill) —
       **SELESAI secara fungsional** (2026-10-01), diverifikasi dua arah

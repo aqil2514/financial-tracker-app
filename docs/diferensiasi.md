@@ -250,7 +250,7 @@ khusus dari kebutuhan nyata mengelola Warung Aqil.
   "tanya & lihat data dari HP". Tool TULIS masih tahap perencanaan
   (daftar final belum diputuskan). `apps/mobile` sendiri masih
   skeleton, tidak berubah. Detail lengkap & status terkini:
-  `apps/worker/docs/todos/plan/cloud-sync.md`.
+  `apps/worker/docs/todos/done/cloud-sync.md`.
 
 ## 5. Audit histori data, bukan cuma migrasi buta
 

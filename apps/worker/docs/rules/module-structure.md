@@ -204,7 +204,7 @@ struktur wajib dari awal.
 
 ## Terkait
 
-- `apps/worker/docs/todos/plan/cloud-sync.md` — progress implementasi,
+- `apps/worker/docs/todos/done/cloud-sync.md` — progress implementasi,
   daftar modul yang sudah/belum ada.
 - `apps/desktop/docs/todos/plan/mcp-server-business-logic-audit.md` —
   checklist logic bisnis yang di-port ke `service.ts` tiap modul.

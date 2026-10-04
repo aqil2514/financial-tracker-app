@@ -45,16 +45,37 @@ export async function upsertContact(
 // catatan soft-delete di account-groups/service.ts). BEDA dari
 // accounts/categories/account_groups: desktop TIDAK menawarkan
 // reassign/unassign apa pun di sini -- langsung DELETE, FK
-// `transactions.contact_id ON DELETE SET NULL` yg menangani sisanya
-// scr implisit. Port APA ADANYA, TANPA payload action.
+// `transactions.contact_id`/`debts.contact_id ON DELETE SET NULL` yg
+// menangani sisanya scr implisit.
+//
+// CATATAN KOREKSI (2026-10-04, menutup gap yg dicatat di "Yang BELUM
+// diputuskan"): versi SEBELUMNYA cuma soft-delete `contacts` TANPA
+// unassign apa pun -- krn FK `ON DELETE SET NULL` HANYA terpicu kalau
+// baris BENAR2 di-hard-delete, soft-delete di Worker bikin
+// `transactions.contact_id`/`debts.contact_id` TETAP menunjuk ke
+// kontak yg sudah `deleted_at` (TIDAK auto-NULL spt desktop). Diputuskan
+// SAMAKAN perilakunya dgn desktop: UPDATE kedua kolom jadi NULL secara
+// EKSPLISIT di sini, SEBELUM soft-delete `contacts` sendiri (urutan tidak
+// signifikan scr data, konsisten dgn pola "resolve dulu baru commit" di
+// transactions/service.ts).
 export async function deleteContact(env: Env, id: string): Promise<DeleteContactResult> {
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-  const result = await env.DB.prepare(
-    "UPDATE contacts SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NULL"
-  )
+
+  const existing = await env.DB.prepare("SELECT id FROM contacts WHERE id = ?1 AND deleted_at IS NULL")
+    .bind(id)
+    .first<{ id: string }>();
+  if (!existing) return { status: "not_found" };
+
+  await env.DB.prepare("UPDATE transactions SET contact_id = NULL, updated_at = ?1 WHERE contact_id = ?2")
     .bind(now, id)
     .run();
-  if (result.meta.changes === 0) return { status: "not_found" };
+  await env.DB.prepare("UPDATE debts SET contact_id = NULL, updated_at = ?1 WHERE contact_id = ?2")
+    .bind(now, id)
+    .run();
+  await env.DB.prepare("UPDATE contacts SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
+    .bind(now, id)
+    .run();
+
   return { status: "ok" };
 }
 

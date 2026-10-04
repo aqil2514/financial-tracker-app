@@ -1,4 +1,4 @@
-# Cloud Sync Worker — Sync Dua-Arah PC ↔ D1 + CRUD via MCP
+# Cloud Sync Worker — Sync Dua-Arah PC ↔ D1 + CRUD via MCP — SELESAI
 
 > Dipisah dari `apps/desktop/docs/todos/plan/mcp-server-cloud-mirror.md`
 > (2026-09-30) — dokumen itu awalnya berisi keputusan lintas-app
@@ -57,10 +57,22 @@ eksekusi" (Tahap 0-8) di bawah.
       0, idempotent no-op pada panggilan ulang, 404/422 sesuai desain),
       tool `write_off_debt` sukses DAN error case ter-propagate benar.
       Lihat Tahap 8.
-- [ ] **BARU** Deploy perubahan Worker (fix `createNonCashPayment` +
-      endpoint write-off) ke PRODUCTION + verifikasi end-to-end dgn data
-      uji nyata di sana — BELUM dilakukan (yang sudah diverifikasi di
-      atas baru LOKAL), lihat Tahap 8.
+- [x] **Deploy Worker ke PRODUCTION + verifikasi end-to-end dgn data
+      NYATA** (2026-10-04, `wrangler deploy`, versi `d13f0c8d`) —
+      ditemukan dulu gap proses: `git push` cuma auto-deploy
+      `apps/mcp-server` (Vercel), Worker (Cloudflare) WAJIB `wrangler
+      deploy` manual terpisah, sempat lupa dilakukan (seluruh router
+      `/debts/*` 404 sebelum deploy ini, termasuk endpoint LAMA yg
+      sudah ada sejak sebelumnya seperti `POST /debts/:id/payments`).
+      Setelah deploy: write-off piutang real "Orang Lain" Rp300rb (tanpa
+      cicilan) DAN pelunasan non-cash parsial Rp100rb piutang lain
+      Rp1.000.000 — KEDUANYA sukses dgn hasil identik verifikasi lokal
+      (transaksi penutup benar, saldo akun debt bergerak sesuai, status
+      `written_off`/`ongoing` sesuai). **Revert manual lewat `wrangler
+      d1 execute --remote`** (DELETE baris `debt_payments`+`transactions`
+      baru, UPDATE `debts.status`/`updated_at` balik ke nilai asli) —
+      diverifikasi ulang 0 jejak tersisa, saldo akun & seluruh kolom
+      `debts` identik persis sebelum/sesudah tes.
 
 ## Latar belakang
 
@@ -406,39 +418,80 @@ terpusat di satu tempat.
 
 ## Yang BELUM diputuskan
 
-- [ ] **Arsitektur tool tulis MCP**: apakah `apps/mcp-server` akses D1
-      langsung (REST API, tulis manual dgn `updated_at`+validasi di
-      kode Vercel), ATAU tool tulis MCP memanggil `apps/worker` yg SAMA
-      dipakai PC utk sync (supaya logic validasi/`updated_at` terpusat
-      di satu tempat, tidak dobel-tulis di Vercel & Worker). Condong ke
-      opsi kedua (logic terpusat) tapi belum final.
+- [x] ~~**Arsitektur tool tulis MCP**: apakah `apps/mcp-server` akses D1
+      langsung...~~ — **TERJAWAB** (ditemukan usang saat audit
+      2026-10-04, checklist lupa diupdate stlh implementasi): opsi
+      KEDUA yang dipilih — SEMUA 25 tool (baca+tulis) di
+      `src/lib/mcp-tools/` memanggil `workerFetch` ke `apps/worker`,
+      TIDAK ADA satu pun yang akses D1 REST API langsung. Logic
+      validasi/`updated_at` terpusat sepenuhnya di Worker.
 - [x] ~~(a) reassign/unassign saat delete account/category/account-group~~
       — **DIPUTUSKAN & DI-IMPLEMENTASI 2026-10-01**: WAJIB terima
       parameter aksi eksplisit, PERSIS pola desktop. Lihat "Progress
       implementasi" bagian endpoint `DELETE`.
-- [ ] **2 open question tersisa** dari audit logic bisnis (detail di
-      `mcp-server-business-logic-audit.md`, bagian "Perlu keputusan
-      desain eksplisit"): (b) guard delete transaksi terhadap
-      debt/payment terkait — SAAT INI tidak ada sama sekali bahkan di
-      desktop, dibiarkan atau ditambah di kedua sisi sekalian?; (c)
-      definisi tunggal formula `remaining`/`balance` (shared util/VIEW)
-      dibuat SEBELUM porting ke Worker, atau di-port apa adanya per
-      lokasi (risiko drift diterima)?
-- [ ] **BARU**: soft-delete `contacts` tidak auto-unassign
-      `transactions.contact_id` (beda dari hard-delete desktop) — lihat
-      temuan lengkap di "Progress implementasi". Perlu diputuskan apakah
-      ditangani atau diterima sbg keterbatasan.
-- [ ] Daftar tool CRUD fase pertama & urutan prioritas — draft awal py
-      5 tool BACA (`get_account_balances`, dst) — perlu diperluas dgn
-      tool TULIS, belum diputuskan mana yg paling mendesak.
-- [ ] Nama/struktur endpoint Worker (`/sync` masih working name;
-      `/transactions` sudah ada tapi DEVELOPMENT ONLY, lihat
-      "Progress implementasi" di bawah).
-- [ ] DI MANA token OAuth-shim/API key (Claude↔MCP server) disimpan &
-      di-generate.
-- [ ] Bentuk token PC↔Worker (terpisah dari OAuth-shim MCP) — belum
-      ada sama sekali, endpoint `/transactions` saat ini TANPA
-      autentikasi (development only).
+- [x] (b) ~~guard delete transaksi terhadap debt/payment terkait~~ —
+      **TERJAWAB** (ditemukan usang saat audit 2026-10-04): keputusan
+      final 2026-10-03 (lihat "Progress implementasi" bagian
+      `DELETE /transactions/:id`) BUKAN guard yang memblokir —
+      `deleteTransaction` SELALU izinkan hapus apa pun role-nya,
+      `detachDebtForDeletedTransaction` menangani konsekuensi SETELAH
+      hapus (SET NULL `transaction_id` utk principal, hapus
+      `debt_payments`+revert status utk payment). Guard blocking
+      ditolak scr sadar demi UX yang lebih mulus.
+- [x] (c) ~~definisi tunggal formula `remaining`/`balance`~~ —
+      **DIPUTUSKAN (2026-10-04): diterima apa adanya, TIDAK dibuat
+      shared util/VIEW.** Risiko drift (3 lokasi hitung manual sendiri:
+      Worker, desktop, MCP `sync-snapshot.ts`) diterima sbg trade-off
+      sadar — skala personal, bukan sistem finansial kritikal
+      multi-pihak, konsisten dgn keputusan LWW sederhana di "Keputusan
+      desain final". BUKAN "belum diputuskan" lagi, ini keputusan
+      final.
+- [x] **Soft-delete `contacts` tidak auto-unassign — DIPERBAIKI
+      (2026-10-04)**: diputuskan SAMAKAN perilaku dgn hard-delete
+      desktop (user eksplisit minta disamakan). `deleteContact`
+      (`contacts/service.ts`) sekarang UPDATE KEDUA kolom FK
+      (`transactions.contact_id` DAN `debts.contact_id`, skema py
+      `ON DELETE SET NULL` utk keduanya — audit sebelumnya cuma sebut
+      `transactions`, ternyata `debts` py FK sama) jadi NULL SECARA
+      EKSPLISIT sebelum soft-delete `contacts` sendiri. **DIVERIFIKASI
+      LOKAL** (`wrangler dev`, data uji existing `test-contact-01` dgn
+      5 transaksi + 3 debt terkait): delete sukses → KEDUA tabel
+      `cnt: 0` yg masih merujuk (sebelumnya tetap nyangkut); 404 utk id
+      tidak ada; 404 utk delete ulang kontak yg sudah `deleted_at`.
+      **Di-deploy ke production** (`wrangler deploy`, versi
+      `57ed925d`) **DAN diverifikasi dgn data uji nyata**: kontak uji +
+      1 transaksi terkait (account_id NULL, sengaja tidak sentuh akun
+      apa pun) dibuat via endpoint, delete kontak via endpoint →
+      `transactions.contact_id` TERKONFIRMASI `null` via query D1
+      langsung. Data uji dibersihkan (hard delete, 0 baris tersisa).
+- [x] ~~Daftar tool CRUD fase pertama & urutan prioritas...~~ —
+      **MOOT, terlampaui implementasi** (ditemukan usang saat audit
+      2026-10-04): draft awal "5 tool BACA, prioritas tool TULIS blm
+      diputuskan" sudah jauh terlampaui — SEKARANG ada 25 tool total
+      (baca+tulis lintas semua modul: transactions, debts, accounts,
+      categories, contacts, account-groups), bukan cuma 5. Tidak ada
+      "keputusan prioritas" formal yg pernah ditulis, tapi pertanyaan
+      ini sendiri jadi tidak relevan lagi krn scope penuh sudah
+      ter-cover.
+- [x] ~~Nama/struktur endpoint Worker...~~ — **TERJAWAB** (ditemukan
+      usang saat audit 2026-10-04): `/transactions`, `/debts`,
+      `/accounts`, `/account-groups`, `/categories`, `/contacts`,
+      `/sync` SEMUA sudah jadi nama final di production (bukan
+      "working name" lagi), diverifikasi end-to-end berkali-kali
+      sepanjang Tahap 1-8.
+- [x] ~~DI MANA token OAuth-shim/API key... disimpan & di-generate~~ —
+      **TERJAWAB** (ditemukan usang saat audit 2026-10-04): Cloudflare
+      secret (`wrangler secret put PC_SYNC_TOKEN`/`MCP_SYNC_TOKEN`),
+      digenerate random 32-byte hex (`openssl rand -hex 32` /
+      `RandomNumberGenerator` .NET di PowerShell), lihat "Progress
+      implementasi" bagian autentikasi.
+- [x] ~~Bentuk token PC↔Worker... endpoint `/transactions` TANPA
+      autentikasi (development only)~~ — **TERJAWAB, klaim usang**
+      (ditemukan usang saat audit 2026-10-04): `PC_SYNC_TOKEN` Bearer
+      statis, dicek `isAuthorized()`/`requireAuth` SEBELUM endpoint
+      tulis apa pun jalan — SEMUA endpoint (termasuk `/transactions`)
+      WAJIB autentikasi di production, "development only" sudah tidak
+      berlaku sejak lama.
 
 ## Keputusan yang sudah ditutup (dari open question sebelumnya)
 
@@ -1175,12 +1228,45 @@ jadi bug saat riset lanjutan (bukan cuma gap) — lihat poin "Bug
       status 422 dgn benar. File test sementara (`test-write-off-tool.mts`
       dkk) sudah dibersihkan, `wrangler dev` sudah dimatikan, data uji
       HANYA di D1 lokal (TIDAK menyentuh production).
-- [ ] **BELUM dikerjakan**: deploy perubahan Worker (fix
-      `createNonCashPayment` + endpoint write-off) ke PRODUCTION +
-      verifikasi ulang end-to-end di sana dgn data uji nyata (dibersihkan
-      sesudahnya) — yang di atas baru LOKAL, production masih pakai kode
-      LAMA (`createNonCashPayment` masih bug, endpoint write-off belum
-      ada sama sekali) sampai deploy ini dilakukan.
+- [x] **Deploy ke PRODUCTION + verifikasi ulang dgn data NYATA**
+      (2026-10-04, `wrangler deploy`, versi `d13f0c8d`,
+      `2026-10-04T05:13:32Z`).
+      **Gap proses ditemukan**: `git push` cuma auto-deploy
+      `apps/mcp-server` (Vercel, via GitHub integration) — Worker
+      (Cloudflare) TIDAK auto-deploy dari git, WAJIB `wrangler deploy`
+      manual terpisah. Sempat lupa dijalankan setelah commit `c937acb`
+      — terdeteksi krn SELURUH router `/debts/*` 404 di production
+      (bukan cuma endpoint write-off yg baru, endpoint LAMA yg sudah
+      ada sejak lama seperti `POST /debts/:id/payments` pun ikut 404 —
+      sinyal kuat versi aktif Worker belum ter-update sama sekali,
+      BUKAN masalah spesifik write-off). Dibedakan dari 404 "debt tidak
+      ditemukan" (JSON dari controller) via `debtId` palsu: 404 text
+      polos Hono (`Content-Type: text/plain`) = route BENAR2 tidak ada,
+      beda dari 404 JSON (`{"error":"Debt not found"}`) = route ADA tapi
+      datanya tidak ketemu.
+      **Setelah `wrangler deploy` dijalankan user**: route `/debts/*`
+      langsung hidup, dikonfirmasi via `debtId` palsu (400/404 JSON
+      sesuai controller, bukan 404 Hono lagi).
+      **Verifikasi dgn 2 piutang PRODUCTION NYATA** (bukan data uji
+      sintetis): (1) write-off piutang "Orang Lain" Rp300.000 (belum
+      dicicil sama sekali) — status jadi `written_off`, transaksi
+      penutup `expense` Rp300.000 benar, `debt_payments` baru dgn
+      `transaction_id` terisi; (2) pelunasan non-cash PARSIAL Rp100.000
+      dari piutang Rp1.000.000 (sengaja parsial, bukan lunas penuh,
+      supaya status TIDAK berubah — revert lebih sederhana) — transaksi
+      penutup `expense` Rp100.000 dibuat, `transaction_id` TERISI (bug
+      lama TERBUKTI fixed di production sungguhan), saldo akun debt
+      bergerak dari 0 ke -100.000 sesuai formula.
+      **Revert PENUH via `wrangler d1 execute --remote`** (SQL langsung
+      ke D1 production, BUKAN lewat endpoint Worker) utk kedua tes:
+      `DELETE` baris `debt_payments` dan `transactions` baru yg
+      ditimbulkan tes, `UPDATE debts SET status, updated_at` balik ke
+      nilai PERSIS sebelum tes (dicatat dulu sblm tes dijalankan).
+      **DIVERIFIKASI ULANG setelah revert**: `rows_read: 0` utk query
+      cek baris test (benar2 hilang, bukan cuma soft-delete), seluruh
+      kolom `debts` (amount/status/updated_at) identik persis dgn
+      SEBELUM tes, saldo akun debt balik ke nilai asli (0 utk kedua
+      akun) — 0 jejak data uji tersisa di production.
 
 ## Terkait
 
@@ -1190,7 +1276,7 @@ jadi bug saat riset lanjutan (bukan cuma gap) — lihat poin "Bug
 - [`../../../../desktop/docs/todos/plan/mcp-server-business-logic-audit.md`](../../../../desktop/docs/todos/plan/mcp-server-business-logic-audit.md)
   — checklist LENGKAP logic bisnis yang wajib di-port ke Worker ini
   sebelum endpoint tulis dianggap aman dipakai sungguhan.
-- [`../../../../../docs/todos/plan/cloud-sync-mcp.md`](../../../../../docs/todos/plan/cloud-sync-mcp.md) — index
+- [`../../../../../docs/todos/done/cloud-sync-mcp.md`](../../../../../docs/todos/done/cloud-sync-mcp.md) — index
   navigasi lintas-app di root repo.
 - `apps/desktop/docs/todos/plan/mcp-server-for-claude.md` — riset
   paling awal, opsi hosting/autentikasi/tooling dasar (masih berlaku).

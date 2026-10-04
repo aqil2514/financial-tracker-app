@@ -55,7 +55,7 @@ lokal (BUKAN lewat endpoint/UI resmi — lihat catatan "cara tidak ideal"
 di bawah).
 
 **Root cause duplikat**: `debts`/`debt_payments` SENGAJA TIDAK di-push
-dari PC ke Worker (lihat `apps/worker/docs/todos/plan/cloud-sync.md`
+dari PC ke Worker (lihat `apps/worker/docs/todos/done/cloud-sync.md`
 baris ~745, alasan: "tidak py padanan di desktop" — `debts` dianggap
 derivatif, bukan entitas yang di-CRUD independen). Sebagai gantinya,
 `debts` "diturunkan ulang" dari `transactions` di KEDUA SISI secara

@@ -5,7 +5,7 @@
 > isinya banyak yang bukan tanggung jawab `apps/desktop`. Sekarang:
 > keputusan desain umum, skema D1, endpoint Worker, autentikasi
 > PC↔Worker, dan progress implementasi Worker ada di
-> [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../../worker/docs/todos/plan/cloud-sync.md).
+> [`apps/worker/docs/todos/done/cloud-sync.md`](../../../../worker/docs/todos/done/cloud-sync.md).
 > Dokumen INI cuma berisi yang jadi tanggung jawab PC: migrasi lokal,
 > titik integrasi UI Settings, dan Tahap 6 (integrasi klien). Lihat
 > [`docs/todos/plan/cloud-sync-mcp.md`](../../../../../docs/todos/plan/cloud-sync-mcp.md) di root repo utk
@@ -350,7 +350,7 @@ on-write, pull, retry queue, backfill, UI Settings semua diverifikasi
 jalan di production nyata (push PC→D1 DAN pull D1→PC, dua arah).
 **UPDATE 2026-10-03**: Tahap 5 (`apps/mcp-server`) sekarang SEBAGIAN
 SELESAI (sisi baca) & SUDAH DI-DEPLOY ke production (Vercel), lihat
-detail lengkap di `apps/worker/docs/todos/plan/cloud-sync.md` bagian
+detail lengkap di `apps/worker/docs/todos/done/cloud-sync.md` bagian
 "Tahap 5". Juga ditambah: section Settings PC "AI Assistant (MCP)"
 (`features/settings/content/ai-assistant/`) — sebelumnya placeholder
 kosong sejak 2026-09-22, sekarang diisi form URL+token server MCP
@@ -360,7 +360,7 @@ supaya user gampang copy-paste saat setup client MCP.
 Sisa pekerjaan di luar scope sesi ini:
 
 1. `DELETE /transactions/:id` — **SELESAI PENUH 2026-10-03** (Worker +
-   PC, lihat `apps/worker/docs/todos/plan/cloud-sync.md` "Progress
+   PC, lihat `apps/worker/docs/todos/done/cloud-sync.md` "Progress
    implementasi" utk desain lengkap sisi Worker). **Sisi PC**:
    - `getTransactionDebtStatus()` (`shared/debts/use-transaction-debt-status.ts`)
      DIUBAH terima `db` sbg parameter (BUKAN lagi `getDb()` dipanggil di
@@ -404,7 +404,7 @@ Sisa pekerjaan di luar scope sesi ini:
      `amount`/`status` piutang tidak tersentuh.
 2. ~~Token MCP terpisah dari `PC_SYNC_TOKEN`~~ **DITUTUP 2026-10-03** —
    `MCP_SYNC_TOKEN` sudah ada & di-deploy (lihat
-   `apps/worker/docs/todos/plan/cloud-sync.md`). **TAPI** `sync_source`
+   `apps/worker/docs/todos/done/cloud-sync.md`). **TAPI** `sync_source`
    di endpoint2 spt `correct-balance` MASIH hardcode `'mcp'` — belum
    dibenahi jadi dinamis per token krn belum ada tool TULIS MCP
    sungguhan yg butuh itu. Prasyarat token-nya sendiri SUDAH beres.
@@ -430,7 +430,7 @@ Sisa pekerjaan di luar scope sesi ini:
 
 ## Terkait
 
-- [`apps/worker/docs/todos/plan/cloud-sync.md`](../../../../worker/docs/todos/plan/cloud-sync.md)
+- [`apps/worker/docs/todos/done/cloud-sync.md`](../../../../worker/docs/todos/done/cloud-sync.md)
   — dokumen UTAMA: keputusan desain lengkap (LWW, soft delete,
   `sync_source`), skema D1, endpoint Worker, autentikasi, roadmap
   Tahap 0/1/4/5/7, progress implementasi terkini.

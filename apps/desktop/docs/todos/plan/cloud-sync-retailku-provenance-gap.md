@@ -155,7 +155,7 @@ Yang dikerjakan, termasuk gap tambahan yg ketemu saat implementasi:
 
 ## Terkait
 
-- `apps/worker/docs/todos/plan/cloud-sync.md` -- rencana awal endpoint
+- `apps/worker/docs/todos/done/cloud-sync.md` -- rencana awal endpoint
   push/pull, checklist-nya tidak menyebut `source`/`source_ref` sama
   sekali (konsisten dgn gap ini: dari awal tidak masuk scope, bukan
   regresi).
