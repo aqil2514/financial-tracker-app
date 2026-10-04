@@ -5,6 +5,7 @@ import { categoriesQueryKey } from "@/hooks/resources";
 import { contactsQueryKey } from "@/shared/contacts/use-contacts";
 import { ongoingDebtsQueryKey } from "@/shared/debts/use-ongoing-debts";
 import { debtsListQueryKey } from "@/shared/debts/use-debts-list";
+import { debtPaymentsQueryKey } from "@/shared/debts/use-debt-payments";
 import { contactSummaryQueryKey } from "@/shared/debts/use-contact-summary";
 import { transactionsQueryKey } from "@/features/transactions/content/list/use-transactions";
 import { recentTransactionsQueryKey } from "@/features/dashboard/content/recent-transactions/use-recent-transactions";
@@ -41,13 +42,14 @@ export const QUERY_DEPENDENCIES = {
     accountSummaryQueryKey,
     ongoingDebtsQueryKey, // transaksi transfer bisa membuat/melunasi debts
     debtsListQueryKey,
+    debtPaymentsQueryKey,
     contactSummaryQueryKey,
   ],
   accounts: [accountsQueryKey, accountBalancesQueryKey, accountGroupBalancesQueryKey],
   accountGroups: [accountGroupsQueryKey, accountGroupBalancesQueryKey],
   categories: [categoriesQueryKey],
   contacts: [contactsQueryKey],
-  debts: [ongoingDebtsQueryKey, debtsListQueryKey, contactSummaryQueryKey],
+  debts: [ongoingDebtsQueryKey, debtsListQueryKey, debtPaymentsQueryKey, contactSummaryQueryKey],
 } satisfies Record<string, QueryKey[]>;
 
 export type QueryDependencyDomain = keyof typeof QUERY_DEPENDENCIES;

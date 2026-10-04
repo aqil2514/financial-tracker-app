@@ -28,16 +28,25 @@ dan "BELUM ditulis / batasan yang diketahui" di bawah.
       `debt_payments` langsung di tabel (`PaymentsList` diekstrak jadi
       shared component, dipakai juga di dialog detail kontak).
 - [ ] Jatuh tempo & reminder — belum diputuskan masuk scope awal atau tidak.
-- [ ] Poles UI lanjutan `/debts`: empty state (ilustrasi/pesan ramah
-      saat tabel kosong — bukan sekadar teks polos yang sudah ada).
+- [x] Poles UI lanjutan `/debts`: empty state `DebtListTable` — beda
+      pesan+icon untuk "belum ada data sama sekali" vs "tidak ada hasil
+      setelah filter" (dengan tombol reset), lihat catatan di bawah.
 - [ ] Write-off untuk `debts` dari sync Retailku (`account_id` NULL) —
       sengaja DITOLAK dulu di `useWriteOffDebt`, butuh tindak lanjut
       terpisah (lihat catatan di bawah).
-- [ ] Revert `debts.status` `'paid'` → `'ongoing'` saat edit pembayaran
-      yang sebelumnya melunasi penuh — variasi kecil, risiko rendah,
-      belum sempat diuji langsung.
+- [x] Revert `debts.status` `'paid'` → `'ongoing'` saat edit pembayaran
+      yang sebelumnya melunasi penuh — sudah diuji live, lihat catatan
+      di bawah.
 - [ ] Transfer ke akun `debt` non-personal (mis. "Modal") — untuk sekarang
       diperlakukan sama seperti piutang personal, belum ada pengecualian.
+- [ ] **BARU** Backfill `debt_payments` lama dengan `transaction_id IS
+      NULL` tapi `account_id` TERISI (data dari SEBELUM fix non_cash) —
+      saldo akun `debt` terkait kemungkinan masih menumpuk salah, lihat
+      catatan di bawah.
+- [x] **BARU** Aksi cepat Edit/Hapus per baris riwayat cicilan di
+      `PaymentsList` — tidak perlu lagi pindah ke halaman Transaksi,
+      sudah diuji live (edit nominal in-place DAN hapus dengan revert
+      status), lihat catatan di bawah.
 
 ## Latar belakang
 
@@ -702,7 +711,19 @@ BELUM ditulis / batasan yang diketahui:
        `FilterSelect` generik SENGAJA diabaikan (ambil elemen pertama
        array saja) sampai memang ada kebutuhan nyata lebih dari
        "yes"/"no".
-    6. **Riwayat `debt_payments` langsung di `DebtListTable`** — baris
+    6. **Empty state `DebtListTable`** — sebelumnya cuma satu pesan teks
+       polos ("Belum ada piutang/utang tercatat.") apa pun alasan
+       kosongnya. Sekarang dibedakan dua kasus (pola sama dengan
+       `contact-list.tsx`/`category-list.tsx`, satu-satunya tempat lain
+       di app yang sudah bedakan "kosong beneran" vs "kosong karena
+       filter"): kosong beneran (`Inbox` icon + pesan apa adanya) vs
+       kosong karena `hasActiveQuery` aktif (`SearchX` icon + pesan +
+       tombol "Reset filter", reuse `handleReset` yang sama dengan
+       tombol Reset di toolbar). Tidak ada komponen `EmptyState`
+       reusable di codebase ini — dicek dulu sebelum menulis, ternyata
+       konvensi yang ada di mana pun murni `<p>` teks, jadi icon di sini
+       net-new enhancement, bukan ngikut pola existing.
+    7. **Riwayat `debt_payments` langsung di `DebtListTable`** — baris
        tabel sekarang bisa diklik utk expand (chevron + baris detail
        `colSpan={8}`, klik di kolom aksi `⋯` TIDAK ikut trigger expand
        lewat `stopPropagation`). `PaymentsList` (sebelumnya inline di
@@ -711,6 +732,140 @@ BELUM ditulis / batasan yang diketahui:
        KEDUA tempat tanpa duplikasi — `debt-row.tsx` disederhanakan
        jadi cuma pakai `PaymentsList` yang sama, tanpa perubahan
        perilaku.
+
+## Temuan BARU: data lama `debt_payments` dengan `transaction_id NULL` yang belum di-backfill — ADA di dev DAN production
+
+Muncul dari diskusi "mau tambah aksi cepat edit/hapus cicilan langsung
+di `PaymentsList`" (belum diimplementasikan) — sebelum desain, perlu tahu
+dulu SEMUA bentuk `debt_payments` yang mungkin ada (lihat komentar
+panjang di `use-pay-debt.ts`: satu baris bisa dari transaksi transfer
+biasa, income/expense penutup langsung, ATAU `transaction_id: NULL`
+tanpa transaksi apa pun sama sekali).
+
+**Cek nyata ke database** (`docs/rules/checking-dev-database.md`):
+- **Dev** (`finance.dev.db`): dari 7 baris `debt_payments`, **6 di
+  antaranya `transaction_id IS NULL`** — SEMUANYA `account_id` TERISI
+  (akun "Keluarga"/"Orang Lain", `account_type='debt'`), BUKAN NULL
+  seperti yang dikira komentar `use-pay-debt.ts` ("satu-satunya sisa
+  kasus NULL adalah sync Retailku dengan `account_id` NULL"). Beberapa
+  punya `note` "Perjanjian"/"Pemutihan" — ciri khas `settlement_mode:
+  'non_cash'`.
+- **Production/cloud (D1, `financial-app` worker)**: dicek user langsung
+  lewat Cloudflare D1 Studio — **1 dari 1** baris `debt_payments` yang
+  ada JUGA `transaction_id NULL`, `account_id` mengarah ke akun
+  "Keluarga" (`account_type='debt'`), `amount=2000000`. Pola IDENTIK
+  dengan temuan di dev — bukan kebetulan lokal.
+
+**Kesimpulan**: ini BUKAN cuma kasus teoretis "sync Retailku" seperti
+yang disangka komentar kode — ini DATA LAMA dari SEBELUM fix non_cash
+(lihat "Bug yang SAMA PERSIS ditemukan..." di atas DAN
+`docs/concept/konsep-transaksi.md` "Kenapa prinsip ini sempat
+dilanggar") diterapkan. Fix yang sudah ada cuma mencegah kasus BARU
+(baris yang dibuat SETELAH fix selalu dapat transaksi penutup) — TIDAK
+ada backfill utk baris LAMA yang terlanjur tersimpan tanpa transaksi.
+Konsekuensi konkret: **saldo akun `debt` terkait (mis. "Keluarga")
+kemungkinan BESAR masih menumpuk salah** (tidak pernah ikut ke nol)
+untuk setiap baris lama ini — prinsip "diselesaikan = saldo ke nol" di
+`konsep-utang-piutang.md` TIDAK terpenuhi untuk data historis ini,
+walau SUDAH terpenuhi untuk transaksi baru sejak fix.
+
+**BELUM diputuskan**: strategi backfill (buat transaksi penutup
+retroaktif per baris NULL? berapa banyak baris ini pengaruhnya ke
+laporan/saldo yg sudah dipakai user sehari-hari? perlu migrasi data atau
+cukup tombol "Perbaiki" manual?) — sengaja dipisah dari task "aksi cepat
+edit/hapus cicilan di `PaymentsList`" yang sedang didesain, supaya tidak
+tercampur 2 concern berbeda. Akses baca `finance.db` lokal (bukan D1)
+sengaja diblokir classifier Claude Code (kateg. "Production Reads") —
+verifikasi lanjutan ke data produksi HARUS lewat user langsung (D1
+Studio atau cara lain), bukan dari sesi otomatis.
+
+**Penting untuk desain fitur LAIN yang bergantung pada `transaction_id`
+(mis. aksi edit/hapus cicilan di `PaymentsList`, lihat di bawah): gap
+`transaction_id NULL` ini TIDAK akan terus bertambah dari sini** — sudah
+dicek ulang ke `use-pay-debt.ts` dan `use-write-off-debt.ts` (dua
+tempat yang DULU jadi sumber bug ini):
+- `useWriteOffDebt` SEKARANG SELALU membuat transaksi penutup kalau
+  `debt.account_id` terisi; kalau NULL (Retailku) malah `throw Error`
+  eksplisit (DITOLAK), bukan jalan pintas diam-diam yang menghasilkan
+  `transaction_id: NULL`.
+- `usePayDebt` cuma MASIH bisa hasilkan `transaction_id: NULL` untuk
+  SATU kombinasi sempit: `debt.account_id == null` (piutang dari sync
+  Retailku) **DAN** `settlement_mode: 'non_cash'` sekaligus — kombinasi
+  ini SUDAH diketahui & tercatat sebagai gap terbuka terpisah ("Write-off
+  untuk `debts` dari sync Retailku" di checklist atas), BUKAN bug diam-
+  diam yang baru ditemukan.
+
+Jadi baris `transaction_id NULL` yang ada SEKARANG (6 di dev, 1 di
+production) adalah POPULASI TETAP peninggalan sebelum fix — tidak
+bertambah dari pemakaian normal sehari-hari selama kasus Retailku+
+non_cash di atas belum terjadi. Aman dijadikan dasar keputusan desain
+"sembunyikan aksi edit/hapus kalau `transaction_id == null`" di
+`PaymentsList` tanpa khawatir jumlahnya akan terus membengkak diam-diam.
+
+## Aksi cepat Edit/Hapus cicilan langsung di `PaymentsList`
+
+Muncul dari pertanyaan user: di `DebtListTable`, riwayat cicilan yang
+di-expand cuma READ-ONLY — koreksi nominal atau pembatalan cicilan yang
+salah input HARUS pindah ke halaman Transaksi dulu (cari transaksinya
+manual), padahal konteksnya (debt mana, cicilan yang mana) sudah ada di
+tangan saat itu juga.
+
+**Keputusan desain** (setelah eksplorasi `use-pay-debt.ts` menunjukkan
+1 baris `debt_payments` bisa berasal dari 4 bentuk transaksi berbeda —
+lihat "Temuan BARU" di atas):
+- **Edit**: dialog RINGKAS di tempat (TIDAK pindah halaman seperti pola
+  lama `?edit=<id>` di `detail-tab.tsx`) — field dibatasi SENGAJA cuma
+  Nominal/Tanggal/Catatan, field "berbahaya" lain (akun, tipe, kontak)
+  TETAP terkunci ke nilai transaksi asli, konsisten dgn field-locking di
+  `transaction-form.tsx` utk role `payment`.
+- **Hapus**: `ConfirmDeleteDialog` + reuse 100% `useDeleteTransaction()`
+  yang sudah ada (termasuk toast informatif "pelunasannya ikut
+  dibatalkan" dari `describeDebtInfo`) — TIDAK ada mutation baru utk
+  hapus, cukup pakai `payment.transaction_id`.
+- **Guard WAJIB**: kedua tombol disembunyikan total kalau
+  `payment.transaction_id == null` (baris lama dari sebelum fix
+  non_cash, lihat "Temuan BARU" di atas) — tidak ada transaksi utk
+  dituju dari baris itu. Dikonfirmasi lewat cek kode ulang: gap ini
+  TIDAK akan terus bertambah (populasi tetap), aman jadi dasar guard
+  permanen, bukan sekadar tempelan sementara.
+
+**Implementasi** (`shared/debts/edit-payment-form/`: `schema.ts`,
+`use-edit-payment.ts`, `edit-payment-form.tsx`, `edit-payment-dialog.tsx`,
+pola sama `pay-debt-form/`):
+- `useEditPayment` baca transaksi asli (`SELECT * FROM transactions
+  WHERE id = $1`) di dalam `mutationFn` sendiri (bukan `useQuery`
+  terpisah — hindari race baca-lalu-tulis), rekonstruksi
+  `accountId`/`transferAccountId`/`contactId`/`debtAction`/
+  `settleDebtIds` dari nilai transaksi asli (TIDAK pernah diisi user),
+  lalu reuse PENUH `applyDebtTransactionEdit` yang sama dgn jalur edit
+  transaksi biasa — termasuk logic revert `debts.status` `'paid'` ->
+  `'ongoing'` yang baru saja diuji live (lihat di atas).
+- `dangerousFieldsChanged` dihitung CUMA dari `amount` (konsisten dgn
+  `use-update-transaction.ts`: akun/tipe/kontak tidak pernah berubah
+  dari dialog ini, `date` SENGAJA tidak dianggap berbahaya sama seperti
+  jalur edit transaksi biasa).
+- Gap kecil ditemukan & diperbaiki SEBELUM fitur ini selesai:
+  `debtPaymentsQueryKey` (dipakai `useDebtPayments`/`PaymentsList`)
+  TERNYATA belum terdaftar di `QUERY_DEPENDENCIES` (`lib/query-
+  dependencies.ts`) sama sekali — tanpa ini, `PaymentsList` tidak akan
+  auto-refresh setelah edit/hapus. Ditambahkan ke domain `transactions`
+  DAN `debts`.
+
+**Diverifikasi live di `tauri dev` + query SQL ke `finance.dev.db`**
+(bukan cuma toast UI, `docs/rules/checking-dev-database.md`):
+- **Edit**: cicilan Rp60.000 (piutang "Test Piutang" Adel, sisa
+  Rp40.000 sebelumnya) diedit jadi Rp20.000 lewat dialog baru —
+  `debt_payments` baris baru (Rp20.000) dgn `transaction_id` SAMA
+  PERSIS (update in-place pada transaksi, bukan recreate), `debts`
+  tetap `ongoing` dgn sisa Rp80.000, DAN baris `transactions` ikut
+  ter-`UPDATE amount=20000` — semua lewat 1 dialog, 0 navigasi halaman.
+- **Hapus**: cicilan Rp20.000 yang sama dihapus lewat tombol baru —
+  toast "Transaksi berhasil dihapus" + info "pelunasannya ikut
+  dibatalkan" (persis sesuai `describeDebtInfo`), tabel `/debts`
+  langsung menunjukkan sisa kembali Rp100.000 (pokok penuh). Dikonfirmasi
+  SQL: `debt_payments` baris terkait TERHAPUS, `transactions` jejaknya
+  TERHAPUS, `debts.status` tetap `ongoing` dgn `total_paid=0`.
+
 - ~~Alur "Debt→Kas" arah "Utang baru" DAN "Pelunasan" dari FORM
   TRANSAKSI (`DebtActionField`)~~ **SUDAH DIUJI LIVE** (dikonfirmasi
   belakangan, sempat salah tercatat BELUM di draf sebelumnya) — transaksi
@@ -784,12 +939,22 @@ BELUM ditulis / batasan yang diketahui:
   debt id 1 BERTAMBAH kembali dari Rp100.000 jadi Rp160.000 (persis
   sesuai hitungan: total pembayaran lain Rp800.000 + Rp40.000 baru =
   Rp840.000, sisa Rp1.000.000-Rp840.000), `status` tetap `'ongoing'`.
-  Confirmed benar lewat query SQL. Yang belum sempat diuji dari sub-
-  kasus ini: revert `debts.status` dari `'paid'` balik ke `'ongoing'`
-  (perlu kasus di mana pembayaran yang direvisi tadinya PERSIS
-  melunasi sisa jadi `'paid'`) — variasi kecil dari logic yang sama,
-  risiko rendah karena source code-nya (bukan cuma UI) sama persis
-  dengan yang baru diuji ini.
+  Confirmed benar lewat query SQL.
+
+  ~~Revert `debts.status` dari `'paid'` balik ke `'ongoing'`~~ **SUDAH
+  DIUJI LIVE** (sesi 2026-10-04 sesi ke-2): piutang baru "Test Piutang"
+  Adel Rp100.000 (kas "Dompet Bebas" → debt "Bisnis") dilunasi PENUH
+  Rp100.000 lewat "Bayar" → `status='paid'`, `debt_payments` 1 baris
+  Rp100.000. Transaksi pelunasan itu lalu DIEDIT nominalnya turun jadi
+  Rp60.000 (field berbahaya berubah, `role: 'payment'`). Hasil: baris
+  `debt_payments` lama TERHAPUS, baris baru dibuat (Rp60.000, id baru),
+  DAN `debts.status` berhasil revert ke `'ongoing'` dengan `remaining`
+  Rp40.000 — persis sesuai desain `applyDebtTransactionEdit` (kondisi
+  `amount > SUM(debt_payments)` setelah DELETE lama, sebelum INSERT
+  baru). Dikonfirmasi lewat query SQL ke salinan `finance.dev.db`
+  (`docs/rules/checking-dev-database.md`), bukan cuma percaya toast UI.
+  Gap terakhir yang tersisa dari sub-kasus edit-pembayaran: belum ada
+  yang perlu diuji lagi di area ini.
 
 **Kesimpulan checklist edit-transaksi**: seluruh 3 role/kondisi utama
 (`none` implisit dari alur create yang sudah lama teruji, `principal`

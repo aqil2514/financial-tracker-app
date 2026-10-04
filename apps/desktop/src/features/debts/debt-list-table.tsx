@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
-import { Ban, ChevronDown, HandCoins, X } from "lucide-react";
+import { Ban, ChevronDown, HandCoins, Inbox, SearchX, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -141,9 +141,26 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Memuat...</p>
       ) : !data || data.debts.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          Belum ada {type === "receivable" ? "piutang" : "utang"} tercatat.
-        </p>
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-12 text-center">
+          {hasActiveQuery ? (
+            <>
+              <SearchX className="text-muted-foreground size-8" />
+              <p className="text-muted-foreground text-sm">
+                Tidak ada {type === "receivable" ? "piutang" : "utang"} yang cocok dengan filter.
+              </p>
+              <Button variant="ghost" size="sm" onClick={handleReset}>
+                Reset filter
+              </Button>
+            </>
+          ) : (
+            <>
+              <Inbox className="text-muted-foreground size-8" />
+              <p className="text-muted-foreground text-sm">
+                Belum ada {type === "receivable" ? "piutang" : "utang"} tercatat.
+              </p>
+            </>
+          )}
+        </div>
       ) : (
         <>
           <Table>
