@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot, listTransactions } from "@/lib/sync-snapshot";
+import { fetchFullSnapshot, listTransactions, buildNameLookups } from "@/lib/sync-snapshot";
 
 export function registerListTransactions(server: McpServer) {
   server.registerTool(
@@ -21,7 +21,17 @@ export function registerListTransactions(server: McpServer) {
     async ({ limit, from, to, type, accountId }, ctx) => {
       const token = getToken(ctx);
       const snapshot = await fetchFullSnapshot((path) => workerFetch(token, path));
-      const result = listTransactions(snapshot, { limit, from, to, type, accountId });
+      const transactions = listTransactions(snapshot, { limit, from, to, type, accountId });
+      const lookup = buildNameLookups(snapshot);
+
+      const result = transactions.map((t) => ({
+        ...t,
+        categoryName: t.categoryId ? (lookup.categoryName.get(t.categoryId) ?? null) : null,
+        accountName: t.accountId ? (lookup.accountName.get(t.accountId) ?? null) : null,
+        transferAccountName: t.transferAccountId ? (lookup.accountName.get(t.transferAccountId) ?? null) : null,
+        contactName: t.contactId ? (lookup.contactName.get(t.contactId) ?? null) : null,
+      }));
+
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
   );

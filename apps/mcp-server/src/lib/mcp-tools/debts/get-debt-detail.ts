@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot, listDebtDetails } from "@/lib/sync-snapshot";
+import { fetchFullSnapshot, listDebtDetails, buildNameLookups } from "@/lib/sync-snapshot";
 
 // Menutup gap cloud-sync.md Tahap 8: tanpa ini, Claude tidak punya cara
 // menemukan transactionId satu baris cicilan (debt_payments) tertentu --
@@ -26,7 +26,19 @@ export function registerGetDebtDetail(server: McpServer) {
     async ({ debtId, contactId }, ctx) => {
       const token = getToken(ctx);
       const snapshot = await fetchFullSnapshot((path) => workerFetch(token, path));
-      const result = listDebtDetails(snapshot, { debtId, contactId });
+      const debts = listDebtDetails(snapshot, { debtId, contactId });
+      const lookup = buildNameLookups(snapshot);
+
+      const result = debts.map((d) => ({
+        ...d,
+        contactName: d.contactId ? (lookup.contactName.get(d.contactId) ?? null) : null,
+        accountName: d.accountId ? (lookup.accountName.get(d.accountId) ?? null) : null,
+        payments: d.payments.map((p) => ({
+          ...p,
+          accountName: p.accountId ? (lookup.accountName.get(p.accountId) ?? null) : null,
+        })),
+      }));
+
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
   );

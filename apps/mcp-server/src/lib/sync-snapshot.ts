@@ -101,6 +101,17 @@ function isAlive<T extends { deletedAt: string | null }>(row: T): boolean {
   return row.deletedAt === null;
 }
 
+// Dipakai tool-tool "get"/"list" buat resolve ID mentah (accountId,
+// categoryId, contactId) ke nama -- tanpa ini caller harus lookup manual
+// via get_account_balances dulu tiap kali baca transaksi/debt.
+export function buildNameLookups(snapshot: SyncSnapshot) {
+  return {
+    accountName: new Map(snapshot.accounts.map((a) => [a.id, a.name])),
+    categoryName: new Map(snapshot.categories.map((c) => [c.id, c.name])),
+    contactName: new Map(snapshot.contacts.map((c) => [c.id, c.name])),
+  };
+}
+
 // Formula SAMA PERSIS dgn getAccountBalance() di apps/worker/src/modules/accounts/service.ts --
 // initial_balance + income - expense - transfer keluar + transfer masuk,
 // cuma baris transaksi hidup (deletedAt null) yg dihitung.
@@ -196,10 +207,10 @@ export function summarizeDebts(snapshot: SyncSnapshot): {
 export function listContactHistory(
   snapshot: SyncSnapshot,
   contactId: string
-): { transactions: Transaction[]; debts: Debt[] } {
+): { transactions: Transaction[]; debts: Array<Debt & { remaining: number; payments: DebtPayment[] }> } {
   return {
     transactions: snapshot.transactions.filter((t) => isAlive(t) && t.contactId === contactId),
-    debts: snapshot.debts.filter((d) => isAlive(d) && d.contactId === contactId),
+    debts: listDebtDetails(snapshot, { contactId }),
   };
 }
 
