@@ -13,7 +13,6 @@ import {
 } from "../debts/service";
 import { resolveContactId } from "../contacts/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
-import { isAccountTypeRestrictedFromDirectTransaction } from "../../shared/account-types";
 
 // contactId eksplisit SELALU menang; contactName (nama natural dari tool
 // MCP) cuma dipakai kalau contactId kosong -- lihat keputusan desain di
@@ -39,25 +38,50 @@ export type UpdateTransactionResult =
   | { status: "not_found" }
   | { status: "rejected"; reason: string };
 
-// Logic bisnis #4 dari mcp-server-business-logic-audit.md, port dari
-// apps/desktop/.../use-transaction-form.ts (proteksi via useEffect di
-// form desktop). DI SINI harus jadi VALIDASI KERAS (reject), bukan
-// auto-correct spt di form desktop -- Worker tidak punya UI utk
-// "otomatis ganti pilihan user", cuma bisa terima atau tolak.
-async function violatesDebtAccountRule(
+// categoryId FK ke categories(id) tidak di-precheck sebelumnya (beda
+// dari accountId/transferAccountId yang sudah lewat getAccountType) --
+// kalau kategori belum ter-sync ke D1 (race push transaksi vs push
+// kategori dari PC), INSERT/UPDATE kena SQLITE_CONSTRAINT_FOREIGNKEY
+// mentah yang lolos jadi 500 tak terduga, bukan 422 yang jelas. Lihat
+// investigasi 2026-10-04 (3 baris di cloud_sync_queue stuck retry
+// dengan last_error='HTTP 500', reproduced di wrangler dev local).
+async function categoryExists(env: Env, categoryId: string): Promise<boolean> {
+  const row = await env.DB.prepare("SELECT 1 FROM categories WHERE id = ?1 AND deleted_at IS NULL")
+    .bind(categoryId)
+    .first();
+  return row !== null;
+}
+
+async function validateCategoryExists(
   env: Env,
-  payload: Pick<PushTransactionPayload, "type" | "accountId">
-): Promise<boolean> {
-  if (payload.type === "transfer") return false; // transfer boleh menyentuh akun debt
-  if (!payload.accountId) return false;
+  categoryId: string | null | undefined
+): Promise<{ status: "ok" } | { status: "rejected"; reason: string }> {
+  if (!categoryId) return { status: "ok" };
+  if (await categoryExists(env, categoryId)) return { status: "ok" };
+  return {
+    status: "rejected",
+    reason: "Kategori belum ditemukan di cloud (kemungkinan belum ter-sync) — coba lagi setelah kategori tersinkron.",
+  };
+}
 
-  const row = await env.DB.prepare(
-    "SELECT account_type FROM accounts WHERE id = ?1 AND deleted_at IS NULL"
-  )
-    .bind(payload.accountId)
-    .first<{ account_type: string }>();
-
-  return row !== null && isAccountTypeRestrictedFromDirectTransaction(row.account_type);
+// Sama alasannya dgn validateCategoryExists -- tapi khusus contactId
+// EKSPLISIT (bukan contactName, yg sudah get-or-create lewat
+// resolveContactId). resolvedContactId dicek SETELAH resolveFinalContactId
+// krn baru di situ tahu ID final-nya (bisa dari contactId langsung atau
+// hasil resolve by name).
+async function validateResolvedContactExists(
+  env: Env,
+  contactId: string | null
+): Promise<{ status: "ok" } | { status: "rejected"; reason: string }> {
+  if (!contactId) return { status: "ok" };
+  const row = await env.DB.prepare("SELECT 1 FROM contacts WHERE id = ?1 AND deleted_at IS NULL")
+    .bind(contactId)
+    .first();
+  if (row !== null) return { status: "ok" };
+  return {
+    status: "rejected",
+    reason: "Kontak belum ditemukan di cloud (kemungkinan belum ter-sync) — coba lagi setelah kontak tersinkron.",
+  };
 }
 
 // UPSERT dgn LWW (lihat shared/lww.ts). `id` sudah ada di D1 -> delegasi
@@ -99,13 +123,6 @@ async function createTransactionRow(
   updatedAt: string,
   syncSource: SyncSource
 ): Promise<InsertTransactionResult> {
-  if (await violatesDebtAccountRule(env, payload)) {
-    return {
-      status: "rejected",
-      reason: "Transaksi income/expense tidak boleh menyentuh akun bertipe 'debt' — gunakan transfer.",
-    };
-  }
-
   // Pertanyaan #4 audit-kepatuhan-konsep-tipe-akun.md: kombinasi tipe
   // akun di luar cash/debt (misal cash->investment) HARUS ditolak SEBELUM
   // insert, bukan ketahuan belakangan di applyDebtTransaction (sama
@@ -116,6 +133,9 @@ async function createTransactionRow(
     transferAccountId: payload.transferAccountId ?? null,
   });
   if (accountPairPrecheck.status === "rejected") return accountPairPrecheck;
+
+  const categoryPrecheck = await validateCategoryExists(env, payload.categoryId);
+  if (categoryPrecheck.status === "rejected") return categoryPrecheck;
 
   // Logic #3 dicek SEBELUM insert baris transaksi -- kalau reject
   // terjadi SETELAH insert (di dalam applyDebtTransaction), baris
@@ -135,6 +155,8 @@ async function createTransactionRow(
   }
 
   const resolvedContactId = await resolveFinalContactId(env, payload, syncSource);
+  const contactPrecheck = await validateResolvedContactExists(env, resolvedContactId);
+  if (contactPrecheck.status === "rejected") return contactPrecheck;
 
   const now = nowText();
   await env.DB.prepare(
@@ -275,13 +297,6 @@ async function updateTransactionRow(
     .first<ExistingTransactionRow>();
   if (!existing) return { status: "not_found" };
 
-  if (await violatesDebtAccountRule(env, payload)) {
-    return {
-      status: "rejected",
-      reason: "Transaksi income/expense tidak boleh menyentuh akun bertipe 'debt' — gunakan transfer.",
-    };
-  }
-
   // Pertanyaan #4 audit-kepatuhan-konsep-tipe-akun.md -- sama alasannya
   // dgn createTransactionRow: cegah UPDATE tersimpan dgn kombinasi tipe
   // akun yang belum didukung.
@@ -292,7 +307,15 @@ async function updateTransactionRow(
   });
   if (accountPairPrecheck.status === "rejected") return accountPairPrecheck;
 
+  if (payload.type !== "transfer") {
+    const categoryPrecheck = await validateCategoryExists(env, payload.categoryId);
+    if (categoryPrecheck.status === "rejected") return categoryPrecheck;
+  }
+
   const resolvedContactId = await resolveFinalContactId(env, payload, syncSource);
+  const contactPrecheck = await validateResolvedContactExists(env, resolvedContactId);
+  if (contactPrecheck.status === "rejected") return contactPrecheck;
+
   const fieldsChanged = dangerousFieldsChanged(existing, payload, resolvedContactId);
 
   // Logic #3 pre-check -- sama alasannya dgn createTransactionRow: cegah

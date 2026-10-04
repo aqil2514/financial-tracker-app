@@ -172,8 +172,8 @@ export type CorrectAccountBalanceResult =
 
 // Titik rawan #2 (docs/todos/plan/titik-rawan-tipe-akun.md): jalur ini
 // INSERT transaksi income/expense langsung, TIDAK lewat
-// createTransactionRow -- jadi applyDebtTransaction & violatesDebtAccountRule
-// (transactions/service.ts) otomatis tidak pernah terpicu. Utk tipe akun
+// createTransactionRow -- jadi applyDebtTransaction (transactions/service.ts)
+// otomatis tidak pernah terpicu. Utk tipe akun
 // yang saldonya derived dari tabel lain (mis. "debt"), itu bikin saldo
 // akun & data turunan (debts/debt_payments) jadi tidak saling menjelaskan
 // -- SUDAH TERJADI NYATA sesi 2026-10-03 (lihat dokumen). Ditolak total

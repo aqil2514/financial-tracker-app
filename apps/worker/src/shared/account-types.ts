@@ -15,15 +15,19 @@ export function isAccountType(value: unknown): value is AccountType {
 
 /**
  * Tipe akun yang saldonya derived dari tabel lain (bukan nilai bebas),
- * jadi tidak boleh disentuh income/expense langsung ATAU koreksi saldo
- * manual -- keduanya wajib lewat transaksi transfer supaya data turunan
- * (mis. `debts`/`debt_payments` utk "debt") ikut disesuaikan. Satu-
- * satunya tempat daftar ini didefinisikan (lihat
+ * jadi tidak boleh disentuh lewat `correctAccountBalance` (koreksi
+ * saldo manual) -- jalur itu INSERT transaksi langsung TANPA lewat
+ * applyDebtTransaction, jadi data turunan (mis. `debts`/`debt_payments`
+ * utk "debt") tidak ikut disesuaikan kalau diizinkan. income/expense
+ * BIASA (lewat createTransactionRow/updateTransactionRow) ke tipe akun
+ * ini TETAP sah -- docs/concept/konsep-transaksi.md menegaskan
+ * income/expense/transfer sama-sama sah merepresentasikan perubahan
+ * nilai akun apa pun (termasuk "kas virtual" debt yg bertambah/berkurang
+ * individual tanpa pasangan transfer), tidak dibatasi harus transfer.
+ * Satu-satunya tempat daftar ini didefinisikan (lihat
  * docs/todos/plan/titik-rawan-tipe-akun.md #2 & #3) -- dipakai di
- * transactions/service.ts (violatesDebtAccountRule) DAN
  * accounts/service.ts (correctAccountBalance). Nambah tipe akun baru yg
- * punya data turunan serupa (mis. "investment") = tambah ke sini, bukan
- * tambal 2 tempat terpisah.
+ * punya data turunan serupa (mis. "investment") = tambah ke sini.
  */
 const ACCOUNT_TYPES_RESTRICTED_FROM_DIRECT_TRANSACTION: readonly AccountType[] = ["debt"];
 
