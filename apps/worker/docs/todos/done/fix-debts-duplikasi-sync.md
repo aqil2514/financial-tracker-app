@@ -1,9 +1,9 @@
 # Fix: Worker berhenti auto-derive `debts`/`debt_payments` untuk transaksi PC
 
 Index lintas-app:
-[`docs/todos/plan/fix-debts-duplikasi-sync.md`](../../../../docs/todos/plan/fix-debts-duplikasi-sync.md).
+[`docs/todos/done/fix-debts-duplikasi-sync.md`](../../../../../docs/todos/done/fix-debts-duplikasi-sync.md).
 Detail desktop:
-[`apps/desktop/docs/todos/plan/fix-debts-duplikasi-sync.md`](../../../desktop/docs/todos/plan/fix-debts-duplikasi-sync.md).
+[`apps/desktop/docs/todos/done/fix-debts-duplikasi-sync.md`](../../../../desktop/docs/todos/done/fix-debts-duplikasi-sync.md).
 
 ## Status & TODO saat ini (ringkas)
 
@@ -57,7 +57,7 @@ diberitahu id mana yg sudah tidak dipakai lagi di desktop.
 **Fix**: endpoint `DELETE /debts/push/:id` + `DELETE /debts/payments/push/:id`
 baru (lihat checklist di atas), dipanggil desktop via `pushDeleteOnWrite`
 tiap kali `applyDebtTransactionEdit` lokal men-DELETE baris lama (detail
-sisi desktop: `apps/desktop/docs/todos/plan/fix-debts-duplikasi-sync.md`).
+sisi desktop: `apps/desktop/docs/todos/done/fix-debts-duplikasi-sync.md`).
 Diverifikasi via `wrangler d1 execute --local` langsung: baris lama
 `deleted_at` terisi, jumlah baris AKTIF (`deleted_at IS NULL`) per
 `transaction_id` tetap 1 setelah edit berulang.
@@ -89,7 +89,7 @@ pemilik utk transaksi `syncSource==='mcp'` (tidak ada PC lokal yg
 terlibat sama sekali di jalur ini — tidak berubah).
 
 **REVISI keputusan lama**: [`apps/worker/docs/todos/done/cloud-sync.md`](../done/cloud-sync.md)
-dan [`docs/todos/done/cloud-sync-mcp.md`](../../../../docs/todos/done/cloud-sync-mcp.md)
+dan [`docs/todos/done/cloud-sync-mcp.md`](../../../../../docs/todos/done/cloud-sync-mcp.md)
 pernah menyatakan "Worker satu-satunya penulis D1" dan SENGAJA skip
 endpoint push `/debts` langsung karena dianggap "tidak py padanan
 create/update di desktop" — asumsi itu SALAH, desktop selalu py

@@ -32,7 +32,7 @@ lainnya (retailku sync).
       delete baru (`DELETE /debts/push/:id` dkk, ditemukan perlu saat
       test manual — lihat gap di bawah). Kode SELESAI, type-check lolos,
       test manual via `wrangler dev` SELESAI & lolos. Detail:
-      [`apps/worker/docs/todos/plan/fix-debts-duplikasi-sync.md`](../../../apps/worker/docs/todos/plan/fix-debts-duplikasi-sync.md)
+      [`apps/worker/docs/todos/done/fix-debts-duplikasi-sync.md`](../../../apps/worker/docs/todos/done/fix-debts-duplikasi-sync.md)
 - [x] **Desktop** — migrasi `cloud_sync_queue` (tambah `debts`,
       `debt_payments` ke CHECK constraint, versi 34), `QueueableTable`
       baru, `push-row.ts`/`worker-client.ts` baru, titik panggil
@@ -41,7 +41,7 @@ lainnya (retailku sync).
       (`cargo test`) & test TS (`vitest run`, 172/172) lolos, verifikasi
       manual via `tauri dev` + `wrangler dev` SELESAI & lolos (query D1
       lokal langsung, bukan cuma toast UI). Detail:
-      [`apps/desktop/docs/todos/plan/fix-debts-duplikasi-sync.md`](../../../apps/desktop/docs/todos/plan/fix-debts-duplikasi-sync.md)
+      [`apps/desktop/docs/todos/done/fix-debts-duplikasi-sync.md`](../../../apps/desktop/docs/todos/done/fix-debts-duplikasi-sync.md)
 - [x] **Pembersihan data** — SELESAI 2026-10-05. Worker di-deploy +
       desktop di-build ulang production, baru 3 transaksi duplikat lama
       (Kak Ipit, Mama Dicky, Wahyu) dihapus TOTAL (transaksi + `debts`
@@ -74,9 +74,9 @@ Ditemukan saat riset: transaksi yang dibuat lewat shortcut halaman
 `/debts` (`use-create-debt.ts` mode transfer, `use-pay-debt.ts` mode
 cash dengan `debt.account_id` terisi) **TIDAK PERNAH ter-push ke
 Worker sama sekali** — beda akar masalah dari bug duplikasi ini (ini
-soal transaksi yang HILANG dari sync, bukan DOBEL). Dicatat di sini
-sebagai pointer, belum ada dokumen rencana terpisah — perlu dibuatkan
-kalau mau dikerjakan.
+soal transaksi yang HILANG dari sync, bukan DOBEL). Sekarang py
+dokumen rencana sendiri:
+[`docs/todos/plan/fix-debts-shortcut-tidak-tersync.md`](../plan/fix-debts-shortcut-tidak-tersync.md).
 
 ## Latar belakang
 

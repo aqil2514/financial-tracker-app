@@ -144,7 +144,9 @@ kontak ini di production).
   jadi penulis `debts`/`debt_payments` untuk transaksinya sendiri —
   REVISI keputusan lama "Worker satu-satunya penulis D1"), BELUM
   diimplementasikan. Detail lengkap:
-  [`docs/todos/plan/fix-debts-duplikasi-sync.md`](../todos/plan/fix-debts-duplikasi-sync.md).
+  [`docs/todos/done/fix-debts-duplikasi-sync.md`](../todos/done/fix-debts-duplikasi-sync.md)
+  (SELESAI & terverifikasi di production, lihat
+  [2026-10-05-verifikasi-fix-debts-duplikat-dan-gap-kontak.md](2026-10-05-verifikasi-fix-debts-duplikat-dan-gap-kontak.md)).
 
 ## Pelajaran
 

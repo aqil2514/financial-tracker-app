@@ -3,7 +3,7 @@
 Lanjutan dari
 [2026-10-05-debts-duplikat-desktop-vs-worker.md](2026-10-05-debts-duplikat-desktop-vs-worker.md):
 fix source-based ownership (lihat
-[`docs/todos/plan/fix-debts-duplikasi-sync.md`](../todos/plan/fix-debts-duplikasi-sync.md))
+[`docs/todos/done/fix-debts-duplikasi-sync.md`](../todos/done/fix-debts-duplikasi-sync.md))
 diimplementasikan, di-deploy, lalu diverifikasi langsung di production
 (`wrangler dev` dulu, lalu desktop production build + Worker production
 sungguhan) — **dari dogfooding langsung** (hapus 3 transaksi duplikat

@@ -1,9 +1,9 @@
 # Fix: Desktop push `debts`/`debt_payments` sendiri (source-based ownership)
 
 Index lintas-app:
-[`docs/todos/plan/fix-debts-duplikasi-sync.md`](../../../../docs/todos/plan/fix-debts-duplikasi-sync.md).
+[`docs/todos/done/fix-debts-duplikasi-sync.md`](../../../../../docs/todos/done/fix-debts-duplikasi-sync.md).
 Detail Worker:
-[`apps/worker/docs/todos/plan/fix-debts-duplikasi-sync.md`](../../../worker/docs/todos/plan/fix-debts-duplikasi-sync.md).
+[`apps/worker/docs/todos/done/fix-debts-duplikasi-sync.md`](../../../../worker/docs/todos/done/fix-debts-duplikasi-sync.md).
 
 ## Status & TODO saat ini (ringkas)
 
@@ -104,8 +104,8 @@ Hasil grep lengkap `applyDebtTransaction`/`applyDebtTransactionEdit`
 **Catatan terpisah (BUKAN scope fix ini)**: titik #3 dan #4 SAAT INI
 juga tidak memanggil `pushOnWrite("transactions", ...)` sama sekali
 (beda dari #1/#2) — transaksi dari shortcut `/debts` tidak ter-sync ke
-Worker. Ini gap terpisah, dicatat di index root, JANGAN digabung
-perbaikannya ke sini supaya scope tetap fokus ke soal duplikasi.
+Worker. Gap terpisah ini py dokumen rencana sendiri:
+[`docs/todos/plan/fix-debts-shortcut-tidak-tersync.md`](../../../../../docs/todos/plan/fix-debts-shortcut-tidak-tersync.md).
 
 ## Skema kolom (acuan implementasi `push-row.ts`/`worker-client.ts`)
 

@@ -10,7 +10,7 @@
 > bawah SALAH secara faktual utk `debts`/`debt_payments` — desktop
 > SELALU py jalur tulis lokalnya sendiri, menyebabkan bug duplikasi.
 > Keputusan dibalik sadar, lihat index
-> [`docs/todos/plan/fix-debts-duplikasi-sync.md`](../plan/fix-debts-duplikasi-sync.md).
+> [`docs/todos/done/fix-debts-duplikasi-sync.md`](../done/fix-debts-duplikasi-sync.md).
 
 Index ini HANYA navigasi + checklist ringkas. Detail keputusan desain,
 riset, dan progress implementasi ada di dokumen masing-masing app —
