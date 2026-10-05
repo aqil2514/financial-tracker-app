@@ -2,10 +2,10 @@
 
 ## Status & TODO saat ini (ringkas)
 
-Cashflow tab v1 SELESAI (query + UI + page.tsx dirapikan ke pola
-`page-layout.md`) — lihat "Catatan implementasi Cashflow (2026-10-05)"
-di bawah untuk detail. Per Tipe Akun & Tren Keuangan masih placeholder
-"Segera hadir.", belum diimplementasikan — jadi task berikutnya.
+SEMUA 3 TAB SELESAI diimplementasikan (Cashflow, Per Tipe Akun, Tren
+Keuangan) — halaman Laporan redesign v1 DONE. Lihat "Catatan
+implementasi" masing-masing tab di bawah untuk detail teknis. Sisa
+pekerjaan: MCP tools pendamping (belum dimulai).
 
 **Cashflow:**
 - [x] Tentukan layout dasar: period picker + grid 2 kolom + pie chart
@@ -21,8 +21,13 @@ di bawah untuk detail. Per Tipe Akun & Tren Keuangan masih placeholder
 - [x] DIANGGAP SELESAI untuk v1 (2026-10-05) — tidak ada tambahan lain
   di bawah grid 2 kolom untuk sekarang, sesuai scope v1 yang sengaja
   dibatasi.
-- [ ] Opening→closing balance rekonsiliasi — scope v1 ini BELUM
-  termasuk (lihat "Cashflow — opsi konsep", poin 2), nanti dulu.
+
+**DIKELUARKAN dari scope dokumen ini (2026-10-05):** opening→closing
+balance rekonsiliasi (poin 2 di "Cashflow — opsi konsep") DIHAPUS dari
+rencana v1 — bukan "belum", tapi memang scope selanjutnya, bukan bagian
+redesign ini. Kekurangan lain yang mungkin muncul di tab mana pun
+ditangani lewat dogfooding (lihat `docs/dogfooding/`), bukan ditambahkan
+balik ke dokumen plan ini.
 
 **Per Tipe Akun (pengganti "Per Akun"):**
 - [x] Tentukan: tab "Per Akun" lama (horizontal bar chart semua akun,
@@ -31,10 +36,12 @@ di bawah untuk detail. Per Tipe Akun & Tren Keuangan masih placeholder
 - [x] Tentukan layout: pie chart breakdown saldo per `account_type` di
   atas, summary card per tipe di bawahnya (bisa berubah setelah
   implementasi — lihat "Per Tipe Akun — layout final v1").
-- [ ] Implementasi query breakdown saldo per `account_type`.
-- [ ] Implementasi UI (component + page tab baru, hapus
-  `AccountBalanceChart`/`use-account-balances.ts` lama kalau memang
-  tidak dipakai di tempat lain).
+- [x] Tidak perlu period picker — murni snapshot saat ini (lihat
+  "Catatan implementasi Per Tipe Akun" di bawah).
+- [x] Implementasi query breakdown saldo per `account_type`.
+- [x] Implementasi UI (component + page tab baru). `AccountBalanceChart`
+  lama sudah dihapus duluan (barengan Cashflow); `use-account-balances.ts`
+  TETAP dipakai (dashboard & accounts), tidak dihapus.
 
 **Ringkasan Bulanan & Per Kategori:**
 - [x] Tentukan: KEDUANYA DIHAPUS, tidak dipindah/digabung ke mana pun
@@ -62,12 +69,18 @@ di bawah untuk detail. Per Tipe Akun & Tren Keuangan masih placeholder
   (`account_groups`), dan akun individual. Semua opsional/bisa kosong;
   default tetap cuma `account_type = cash`. Lihat "Tren Keuangan —
   filter level akun" di bawah.
-- [ ] Desain UI detail (chart tunggal line/area, ada perbandingan
-  nilai awal-akhir periode atau tidak, dst).
-- [ ] Desain query: hitung saldo akumulatif per titik waktu (mirip
-  `use-account-balances.ts` tapi dgn cutoff tanggal berubah-ubah per
-  titik, bukan cuma "saat ini") — lihat "Catatan performa" di bawah,
-  berpotensi mahal kalau granularitas harian & rentang panjang.
+- [x] Desain UI detail: area chart tunggal + indikator perbandingan
+  nilai awal→akhir periode di atas chart (lihat "Catatan implementasi
+  Tren Keuangan" di bawah).
+- [x] Desain query: strategi 2-query (saldo awal SEBELUM `from` + net
+  perubahan per titik dalam rentang, running sum di TS) — BUKAN
+  re-SUM per titik dari awal waktu, sesuai "Catatan performa" di bawah.
+- [x] Filter panel: dibangun pakai `FilterPanel` generik yang sama
+  persis dipakai halaman Transaksi (`components/query/filters/panel`),
+  BUKAN komponen custom — field Tipe Akun (select)/Grup Akun
+  (combobox)/Akun (combobox), default `account_type=cash` terisi
+  otomatis. Granularitas tetap `ToggleGroup` terpisah (bukan bagian
+  filter data, tapi kontrol tampilan chart).
 
 **Hasil akhir halaman Laporan (setelah semua tahap ini):**
 3 tab: **Cashflow**, **Per Tipe Akun**, dan **Tren Keuangan**. Tidak
@@ -251,6 +264,75 @@ Disepakati 2026-10-05 (berdasar referensi screenshot Money Manager tab
   opening→closing balance & operating/investing/financing tetap
   "nanti dulu" sesuai scope v1 di atas.
 
+## Catatan implementasi Per Tipe Akun (2026-10-05)
+
+- Tanpa period picker, dikonfirmasi — murni snapshot saldo saat ini,
+  sama seperti `AccountBalanceChart` lama.
+- Query (`use-balances-by-account-type.ts`): formula saldo PERSIS sama
+  dengan `use-account-balances.ts` yang sudah ada (`initial_balance` +
+  agregat transaksi income/expense/transfer kedua arah), tinggal
+  di-`GROUP BY a.account_type` alih-alih per akun individual.
+- Label tipe akun diambil dari `ACCOUNT_TYPE_OPTIONS`
+  (`lib/account-types.ts`, satu-satunya sumber kebenaran union
+  `AccountType`) — BUKAN hardcode string. Konsekuensinya: begitu tipe
+  baru (`credit`/`investment`/dst, lihat `account-type.md`) ditambahkan
+  ke `account-types.ts` + migrasi CHECK constraint, tab ini otomatis
+  menampilkan breakdown tipe baru itu TANPA perlu sentuh file di
+  `features/reports/content/account-type/` sama sekali (query generik,
+  chart/card di-`.map()` dari hasil query).
+- File: `features/reports/content/account-type/use-balances-by-account-type.ts`
+  (query) + `index.tsx` (donut chart + grid card ringkasan per tipe,
+  masing-masing dengan indikator warna + nominal + persentase).
+- `balancesByAccountTypeQueryKey` didaftarkan ke domain `transactions`
+  DAN `accounts` di `lib/query-dependencies.ts`.
+
+## Catatan implementasi Tren Keuangan (2026-10-05)
+
+- Strategi query 2-tahap (bukan re-scan per titik waktu, sesuai
+  "Catatan performa" di bawah): (1) 1 query SUM saldo SEBELUM tanggal
+  `from` (saldo awal akun terfilter), (2) 1 query net perubahan per
+  titik granularitas (`GROUP BY strftime(...)`) dalam rentang
+  `from`-`to`, lalu running-sum digabung di TypeScript. Total selalu 2
+  query SQL, independen dari jumlah titik data.
+- Filter akun 3-level (tipe/grup/individual) dibangun sebagai kondisi
+  `WHERE` tambahan terhadap `accounts a`, params `$N` dibangun
+  incremental lewat helper `buildAccountFilter()` — dipanggil 2x per
+  query (sisi `account_id` langsung + sisi `transfer_account_id` utk
+  transfer masuk), placeholder kedua sisi otomatis sinkron karena satu
+  array `params` dipakai bersambung.
+- Akun nonaktif: di-exclude SECARA DEFAULT (`is_active = 1`) HANYA
+  kalau user tidak memilih akun individual spesifik. Begitu user
+  sengaja pilih akun (termasuk yang nonaktif — ditandai label
+  `"(Nonaktif)"` di dropdown filter), kondisi `is_active` dilepas
+  supaya pilihan eksplisit itu tetap terhitung.
+- Filter panel: SEMPAT dibuat custom (kombinasi `ToggleGroup` +
+  combobox mandiri meniru `FilterComboboxInput`), ternyata ada bug
+  (opsi Grup Akun langsung ke-render semua terpilih padahal default
+  harus kosong). Diganti total pakai `FilterPanel` generik dari
+  `components/query/filters/panel` — PERSIS pola yang sudah dipakai
+  halaman Transaksi (tombol "Filter" + badge jumlah aktif, popover
+  "Filter Data", "Tambah Filter"/"Terapkan Filter"), bukan filter panel
+  yang selalu terbuka. Field: `account_type` (type `select`),
+  `group_id`/`account_id` (type `combobox`). Hasil `FilterConfig[]`
+  di-translate ke `BalanceTrendFilter` lewat `toBalanceTrendFilter()`
+  di `index.tsx` (cuma baca operator `eq`, sesuai keputusan filter ini
+  cuma mode include, tidak ada exclude/neq).
+- Granularitas (`day`/`week`/`month`/`year`) TETAP `ToggleGroup`
+  terpisah dari `FilterPanel` — ini kontrol tampilan chart, bukan
+  filter data.
+- Chart: `AreaChart` (recharts) dengan gradient fill, indikator
+  perbandingan nominal awal→akhir periode (format
+  `Rp X → Rp Y` + `+/-` selisih berwarna) di atas chart.
+- File: `features/reports/content/balance-trend/use-balance-trend.ts`
+  (query), `balance-trend-filter.tsx` (filter panel + granularitas),
+  `balance-trend-chart.tsx` (chart), `index.tsx` (section orkestrator,
+  default filter `account_type=cash`, granularitas harian, period 1
+  bulan terakhir).
+- `balanceTrendQueryKey` didaftarkan ke domain `transactions`,
+  `accounts`, DAN `accountGroups` di `lib/query-dependencies.ts`
+  (bergantung ke ketiganya karena filter bisa menyentuh semua dimensi
+  itu).
+
 ## Per Tipe Akun — layout final v1
 
 Disepakati 2026-10-05. Motivasi: `account_type` sekarang cuma
@@ -385,21 +467,31 @@ utk dataset besar.
   `investment`) selesai. Untuk versi awal, klasifikasi
   operating/investing/financing bisa di-skip atau disederhanakan.
 
-## Pertanyaan terbuka
+## Pertanyaan terbuka (SEMUA TERJAWAB per 2026-10-05, diarsipkan)
 
-- Cashflow: sesederhana poin 1-3, atau sekalian poin 4
-  (operating/investing/financing)?
+- ~~Cashflow: sesederhana poin 1-3, atau sekalian poin 4
+  (operating/investing/financing)?~~ DIJAWAB: sesederhana poin 1-3 saja.
+  Poin 2 (opening→closing balance) & poin 4 DIKELUARKAN dari scope v1
+  sepenuhnya — scope selanjutnya, bukan "belum" (lihat checklist
+  Cashflow di atas).
 - ~~Transfer antar akun: include atau exclude dari kas masuk/keluar?~~
-  SUDAH DIPUTUSKAN 2026-10-05: exclude. Lihat checklist Cashflow di atas.
-- Per Tipe Akun: perlu period picker atau murni snapshot saat ini?
-- Tren Keuangan: perlu downsample otomatis saat rentang panjang +
-  granularitas harian dipilih bersamaan, atau biarkan apa adanya
-  (mengandalkan optimasi query running-sum saja)?
-- Urutan tab final di halaman Laporan: Cashflow, Per Tipe Akun, Tren
-  Keuangan — urutan ini belum dikonfirmasi eksplisit, masih asumsi
-  urutan pembahasan.
-- MCP: `get_balances_by_account_type` SEMENTARA dicoret (lihat update
-  2026-10-05 di "MCP tools — rencana") — `get_account_balances` yang
-  ada sudah cukup. Konfirmasi ulang saat implementasi Tren Keuangan
-  apakah agregasi per tipe/grup akun oleh model cukup, atau tetap
-  butuh tool khusus utk dataset besar.
+  DIJAWAB: exclude. Lihat checklist Cashflow di atas.
+- ~~Per Tipe Akun: perlu period picker atau murni snapshot saat ini?~~
+  DIJAWAB: murni snapshot, tanpa period picker.
+- ~~Tren Keuangan: perlu downsample otomatis saat rentang panjang +
+  granularitas harian dipilih bersamaan, atau biarkan apa adanya?~~
+  DIJAWAB (implisit): dibiarkan apa adanya untuk v1 — strategi 2-query
+  (saldo awal + running sum di TS) sudah cukup menghindari masalah
+  performa O(titik × transaksi) yang dikhawatirkan; downsample otomatis
+  tidak diimplementasikan, bisa dipertimbangkan lagi lewat dogfooding
+  kalau ternyata lambat di dataset nyata.
+- ~~Urutan tab final: Cashflow, Per Tipe Akun, Tren Keuangan?~~ DIJAWAB:
+  urutan ini yang dipakai final di `ReportsContent`.
+- ~~MCP: `get_balances_by_account_type` perlu atau tidak?~~ MASIH
+  BELUM dikerjakan (bukan terjawab) — seluruh "MCP tools pendamping"
+  di atas belum dimulai, jadi keputusan final soal ini menyusul saat
+  implementasi MCP tools, bukan sekarang.
+
+Kekurangan/bug lain yang muncul dari pemakaian nyata (bukan dari
+diskusi desain di atas) ditangani lewat dogfooding (`docs/dogfooding/`),
+BUKAN ditambahkan balik ke dokumen plan ini.
