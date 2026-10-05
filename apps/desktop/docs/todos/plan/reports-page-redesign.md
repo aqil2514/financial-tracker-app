@@ -23,6 +23,9 @@ kekurangan berikutnya ditangani lewat dogfooding (`docs/dogfooding/`).
 - [x] DIANGGAP SELESAI untuk v1 (2026-10-05) — tidak ada tambahan lain
   di bawah grid 2 kolom untuk sekarang, sesuai scope v1 yang sengaja
   dibatasi.
+- [x] FOLLOW-UP pasca-rilis v0.1.3 (masuk v0.1.4): toggle dimensi
+  breakdown "Grup Akun"/"Kategori Induk" — lihat "Catatan implementasi
+  Cashflow" di bawah.
 
 **DIKELUARKAN dari scope dokumen ini (2026-10-05):** opening→closing
 balance rekonsiliasi (poin 2 di "Cashflow — opsi konsep") DIHAPUS dari
@@ -269,6 +272,24 @@ Disepakati 2026-10-05 (berdasar referensi screenshot Money Manager tab
   grid 2 kolom untuk v1 — summary card + breakdown dianggap cukup,
   opening→closing balance & operating/investing/financing tetap
   "nanti dulu" sesuai scope v1 di atas.
+
+**Follow-up pasca-rilis v0.1.3 (2026-10-05, masuk v0.1.4):** ditambah
+toggle dimensi breakdown "Grup Akun" (default, seperti sebelumnya) vs
+"Kategori Induk" (baru) di atas grid 2 kolom:
+- Kategori tanpa `parent_id` (sudah top-level) dikelompokkan pakai
+  namanya sendiri; kategori anak (`parent_id` NOT NULL) digabung ke
+  nama induknya; transaksi `category_id IS NULL` → "Tanpa Kategori".
+- `use-cashflow-breakdown.ts` di-refactor: kolom hasil query diganti
+  dari `group_name` jadi `label` generik, hook sekarang menerima
+  parameter `groupBy: "account_group" | "parent_category"`, dua query
+  SQL berbeda dipilih lewat `QUERY_BY_GROUP_BY` map. `CashflowColumn`
+  ikut diupdate pakai `label` (bukan `group_name` lagi).
+  `CashflowSection` dapat `ToggleGroup` baru di atas grid 2 kolom.
+- Tool MCP `get_cashflow_breakdown` disinkronkan: `summarizeCashflow()`
+  di `apps/mcp-server/src/lib/sync-snapshot.ts` juga menerima parameter
+  `groupBy` yang sama (join manual `categoryId → categories.parentId →
+  categories.name` di TS, cermin logic SQL desktop), output field
+  `groupName` diganti `label` juga biar konsisten.
 
 ## Catatan implementasi Per Tipe Akun (2026-10-05)
 

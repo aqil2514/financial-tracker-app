@@ -6,7 +6,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/format-currency";
-import { useCashflowBreakdown } from "./use-cashflow-breakdown";
+import { useCashflowBreakdown, type CashflowGroupBy } from "./use-cashflow-breakdown";
 
 const COLORS = [
   "#ef4444",
@@ -23,14 +23,14 @@ function ChartTooltip({
   payload,
 }: {
   active?: boolean;
-  payload?: { payload: { group_name: string; total: number; percent: number } }[];
+  payload?: { payload: { label: string; total: number; percent: number } }[];
 }) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
 
   return (
     <div className="bg-popover rounded-lg border p-3 text-sm shadow-md">
-      <p className="font-medium">{row.group_name}</p>
+      <p className="font-medium">{row.label}</p>
       <p className="text-muted-foreground">
         {formatCurrency(row.total, "IDR")} ({row.percent.toFixed(1)}%)
       </p>
@@ -43,13 +43,17 @@ export function CashflowColumn({
   type,
   from,
   to,
+  groupBy,
+  onRowClick,
 }: {
   title: string;
   type: "income" | "expense";
   from: string;
   to: string;
+  groupBy: CashflowGroupBy;
+  onRowClick: (row: { groupKey: string | null; label: string }) => void;
 }) {
-  const { data, isLoading, error } = useCashflowBreakdown(from, to, type);
+  const { data, isLoading, error } = useCashflowBreakdown(from, to, type, groupBy);
 
   const total = useMemo(
     () => data?.reduce((sum, row) => sum + row.total, 0) ?? 0,
@@ -85,13 +89,13 @@ export function CashflowColumn({
                 <Pie
                   data={chartData}
                   dataKey="total"
-                  nameKey="group_name"
+                  nameKey="label"
                   innerRadius="55%"
                   outerRadius="90%"
                   paddingAngle={2}
                 >
                   {chartData.map((row) => (
-                    <Cell key={row.group_name} fill={row.color} />
+                    <Cell key={row.label} fill={row.color} />
                   ))}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />
@@ -102,22 +106,25 @@ export function CashflowColumn({
           <ScrollArea className="h-64">
             <ul className="divide-y pr-3">
               {chartData.map((row) => (
-                <li
-                  key={row.group_name}
-                  className="flex items-center justify-between gap-3 py-2 text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                      style={{ backgroundColor: row.color }}
-                    >
-                      {row.percent.toFixed(0)}%
+                <li key={row.label}>
+                  <button
+                    type="button"
+                    onClick={() => onRowClick({ groupKey: row.group_key, label: row.label })}
+                    className="hover:bg-muted/50 flex w-full items-center justify-between gap-3 rounded-md px-1 py-2 text-left text-sm transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                        style={{ backgroundColor: row.color }}
+                      >
+                        {row.percent.toFixed(0)}%
+                      </span>
+                      <span>{row.label}</span>
+                    </div>
+                    <span className="text-muted-foreground">
+                      {formatCurrency(row.total, "IDR")}
                     </span>
-                    <span>{row.group_name}</span>
-                  </div>
-                  <span className="text-muted-foreground">
-                    {formatCurrency(row.total, "IDR")}
-                  </span>
+                  </button>
                 </li>
               ))}
             </ul>

@@ -6,8 +6,16 @@ import type { DateRange } from "react-day-picker";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodPicker } from "@/components/query/period-picker";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CashflowColumn } from "./cashflow-column";
 import { CashflowSummaryCards } from "./cashflow-summary-cards";
+import { CashflowTransactionsDialog, type CashflowDrillDownTarget } from "./cashflow-transactions-dialog";
+import type { CashflowGroupBy } from "./use-cashflow-breakdown";
+
+const GROUP_BY_OPTIONS: { value: CashflowGroupBy; label: string }[] = [
+  { value: "account_group", label: "Grup Akun" },
+  { value: "parent_category", label: "Kategori Induk" },
+];
 
 export function CashflowSection() {
   const [dateRange, setDateRange] = useState<{ from: string; to: string } | undefined>(
@@ -17,6 +25,8 @@ export function CashflowSection() {
       return { from: format(from, "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
     }
   );
+  const [groupBy, setGroupBy] = useState<CashflowGroupBy>("account_group");
+  const [drillDown, setDrillDown] = useState<CashflowDrillDownTarget | null>(null);
 
   const periodValue = useMemo<DateRange | undefined>(
     () =>
@@ -44,20 +54,49 @@ export function CashflowSection() {
         {dateRange ? (
           <>
             <CashflowSummaryCards from={dateRange.from} to={dateRange.to} />
+
+            <ToggleGroup
+              value={[groupBy]}
+              onValueChange={(values: string[]) => {
+                if (values.length > 0) setGroupBy(values[values.length - 1] as CashflowGroupBy);
+              }}
+            >
+              {GROUP_BY_OPTIONS.map((option) => (
+                <ToggleGroupItem key={option.value} value={option.value}>
+                  {option.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+
             <div className="grid gap-6 md:grid-cols-2">
               <CashflowColumn
                 title="Pengeluaran"
                 type="expense"
                 from={dateRange.from}
                 to={dateRange.to}
+                groupBy={groupBy}
+                onRowClick={(row) =>
+                  setDrillDown({ type: "expense", groupBy, groupKey: row.groupKey, label: row.label })
+                }
               />
               <CashflowColumn
                 title="Pemasukan"
                 type="income"
                 from={dateRange.from}
                 to={dateRange.to}
+                groupBy={groupBy}
+                onRowClick={(row) =>
+                  setDrillDown({ type: "income", groupBy, groupKey: row.groupKey, label: row.label })
+                }
               />
             </div>
+
+            <CashflowTransactionsDialog
+              target={drillDown}
+              from={dateRange.from}
+              to={dateRange.to}
+              onOpenChange={(open) => !open && setDrillDown(null)}
+            />
           </>
         ) : (
           <p className="text-muted-foreground text-sm">Pilih periode untuk menampilkan data.</p>

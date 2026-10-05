@@ -166,25 +166,47 @@ export function summarizeExpenseByCategory(
     .sort((a, b) => b.total - a.total);
 }
 
+export type CashflowGroupBy = "account_group" | "parent_category";
+
 // Cermin query SQL use-cashflow-breakdown.ts (desktop) -- breakdown kas
-// masuk/keluar per account_groups, TANPA join debts/debt_payments sama
-// sekali: mode non_cash memang tidak pernah punya baris transactions,
-// dan semua pergerakan kas riil (termasuk pokok utang/piutang &
-// pelunasannya) sudah tercatat sebagai baris transactions biasa (lihat
-// migrasi 0033_backfill_direct_debt_transactions.sql di desktop app) --
-// jadi query transactions saja sudah cukup & akurat. Transfer antar
-// akun EXCLUDE dari kas masuk/keluar (type cuma income|expense).
+// masuk/keluar, TANPA join debts/debt_payments sama sekali: mode
+// non_cash memang tidak pernah punya baris transactions, dan semua
+// pergerakan kas riil (termasuk pokok utang/piutang & pelunasannya)
+// sudah tercatat sebagai baris transactions biasa (lihat migrasi
+// 0033_backfill_direct_debt_transactions.sql di desktop app) -- jadi
+// query transactions saja sudah cukup & akurat. Transfer antar akun
+// EXCLUDE dari kas masuk/keluar (type cuma income|expense).
+//
+// 2 dimensi breakdown: "account_group" (default, join ke
+// accounts.groupId -> accountGroups.name) atau "parent_category"
+// (kategori tanpa parentId dipakai namanya sendiri, kategori anak
+// digabung ke nama induknya, transaksi tanpa kategori -> "Tanpa
+// Kategori") -- cermin toggle yang sama di UI desktop.
 export function summarizeCashflow(
   snapshot: SyncSnapshot,
-  options: { from?: string; to?: string } = {}
+  options: { from?: string; to?: string; groupBy?: CashflowGroupBy } = {}
 ): {
-  income: { total: number; byGroup: Array<{ groupName: string; total: number }> };
-  expense: { total: number; byGroup: Array<{ groupName: string; total: number }> };
+  income: { total: number; byGroup: Array<{ label: string; total: number }> };
+  expense: { total: number; byGroup: Array<{ label: string; total: number }> };
 } {
+  const groupBy = options.groupBy ?? "account_group";
   const accountById = new Map(snapshot.accounts.map((a) => [a.id, a]));
   const groupNameById = new Map(
     snapshot.accountGroups.filter((g) => g.deletedAt === null).map((g) => [g.id, g.name])
   );
+  const categoryById = new Map(snapshot.categories.map((c) => [c.id, c]));
+
+  const labelFor = (t: Transaction): string => {
+    if (groupBy === "parent_category") {
+      const category = t.categoryId ? categoryById.get(t.categoryId) : undefined;
+      if (!category) return "Tanpa Kategori";
+      const parent = category.parentId ? categoryById.get(category.parentId) : undefined;
+      return parent?.name ?? category.name;
+    }
+
+    const account = t.accountId ? accountById.get(t.accountId) : undefined;
+    return account?.groupId ? (groupNameById.get(account.groupId) ?? "Tanpa Grup") : "Tanpa Grup";
+  };
 
   const totalsByType: Record<"income" | "expense", Map<string, number>> = {
     income: new Map(),
@@ -197,15 +219,14 @@ export function summarizeCashflow(
     if (options.from && t.date < options.from) continue;
     if (options.to && t.date > options.to) continue;
 
-    const account = t.accountId ? accountById.get(t.accountId) : undefined;
-    const groupName = account?.groupId ? (groupNameById.get(account.groupId) ?? "Tanpa Grup") : "Tanpa Grup";
+    const label = labelFor(t);
     const totals = totalsByType[t.type];
-    totals.set(groupName, (totals.get(groupName) ?? 0) + t.amount);
+    totals.set(label, (totals.get(label) ?? 0) + t.amount);
   }
 
   const toByGroup = (totals: Map<string, number>) =>
     Array.from(totals.entries())
-      .map(([groupName, total]) => ({ groupName, total }))
+      .map(([label, total]) => ({ label, total }))
       .sort((a, b) => b.total - a.total);
 
   const sumOf = (totals: Map<string, number>) =>
