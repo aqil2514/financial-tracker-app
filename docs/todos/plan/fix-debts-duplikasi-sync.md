@@ -42,14 +42,19 @@ lainnya (retailku sync).
       manual via `tauri dev` + `wrangler dev` SELESAI & lolos (query D1
       lokal langsung, bukan cuma toast UI). Detail:
       [`apps/desktop/docs/todos/plan/fix-debts-duplikasi-sync.md`](../../../apps/desktop/docs/todos/plan/fix-debts-duplikasi-sync.md)
-- [ ] **Pembersihan data** — baris `debts`/`debt_payments` duplikat
-      yang SUDAH ada (lokal `finance.db`, minimal 3 kontak diketahui
-      kena: Kak Ipit, Mama Dicky, Wahyu) belum dibersihkan — tunggu
-      fix kode DEPLOY & terverifikasi live dulu supaya tidak dobel lagi
-      setelah dibersihkan (lihat dogfooding doc untuk daftar `id` yang
-      sudah teridentifikasi). Data kotor TAMBAHAN dari sesi test manual
-      di D1 LOKAL (`wrangler dev`, bukan production) dicatat di dokumen
-      Worker — tidak perlu dibersihkan serius (environment test).
+- [x] **Pembersihan data** — SELESAI 2026-10-05. Worker di-deploy +
+      desktop di-build ulang production, baru 3 transaksi duplikat lama
+      (Kak Ipit, Mama Dicky, Wahyu) dihapus TOTAL (transaksi + `debts`
+      turunannya, dicek dulu tidak ada `debt_payments` terkait) dari
+      `finance.db` lokal + D1 production, lalu diinput ulang via UI
+      desktop production. Hasil akhir dicek langsung lewat
+      `wrangler d1 execute --remote`: ketiganya cuma 1 baris `debts`
+      aktif, termasuk Wahyu yang sempat diedit (membuktikan jalur
+      recreate + `DELETE /debts/push/:id` jalan benar). Detail lengkap +
+      3 gap TERPISAH yang ketahuan saat verifikasi (kontak tidak
+      ter-push, combobox key collision, 422 tidak di-retry):
+      [`docs/dogfooding/2026-10-05-verifikasi-fix-debts-duplikat-dan-gap-kontak.md`](../../dogfooding/2026-10-05-verifikasi-fix-debts-duplikat-dan-gap-kontak.md).
+      Rilis: [`docs/release/v0.1.4.md`](../../release/v0.1.4.md).
 
 ## Gap ditemukan SETELAH rencana awal (lewat test manual, 2026-10-05)
 
