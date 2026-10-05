@@ -265,7 +265,7 @@ export type BalanceTrendFilter = {
 // SEBELUM `from`, (2) net perubahan per titik granularitas DALAM
 // rentang from..to, running sum digabung terakhir -- BUKAN re-SUM per
 // titik dari awal waktu (lihat "Catatan performa" di
-// docs/todos/plan/reports-page-redesign.md).
+// apps/desktop/docs/todos/done/reports-page-redesign.md).
 //
 // Filter akun nonaktif: exclude SECARA DEFAULT (accountIds kosong) --
 // begitu user pilih akun spesifik, filter isActive dilepas supaya
