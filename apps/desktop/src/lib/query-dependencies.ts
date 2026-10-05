@@ -11,8 +11,9 @@ import { transactionsQueryKey } from "@/features/transactions/content/list/use-t
 import { recentTransactionsQueryKey } from "@/features/dashboard/content/recent-transactions/use-recent-transactions";
 import { currentMonthSummaryQueryKey } from "@/features/dashboard/content/current-month-summary/use-current-month-summary";
 import { monthlySummaryQueryKey } from "@/features/reports/use-monthly-summary";
-import { categoryBreakdownQueryKey } from "@/features/reports/use-category-breakdown";
 import { accountBalancesQueryKey } from "@/features/reports/use-account-balances";
+import { cashflowBreakdownQueryKey } from "@/features/reports/content/cashflow/use-cashflow-breakdown";
+import { cashflowSummaryQueryKey } from "@/features/reports/content/cashflow/use-cashflow-summary";
 import { accountGroupBalancesQueryKey } from "@/features/accounts/sections/balance-pie-chart/use-account-group-balances";
 import { transactionDaysQueryKey } from "@/features/transactions/shared/hooks/use-transaction-days";
 import { monthSummaryQueryKey } from "@/features/transactions/shared/hooks/use-month-summary";
@@ -34,7 +35,8 @@ export const QUERY_DEPENDENCIES = {
     recentTransactionsQueryKey,
     currentMonthSummaryQueryKey,
     monthlySummaryQueryKey,
-    categoryBreakdownQueryKey,
+    cashflowBreakdownQueryKey,
+    cashflowSummaryQueryKey,
     accountBalancesQueryKey,
     accountGroupBalancesQueryKey,
     transactionDaysQueryKey,

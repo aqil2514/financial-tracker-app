@@ -2,25 +2,25 @@
 
 ## Status & TODO saat ini (ringkas)
 
-Layout tab Cashflow versi sederhana SUDAH disepakati (lihat
-"Cashflow — layout final v1" di bawah). Layout tab "Per Tipe Akun"
-(pengganti "Per Akun") juga SUDAH disepakati (lihat "Per Tipe Akun —
-layout final v1" di bawah). Belum ada yang diimplementasikan — masih
-tahap plan/dokumen.
+Cashflow tab v1 SELESAI (query + UI + page.tsx dirapikan ke pola
+`page-layout.md`) — lihat "Catatan implementasi Cashflow (2026-10-05)"
+di bawah untuk detail. Per Tipe Akun & Tren Keuangan masih placeholder
+"Segera hadir.", belum diimplementasikan — jadi task berikutnya.
 
 **Cashflow:**
-- [x] Tentukan layout dasar: period picker + grid 2 kolom (kiri
-  pengeluaran, kanan pemasukan), masing-masing pie chart breakdown per
-  **grup akun** (`account_groups`, BUKAN per kategori transaksi) +
-  list persentase di bawahnya. Referensi visual: Money Manager (lihat
-  lampiran screenshot di percakapan 2026-10-05).
-- [ ] Tentukan apakah transfer antar akun di-include/exclude dari kas
-  masuk/keluar (lihat "Pertanyaan terbuka").
-- [ ] Tentukan apakah debt payment `non_cash` di-exclude dari cashflow
-  (harus, karena tidak gerakin kas — lihat bagian "Catatan dari skema
-  yang ada").
-- [ ] Implementasi query breakdown kas keluar/masuk per `account_groups`.
-- [ ] Implementasi UI (component + page tab baru).
+- [x] Tentukan layout dasar: period picker + grid 2 kolom + pie chart
+  breakdown per grup akun + list persentase.
+- [x] Transfer antar akun: exclude dari kas masuk/keluar.
+- [x] Debt payment `non_cash`: otomatis ter-exclude, tidak perlu logic
+  tambahan (lihat catatan implementasi di bawah).
+- [x] Implementasi query breakdown kas keluar/masuk per `account_groups`.
+- [x] Implementasi UI (component + page tab baru) — termasuk 3 card
+  status (Pemasukan/Pengeluaran/Surplus-Defisit) di atas grid, dan
+  list per kolom dibatasi tinggi + `ScrollArea` shadcn biar halaman
+  tidak memanjang kalau grup akunnya banyak.
+- [x] DIANGGAP SELESAI untuk v1 (2026-10-05) — tidak ada tambahan lain
+  di bawah grid 2 kolom untuk sekarang, sesuai scope v1 yang sengaja
+  dibatasi.
 - [ ] Opening→closing balance rekonsiliasi — scope v1 ini BELUM
   termasuk (lihat "Cashflow — opsi konsep", poin 2), nanti dulu.
 
@@ -40,11 +40,13 @@ tahap plan/dokumen.
 - [x] Tentukan: KEDUANYA DIHAPUS, tidak dipindah/digabung ke mana pun
   secara eksplisit — dianggap sudah ter-cover oleh tab Cashflow (lihat
   "Kenapa Ringkasan Bulanan & Per Kategori dihapus" di bawah).
-- [ ] Hapus `MonthlySummaryChart`/`use-monthly-summary.ts` dan
-  `CategoryBreakdownChart`/`use-category-breakdown.ts` beserta
-  tab-nya di `reports/page.tsx` — dilakukan BARENGAN saat implementasi
-  Cashflow (bukan langkah terpisah), supaya tidak ada jeda halaman
-  Laporan kehilangan info sebelum Cashflow siap gantiin.
+- [x] Hapus `MonthlySummaryChart`/`CategoryBreakdownChart` (komponen
+  chart tab lama) beserta tab-nya di `reports/page.tsx`, dilakukan
+  BARENGAN implementasi Cashflow. Catatan: `use-monthly-summary.ts`
+  DIPERTAHANKAN (dipakai `dashboard/content/mini-trend-chart/`),
+  `use-category-breakdown.ts` yang dihapus (tidak dipakai di luar
+  komponen chart yang sudah dihapus) — lihat "Catatan implementasi
+  Cashflow" di bawah.
 
 **Tren Keuangan (tab baru):**
 - [x] Tentukan konsep: snapshot kondisi keuangan di titik waktu
@@ -199,6 +201,56 @@ Disepakati 2026-10-05 (berdasar referensi screenshot Money Manager tab
   operating/investing/financing (poin 4). Transfer antar akun: lihat
   "Pertanyaan terbuka" — masih perlu diputuskan include/exclude.
 
+## Catatan implementasi Cashflow (2026-10-05)
+
+- Transfer antar akun: diputuskan **exclude** — query Cashflow cuma
+  filter `type IN ('income','expense')`, sesuai definisi cashflow
+  standar ("uang cuma pindah kantong, bukan benar-benar masuk/keluar").
+- Debt payment `non_cash` ternyata **otomatis ter-exclude TANPA perlu
+  join `debts`/`debt_payments` sama sekali** — mode `non_cash` memang
+  tidak pernah punya baris `transactions`, dan semua pergerakan kas
+  riil (termasuk pokok utang/piutang & pelunasannya) SUDAH tercatat
+  sebagai baris `transactions` biasa (lihat migrasi
+  `0033_backfill_direct_debt_transactions.sql`, prinsip "saldo akun
+  HANYA bisa berubah lewat transactions"). Jadi query Cashflow cukup
+  query `transactions` → `accounts` → `account_groups`, tidak perlu
+  tabel `debts`/`debt_payments` apapun.
+- File: `features/reports/content/cashflow/use-cashflow-breakdown.ts`
+  (query), `cashflow-column.tsx` (donut chart + list per kolom,
+  reusable utk pengeluaran/pemasukan), `index.tsx` (section: card +
+  `PeriodPicker` + grid 2 kolom, default period = bulan berjalan).
+- `reports/page.tsx` dirapikan jadi orkestrator murni
+  (`ReportsHeader` + `ReportsContent`) — sebelumnya melanggar
+  `docs/rules/page-layout.md` (nulis `PageHeader`/`Tabs` langsung).
+  Tab "Per Tipe Akun"/"Tren Keuangan" sementara placeholder "Segera
+  hadir." di `ReportsContent`, pakai `BaseTabs`
+  (`components/pattern/base-tabs.tsx`, pola config-array yang sudah
+  dipakai di `features/retailku/summary/`) bukan `Tabs` mentah.
+- Hook lama `use-monthly-summary.ts`/`use-account-balances.ts` TETAP
+  dipertahankan (dipakai juga oleh `dashboard/` &
+  `accounts/sections/balance-pie-chart/`) — yang dihapus cuma 3
+  komponen chart tab lama (`MonthlySummaryChart`,
+  `CategoryBreakdownChart`, `AccountBalanceChart`) dan
+  `use-category-breakdown.ts` (tidak dipakai di tempat lain).
+  `lib/query-dependencies.ts` diupdate: `categoryBreakdownQueryKey`
+  dibuang, `cashflowBreakdownQueryKey` & `cashflowSummaryQueryKey`
+  ditambahkan.
+- `reports/page.tsx` pakai `<PageContainer maxWidth="6xl">` (bukan
+  default `3xl`) — awalnya lupa di-set jadi halaman sempit terpusat,
+  padahal halaman list/grid lain (Akun, Transaksi, Debts, dst) semua
+  pakai `6xl`.
+- Ditambah `CashflowSummaryCards` (`cashflow-summary-cards.tsx` +
+  `use-cashflow-summary.ts`) — 3 card status (Pemasukan/Pengeluaran/
+  Surplus-Defisit) full-width di atas grid 2 kolom, query terpisah
+  dari breakdown per grup (cuma total, tanpa join `account_groups`).
+- List persentase tiap `CashflowColumn` dibatasi tinggi (`h-64`) +
+  dibungkus `ScrollArea` (shadcn) — supaya kalau grup akun banyak,
+  scroll di dalam kolom, bukan memanjangkan seluruh halaman.
+- Diputuskan (2026-10-05): TIDAK ada tambahan konten lain di bawah
+  grid 2 kolom untuk v1 — summary card + breakdown dianggap cukup,
+  opening→closing balance & operating/investing/financing tetap
+  "nanti dulu" sesuai scope v1 di atas.
+
 ## Per Tipe Akun — layout final v1
 
 Disepakati 2026-10-05. Motivasi: `account_type` sekarang cuma
@@ -337,7 +389,8 @@ utk dataset besar.
 
 - Cashflow: sesederhana poin 1-3, atau sekalian poin 4
   (operating/investing/financing)?
-- Transfer antar akun: include atau exclude dari kas masuk/keluar?
+- ~~Transfer antar akun: include atau exclude dari kas masuk/keluar?~~
+  SUDAH DIPUTUSKAN 2026-10-05: exclude. Lihat checklist Cashflow di atas.
 - Per Tipe Akun: perlu period picker atau murni snapshot saat ini?
 - Tren Keuangan: perlu downsample otomatis saat rentang panjang +
   granularitas harian dipilih bersamaan, atau biarkan apa adanya
