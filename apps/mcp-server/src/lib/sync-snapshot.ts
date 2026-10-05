@@ -166,6 +166,151 @@ export function summarizeExpenseByCategory(
     .sort((a, b) => b.total - a.total);
 }
 
+// Cermin query SQL use-cashflow-breakdown.ts (desktop) -- breakdown kas
+// masuk/keluar per account_groups, TANPA join debts/debt_payments sama
+// sekali: mode non_cash memang tidak pernah punya baris transactions,
+// dan semua pergerakan kas riil (termasuk pokok utang/piutang &
+// pelunasannya) sudah tercatat sebagai baris transactions biasa (lihat
+// migrasi 0033_backfill_direct_debt_transactions.sql di desktop app) --
+// jadi query transactions saja sudah cukup & akurat. Transfer antar
+// akun EXCLUDE dari kas masuk/keluar (type cuma income|expense).
+export function summarizeCashflow(
+  snapshot: SyncSnapshot,
+  options: { from?: string; to?: string } = {}
+): {
+  income: { total: number; byGroup: Array<{ groupName: string; total: number }> };
+  expense: { total: number; byGroup: Array<{ groupName: string; total: number }> };
+} {
+  const accountById = new Map(snapshot.accounts.map((a) => [a.id, a]));
+  const groupNameById = new Map(
+    snapshot.accountGroups.filter((g) => g.deletedAt === null).map((g) => [g.id, g.name])
+  );
+
+  const totalsByType: Record<"income" | "expense", Map<string, number>> = {
+    income: new Map(),
+    expense: new Map(),
+  };
+
+  for (const t of snapshot.transactions) {
+    if (!isAlive(t)) continue;
+    if (t.type !== "income" && t.type !== "expense") continue;
+    if (options.from && t.date < options.from) continue;
+    if (options.to && t.date > options.to) continue;
+
+    const account = t.accountId ? accountById.get(t.accountId) : undefined;
+    const groupName = account?.groupId ? (groupNameById.get(account.groupId) ?? "Tanpa Grup") : "Tanpa Grup";
+    const totals = totalsByType[t.type];
+    totals.set(groupName, (totals.get(groupName) ?? 0) + t.amount);
+  }
+
+  const toByGroup = (totals: Map<string, number>) =>
+    Array.from(totals.entries())
+      .map(([groupName, total]) => ({ groupName, total }))
+      .sort((a, b) => b.total - a.total);
+
+  const sumOf = (totals: Map<string, number>) =>
+    Array.from(totals.values()).reduce((sum, v) => sum + v, 0);
+
+  return {
+    income: { total: sumOf(totalsByType.income), byGroup: toByGroup(totalsByType.income) },
+    expense: { total: sumOf(totalsByType.expense), byGroup: toByGroup(totalsByType.expense) },
+  };
+}
+
+export type BalanceTrendGranularity = "day" | "week" | "month" | "year";
+
+function bucketLabel(date: string, granularity: BalanceTrendGranularity): string {
+  // `date` format YYYY-MM-DD -- slice murni, cermin strftime SQLite di
+  // use-balance-trend.ts (desktop), KECUALI "week" yang butuh hitungan
+  // ISO-week manual (tidak ada strftime %W setara di TS tanpa lib date).
+  if (granularity === "year") return date.slice(0, 4);
+  if (granularity === "month") return date.slice(0, 7);
+  if (granularity === "day") return date;
+
+  const d = new Date(`${date}T00:00:00Z`);
+  const startOfYear = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const dayOfYear = Math.floor((d.getTime() - startOfYear.getTime()) / 86400000);
+  const week = Math.floor(dayOfYear / 7);
+  return `${d.getUTCFullYear()}-${String(week).padStart(2, "0")}`;
+}
+
+export type BalanceTrendFilter = {
+  accountTypes?: AccountType[];
+  groupIds?: string[];
+  accountIds?: string[];
+};
+
+// Cermin strategi 2-fase use-balance-trend.ts (desktop): (1) saldo awal
+// SEBELUM `from`, (2) net perubahan per titik granularitas DALAM
+// rentang from..to, running sum digabung terakhir -- BUKAN re-SUM per
+// titik dari awal waktu (lihat "Catatan performa" di
+// docs/todos/plan/reports-page-redesign.md).
+//
+// Filter akun nonaktif: exclude SECARA DEFAULT (accountIds kosong) --
+// begitu user pilih akun spesifik, filter isActive dilepas supaya
+// pilihan eksplisit itu (termasuk akun nonaktif) tetap terhitung.
+export function computeBalanceTrend(
+  snapshot: SyncSnapshot,
+  from: string,
+  to: string,
+  granularity: BalanceTrendGranularity,
+  filter: BalanceTrendFilter = {}
+): Array<{ label: string; balance: number }> {
+  const accountTypes = filter.accountTypes ?? [];
+  const groupIds = filter.groupIds ?? [];
+  const accountIds = filter.accountIds ?? [];
+
+  const matchesAccount = (account: Account | undefined): account is Account => {
+    if (!account) return false;
+    if (accountIds.length === 0 && !account.isActive) return false;
+    if (accountTypes.length > 0 && !accountTypes.includes(account.accountType)) return false;
+    if (groupIds.length > 0 && (!account.groupId || !groupIds.includes(account.groupId))) return false;
+    if (accountIds.length > 0 && !accountIds.includes(account.id)) return false;
+    return true;
+  };
+
+  const accountById = new Map(snapshot.accounts.map((a) => [a.id, a]));
+  const matchingAccounts = snapshot.accounts.filter((a) => matchesAccount(a));
+
+  let openingBalance = matchingAccounts.reduce((sum, a) => sum + a.initialBalance, 0);
+
+  const buckets = new Map<string, number>();
+
+  for (const t of snapshot.transactions) {
+    if (!isAlive(t)) continue;
+
+    const fromAccount = t.accountId ? accountById.get(t.accountId) : undefined;
+    const toAccount = t.transferAccountId ? accountById.get(t.transferAccountId) : undefined;
+    const fromMatches = matchesAccount(fromAccount);
+    const toMatches = t.type === "transfer" && matchesAccount(toAccount);
+    if (!fromMatches && !toMatches) continue;
+
+    let net = 0;
+    if (fromMatches) {
+      if (t.type === "income") net += t.amount;
+      else if (t.type === "expense" || t.type === "transfer") net -= t.amount;
+    }
+    if (toMatches) net += t.amount;
+
+    if (t.date < from) {
+      openingBalance += net;
+      continue;
+    }
+    if (t.date > to) continue;
+
+    const label = bucketLabel(t.date, granularity);
+    buckets.set(label, (buckets.get(label) ?? 0) + net);
+  }
+
+  let running = openingBalance;
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, net]) => {
+      running += net;
+      return { label, balance: running };
+    });
+}
+
 export function listTransactions(
   snapshot: SyncSnapshot,
   options: { limit?: number; from?: string; to?: string; type?: Transaction["type"]; accountId?: string } = {}

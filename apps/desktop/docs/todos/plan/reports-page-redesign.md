@@ -2,10 +2,12 @@
 
 ## Status & TODO saat ini (ringkas)
 
-SEMUA 3 TAB SELESAI diimplementasikan (Cashflow, Per Tipe Akun, Tren
-Keuangan) — halaman Laporan redesign v1 DONE. Lihat "Catatan
-implementasi" masing-masing tab di bawah untuk detail teknis. Sisa
-pekerjaan: MCP tools pendamping (belum dimulai).
+SELURUH REDESIGN HALAMAN LAPORAN v1 DONE (2026-10-05) — 3 tab UI
+(Cashflow, Per Tipe Akun, Tren Keuangan) + MCP tools pendamping
+(`get_cashflow_breakdown`, `get_balance_trend`) semuanya sudah
+diimplementasikan. Lihat "Catatan implementasi" masing-masing di bawah
+untuk detail teknis. Tidak ada pekerjaan tersisa dari dokumen ini —
+kekurangan berikutnya ditangani lewat dogfooding (`docs/dogfooding/`).
 
 **Cashflow:**
 - [x] Tentukan layout dasar: period picker + grid 2 kolom + pie chart
@@ -92,15 +94,19 @@ ada lagi Ringkasan Bulanan/Per Kategori/Per Akun (lama).
   `apps/mcp-server`, bukan cuma fitur UI desktop — supaya Claude lewat
   MCP juga bisa menjawab pertanyaan yang sama persis. Lihat "MCP
   tools — rencana" di bawah.
-- [ ] Desain nama tool + input schema utk masing-masing (ikuti pola
+- [x] Desain nama tool + input schema utk masing-masing (ikuti pola
   `get_expense_summary_by_category`/`get_account_balances` yang sudah
   ada).
-- [ ] Implementasi fungsi agregasi di `lib/sync-snapshot.ts` (atau
-  helper baru) — MCP tools baca dari snapshot worker/D1, BUKAN query
-  SQLite lokal seperti desktop app, jadi logic agregasi perlu ditulis
-  ULANG di sisi MCP (tidak bisa reuse query SQL dari
-  `apps/desktop/src/features/reports/*`).
-- [ ] Registrasi tool baru di `lib/mcp-tools/*/index.ts` sesuai domain.
+- [x] Implementasi fungsi agregasi di `lib/sync-snapshot.ts` — logic
+  agregasi ditulis ULANG di TS (bukan SQL) karena MCP baca dari
+  snapshot worker/D1 (`fetchFullSnapshot`), bukan query SQLite lokal.
+  Lihat "Catatan implementasi MCP tools" di bawah.
+- [x] Registrasi tool baru di `lib/mcp-tools/accounts/index.ts`
+  (keduanya masuk domain `accounts`, bukan `transactions` — final,
+  bukan lagi TBD).
+- [x] DONE (2026-10-05) — `get_balances_by_account_type` TETAP tidak
+  dibuat (dicoret dari rencana sejak update 2026-10-05 di "MCP tools —
+  rencana", `get_account_balances` sudah cukup).
 
 ## Latar belakang
 
@@ -446,6 +452,55 @@ perlu tool/field baru di MCP** untuk kebutuhan ini. `get_balances_by_account_typ
 di atas kemungkinan JADI TIDAK PERLU dibuat — dicoret dari rencana
 kecuali nanti ternyata agregasi manual oleh model kurang akurat/mahal
 utk dataset besar.
+
+## Catatan implementasi MCP tools (2026-10-05)
+
+- Konfirmasi riset: `fetchFullSnapshot` (`apps/mcp-server/src/lib/sync-snapshot.ts`)
+  mengembalikan `SyncSnapshot` yang SUDAH menyertakan array `transactions`
+  PENUH & TIDAK teragregasi (bukan cuma saldo akun) — jadi breakdown
+  Cashflow (group by rentang tanggal + account_group + income/expense)
+  dan Tren Keuangan (saldo kumulatif per titik waktu) BISA dihitung
+  penuh di TS dari satu snapshot ini, tanpa perlu endpoint/field baru
+  di Worker.
+- Ditambah 2 fungsi agregasi baru ke `lib/sync-snapshot.ts`, sejajar
+  dengan `summarizeExpenseByCategory`/`computeAccountBalance` yang
+  sudah ada:
+  - `summarizeCashflow(snapshot, {from, to})` — iterasi
+    `snapshot.transactions`, filter `isAlive` + `type IN
+    (income,expense)` + rentang tanggal, join manual
+    `accountId → accounts.groupId → accountGroups.name` (fallback
+    `"Tanpa Grup"`), akumulasi per grup. Cermin PERSIS logic
+    `use-cashflow-breakdown.ts` desktop — transfer excluded, tidak ada
+    join `debts`/`debt_payments` (lihat alasannya di "Catatan
+    implementasi Cashflow" di atas, berlaku sama persis di sisi MCP).
+  - `computeBalanceTrend(snapshot, from, to, granularity, filter)` —
+    strategi 2-fase sama seperti `use-balance-trend.ts` desktop: saldo
+    awal (initial_balance semua akun terfilter + net transaksi SEBELUM
+    `from`) lalu net perubahan per bucket granularitas DALAM rentang,
+    running sum digabung terakhir. Filter 3-level (`accountTypes`/
+    `groupIds`/`accountIds`) independen (AND), akun nonaktif exclude
+    default kecuali dipilih eksplisit lewat `accountIds` — logic PERSIS
+    sama dengan desktop.
+  - Granularitas "week": TS tidak punya `strftime %W` SQLite, jadi
+    dihitung manual (`dayOfYear / 7`) di helper `bucketLabel()` —
+    pendekatan beda implementasi dari desktop tapi hasil label yang
+    sebanding (`YYYY-WW`).
+- 2 tool baru: `get_cashflow_breakdown` dan `get_balance_trend`, KEDUANYA
+  didaftarkan di `lib/mcp-tools/accounts/index.ts` (domain `accounts`,
+  bukan `transactions` — keputusan final, sebelumnya "TBD" di rencana
+  awal). File: `accounts/get-cashflow-breakdown.ts`,
+  `accounts/get-balance-trend.ts`.
+- Input schema (Zod) ikut konvensi yang sudah ada: `from`/`to` sebagai
+  `z.string().optional()` longgar (bukan `dateField` yang lebih ketat,
+  karena tool "read"/filter lain juga tidak pakai itu). `accountTypes`
+  array pertama di codebase ini yang pakai `z.array(...).optional()`
+  untuk filter — sebelumnya semua filter MCP cuma single-value.
+- `get_balances_by_account_type` TETAP tidak dibuat sesuai keputusan di
+  atas — `get_account_balances` yang sudah ada (mengembalikan
+  `accountType` per baris) dianggap cukup utk agregasi manual oleh
+  model.
+- Verifikasi: `npm run typecheck` dan `npm run build` di
+  `apps/mcp-server` keduanya lolos bersih setelah perubahan ini.
 
 ## Catatan dari skema yang ada
 
