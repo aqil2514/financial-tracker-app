@@ -11,11 +11,14 @@ import type { Transaction } from "@/lib/db";
 import { RichTextViewer } from "@/components/rich-text";
 import { AttachmentThumbnail } from "@/shared/attachments/attachment-thumbnail";
 import { useTransactionAttachments } from "@/shared/attachments/use-transaction-attachments";
+import { useContacts } from "@/features/contacts";
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
+import { DEBT_STATUS_LABEL, DEBT_STATUS_VARIANT } from "@/shared/debts/status-labels";
+import { useRelatedDebt } from "@/shared/debts/use-related-debt";
 import { typeConfig } from "../shared/constants";
 import { useTransactionById } from "../shared/hooks/use-transaction-by-id";
-import { accountName } from "../shared/utils/account-name";
+import { accountNameParts } from "../shared/utils/account-name";
 import { categoryName } from "../shared/utils/category-name";
 import { useTransactionsDialog } from "./context";
 
@@ -57,19 +60,26 @@ function TransactionDetailDialogContent({
 }) {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const { data: contacts } = useContacts();
   const { data: attachments } = useTransactionAttachments(transaction.id);
+  const { data: relatedDebt } = useRelatedDebt(transaction.id);
 
   const description = transaction.description
     ? JSON.parse(transaction.description)
     : null;
 
+  const contact = contacts?.find((contact) => contact.id === transaction.contact_id);
+
   const config = typeConfig[transaction.type];
   const Icon = config.icon;
 
-  const transactionType =
+  const fromAccount = accountNameParts(accounts, transaction.account_id);
+  const toAccount =
     transaction.type === "transfer"
-      ? `${accountName(accounts, transaction.account_id)} → ${accountName(accounts, transaction.transfer_account_id)}`
-      : accountName(accounts, transaction.account_id);
+      ? accountNameParts(accounts, transaction.transfer_account_id)
+      : null;
+  const accountLine = toAccount ? `${fromAccount.name} → ${toAccount.name}` : fromAccount.name;
+  const accountGroups = [...new Set([fromAccount.group, toAccount?.group].filter(Boolean))] as string[];
 
   return (
     <Dialog open={true} onOpenChange={onOpenChange}>
@@ -101,7 +111,18 @@ function TransactionDetailDialogContent({
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-4">
               <span className="text-muted-foreground shrink-0">Akun</span>
-              <span className="font-medium text-right">{transactionType}</span>
+              <div className="flex flex-col items-end gap-1">
+                <span className="font-medium text-right">{accountLine}</span>
+                {accountGroups.length > 0 && (
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {accountGroups.map((group) => (
+                      <Badge key={group} variant="outline" className="text-muted-foreground">
+                        {group}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             {categoryName(categories, transaction.category_id) && (
               <div className="flex items-center justify-between">
@@ -109,9 +130,32 @@ function TransactionDetailDialogContent({
                 <Badge variant="secondary">{categoryName(categories, transaction.category_id)}</Badge>
               </div>
             )}
+            {contact && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Kontak</span>
+                <span className="font-medium">{contact.name}</span>
+              </div>
+            )}
+            {relatedDebt && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">
+                  {relatedDebt.role === "principal" ? "Mencatat" : "Membayar"}{" "}
+                  {relatedDebt.debt.type === "receivable" ? "Piutang" : "Utang"}
+                </span>
+                <Badge variant={DEBT_STATUS_VARIANT[relatedDebt.debt.status]}>
+                  {DEBT_STATUS_LABEL[relatedDebt.debt.status]}
+                </Badge>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Tanggal</span>
               <span>{formatDate(transaction.date, "date-time")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Dicatat</span>
+              <span className="text-muted-foreground text-xs">
+                {formatDate(transaction.created_at, "date-time")}
+              </span>
             </div>
           </div>
 

@@ -15,3 +15,18 @@ export function accountName(
   if (!account) return "-";
   return account.group_name ? `${account.name} — ${account.group_name}` : account.name;
 }
+
+/**
+ * Nama akun & grup terpisah (bukan digabung jadi satu string) — dipakai
+ * di tempat yg butuh beda penekanan visual antara keduanya, mis. baris
+ * transfer di list transaksi (dua `accountName()` berdampingan jadi
+ * terlalu panjang kalau grupnya ikut digabung penuh di tiap sisi).
+ */
+export function accountNameParts(
+  accounts: AccountWithBalance[] | undefined,
+  id: string | null
+): { name: string; group: string | null } {
+  const account = accounts?.find((account) => account.id === id);
+  if (!account) return { name: "-", group: null };
+  return { name: account.name, group: account.group_name ?? null };
+}

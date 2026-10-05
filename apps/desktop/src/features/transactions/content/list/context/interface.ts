@@ -31,6 +31,7 @@ export interface ListContextPageControl {
 
 export interface ListContextLookup {
   accountName: (id: string | null) => string;
+  accountNameParts: (id: string | null) => { name: string; group: string | null };
   categoryName: (id: string | null) => string | null;
 }
 

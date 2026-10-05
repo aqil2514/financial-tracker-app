@@ -14,4 +14,9 @@ describe("formatDate", () => {
   it("includes time when the value has a time component", () => {
     expect(formatDate("2026-09-17T14:30", "date-time")).toMatch(/14[.:]30/);
   });
+
+  it("handles SQLite datetime('now') space-separated format (created_at)", () => {
+    expect(formatDate("2026-09-17 14:30:05", "date-time")).toMatch(/14[.:]30/);
+    expect(formatDate("2026-09-17 14:30:05", "time-only")).toMatch(/14[.:]30/);
+  });
 });

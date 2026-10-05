@@ -2,7 +2,6 @@
 
 import { AlignLeft, ImageIcon } from "lucide-react";
 
-import { formatDate } from "@/lib/format-date";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -15,13 +14,14 @@ import { useList } from "../../context";
 import type { TransactionListRow } from "../../use-transactions";
 
 export const ItemInfo = ({ tx }: { tx: TransactionListRow }) => {
-  const { accountName, categoryName } = useList().lookup;
+  const { accountNameParts, categoryName } = useList().lookup;
   const config = typeConfig[tx.type];
   const Icon = config.icon;
-  const transactionType =
-    tx.type === "transfer"
-      ? `${accountName(tx.account_id)} → ${accountName(tx.transfer_account_id)}`
-      : accountName(tx.account_id);
+
+  const from = accountNameParts(tx.account_id);
+  const to = tx.type === "transfer" ? accountNameParts(tx.transfer_account_id) : null;
+  const accountLine = to ? `${from.name} → ${to.name}` : from.name;
+  const groups = [...new Set([from.group, to?.group].filter(Boolean))] as string[];
 
   return (
     <div className="flex items-center gap-3">
@@ -49,10 +49,14 @@ export const ItemInfo = ({ tx }: { tx: TransactionListRow }) => {
             </TooltipProvider>
           )}
         </div>
-        <p className="text-muted-foreground text-sm">{transactionType}</p>
-        <p className="text-muted-foreground text-sm">
-          {formatDate(tx.date, "date-time")}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm">{accountLine}</p>
+          {groups.map((group) => (
+            <Badge key={group} variant="outline" className="text-muted-foreground">
+              {group}
+            </Badge>
+          ))}
+        </div>
       </div>
     </div>
   );

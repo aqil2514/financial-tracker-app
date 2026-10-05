@@ -3,6 +3,7 @@
 import { Eye, Pencil, Trash2 } from "lucide-react";
 
 import { formatCurrency } from "@/lib/format-currency";
+import { formatDate } from "@/lib/format-date";
 import { ListItemActionsMenu } from "@/components/list-item-actions-menu";
 import { useTransactionsDialog } from "../../../../dialog";
 import { typeConfig } from "../../../../shared/constants";
@@ -11,6 +12,7 @@ import type { TransactionListRow } from "../../use-transactions";
 export const ItemActions = ({ tx }: { tx: TransactionListRow }) => {
   const { openDialog } = useTransactionsDialog();
   const config = typeConfig[tx.type];
+  const time = formatDate(tx.date, "time-only");
 
   return (
     <div className="flex items-center gap-1">
@@ -24,6 +26,7 @@ export const ItemActions = ({ tx }: { tx: TransactionListRow }) => {
             Saldo {formatCurrency(tx.running_balance, "IDR")}
           </p>
         )}
+        {time && <p className="text-muted-foreground text-xs">{time}</p>}
       </div>
       <ListItemActionsMenu
         actions={[

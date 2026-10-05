@@ -9,9 +9,14 @@ import { z } from "zod";
 // cek literal "T" pada string -- tanggal dgn format lain (mis. "2026/10/05"
 // atau "5 Oktober 2026") bisa membuat `new Date(value)` jadi Invalid Date
 // saat baris itu di-pull ke desktop. Lihat mcp-server-business-logic-audit.md.
-const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+//
+// Jam opsional (HH:mm) supaya format MCP sama persis dengan yang dihasilkan
+// desktop (lihat use-create-transaction.ts: `toISOString().slice(0, 16)`
+// dari local time) -- tanpa ini transaksi MCP selalu tampil tanpa jam di
+// desktop meski row lain di hari yang sama punya jam.
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/;
 
 export const dateField = z
   .string()
-  .regex(DATE_ONLY_PATTERN, "Format tanggal harus YYYY-MM-DD, misal 2026-10-05")
-  .describe("Format YYYY-MM-DD");
+  .regex(DATE_PATTERN, "Format tanggal harus YYYY-MM-DD atau YYYY-MM-DDTHH:mm, misal 2026-10-05T14:30")
+  .describe("Format YYYY-MM-DD, atau YYYY-MM-DDTHH:mm kalau jam transaksinya diketahui/relevan");
