@@ -1,5 +1,17 @@
 # Cloud Sync Worker — Sync Dua-Arah PC ↔ D1 + CRUD via MCP — SELESAI
 
+> **KOREKSI (2026-10-05)**: asumsi "Worker satu-satunya penulis D1"
+> dan keputusan **SENGAJA SKIP** endpoint push `/debts`/`/debt-payments`
+> langsung (lihat baris "SENGAJA SKIP" di bawah) ternyata SALAH secara
+> faktual — desktop SELALU py jalur tulis `debts`/`debt_payments`
+> lokalnya sendiri (`apps/desktop/src/shared/debts/apply-debt-transaction.ts`),
+> independen dari keputusan ini, dan menyebabkan bug duplikasi (dua
+> penulis independen utk event yang sama). Keputusan ini DIBALIK sadar
+> di [`apps/worker/docs/todos/plan/fix-debts-duplikasi-sync.md`](../plan/fix-debts-duplikasi-sync.md) —
+> PC sekarang JADI penulis utk transaksi asalnya sendiri (endpoint push
+> baru ditambahkan). Isi di bawah ini TETAP dipertahankan apa adanya
+> sbg riwayat keputusan saat itu, bukan panduan arsitektur saat ini.
+
 > Dipisah dari `apps/desktop/docs/todos/done/mcp-server-cloud-mirror.md`
 > (2026-09-30) — dokumen itu awalnya berisi keputusan lintas-app
 > (desktop+worker+mcp-server) sekaligus, padahal lokasinya di

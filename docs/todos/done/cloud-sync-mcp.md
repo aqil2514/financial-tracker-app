@@ -6,6 +6,12 @@
 > `docs/todos/{plan,done}/` di root repo — folder ini bisa berisi
 > rencana lintas-app LAIN di masa depan, bukan cuma topik ini.
 
+> **KOREKSI (2026-10-05)**: "apps/worker (satu-satunya penulis D1)" di
+> bawah SALAH secara faktual utk `debts`/`debt_payments` — desktop
+> SELALU py jalur tulis lokalnya sendiri, menyebabkan bug duplikasi.
+> Keputusan dibalik sadar, lihat index
+> [`docs/todos/plan/fix-debts-duplikasi-sync.md`](../plan/fix-debts-duplikasi-sync.md).
+
 Index ini HANYA navigasi + checklist ringkas. Detail keputusan desain,
 riset, dan progress implementasi ada di dokumen masing-masing app —
 JANGAN duplikasi isi ke sini, cukup pointer.
