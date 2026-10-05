@@ -74,9 +74,8 @@ Ditemukan saat riset: transaksi yang dibuat lewat shortcut halaman
 `/debts` (`use-create-debt.ts` mode transfer, `use-pay-debt.ts` mode
 cash dengan `debt.account_id` terisi) **TIDAK PERNAH ter-push ke
 Worker sama sekali** — beda akar masalah dari bug duplikasi ini (ini
-soal transaksi yang HILANG dari sync, bukan DOBEL). Sekarang py
-dokumen rencana sendiri:
-[`docs/todos/plan/fix-debts-shortcut-tidak-tersync.md`](../plan/fix-debts-shortcut-tidak-tersync.md).
+soal transaksi yang HILANG dari sync, bukan DOBEL). SELESAI, lihat
+[`docs/todos/done/fix-debts-shortcut-tidak-tersync.md`](fix-debts-shortcut-tidak-tersync.md).
 
 ## Latar belakang
 

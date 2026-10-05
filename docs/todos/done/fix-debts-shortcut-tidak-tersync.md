@@ -7,46 +7,48 @@
 ## Status & TODO saat ini (ringkas)
 
 Ditemukan sbg gap TERPISAH saat riset fix duplikasi `debts`
-([`done/fix-debts-duplikasi-sync.md`](../done/fix-debts-duplikasi-sync.md)
-— SELESAI, dipindah ke `done/`): transaksi yang dibuat lewat shortcut
+([`fix-debts-duplikasi-sync.md`](fix-debts-duplikasi-sync.md)
+— SELESAI): transaksi yang dibuat lewat shortcut
 halaman `/debts` (bukan form Transaksi utama) **TIDAK PERNAH ter-push
 ke Worker sama sekali** — beda akar masalah dari bug duplikasi (itu
 soal DOBEL, ini soal HILANG dari sync).
 
-- [ ] `new-debt-form/use-create-debt.ts` — 2 titik, KEDUANYA cuma
+- [x] `new-debt-form/use-create-debt.ts` — 2 titik, KEDUANYA cuma
       push `debts` (ditambahkan saat fix duplikasi), TIDAK push
       `transactions`:
       - mode `record_mode === 'direct'` (baris ~74-102): insert
         `transactions` (transaksi penutup) + `debts` manual langsung.
-        Tambahkan `void pushOnWrite("transactions", transactionId)`
-        SEBELUM/SEJAJAR `void pushOnWrite("debts", debtId)` yang
-        sudah ada.
+        Ditambahkan `void pushOnWrite("transactions", transactionId)`
+        sejajar `void pushOnWrite("debts", debtId)` yang sudah ada.
       - mode `record_mode === 'transfer'`: insert `transactions`
-        (transfer kas↔debt) + panggil `applyDebtTransaction`. Tambahkan
+        (transfer kas↔debt) + panggil `applyDebtTransaction`. Ditambahkan
         `void pushOnWrite("transactions", transactionId)` sejajar push
         `debts`/`debt_payments` yang sudah ada dari hasil
         `touchedDebtRows`.
-- [ ] `pay-debt-form/use-pay-debt.ts` — SEMUA cabang (non_cash tanpa
+- [x] `pay-debt-form/use-pay-debt.ts` — SEMUA cabang (non_cash tanpa
       account_id, non_cash dgn account_id, cash tanpa account_id, cash
       dgn account_id via `applyDebtTransaction`) insert `transactions`
       TANPA push, KECUALI cabang `transaction_id: NULL` (non_cash tanpa
       account_id — di situ memang tidak ada `transactions` apa pun utk
       di-push, lihat komentar "SATU-SATUNYA kasus tanpa transaksi
-      penutup" di file itu). Tambahkan `pushOnWrite("transactions", ...)`
+      penutup" di file itu). Ditambahkan `pushOnWrite("transactions", ...)`
       di 3 cabang yang PUNYA `transactionId`.
-- [ ] Worker — TIDAK perlu endpoint baru, `POST /transactions` yang
-      sudah ada sudah generik (upsert-by-id + LWW), cukup dipanggil dari
-      titik-titik di atas. Perlu diverifikasi: `createTransactionRow`
-      tidak keberatan menerima transaksi `type: income/expense` TANPA
-      `categoryId` (mode `direct` `/debts`, kategori selalu NULL) — cek
-      `validateCategoryExists` treat `categoryId` null sbg skip (`if
-      (!categoryId) return { status: "ok" }`, sudah begitu, SEHARUSNYA
-      aman tapi WAJIB dicoba manual sebelum anggap selesai).
-- [ ] Verifikasi manual via `tauri dev` + `wrangler dev`: buat piutang
-      baru lewat `/debts` (mode direct DAN transfer), bayar piutang
-      lewat `/debts` (3 cabang yang punya transaksi), cek transaksinya
-      MUNCUL di D1 (lokal dulu, baru production setelah deploy) — bukan
-      cuma `debts`/`debt_payments`-nya.
+- [x] Worker — TIDAK perlu endpoint baru, dikonfirmasi `POST
+      /transactions` yang sudah ada sudah generik (upsert-by-id + LWW).
+      Dicek `validateCategoryExists`
+      (`apps/worker/src/modules/transactions/service.ts:69`):
+      `categoryId` null -> `{ status: "ok" }` (skip validasi), aman utk
+      payload mode `direct` `/debts` yang selalu `category_id: NULL`.
+      Type-check (`tsc --noEmit`) + test suite desktop (172/172) lolos
+      setelah perubahan.
+- [x] Verifikasi manual via `tauri dev` + `wrangler dev` (D1 lokal) —
+      4 dari 5 jalur dicoba & berhasil (mode `direct`, mode `transfer`,
+      bayar cash+account_id, bayar non_cash+account_id); jalur "bayar
+      cash tanpa account_id" (khusus data sync Retailku) dilewati,
+      tidak ada data uji di DB lokal. Detail lengkap + gap kontak
+      terkait yang ditemukan di tengah jalan: lihat
+      [dogfooding 2026-10-06](../../dogfooding/2026-10-06-fix-shortcut-debts-sync-dan-gap-kontak-resolvecontactid.md).
+      **Belum** dicoba di production sungguhan — masih tahap lokal.
 
 ## Kenapa ini beda dari fix duplikasi `debts`
 

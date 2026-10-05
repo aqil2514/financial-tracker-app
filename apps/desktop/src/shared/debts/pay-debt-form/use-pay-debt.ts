@@ -134,9 +134,7 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
           [paymentId, debt.id, values.amount, debt.account_id, transactionId, values.date, values.note]
         );
 
-        // `transactions` TIDAK dipush di sini -- gap terpisah (shortcut
-        // /debts tidak push transactions sama sekali), lihat
-        // docs/todos/plan/fix-debts-duplikasi-sync.md "Gap terpisah".
+        void pushOnWrite("transactions", transactionId);
         void pushOnWrite("debt_payments", paymentId);
         if (values.amount >= debt.remaining) {
           await db.execute("UPDATE debts SET status = 'paid' WHERE id = $1", [debt.id]);
@@ -165,8 +163,7 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
           [paymentId, debt.id, values.amount, cashAccountId, transactionId, values.date]
         );
 
-        // `transactions` TIDAK dipush di sini -- gap terpisah, sama
-        // alasannya dgn cabang non_cash+account_id di atas.
+        void pushOnWrite("transactions", transactionId);
         void pushOnWrite("debt_payments", paymentId);
         if (values.amount >= debt.remaining) {
           await db.execute("UPDATE debts SET status = 'paid' WHERE id = $1", [debt.id]);
@@ -199,8 +196,7 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
         settleDebtIds: [debt.id],
       });
 
-      // `transactions` TIDAK dipush di sini -- gap terpisah, sama
-      // alasannya dgn cabang-cabang lain di atas.
+      void pushOnWrite("transactions", transactionId);
       for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
       for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
 

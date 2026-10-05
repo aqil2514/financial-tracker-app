@@ -94,10 +94,7 @@ export function useCreateDebt() {
             values.note,
           ]
         );
-        // Push `debts` (BUKAN `transactions` di sini -- gap terpisah,
-        // lihat docs/todos/plan/fix-debts-duplikasi-sync.md "Gap
-        // terpisah": shortcut /debts tidak push transactions sama
-        // sekali, di luar scope fix duplikasi ini).
+        void pushOnWrite("transactions", transactionId);
         void pushOnWrite("debts", debtId);
         return debtId;
       }
@@ -136,8 +133,7 @@ export function useCreateDebt() {
         settleDebtIds: [],
       });
 
-      // Push `debts` saja (BUKAN `transactions` di sini -- gap terpisah,
-      // sama alasannya dgn cabang 'direct' di atas).
+      void pushOnWrite("transactions", transactionId);
       for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
       for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
 

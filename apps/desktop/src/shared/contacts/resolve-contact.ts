@@ -1,5 +1,6 @@
 import { getDb, type Contact } from "@/lib/db";
 import { newId } from "@/lib/id";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 /**
  * Mengubah nama kontak (hasil ketikan bebas dari form transaksi) menjadi
@@ -21,5 +22,6 @@ export async function resolveContactId(name: string | null): Promise<string | nu
 
   const id = newId();
   await db.execute("INSERT INTO contacts (id, name) VALUES ($1, $2)", [id, trimmed]);
+  void pushOnWrite("contacts", id);
   return id;
 }

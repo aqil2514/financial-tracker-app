@@ -101,11 +101,11 @@ Hasil grep lengkap `applyDebtTransaction`/`applyDebtTransactionEdit`
 5. [`edit-payment-form/use-edit-payment.ts:68`](../../../src/shared/debts/edit-payment-form/use-edit-payment.ts) —
    `applyDebtTransactionEdit`, edit cicilan existing.
 
-**Catatan terpisah (BUKAN scope fix ini)**: titik #3 dan #4 SAAT INI
+**Catatan terpisah (BUKAN scope fix ini)**: titik #3 dan #4 SAAT ITU
 juga tidak memanggil `pushOnWrite("transactions", ...)` sama sekali
 (beda dari #1/#2) — transaksi dari shortcut `/debts` tidak ter-sync ke
-Worker. Gap terpisah ini py dokumen rencana sendiri:
-[`docs/todos/plan/fix-debts-shortcut-tidak-tersync.md`](../../../../../docs/todos/plan/fix-debts-shortcut-tidak-tersync.md).
+Worker. Gap terpisah ini SELESAI, lihat
+[`docs/todos/done/fix-debts-shortcut-tidak-tersync.md`](../../../../../docs/todos/done/fix-debts-shortcut-tidak-tersync.md).
 
 ## Skema kolom (acuan implementasi `push-row.ts`/`worker-client.ts`)
 
