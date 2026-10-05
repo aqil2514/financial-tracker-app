@@ -14,6 +14,7 @@ import { monthlySummaryQueryKey } from "@/features/reports/use-monthly-summary";
 import { accountBalancesQueryKey } from "@/features/reports/use-account-balances";
 import { cashflowBreakdownQueryKey } from "@/features/reports/content/cashflow/use-cashflow-breakdown";
 import { cashflowSummaryQueryKey } from "@/features/reports/content/cashflow/use-cashflow-summary";
+import { balancesByAccountTypeQueryKey } from "@/features/reports/content/account-type/use-balances-by-account-type";
 import { accountGroupBalancesQueryKey } from "@/features/accounts/sections/balance-pie-chart/use-account-group-balances";
 import { transactionDaysQueryKey } from "@/features/transactions/shared/hooks/use-transaction-days";
 import { monthSummaryQueryKey } from "@/features/transactions/shared/hooks/use-month-summary";
@@ -38,6 +39,7 @@ export const QUERY_DEPENDENCIES = {
     cashflowBreakdownQueryKey,
     cashflowSummaryQueryKey,
     accountBalancesQueryKey,
+    balancesByAccountTypeQueryKey,
     accountGroupBalancesQueryKey,
     transactionDaysQueryKey,
     monthSummaryQueryKey,
@@ -47,7 +49,12 @@ export const QUERY_DEPENDENCIES = {
     debtPaymentsQueryKey,
     contactSummaryQueryKey,
   ],
-  accounts: [accountsQueryKey, accountBalancesQueryKey, accountGroupBalancesQueryKey],
+  accounts: [
+    accountsQueryKey,
+    accountBalancesQueryKey,
+    balancesByAccountTypeQueryKey,
+    accountGroupBalancesQueryKey,
+  ],
   accountGroups: [accountGroupsQueryKey, accountGroupBalancesQueryKey],
   categories: [categoriesQueryKey],
   contacts: [contactsQueryKey],
