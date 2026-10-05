@@ -35,6 +35,38 @@ async function getAccountType(db: Db, accountId: string): Promise<Account["accou
   return rows[0]?.account_type ?? null;
 }
 
+// Id baris `debts`/`debt_payments` yang DISENTUH (dibuat ATAU di-UPDATE,
+// mis. `status` jadi 'paid') oleh satu panggilan applyDebtTransaction/
+// applyDebtTransactionEdit -- dipakai caller (use-create-transaction.ts
+// dkk) utk tahu PERSIS apa yang perlu di-pushOnWrite ke Worker, krn
+// fungsi di sini tidak lagi satu-satunya penulis D1 (lihat
+// docs/todos/plan/fix-debts-duplikasi-sync.md, source-based ownership).
+// Baris yang CUMA di-update statusnya (bukan dibuat baru) TETAP masuk
+// supaya Worker dapat state terbaru, bukan cuma insert pertama.
+//
+// `deletedDebtIds`/`deletedDebtPaymentIds`: id baris yang di-HARD-DELETE
+// lokal sbg bagian dari RECREATE (field berbahaya berubah, applyDebt-
+// TransactionEdit hapus baris lama lalu insert baru dgn id BARU) --
+// caller WAJIB pushDeleteOnWrite utk id ini, krn /debts/push di Worker
+// cuma upsert-by-id dan TIDAK PERNAH tahu id lama harus dihapus kalau
+// cuma mengandalkan push baris baru (gap ditemukan 2026-10-05 lewat
+// test manual: baris lama menumpuk selamanya di D1 tanpa ini).
+export type TouchedDebtRows = {
+  debtIds: string[];
+  debtPaymentIds: string[];
+  deletedDebtIds: string[];
+  deletedDebtPaymentIds: string[];
+};
+
+function mergeTouchedDebtRows(a: TouchedDebtRows, b: TouchedDebtRows): TouchedDebtRows {
+  return {
+    debtIds: [...a.debtIds, ...b.debtIds],
+    debtPaymentIds: [...a.debtPaymentIds, ...b.debtPaymentIds],
+    deletedDebtIds: [...a.deletedDebtIds, ...b.deletedDebtIds],
+    deletedDebtPaymentIds: [...a.deletedDebtPaymentIds, ...b.deletedDebtPaymentIds],
+  };
+}
+
 /**
  * Setelah transaksi transfer tersimpan, deteksi apakah transfer ini
  * melibatkan akun `account_type='debt'` dan, kalau ya, buat/update baris
@@ -67,8 +99,9 @@ export async function applyDebtTransaction({
   date,
   debtAction,
   settleDebtIds,
-}: ApplyDebtTransactionInput): Promise<void> {
-  if (type !== "transfer" || transferAccountId == null) return;
+}: ApplyDebtTransactionInput): Promise<TouchedDebtRows> {
+  const none: TouchedDebtRows = { debtIds: [], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
+  if (type !== "transfer" || transferAccountId == null) return none;
 
   const [sourceType, destinationType] = await Promise.all([
     getAccountType(db, accountId),
@@ -90,32 +123,36 @@ export async function applyDebtTransaction({
   if (pairKind === "cash-cash" || pairKind === "debt-debt") {
     // "kas -> kas" (bukan urusan debt) maupun "debt -> debt" (di luar
     // scope, lihat dokumen desain) — tidak melakukan apa-apa.
-    return;
+    return none;
   }
 
   if (pairKind === "cash-debt") {
     // Kas -> Debt: piutang baru, tidak ambigu.
+    const id = newId();
     await db.execute(
       `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)
        VALUES ($1, 'receivable', $2, $3, $4, $5, $6)`,
-      [newId(), contactId, amount, transferAccountId, transactionId, date]
+      [id, contactId, amount, transferAccountId, transactionId, date]
     );
-    return;
+    return { debtIds: [id], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
   }
 
   // pairKind === "debt-cash": butuh keputusan eksplisit dari form.
   if (debtAction === "payable") {
+    const id = newId();
     await db.execute(
       `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)
        VALUES ($1, 'payable', $2, $3, $4, $5, $6)`,
-      [newId(), contactId, amount, accountId, transactionId, date]
+      [id, contactId, amount, accountId, transactionId, date]
     );
-    return;
+    return { debtIds: [id], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
   }
 
   if (debtAction === "settlement") {
-    await settleDebtsFifo({ db, transactionId, accountId, amount, date, settleDebtIds });
+    return settleDebtsFifo({ db, transactionId, accountId, amount, date, settleDebtIds });
   }
+
+  return none;
 }
 
 export type ApplyDebtTransactionEditInput = ApplyDebtTransactionInput & {
@@ -173,25 +210,30 @@ export async function applyDebtTransactionEdit({
   status,
   dangerousFieldsChanged,
   ...input
-}: ApplyDebtTransactionEditInput): Promise<void> {
+}: ApplyDebtTransactionEditInput): Promise<TouchedDebtRows> {
   const { db, date } = input;
 
   if (status.role === "none") {
-    await applyDebtTransaction(input);
-    return;
+    return applyDebtTransaction(input);
   }
 
   if (status.role === "principal") {
     if (!dangerousFieldsChanged) {
       await db.execute("UPDATE debts SET date = $1 WHERE id = $2", [date, status.debtId]);
-      return;
+      return { debtIds: [status.debtId], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
     }
     if (status.hasPayments) {
       throw new DebtEditBlockedError();
     }
     await db.execute("DELETE FROM debts WHERE id = $1", [status.debtId]);
-    await applyDebtTransaction(input);
-    return;
+    // id LAMA ikut dilaporkan sbg deleted -- caller WAJIB pushDeleteOnWrite
+    // supaya Worker soft-delete baris lama ini juga, BUKAN cuma push
+    // baris baru dari applyDebtTransaction di bawah (lihat komentar
+    // TouchedDebtRows di atas).
+    return mergeTouchedDebtRows(
+      { debtIds: [], debtPaymentIds: [], deletedDebtIds: [status.debtId], deletedDebtPaymentIds: [] },
+      await applyDebtTransaction(input)
+    );
   }
 
   // status.role === "payment"
@@ -200,13 +242,17 @@ export async function applyDebtTransactionEdit({
       date,
       status.debtPaymentId,
     ]);
-    return;
+    return { debtIds: [], debtPaymentIds: [status.debtPaymentId], deletedDebtIds: [], deletedDebtPaymentIds: [] };
   }
 
   await db.execute("DELETE FROM debt_payments WHERE id = $1", [status.debtPaymentId]);
   // Piutang induknya mungkin sempat ditandai 'paid' karena pembayaran
   // yang baru saja dihapus ini — kalau sekarang ternyata masih ada sisa,
   // kembalikan ke 'ongoing' supaya tidak "hilang" dari daftar berjalan.
+  // debts.id-nya IKUT ditandai disentuh (status berubah) WALAU row-nya
+  // sendiri tidak dihapus -- caller perlu push ulang supaya Worker tahu
+  // status terbaru. debt_payments.id LAMA ikut dilaporkan sbg deleted
+  // (alasan sama dgn cabang 'principal' di atas).
   await db.execute(
     `UPDATE debts SET status = 'ongoing'
      WHERE id = $1 AND status = 'paid' AND amount > COALESCE(
@@ -215,7 +261,10 @@ export async function applyDebtTransactionEdit({
      )`,
     [status.debtId]
   );
-  await applyDebtTransaction(input);
+  return mergeTouchedDebtRows(
+    { debtIds: [status.debtId], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [status.debtPaymentId] },
+    await applyDebtTransaction(input)
+  );
 }
 
 export type DeletedTransactionDebtInfo =
@@ -284,8 +333,9 @@ async function settleDebtsFifo({
   amount: number;
   date: string;
   settleDebtIds: string[];
-}): Promise<void> {
-  if (settleDebtIds.length === 0) return;
+}): Promise<TouchedDebtRows> {
+  if (settleDebtIds.length === 0)
+    return { debtIds: [], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
 
   const placeholders = settleDebtIds.map((_, i) => `$${i + 1}`).join(", ");
   const debts = await db.select<OngoingDebtRow[]>(
@@ -298,22 +348,31 @@ async function settleDebtsFifo({
     settleDebtIds
   );
 
+  const touchedDebtIds: string[] = [];
+  const touchedDebtPaymentIds: string[] = [];
   let remainingToAllocate = amount;
   for (const debt of debts) {
     if (remainingToAllocate <= 0) break;
     const allocation = Math.min(debt.remaining, remainingToAllocate);
     if (allocation <= 0) continue;
 
+    const paymentId = newId();
     await db.execute(
       `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [newId(), debt.id, allocation, accountId, transactionId, date]
+      [paymentId, debt.id, allocation, accountId, transactionId, date]
     );
+    touchedDebtPaymentIds.push(paymentId);
 
     if (allocation >= debt.remaining) {
       await db.execute("UPDATE debts SET status = 'paid' WHERE id = $1", [debt.id]);
+      // debts.id ikut disentuh (status berubah jadi 'paid') -- caller
+      // perlu push ulang baris debt-nya, bukan cuma debt_payments baru.
+      touchedDebtIds.push(debt.id);
     }
 
     remainingToAllocate -= allocation;
   }
+
+  return { debtIds: touchedDebtIds, debtPaymentIds: touchedDebtPaymentIds, deletedDebtIds: [], deletedDebtPaymentIds: [] };
 }

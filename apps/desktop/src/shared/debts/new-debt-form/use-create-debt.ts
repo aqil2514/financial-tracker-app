@@ -6,6 +6,7 @@ import { useEntityForm } from "@/hooks/use-entity-form";
 import { dependentKeysOf } from "@/lib/query-dependencies";
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { newDebtSchema, type NewDebtFormOutput } from "./schema";
 
 function now() {
@@ -93,6 +94,11 @@ export function useCreateDebt() {
             values.note,
           ]
         );
+        // Push `debts` (BUKAN `transactions` di sini -- gap terpisah,
+        // lihat docs/todos/plan/fix-debts-duplikasi-sync.md "Gap
+        // terpisah": shortcut /debts tidak push transactions sama
+        // sekali, di luar scope fix duplikasi ini).
+        void pushOnWrite("debts", debtId);
         return debtId;
       }
 
@@ -112,7 +118,7 @@ export function useCreateDebt() {
         [transactionId, values.amount, accountId, transferAccountId, values.note, values.date, contactId]
       );
 
-      await applyDebtTransaction({
+      const touchedDebtRows = await applyDebtTransaction({
         db,
         transactionId,
         type: "transfer",
@@ -129,6 +135,11 @@ export function useCreateDebt() {
         debtAction: values.debt_type === "payable" ? "payable" : null,
         settleDebtIds: [],
       });
+
+      // Push `debts` saja (BUKAN `transactions` di sini -- gap terpisah,
+      // sama alasannya dgn cabang 'direct' di atas).
+      for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
+      for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
 
       return transactionId;
     },

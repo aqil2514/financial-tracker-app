@@ -26,21 +26,42 @@ PC jadi penulis `debts`/`debt_payments` untuk transaksinya sendiri
 Worker tetap jadi penulis untuk transaksi dari MCP/sumber non-PC
 lainnya (retailku sync).
 
-- [ ] **Worker** — syarat `syncSource !== 'pc'` sebelum auto-derive
+- [x] **Worker** — syarat `syncSource !== 'pc'` sebelum auto-derive
       `debts`/`debt_payments` dari transaksi. Endpoint push baru
-      (upsert-by-id murni, tanpa bikin transaksi closing). Detail:
+      (upsert-by-id murni, tanpa bikin transaksi closing) PLUS endpoint
+      delete baru (`DELETE /debts/push/:id` dkk, ditemukan perlu saat
+      test manual — lihat gap di bawah). Kode SELESAI, type-check lolos,
+      test manual via `wrangler dev` SELESAI & lolos. Detail:
       [`apps/worker/docs/todos/plan/fix-debts-duplikasi-sync.md`](../../../apps/worker/docs/todos/plan/fix-debts-duplikasi-sync.md)
-- [ ] **Desktop** — migrasi `cloud_sync_queue` (tambah `debts`,
-      `debt_payments` ke CHECK constraint), `QueueableTable` baru,
-      `push-row.ts`/`worker-client.ts` baru, titik panggil
-      `pushOnWrite` di 5 lokasi yang sudah menulis `debts`/
-      `debt_payments` lokal. Detail:
+- [x] **Desktop** — migrasi `cloud_sync_queue` (tambah `debts`,
+      `debt_payments` ke CHECK constraint, versi 34), `QueueableTable`
+      baru, `push-row.ts`/`worker-client.ts` baru, titik panggil
+      `pushOnWrite`/`pushDeleteOnWrite` di 5+2 lokasi (5 utk upsert, 2
+      dari 5 itu jg utk delete-saat-recreate). Kode SELESAI, test migrasi
+      (`cargo test`) & test TS (`vitest run`, 172/172) lolos, verifikasi
+      manual via `tauri dev` + `wrangler dev` SELESAI & lolos (query D1
+      lokal langsung, bukan cuma toast UI). Detail:
       [`apps/desktop/docs/todos/plan/fix-debts-duplikasi-sync.md`](../../../apps/desktop/docs/todos/plan/fix-debts-duplikasi-sync.md)
 - [ ] **Pembersihan data** — baris `debts`/`debt_payments` duplikat
       yang SUDAH ada (lokal `finance.db`, minimal 3 kontak diketahui
       kena: Kak Ipit, Mama Dicky, Wahyu) belum dibersihkan — tunggu
-      fix kode selesai dulu supaya tidak dobel lagi setelah dibersihkan
-      (lihat dogfooding doc untuk daftar `id` yang sudah teridentifikasi).
+      fix kode DEPLOY & terverifikasi live dulu supaya tidak dobel lagi
+      setelah dibersihkan (lihat dogfooding doc untuk daftar `id` yang
+      sudah teridentifikasi). Data kotor TAMBAHAN dari sesi test manual
+      di D1 LOKAL (`wrangler dev`, bukan production) dicatat di dokumen
+      Worker — tidak perlu dibersihkan serius (environment test).
+
+## Gap ditemukan SETELAH rencana awal (lewat test manual, 2026-10-05)
+
+Rencana awal cuma mencakup PUSH baris baru `debts`/`debt_payments` —
+TIDAK mencakup kasus desktop men-DELETE baris LAMA saat RECREATE (edit
+transaksi yang mengubah field berbahaya). Tanpa endpoint DELETE,
+`/debts/push` yang cuma upsert-by-id tidak pernah tahu id lama harus
+dihapus → baris menumpuk tiap kali transaksi di-edit. Ditemukan &
+ditutup di sesi yang sama (endpoint `DELETE /debts/push/:id` +
+`DELETE /debts/payments/push/:id` di Worker, `pushDeleteOnWrite` di 2
+titik desktop yang pakai `applyDebtTransactionEdit`) — lihat detail di
+kedua dokumen app.
 
 ## Gap terpisah (TIDAK masuk scope fix ini)
 

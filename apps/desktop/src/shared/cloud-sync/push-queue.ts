@@ -27,7 +27,14 @@ import type { CloudSyncCredentials, DeleteCloudPayload } from "./worker-client";
 import { deleteCloudRow } from "./worker-client";
 import { pushRowPayload } from "./push-row";
 
-export type QueueableTable = "transactions" | "accounts" | "account_groups" | "categories" | "contacts";
+export type QueueableTable =
+  | "transactions"
+  | "accounts"
+  | "account_groups"
+  | "categories"
+  | "contacts"
+  | "debts"
+  | "debt_payments";
 export type DeletableTable = DeleteCloudPayload["table"];
 
 export async function enqueueUpsertPush(table: QueueableTable, id: string) {

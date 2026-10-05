@@ -6,6 +6,7 @@ import { useEntityForm } from "@/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
 import type { DebtListRow } from "@/shared/debts/use-debts-list";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { payDebtSchema, type PayDebtFormOutput } from "./schema";
 
 function now() {
@@ -88,14 +89,17 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
         // atas use-pay-debt.ts) — SATU-SATUNYA kasus tanpa transaksi
         // penutup, karena tidak ada akun debt yang bisa dituju.
         if (debt.account_id == null) {
+          const paymentId = newId();
           await db.execute(
             `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date, note)
              VALUES ($1, $2, $3, NULL, NULL, $4, $5)`,
-            [newId(), debt.id, values.amount, values.date, values.note]
+            [paymentId, debt.id, values.amount, values.date, values.note]
           );
 
+          void pushOnWrite("debt_payments", paymentId);
           if (values.amount >= debt.remaining) {
             await db.execute("UPDATE debts SET status = 'paid' WHERE id = $1", [debt.id]);
+            void pushOnWrite("debts", debt.id);
           }
 
           return null;
@@ -123,14 +127,20 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
           ]
         );
 
+        const paymentId = newId();
         await db.execute(
           `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date, note)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [newId(), debt.id, values.amount, debt.account_id, transactionId, values.date, values.note]
+          [paymentId, debt.id, values.amount, debt.account_id, transactionId, values.date, values.note]
         );
 
+        // `transactions` TIDAK dipush di sini -- gap terpisah (shortcut
+        // /debts tidak push transactions sama sekali), lihat
+        // docs/todos/plan/fix-debts-duplikasi-sync.md "Gap terpisah".
+        void pushOnWrite("debt_payments", paymentId);
         if (values.amount >= debt.remaining) {
           await db.execute("UPDATE debts SET status = 'paid' WHERE id = $1", [debt.id]);
+          void pushOnWrite("debts", debt.id);
         }
 
         return transactionId;
@@ -148,14 +158,19 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
           [transactionId, transactionType, values.amount, cashAccountId, values.note, values.date, debt.contact_id]
         );
 
+        const paymentId = newId();
         await db.execute(
           `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [newId(), debt.id, values.amount, cashAccountId, transactionId, values.date]
+          [paymentId, debt.id, values.amount, cashAccountId, transactionId, values.date]
         );
 
+        // `transactions` TIDAK dipush di sini -- gap terpisah, sama
+        // alasannya dgn cabang non_cash+account_id di atas.
+        void pushOnWrite("debt_payments", paymentId);
         if (values.amount >= debt.remaining) {
           await db.execute("UPDATE debts SET status = 'paid' WHERE id = $1", [debt.id]);
+          void pushOnWrite("debts", debt.id);
         }
 
         return transactionId;
@@ -171,7 +186,7 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
         [transactionId, values.amount, debt.account_id, cashAccountId, values.note, values.date, debt.contact_id]
       );
 
-      await applyDebtTransaction({
+      const touchedDebtRows = await applyDebtTransaction({
         db,
         transactionId,
         type: "transfer",
@@ -183,6 +198,11 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
         debtAction: "settlement",
         settleDebtIds: [debt.id],
       });
+
+      // `transactions` TIDAK dipush di sini -- gap terpisah, sama
+      // alasannya dgn cabang-cabang lain di atas.
+      for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
+      for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
 
       return transactionId;
     },

@@ -4,7 +4,12 @@ import type { SyncSource } from "../../shared/auth";
 import { classifyAccountPair, UnsupportedAccountPairError } from "./classify-account-pair";
 import { resolveContactId } from "../contacts/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
-import type { CreateDirectDebtPayload, CreateNonCashPaymentPayload } from "./schema";
+import type {
+  CreateDirectDebtPayload,
+  CreateNonCashPaymentPayload,
+  PushDebtPayload,
+  PushDebtPaymentPayload,
+} from "./schema";
 
 type OngoingDebtRow = { id: string; remaining: number };
 
@@ -333,26 +338,42 @@ async function settleDebtsFifo(
   }
 }
 
+// Precheck READ-ONLY dari applyDebtTransactionEdit -- dipisah supaya
+// bisa dipanggil UNCONDITIONAL (termasuk utk syncSource==='pc', yg
+// bagian TULISnya di-skip lewat applyDebtEditAction di bawah) tanpa
+// menyentuh baris debts/debt_payments sama sekali. Melempar
+// DebtEditBlockedError kalau editnya harus ditolak -- caller
+// (transactions/service.ts) WAJIB panggil ini SEBELUM UPDATE baris
+// `transactions`, utk SEMUA syncSource, krn larangan "jangan recreate
+// debt yg sudah dicicil" berlaku apa pun sumbernya.
+export function checkDebtEditAllowed(status: TransactionDebtStatus, dangerousFieldsChanged: boolean): void {
+  if (status.role === "principal" && dangerousFieldsChanged && status.hasPayments) {
+    throw new DebtEditBlockedError();
+  }
+}
+
 // Logic bisnis #2 dari mcp-server-business-logic-audit.md, port PERSIS
 // dari apply-debt-transaction.ts (applyDebtTransactionEdit) -- versi
 // EDIT dari applyDebtTransaction di atas, dipanggil dari
 // transactions/service.ts (modul PEMICU) setelah UPDATE baris
-// `transactions` berhasil:
+// `transactions` berhasil DAN checkDebtEditAllowed sudah lolos:
 // - role 'none': sama seperti create, langsung applyDebtTransaction.
 // - role 'principal' + field berbahaya TIDAK berubah: sinkronkan
 //   debts.date saja.
-// - role 'principal' + field berbahaya berubah + hasPayments: BLOKIR
-//   (DebtEditBlockedError) -- recreate akan menghapus cicilan via
-//   CASCADE.
-// - role 'principal' + field berbahaya berubah + belum ada cicilan:
-//   hapus debts lama, applyDebtTransaction dari nilai baru.
+// - role 'principal' + field berbahaya berubah (hasPayments sudah
+//   pasti false, dicegat checkDebtEditAllowed): hapus debts lama,
+//   applyDebtTransaction dari nilai baru.
 // - role 'payment' + field berbahaya TIDAK berubah: sinkronkan
 //   debt_payments.date saja.
 // - role 'payment' + field berbahaya berubah: SELALU aman recreate --
 //   hapus debt_payments lama, revert debts.status ke 'ongoing' kalau
 //   sempat 'paid' krn pembayaran ini, lalu applyDebtTransaction dari
 //   nilai baru.
-export async function applyDebtTransactionEdit(
+//
+// HANYA dipanggil utk syncSource!=='pc' -- transaksi PC sudah py jalur
+// tulis lokalnya sendiri (apply-debt-transaction.ts), lihat
+// docs/todos/plan/fix-debts-duplikasi-sync.md.
+export async function applyDebtEditAction(
   env: Env,
   input: ApplyDebtTransactionInput & { status: TransactionDebtStatus; dangerousFieldsChanged: boolean }
 ): Promise<ApplyDebtTransactionResult> {
@@ -367,9 +388,6 @@ export async function applyDebtTransactionEdit(
     if (!dangerousFieldsChanged) {
       await env.DB.prepare("UPDATE debts SET date = ?1 WHERE id = ?2").bind(date, status.debtId).run();
       return { status: "ok" };
-    }
-    if (status.hasPayments) {
-      throw new DebtEditBlockedError();
     }
     await env.DB.prepare("DELETE FROM debts WHERE id = ?1").bind(status.debtId).run();
     return applyDebtTransaction(env, rest);
@@ -789,4 +807,198 @@ export async function writeOffDebt(
   await env.DB.prepare("UPDATE debts SET status = 'written_off' WHERE id = ?1").bind(debtId).run();
 
   return { status: "ok", transactionId };
+}
+
+export type PushDebtResult =
+  | { status: "ok"; id: string }
+  | { status: "stale" };
+
+// Upsert-by-id MURNI utk baris debts yg desktop SUDAH buat sendiri
+// (apply-debt-transaction.ts lokal) -- BEDA dari createDirectDebt:
+// TIDAK PERNAH membuat transaksi closing (transactionId SUDAH ada,
+// adalah transaksi transfer itu sendiri, bukan transaksi baru).
+// Dipanggil HANYA dari endpoint POST /debts/push, HANYA relevan utk
+// syncSource==='pc' (lihat router.ts) -- payload dipakai APA ADANYA
+// (termasuk id, transactionId), bukan di-derive ulang di sini.
+export async function pushDebtFromPc(
+  env: Env,
+  payload: PushDebtPayload,
+  syncSource: SyncSource
+): Promise<PushDebtResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM debts WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  const now = nowText();
+  if (existing) {
+    // `source`/`source_ref` cuma ditimpa kalau payload EKSPLISIT kirim
+    // `source` -- PERSIS pola updateTransactionRow (transactions/service.ts),
+    // supaya push yg tidak tahu provenance tidak menghapus jejak
+    // 'retailku_sync' yg sudah ada.
+    await env.DB.prepare(
+      `UPDATE debts
+       SET type = ?1, contact_id = ?2, amount = ?3, account_id = ?4, transaction_id = ?5,
+           status = ?6, note = ?7, date = ?8, updated_at = ?9, deleted_at = NULL,
+           source = CASE WHEN ?11 = 1 THEN ?12 ELSE source END,
+           source_ref = CASE WHEN ?11 = 1 THEN ?13 ELSE source_ref END
+       WHERE id = ?10`
+    )
+      .bind(
+        payload.type,
+        payload.contactId ?? null,
+        payload.amount,
+        payload.accountId ?? null,
+        payload.transactionId,
+        payload.status ?? "ongoing",
+        payload.note ?? null,
+        payload.date,
+        decision.updatedAt,
+        payload.id,
+        payload.source !== undefined ? 1 : 0,
+        payload.source ?? "manual",
+        payload.source !== undefined ? payload.sourceRef ?? null : null
+      )
+      .run();
+    return { status: "ok", id: payload.id };
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO debts
+       (id, type, contact_id, amount, account_id, transaction_id, status, note, date, created_at, updated_at, sync_source,
+        source, source_ref)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`
+  )
+    .bind(
+      payload.id,
+      payload.type,
+      payload.contactId ?? null,
+      payload.amount,
+      payload.accountId ?? null,
+      payload.transactionId,
+      payload.status ?? "ongoing",
+      payload.note ?? null,
+      payload.date,
+      now,
+      decision.updatedAt,
+      syncSource,
+      payload.source ?? "manual",
+      payload.source !== undefined ? payload.sourceRef ?? null : null
+    )
+    .run();
+
+  return { status: "ok", id: payload.id };
+}
+
+// Sejajar pushDebtFromPc, utk debt_payments. debtId WAJIB SUDAH ada
+// (FK) -- kalau race push debt vs push payment belum selesai, INSERT
+// akan gagal FK constraint (sama pola spt categoryId di
+// transactions/service.ts, caller/retry queue yg handle).
+export async function pushDebtPaymentFromPc(
+  env: Env,
+  payload: PushDebtPaymentPayload,
+  syncSource: SyncSource
+): Promise<PushDebtResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM debt_payments WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  const now = nowText();
+  if (existing) {
+    await env.DB.prepare(
+      `UPDATE debt_payments
+       SET debt_id = ?1, amount = ?2, account_id = ?3, transaction_id = ?4, note = ?5, date = ?6,
+           updated_at = ?7, deleted_at = NULL,
+           source = CASE WHEN ?9 = 1 THEN ?10 ELSE source END,
+           source_ref = CASE WHEN ?9 = 1 THEN ?11 ELSE source_ref END
+       WHERE id = ?8`
+    )
+      .bind(
+        payload.debtId,
+        payload.amount,
+        payload.accountId ?? null,
+        payload.transactionId ?? null,
+        payload.note ?? null,
+        payload.date,
+        decision.updatedAt,
+        payload.id,
+        payload.source !== undefined ? 1 : 0,
+        payload.source ?? "manual",
+        payload.source !== undefined ? payload.sourceRef ?? null : null
+      )
+      .run();
+    return { status: "ok", id: payload.id };
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO debt_payments
+       (id, debt_id, amount, account_id, transaction_id, note, date, created_at, updated_at, sync_source,
+        source, source_ref)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`
+  )
+    .bind(
+      payload.id,
+      payload.debtId,
+      payload.amount,
+      payload.accountId ?? null,
+      payload.transactionId ?? null,
+      payload.note ?? null,
+      payload.date,
+      now,
+      decision.updatedAt,
+      syncSource,
+      payload.source ?? "manual",
+      payload.source !== undefined ? payload.sourceRef ?? null : null
+    )
+    .run();
+
+  return { status: "ok", id: payload.id };
+}
+
+export type DeletePushedDebtResult = { status: "ok" } | { status: "not_found" };
+
+// Soft-delete murni utk baris debts yg PC hapus lokal sbg bagian dari
+// RECREATE (applyDebtTransactionEdit: field berbahaya berubah -> hapus
+// debt lama, applyDebtTransaction insert baru dgn id BARU). TANPA efek
+// samping ke tabel lain (BEDA dari detachDebtForDeletedTransaction yg
+// khusus utk delete TRANSAKSI) -- baris debts yg dihapus di sini SUDAH
+// tidak py cicilan (dijamin checkDebtEditAllowed di transactions/service.ts
+// SEBELUM desktop sampai menghapus lokal), jadi tidak ada debt_payments
+// yg perlu diurus. Ditemukan 2026-10-05 lewat test manual: tanpa ini,
+// baris lama menumpuk selamanya di D1 krn /debts/push cuma upsert-by-id,
+// tidak pernah tahu id LAMA harus dihapus saat desktop ganti ke id baru.
+export async function deletePushedDebt(env: Env, id: string): Promise<DeletePushedDebtResult> {
+  const existing = await env.DB.prepare("SELECT id FROM debts WHERE id = ?1 AND deleted_at IS NULL")
+    .bind(id)
+    .first<{ id: string }>();
+  if (!existing) return { status: "not_found" };
+
+  const now = nowText();
+  await env.DB.prepare("UPDATE debts SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2").bind(now, id).run();
+  return { status: "ok" };
+}
+
+// Sejajar deletePushedDebt, utk debt_payments. Sama alasannya: baris yg
+// dihapus di sini adalah hasil RECREATE (applyDebtTransactionEdit role
+// 'payment', dangerousFieldsChanged -- SELALU aman recreate, lihat
+// komentar di apply-debt-transaction.ts lokal), bukan hasil hapus
+// transaksi (itu jalur detachDebtForDeletedTransaction).
+export async function deletePushedDebtPayment(env: Env, id: string): Promise<DeletePushedDebtResult> {
+  const existing = await env.DB.prepare("SELECT id FROM debt_payments WHERE id = ?1 AND deleted_at IS NULL")
+    .bind(id)
+    .first<{ id: string }>();
+  if (!existing) return { status: "not_found" };
+
+  const now = nowText();
+  await env.DB.prepare("UPDATE debt_payments SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
+    .bind(now, id)
+    .run();
+  return { status: "ok" };
 }

@@ -98,7 +98,7 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
         ]
       );
 
-      await applyDebtTransaction({
+      const touchedDebtRows = await applyDebtTransaction({
         db,
         transactionId,
         type: values.type,
@@ -112,6 +112,8 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
       });
 
       void pushOnWrite("transactions", transactionId);
+      for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
+      for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
 
       return transactionId;
     },

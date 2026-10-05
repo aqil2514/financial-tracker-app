@@ -7,26 +7,69 @@ Detail desktop:
 
 ## Status & TODO saat ini (ringkas)
 
-- [ ] Tambah syarat `syncSource !== 'pc'` sebelum `applyDebtTransaction`
+- [x] Tambah syarat `syncSource !== 'pc'` sebelum `applyDebtTransaction`
       dipanggil di `createTransactionRow` (create).
-- [ ] Tambah syarat yang sama di `updateTransactionRow` sebelum
-      `applyDebtTransactionEdit` dipanggil (edit) — perlu desain
-      precheck `DebtEditBlockedError` tetap jalan READ-ONLY utk
-      transaksi PC (lihat "Kasus khusus: precheck edit" di bawah).
-- [ ] Buat fungsi baru `pushDebtFromPc`/`pushDebtPaymentFromPc` di
-      `debts/service.ts` — upsert-by-id MURNI, TIDAK boleh membuat
+- [x] Tambah syarat yang sama di `updateTransactionRow` sebelum bagian
+      TULIS dipanggil (edit) — diimplementasi via split fungsi:
+      `checkDebtEditAllowed` (precheck read-only, SELALU jalan apa pun
+      `syncSource`) + `applyDebtEditAction` (bagian tulis, dikondisikan
+      `syncSource !== 'pc'`). `applyDebtTransactionEdit` lama dipecah
+      jadi dua fungsi ini, tidak ada lagi fungsi gabungan read+write.
+- [x] Buat fungsi baru `pushDebtFromPc`/`pushDebtPaymentFromPc` di
+      `debts/service.ts` — upsert-by-id MURNI, TIDAK membuat
       transaksi closing (beda dari `createDirectDebt`).
-- [ ] Buat endpoint baru `POST /debts/push` dan
-      `POST /debt-payments/push` (nama bisa disesuaikan) — controller +
-      schema validator baru, BUKAN reuse `POST /debts` yang sudah ada.
-- [ ] Verifikasi `GET /sync` (pull) tidak perlu berubah — begitu Worker
-      berhenti men-derive `debts` untuk transaksi `syncSource==='pc'`,
-      response pull otomatis tidak lagi membawa balik baris yang dulu
-      bikin duplikat (behavior berubah TANPA ubah kode pull).
-- [ ] Test lokal via `wrangler dev` (D1 lokal) sebelum deploy — replikasi
-      skenario: push transaksi transfer cash→debt dgn token PC, pastikan
-      TIDAK ada baris `debts` baru di D1 kecuali lewat endpoint push
-      baru.
+- [x] Buat endpoint baru `POST /debts/push` dan
+      `POST /debts/payments/push` — controller
+      (`handlePostDebtPush`/`handlePostDebtPaymentPush`) + schema
+      validator baru (`isPushDebtPayload`/`isPushDebtPaymentPayload`),
+      BUKAN reuse `POST /debts` yang sudah ada.
+- [x] `GET /sync` (pull) — tidak diubah, sesuai rencana.
+- [x] **Gap ditemukan & ditutup (2026-10-05, test manual)**: endpoint
+      baru `DELETE /debts/push/:id` dan `DELETE /debts/payments/push/:id`
+      (`handleDeleteDebtPush`/`handleDeleteDebtPaymentPush` di
+      `controller.ts`, `deletePushedDebt`/`deletePushedDebtPayment` di
+      `service.ts`) — soft-delete murni TANPA efek samping (beda dari
+      `detachDebtForDeletedTransaction` yg khusus delete TRANSAKSI).
+      Dibutuhkan krn saat desktop RECREATE baris (edit field berbahaya:
+      hapus lama, insert baru dgn id BERBEDA), `/debts/push` yg cuma
+      upsert-by-id TIDAK PERNAH tahu id LAMA harus dihapus — tanpa
+      endpoint ini baris lama menumpuk selamanya di D1. Lihat detail
+      gap di bagian "Gap ditemukan saat test manual" di bawah.
+- [x] Test lokal via `wrangler dev` (D1 lokal) SELESAI — direplikasi via
+      `tauri dev` + `wrangler dev` sungguhan (bukan simulasi): transfer
+      cash→debt baru (1 baris `debts`, bukan 2), edit nominal 2x
+      berturut-turut (precheck `checkDebtEditAllowed` lolos, recreate
+      delete+insert, `DELETE /debts/push/:id` 200 OK, net pertambahan
+      baris AKTIF per edit = 0). Dibuktikan via query
+      `wrangler d1 execute --local` langsung, bukan cuma toast UI.
+
+## Gap ditemukan saat test manual (2026-10-05)
+
+Rencana awal fix cuma mencakup PUSH baris baru (`/debts/push`) — TIDAK
+mencakup kasus desktop men-DELETE baris lama saat RECREATE (edit field
+berbahaya pada transaksi `role: 'principal'` tanpa cicilan, atau
+`role: 'payment'` apa pun — lihat `applyDebtTransactionEdit` lokal).
+Ditemukan lewat test manual: edit nominal transaksi test 2x berturut
+menghasilkan baris `debts` MENUMPUK di D1 (bukan ter-replace), karena
+`pushDebtFromPc` cuma tahu cara upsert id yg DIKIRIM, tidak pernah
+diberitahu id mana yg sudah tidak dipakai lagi di desktop.
+
+**Fix**: endpoint `DELETE /debts/push/:id` + `DELETE /debts/payments/push/:id`
+baru (lihat checklist di atas), dipanggil desktop via `pushDeleteOnWrite`
+tiap kali `applyDebtTransactionEdit` lokal men-DELETE baris lama (detail
+sisi desktop: `apps/desktop/docs/todos/plan/fix-debts-duplikasi-sync.md`).
+Diverifikasi via `wrangler d1 execute --local` langsung: baris lama
+`deleted_at` terisi, jumlah baris AKTIF (`deleted_at IS NULL`) per
+`transaction_id` tetap 1 setelah edit berulang.
+
+**Data kotor sisa testing** (BUKAN bug baru, sisa dari 2-3 edit yg
+terjadi SEBELUM fix DELETE ini ter-load — datanya sudah hilang di
+desktop lokal saat itu, jadi tidak ada lagi kesempatan memberi tahu
+Worker id mana yg harus dihapus): beberapa baris `debts` di D1 LOKAL
+(`wrangler dev`) utk transaksi test tertinggal aktif walau sudah tidak
+relevan. Tidak mempengaruhi D1 PRODUCTION (test ini semua di D1 lokal).
+Dibersihkan manual kalau perlu, atau diabaikan (D1 lokal `wrangler dev`
+cuma environment test, bukan data riil).
 
 ## Kenapa ini — ringkas (detail lengkap di dogfooding doc)
 
@@ -81,20 +124,24 @@ if (payload.type === "transfer" && payload.accountId && syncSource !== "pc") {
 (`applyDebtTransactionEdit` call), dalam `updateTransactionRow` (scope
 py `syncSource`, baris 304-310).
 
-**Kasus khusus: precheck edit.** Precheck `debtStatus.role ===
-'principal' && fieldsChanged && debtStatus.hasPayments` (350-356) ADA
-GUNANYA walau utk transaksi PC — kalau desktop (via jalur barunya
+**Kasus khusus: precheck edit — SELESAI, opsi (a) dipilih.** Precheck
+`debtStatus.role === 'principal' && fieldsChanged && debtStatus.hasPayments`
+ADA GUNANYA walau utk transaksi PC — kalau desktop (via jalur barunya
 sendiri) coba push edit yg melanggar aturan ini, Worker tetap perlu
 MENOLAK update `transactions`-nya (bukan cuma skip derivasi `debts`).
-Jadi precheck READ (baca status, tolak kalau perlu) TETAP jalan utk
-semua `syncSource` — yang DIKONDISIKAN `syncSource !== 'pc'` HANYA
-bagian TULIS (`applyDebtTransactionEdit` yang insert/update/delete
-baris `debts`/`debt_payments`). Perlu dipecah: fungsi existing
-`applyDebtTransactionEdit` saat ini menggabungkan read+write dalam 1
-pemanggilan — opsi: (a) split jadi precheck-only + apply-only, atau
-(b) wrap SELURUH call tapi pastikan precheck blocking (350-356, yang
-SUDAH baca status SEBELUM applyDebtTransactionEdit) tetap jalan
-independen di luar kondisi `syncSource`.
+
+Diimplementasi dgn split `applyDebtTransactionEdit` jadi 2 fungsi
+(`debts/service.ts`):
+- `checkDebtEditAllowed(status, dangerousFieldsChanged)` — murni baca
+  keputusan (tidak query DB lagi, terima `status` yg sudah di-resolve
+  caller), throw `DebtEditBlockedError` kalau harus ditolak. Dipanggil
+  dari `updateTransactionRow` SEBELUM UPDATE baris `transactions`,
+  UNCONDITIONAL (semua `syncSource`).
+- `applyDebtEditAction(env, input)` — bagian TULIS (insert/update/delete
+  baris `debts`/`debt_payments`), signature sama seperti
+  `applyDebtTransactionEdit` lama tapi TIDAK lagi bisa throw
+  `DebtEditBlockedError` (precheck sudah lolos di caller). Dipanggil
+  SETELAH UPDATE baris `transactions`, DIKONDISIKAN `syncSource !== 'pc'`.
 
 ### 3. `debts/service.ts` — fungsi baru, BUKAN reuse `createDirectDebt`
 

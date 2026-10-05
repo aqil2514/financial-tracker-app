@@ -3,7 +3,8 @@ import type { SyncSource } from "../../shared/auth";
 import type { PushTransactionPayload, PatchTransactionPayload } from "./schema";
 import {
   applyDebtTransaction,
-  applyDebtTransactionEdit,
+  applyDebtEditAction,
+  checkDebtEditAllowed,
   getTransactionDebtStatus,
   validateDebtSettlementAmount,
   validateAccountPairSupported,
@@ -207,7 +208,13 @@ async function createTransactionRow(
   // sini sbg PEMICU krn butuh transactionId dari insert di atas. Lihat
   // apps/worker/docs/rules/module-structure.md. TIDAK bisa reject lagi
   // di titik ini krn logic #3 sudah dicek di atas sebelum insert.
-  if (payload.type === "transfer" && payload.accountId) {
+  //
+  // syncSource !== 'pc': transaksi dari PC SUDAH punya baris debts/
+  // debt_payments sendiri (apply-debt-transaction.ts lokal, dipush
+  // terpisah lewat cloud_sync_queue) -- derivasi Worker di sini KHUSUS
+  // utk transaksi yg TIDAK py padanan lokal (MCP), supaya tidak dobel.
+  // Lihat docs/todos/plan/fix-debts-duplikasi-sync.md.
+  if (payload.type === "transfer" && payload.accountId && syncSource !== "pc") {
     await applyDebtTransaction(env, {
       transactionId: payload.id,
       type: payload.type,
@@ -347,12 +354,18 @@ async function updateTransactionRow(
   // Logic #2 pre-check: resolve status SEBELUM update baris transaksi
   // -- kalau nanti DebtEditBlockedError dilempar, UPDATE transactions
   // belum sempat jalan (konsisten dgn pola "validasi dulu baru tulis").
+  // Precheck ini SELALU jalan apa pun syncSource-nya (larangan "jangan
+  // recreate debt yg sudah dicicil" berlaku jg utk PC yg akan menulis
+  // debts/debt_payments-nya sendiri lewat jalur lokal) -- lihat
+  // checkDebtEditAllowed di debts/service.ts.
   const debtStatus = await getTransactionDebtStatus(env, id);
-  if (debtStatus.role === "principal" && fieldsChanged && debtStatus.hasPayments) {
-    return {
-      status: "rejected",
-      reason: "Piutang/utang ini sudah menerima cicilan dari transaksi lain — nominal/akun/kontak tidak bisa diubah dari sini.",
-    };
+  try {
+    checkDebtEditAllowed(debtStatus, fieldsChanged);
+  } catch (err) {
+    if (err instanceof DebtEditBlockedError) {
+      return { status: "rejected", reason: err.message };
+    }
+    throw err;
   }
 
   if (await hasSourceRefConflict(env, id, payload)) {
@@ -389,8 +402,13 @@ async function updateTransactionRow(
     )
     .run();
 
-  try {
-    const result = await applyDebtTransactionEdit(env, {
+  // syncSource !== 'pc': transaksi PC sudah py jalur tulis lokalnya
+  // sendiri utk debts/debt_payments (apply-debt-transaction.ts, dipush
+  // terpisah) -- bagian TULIS di sini (beda dari checkDebtEditAllowed
+  // di atas yg SELALU jalan) khusus utk transaksi tanpa padanan lokal
+  // (MCP). Lihat docs/todos/plan/fix-debts-duplikasi-sync.md.
+  if (syncSource !== "pc") {
+    const result = await applyDebtEditAction(env, {
       transactionId: id,
       type: payload.type,
       accountId: payload.accountId ?? "",
@@ -405,11 +423,6 @@ async function updateTransactionRow(
       dangerousFieldsChanged: fieldsChanged,
     });
     if (result.status === "rejected") return result;
-  } catch (err) {
-    if (err instanceof DebtEditBlockedError) {
-      return { status: "rejected", reason: err.message };
-    }
-    throw err;
   }
 
   return { status: "ok" };

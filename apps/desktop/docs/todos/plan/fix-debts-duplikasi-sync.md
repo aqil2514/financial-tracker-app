@@ -7,40 +7,67 @@ Detail Worker:
 
 ## Status & TODO saat ini (ringkas)
 
-- [ ] Migrasi SQL baru: ubah CHECK constraint `cloud_sync_queue.table_name`
-      supaya include `'debts'` dan `'debt_payments'` — SQLite tidak
-      support `ALTER ... DROP CONSTRAINT`, ikuti pola rebuild tabel yang
-      sudah dipakai migrasi 0009/0022/0027 (rename → create baru dgn
-      CHECK baru → copy data → drop old).
-- [ ] Daftarkan migrasi baru di `migrations.rs` (versi berikutnya
-      setelah 33) — WAJIB manual, tidak auto-discovery (lihat
-      [[feedback_migration_rs_registration]] di memory).
-- [ ] Tambah `"debts" | "debt_payments"` ke union type `QueueableTable`
+- [x] Migrasi SQL baru (`0034_cloud_sync_queue_debts.sql`): rebuild
+      `cloud_sync_queue` dgn CHECK constraint `table_name` baru
+      (tambah `'debts'`, `'debt_payments'`) — pola rename → create baru
+      → copy data → drop old, sama 0009/0022/0027. Tabel ini TIDAK
+      direferensikan FK tabel lain, jadi cukup 1 tabel (tidak serumit
+      rantai dependency 0027).
+- [x] Didaftarkan di `migrations.rs` sbg versi 34.
+- [x] Tambah `"debts" | "debt_payments"` ke union type `QueueableTable`
       (`push-queue.ts`).
-- [ ] Tambah case `"debts"`/`"debt_payments"` di `pushRowPayload`
-      (`push-row.ts`) — pola SELECT by id → map snake_case ke
-      camelCase, PERSIS pola case `"transactions"` yang sudah ada
-      (termasuk kirim `source`/`sourceRef` apa adanya, JANGAN
-      di-drop, supaya tidak merusak provenance retailku).
-- [ ] Tambah `pushDebt`/`pushDebtPayment` di `worker-client.ts`,
-      panggil endpoint baru Worker (`POST /debts/push`,
-      `POST /debt-payments/push`) — lihat detail Worker.
-- [ ] `applyDebtTransaction`/`applyDebtTransactionEdit` lokal
-      (`apps/desktop/src/shared/debts/apply-debt-transaction.ts`)
-      DIUBAH supaya RETURN id baris `debts`/`debt_payments` yang
-      disentuh (saat ini `void`) — dibutuhkan caller utk tahu id mana
-      yang perlu di-`pushOnWrite`.
-- [ ] Tambah pemanggilan `pushOnWrite("debts", id)` /
-      `pushOnWrite("debt_payments", id)` di SEMUA 5 titik yang menulis
-      `debts`/`debt_payments` lokal (daftar lengkap di bawah) — push
-      TERPISAH dari `pushOnWrite("transactions", id)` yang sudah ada
-      (1 fungsi push = 1 row = 1 tabel, tidak digabung).
-- [ ] Verifikasi test migrasi (`migrations.rs` test suite, baris
-      207-332) tetap lolos dgn CHECK constraint baru.
-- [ ] Verifikasi manual via `tauri dev` + cek `finance.dev.db` (ikuti
-      [`checking-dev-database.md`](../../rules/checking-dev-database.md))
-      — pastikan transfer cash→debt baru TIDAK lagi menghasilkan 2
-      baris `debts` setelah pull berikutnya.
+- [x] Tambah case `"debts"`/`"debt_payments"` di `pushRowPayload`
+      (`push-row.ts`) — termasuk `source`/`sourceRef` apa adanya (TIDAK
+      di-drop). Case `"debts"` SKIP push (return null) kalau
+      `transaction_id` NULL (endpoint Worker mewajibkan `transactionId`)
+      — baris begini HANYA dari gap terpisah (#3/#4 di bawah).
+- [x] Tambah `pushDebt`/`pushDebtPayment` di `worker-client.ts`,
+      panggil `POST /debts/push` / `POST /debts/payments/push` (path
+      final, BUKAN `/debt-payments/push` spt draft awal — disesuaikan
+      krn tidak ada router `debt-payments` terpisah, semua lewat
+      `debtsRouter`).
+- [x] `applyDebtTransaction`/`applyDebtTransactionEdit`/`settleDebtsFifo`
+      lokal (`apps/desktop/src/shared/debts/apply-debt-transaction.ts`)
+      DIUBAH return `TouchedDebtRows` (`{ debtIds, debtPaymentIds,
+      deletedDebtIds, deletedDebtPaymentIds }`, array krn FIFO
+      settlement bisa sentuh beberapa baris sekaligus), bukan lagi
+      `void`. 2 field `deleted*` ditambahkan belakangan (lihat gap di
+      bawah) — id baris yg di-HARD-DELETE lokal sbg bagian RECREATE
+      (edit field berbahaya), WAJIB di-`pushDeleteOnWrite`.
+- [x] Tambah pemanggilan `pushOnWrite("debts", id)` /
+      `pushOnWrite("debt_payments", id)` di SEMUA 5 titik (daftar di
+      bawah) — push TERPISAH dari `pushOnWrite("transactions", id)`.
+      Titik #3/#4 (shortcut `/debts`) SENGAJA HANYA push `debts`/
+      `debt_payments`, TIDAK ikut push `transactions` (gap terpisah,
+      luar scope — lihat catatan di bawah). Titik #5 (edit-payment) jg
+      TIDAK push `transactions` (gap existing BERBEDA, tidak disebut di
+      scope fix ini, tidak diperlebar).
+- [x] **Gap ditemukan & ditutup (2026-10-05, test manual)**: titik #2
+      (`use-update-transaction.ts`) dan #5 (`use-edit-payment.ts`) —
+      SATU-SATUNYA 2 titik yg memanggil `applyDebtTransactionEdit` —
+      juga panggil `pushDeleteOnWrite("debts"/"debt_payments", id, {})`
+      utk tiap id di `touchedDebtRows.deletedDebtIds`/
+      `deletedDebtPaymentIds`. Tanpa ini, RECREATE (edit field
+      berbahaya) bikin baris LAMA menumpuk di D1 selamanya — Worker
+      tidak pernah tahu id lama harus dihapus kalau desktop cuma push
+      baris baru. `DeleteCloudPayload`/`DELETE_PATH` di `worker-client.ts`
+      ditambah entry `debts: "/debts/push"` dan
+      `debt_payments: "/debts/payments/push"` (`DELETE_PATH[table]/:id`
+      -> `DELETE /debts/push/:id`, cocok endpoint baru Worker). Detail
+      endpoint: dokumen Worker, bagian "Gap ditemukan saat test manual".
+- [x] Test migrasi (`migrations.rs` test suite) tetap lolos (3/3 test,
+      termasuk `semua_migration_berhasil_dijalankan_dari_nol` dgn
+      migrasi 0034 baru). Test suite TS (`vitest run`, 172/172 test
+      termasuk `apply-debt-transaction.test.ts`) jg tetap lolos setelah
+      gap DELETE ditutup.
+- [x] Verifikasi manual via `tauri dev` + `wrangler dev` SELESAI
+      (bukan simulasi, dgn query `wrangler d1 execute --local`
+      langsung): transfer cash→debt baru -> 1 baris `debts` (bukan 2).
+      Edit nominal 2x berturut-turut -> precheck lolos, recreate
+      delete+insert jalan benar, `DELETE /debts/push/:id` 200 OK, net
+      pertambahan baris AKTIF (`deleted_at IS NULL`) per edit = 0.
+      Ketemu & ditutup gap DELETE di tengah proses verifikasi ini
+      (lihat poin di atas) — BUKAN lolos dari percobaan pertama.
 
 ## Kenapa ini — ringkas (detail lengkap di dogfooding doc + index root)
 
@@ -99,3 +126,7 @@ dokumen Worker utk skema D1 lengkap).
 - `cloud_sync_queue` retry/flush logic (`push-queue.ts`) — sudah
   generik per nama tabel string, tidak perlu logic khusus baru,
   cukup tambah literal type + case baru di `pushRowPayload`.
+  `DeletableTable` (dipakai `enqueueDeletePush`/retry) OTOMATIS
+  mencakup `debts`/`debt_payments` krn diturunkan dari
+  `DeleteCloudPayload["table"]` — tidak perlu sentuh `push-queue.ts`
+  sama sekali utk gap DELETE yg ditutup belakangan (lihat checklist).

@@ -6,6 +6,7 @@ import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { applyDebtTransactionEdit } from "@/shared/debts/apply-debt-transaction";
 import { getTransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
 import type { DebtPaymentRow } from "@/shared/debts/use-debt-payments";
+import { pushOnWrite, pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { editPaymentSchema, type EditPaymentFormOutput } from "./schema";
 
 /**
@@ -65,7 +66,7 @@ export function useEditPayment(payment: DebtPaymentRow, onSuccess?: () => void) 
       // TIDAK dianggap berbahaya (sama seperti note/description).
       const dangerousFieldsChanged = values.amount !== transaction.amount;
 
-      await applyDebtTransactionEdit({
+      const touchedDebtRows = await applyDebtTransactionEdit({
         db,
         transactionId,
         type: transaction.type,
@@ -79,6 +80,12 @@ export function useEditPayment(payment: DebtPaymentRow, onSuccess?: () => void) 
         status,
         dangerousFieldsChanged,
       });
+
+      for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
+      for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
+      for (const debtId of touchedDebtRows.deletedDebtIds) void pushDeleteOnWrite("debts", debtId, {});
+      for (const debtPaymentId of touchedDebtRows.deletedDebtPaymentIds)
+        void pushDeleteOnWrite("debt_payments", debtPaymentId, {});
     },
     invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Cicilan berhasil diperbarui",

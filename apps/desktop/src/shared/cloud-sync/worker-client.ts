@@ -162,6 +162,48 @@ export function pushContact(creds: CloudSyncCredentials, payload: PushContactPay
   return pushUpsert(creds, "/contacts", payload);
 }
 
+// Push baris debts/debt_payments yg PC SUDAH buat sendiri lewat
+// apply-debt-transaction.ts lokal (source-based ownership, lihat
+// docs/todos/plan/fix-debts-duplikasi-sync.md) -- upsert-by-id MURNI,
+// endpoint TERPISAH dari createDirectDebt/createNonCashPayment (yg
+// servernya sendiri bikin transaksi closing baru, salah utk kasus ini
+// krn transactionId SUDAH ada).
+export type PushDebtPayload = {
+  id: string;
+  type: "receivable" | "payable";
+  contactId?: string | null;
+  amount: number;
+  accountId?: string | null;
+  transactionId: string;
+  status?: "ongoing" | "paid" | "written_off";
+  note?: string | null;
+  date: string;
+  source?: TransactionSource;
+  sourceRef?: string | null;
+  updatedAt?: string;
+};
+
+export function pushDebt(creds: CloudSyncCredentials, payload: PushDebtPayload) {
+  return pushUpsert(creds, "/debts/push", payload);
+}
+
+export type PushDebtPaymentPayload = {
+  id: string;
+  debtId: string;
+  amount: number;
+  accountId?: string | null;
+  transactionId?: string | null;
+  note?: string | null;
+  date: string;
+  source?: TransactionSource;
+  sourceRef?: string | null;
+  updatedAt?: string;
+};
+
+export function pushDebtPayment(creds: CloudSyncCredentials, payload: PushDebtPaymentPayload) {
+  return pushUpsert(creds, "/debts/payments/push", payload);
+}
+
 // --- Pull: GET /sync?since= ---
 // Bentuk response SAMA PERSIS dgn apps/worker/src/modules/sync/service.ts
 // (SyncResponse) -- camelCase, termasuk baris `deletedAt` terisi.
@@ -263,7 +305,13 @@ export type DeleteCloudPayload =
       targetCategoryId?: string;
     }
   | { table: "contacts" }
-  | { table: "transactions" };
+  | { table: "transactions" }
+  // Soft-delete baris debts/debt_payments yg PC hapus lokal sbg bagian
+  // dari RECREATE (applyDebtTransactionEdit: field berbahaya berubah ->
+  // hapus lama, insert baru dgn id BARU) -- TANPA payload (beda skenario
+  // dari delete transaksi, lihat deletePushedDebt di Worker service.ts).
+  | { table: "debts" }
+  | { table: "debt_payments" };
 
 const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
   account_groups: "/account-groups",
@@ -271,6 +319,8 @@ const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
   categories: "/categories",
   contacts: "/contacts",
   transactions: "/transactions",
+  debts: "/debts/push",
+  debt_payments: "/debts/payments/push",
 };
 
 export async function deleteCloudRow(

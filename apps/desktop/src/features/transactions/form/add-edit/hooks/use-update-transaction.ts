@@ -9,7 +9,7 @@ import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { useTransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
 import { applyDebtTransactionEdit } from "@/shared/debts/apply-debt-transaction";
 import { transactionSchema, type TransactionFormOutput } from "../schema";
-import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
+import { pushOnWrite, pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 type UseUpdateTransactionOptions = {
   /** Dialog terbuka atau tidak — datang dari context, dipakai untuk
@@ -106,7 +106,7 @@ export function useUpdateTransaction(
         throw new Error("Status utang/piutang transaksi ini belum termuat, coba lagi.");
       }
 
-      await applyDebtTransactionEdit({
+      const touchedDebtRows = await applyDebtTransactionEdit({
         db,
         transactionId: transaction.id,
         type: values.type,
@@ -122,6 +122,14 @@ export function useUpdateTransaction(
       });
 
       void pushOnWrite("transactions", transaction.id);
+      for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
+      for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
+      // Id LAMA dari RECREATE (field berbahaya berubah) -- Worker tidak
+      // pernah tahu id ini harus dihapus kalau cuma mengandalkan push
+      // baris baru di atas, lihat komentar TouchedDebtRows.
+      for (const debtId of touchedDebtRows.deletedDebtIds) void pushDeleteOnWrite("debts", debtId, {});
+      for (const debtPaymentId of touchedDebtRows.deletedDebtPaymentIds)
+        void pushDeleteOnWrite("debt_payments", debtPaymentId, {});
     },
     invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil diperbarui",
