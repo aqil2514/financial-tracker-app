@@ -22,7 +22,10 @@ import { monthSummaryQueryKey } from "@/features/transactions/shared/hooks/use-m
 import { accountSummaryQueryKey } from "@/features/account-detail/header/use-account-summary";
 import { investmentAccountQueryKey } from "@/shared/investments/use-investment-account";
 import { transactionInvestmentPurchaseQueryKey } from "@/shared/investments/use-transaction-investment-purchase";
+import { transactionInvestmentSaleQueryKey } from "@/shared/investments/use-transaction-investment-sale";
 import { investmentPurchasesQueryKey } from "@/shared/investments/use-investment-purchases";
+import { investmentSalesQueryKey } from "@/shared/investments/use-investment-sales";
+import { investmentHoldingSummaryQueryKey } from "@/shared/investments/use-investment-holding-summary";
 
 // Peta ketergantungan query key lintas fitur: kalau data sebuah DOMAIN
 // berubah (mis. transaksi ditambah/diedit/dihapus), semua query key di
@@ -54,7 +57,10 @@ export const QUERY_DEPENDENCIES = {
     debtPaymentsQueryKey,
     contactSummaryQueryKey,
     transactionInvestmentPurchaseQueryKey, // transfer cash->investment bisa membuat/edit investment_purchases
+    transactionInvestmentSaleQueryKey, // transfer investment->cash bisa membuat/edit investment_sales (prefill edit transaksi)
     investmentPurchasesQueryKey, // riwayat lot per akun (features/investment-detail/content/) ikut berubah
+    investmentSalesQueryKey, // riwayat penjualan per akun (SalesHistoryTable) ikut berubah
+    investmentHoldingSummaryQueryKey, // transfer investment->cash bisa membuat/edit investment_sales, sisa unit & average cost ikut berubah
   ],
   accounts: [
     accountsQueryKey,

@@ -11,16 +11,27 @@ import type { AccountType } from "@/lib/account-types";
  * throw UnsupportedAccountPairError utk kombinasi yang belum dikenal
  * daripada diam-diam disamakan dgn cash atau di-no-op-kan.
  *
- * `cash-investment` ditambahkan (bukan `investment-cash`/`investment-debt`/
- * `investment-investment`) karena HANYA pembelian (kas -> investment) yang
- * punya model data final (lihat docs/concept/konsep-investasi.md,
+ * `cash-investment` ditambahkan lebih dulu (bukan sekaligus dgn
+ * `investment-cash`) karena HANYA pembelian (kas -> investment) yang
+ * SAAT ITU punya model data final (lihat docs/concept/konsep-investasi.md,
  * "Unit dan harga per unit"). Penarikan/penjualan sebagian (investment ->
- * cash) sengaja BELUM didukung — pertanyaan terbuka FIFO/average cost +
- * realized gain/loss belum dijawab (lihat bagian "Pertanyaan terbuka" di
- * dokumen itu) — kombinasi itu tetap throw UnsupportedAccountPairError
- * sampai didiskusikan ulang, bukan diam-diam di-no-op-kan.
+ * cash) sempat sengaja BELUM didukung — pertanyaan terbuka FIFO/average
+ * cost + realized gain/loss belum terjawab.
+ *
+ * **Revisi 2026-10-07**: model penjualan (average cost, realized P/L,
+ * validasi oversell) sudah disepakati + diimplementasikan (lihat bagian
+ * "Penjualan/penarikan sebagian" di dokumen yang sama) — `investment-cash`
+ * SEKARANG didukung, lihat apply-sell-investment-transaction.ts. Kombinasi
+ * investment lain (investment-debt, investment-investment, dll) TETAP
+ * throw UnsupportedAccountPairError — belum ada model datanya sama sekali.
  */
-export type AccountPairKind = "cash-cash" | "cash-debt" | "debt-cash" | "debt-debt" | "cash-investment";
+export type AccountPairKind =
+  | "cash-cash"
+  | "cash-debt"
+  | "debt-cash"
+  | "debt-debt"
+  | "cash-investment"
+  | "investment-cash";
 
 export class UnsupportedAccountPairError extends Error {
   constructor(sourceType: string, destinationType: string) {
@@ -41,5 +52,6 @@ export function classifyAccountPair(
   if (sourceType === "debt" && destinationType === "cash") return "debt-cash";
   if (sourceType === "debt" && destinationType === "debt") return "debt-debt";
   if (sourceType === "cash" && destinationType === "investment") return "cash-investment";
+  if (sourceType === "investment" && destinationType === "cash") return "investment-cash";
   throw new UnsupportedAccountPairError(sourceType, destinationType);
 }

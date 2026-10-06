@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatCurrency } from "@/lib/format-currency";
 import { AccountEditDialog } from "@/features/accounts";
 import { NewInvestmentPurchaseDialog } from "@/shared/investments/new-purchase-form/new-investment-purchase-dialog";
+import { SellInvestmentDialog } from "@/shared/investments/sell-investment-form/sell-investment-dialog";
 import { useInvestmentDetailPage } from "../page/investment-detail-page-context";
 import { InvestmentPlStats } from "./investment-pl-stats";
 
@@ -37,6 +38,7 @@ export function InvestmentDetailHeader() {
               {account.group_name && <Badge variant="secondary">{account.group_name}</Badge>}
               {!account.is_active && <Badge variant="outline">Nonaktif</Badge>}
               <NewInvestmentPurchaseDialog investmentAccountId={account.id} />
+              <SellInvestmentDialog investmentAccountId={account.id} />
               <AccountEditDialog account={account} />
               <BackButton onClick={() => router.back()} />
             </div>

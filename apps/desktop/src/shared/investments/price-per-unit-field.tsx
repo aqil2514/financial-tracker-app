@@ -47,6 +47,16 @@ export function PricePerUnitField<TFieldValues extends FieldValues>({
 }: PricePerUnitFieldProps<TFieldValues>) {
   const [mode, setMode] = useState<"unit" | "total">("unit");
   const unitValue = form.watch(unitFieldName) as number | null;
+  // Display string LOKAL, terpisah dari field.value (number) -- state
+  // mentah yang sedang diketik ("7," sebelum digit desimal berikutnya,
+  // atau nilai di mode "total" sebelum dikonversi) TIDAK PUNYA
+  // representasi number yang valid untuk ditampilkan balik, jadi tidak
+  // bisa murni dihitung dari field.value tiap render. Direset ke
+  // `undefined` (fallback ke displayValue terhitung dari field.value)
+  // begitu mode berubah ATAU field blur, supaya tampilan "snap" balik ke
+  // nilai final yang benar-benar tersimpan. Lihat unit-amount-field.tsx
+  // untuk alasan lengkap (bug nyata 2026-10-07).
+  const [display, setDisplay] = useState<string | undefined>(undefined);
 
   return (
     <Controller
@@ -54,14 +64,35 @@ export function PricePerUnitField<TFieldValues extends FieldValues>({
       name={name}
       render={({ field, fieldState }) => {
         // Nilai per-unit tersimpan (field.value) -> nilai yang ditampilkan
-        // di input sesuai mode aktif.
-        const displayValue =
+        // di input sesuai mode aktif -- dipakai HANYA kalau `display`
+        // (state mentah sedang diketik) kosong. Dibulatkan ke 2 desimal
+        // SAMA seperti jalur simpan (lihat handleChange di bawah) --
+        // tanpa ini, perkalian floating-point balik (field.value *
+        // unitValue) nyaris selalu menghasilkan presisi 13+ digit (mis.
+        // 1312.16 * 7.621 = 9999.971360000001, padahal nominal aslinya
+        // yang diketik user persis 10000) — bug nyata 2026-10-07, lihat
+        // docs/dogfooding/2026-10-07-unit-amount-field-koma-desimal-hilang-parsefloat.md.
+        const computedDisplayValue =
           mode === "total" && field.value != null && unitValue
-            ? field.value * unitValue
+            ? Math.round(field.value * unitValue * 100) / 100
             : field.value;
 
-        function handleChange(raw: string | undefined) {
-          const parsed = raw ? parseFloat(raw) : null;
+        function handleChange(
+          raw: string | undefined,
+          _name: string | undefined,
+          values?: { float: number | null }
+        ) {
+          setDisplay(raw);
+          // `values.float` (bukan `parseFloat(raw)` manual) -- raw string
+          // dari library sudah dalam format decimalSeparator="," (koma
+          // Indonesia), parseFloat JS TIDAK mengenali koma sebagai
+          // desimal (mis. parseFloat("7,6201") === 7, bukan 7.6201) --
+          // bug nyata ditemukan 2026-10-07 di UnitAmountField yang
+          // membuang semua digit setelah koma tanpa indikasi apa pun ke
+          // user. `values.float` sudah dikonversi dgn benar oleh library
+          // itu sendiri, satu-satunya sumber parsing yang aman dipakai
+          // bersama decimalSeparator kustom. Lihat unit-amount-field.tsx.
+          const parsed = values?.float ?? null;
           if (parsed == null) {
             field.onChange(null);
             return;
@@ -94,7 +125,10 @@ export function PricePerUnitField<TFieldValues extends FieldValues>({
               <ToggleGroup
                 value={[mode]}
                 onValueChange={(values: string[]) => {
-                  if (values.length > 0) setMode(values[values.length - 1] as "unit" | "total");
+                  if (values.length > 0) {
+                    setMode(values[values.length - 1] as "unit" | "total");
+                    setDisplay(undefined);
+                  }
                 }}
                 size="sm"
               >
@@ -105,9 +139,12 @@ export function PricePerUnitField<TFieldValues extends FieldValues>({
             <CurrencyInput
               id={name}
               name={field.name}
-              value={displayValue ?? ""}
+              value={display !== undefined ? display : (computedDisplayValue ?? "")}
               onValueChange={handleChange}
-              onBlur={field.onBlur}
+              onBlur={() => {
+                setDisplay(undefined);
+                field.onBlur();
+              }}
               placeholder={
                 mode === "total" && !unitValue
                   ? "Isi jumlah unit dulu"

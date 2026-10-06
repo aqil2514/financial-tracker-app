@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Controller, type FieldPath, type FieldValues, type UseFormReturn } from "react-hook-form";
 import CurrencyInput from "react-currency-input-field";
 
@@ -29,6 +30,18 @@ export function UnitAmountField<TFieldValues extends FieldValues>({
   label = "Jumlah Unit",
   optional = true,
 }: UnitAmountFieldProps<TFieldValues>) {
+  // Display string LOKAL, terpisah dari field.value (number) -- state
+  // mentah yang sedang diketik ("7," sebelum digit desimal berikutnya)
+  // TIDAK PUNYA representasi number yang valid, jadi tidak bisa dipakai
+  // langsung sebagai `value` prop terkontrol (bug nyata 2026-10-07,
+  // lihat docs/dogfooding/2026-10-07-unit-amount-field-koma-desimal-hilang-parsefloat.md
+  // revisi kedua): kalau `value={field.value}` dipaksa re-render tiap
+  // keystroke dari number form state, koma "di tengah proses" diketik
+  // hilang lagi karena belum ada float valid untuk dikembalikan. Pola
+  // ini (string display terpisah) sama dengan `displayValue` di
+  // price-per-unit-field.tsx.
+  const [display, setDisplay] = useState<string | undefined>(undefined);
+
   return (
     <Controller
       control={form.control}
@@ -42,9 +55,15 @@ export function UnitAmountField<TFieldValues extends FieldValues>({
           <CurrencyInput
             id={name}
             name={field.name}
-            value={field.value ?? ""}
-            onValueChange={(raw) => field.onChange(raw ? parseFloat(raw) : null)}
-            onBlur={field.onBlur}
+            value={display !== undefined ? display : (field.value ?? "")}
+            onValueChange={(raw, _name, values) => {
+              setDisplay(raw);
+              field.onChange(values?.float ?? null);
+            }}
+            onBlur={() => {
+              setDisplay(undefined);
+              field.onBlur();
+            }}
             placeholder="Kosongkan kalau belum tahu"
             decimalsLimit={4}
             groupSeparator="."

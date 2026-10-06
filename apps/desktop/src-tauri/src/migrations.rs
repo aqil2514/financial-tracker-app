@@ -230,6 +230,24 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0038_investment_purchases_nullable_unit_price.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 39,
+            description: "investment_sales",
+            sql: include_str!("../migrations/0039_investment_sales.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 40,
+            description: "investment_sales_adjustment_transaction",
+            sql: include_str!("../migrations/0040_investment_sales_adjustment_transaction.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 41,
+            description: "investment_sales_nullable_realized_pl",
+            sql: include_str!("../migrations/0041_investment_sales_nullable_realized_pl.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -409,5 +427,65 @@ mod tests {
             ",
         )
         .expect("insert investment_purchases tanpa unit/harga gagal");
+    }
+
+    // Migrasi 0039+0040: investment_sales -- riwayat penjualan/penarikan
+    // sebagian, arah transfer investment -> kas. average_cost_per_unit dan
+    // realized_pl adalah snapshot wajib (NOT NULL), beda dari
+    // investment_purchases yang unit/price_per_unit-nya nullable --
+    // lihat docs/todos/plan/account-type-investment.md bagian "Penjualan".
+    // adjustment_transaction_id (ditambahkan belakangan via migrasi 0040,
+    // ALTER TABLE ADD COLUMN -- bukan diedit langsung di 0039 krn migrasi
+    // itu sudah pernah diterapkan ke finance.dev.db, lihat komentar di
+    // 0040) adalah FK EKSPLISIT ke transaksi income/expense kedua (selisih
+    // Realized P/L di akun kas) -- diuji insert dgn nilai terisi (kasus
+    // realized_pl != 0) DAN NULL (kasus == 0).
+    #[test]
+    fn insert_investment_sales_tidak_gagal() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        conn.execute_batch(
+            "
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-inv-3', 'Reksadana Test 3', 'investment');
+            INSERT INTO investment_accounts (account_id, unit_label, current_market_value)
+                VALUES ('acc-inv-3', 'unit', 50000.0);
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-cash-3', 'Kas Test 3', 'cash');
+            INSERT INTO transactions (id, type, amount, account_id, transfer_account_id, note, date)
+                VALUES ('tx-inv-3', 'transfer', 28000, 'acc-inv-3', 'acc-cash-3', 'jual reksadana', '2026-01-02');
+            INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, date)
+                VALUES ('tx-inv-3-adj', 'income', 2000, NULL, 'acc-cash-3', NULL, 'Realized P/L penjualan investasi', '2026-01-02');
+            INSERT INTO investment_sales (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit, average_cost_per_unit, realized_pl, date, status)
+                VALUES ('is-1', 'acc-inv-3', 'tx-inv-3', 'tx-inv-3-adj', 20.0, 1500.0, 1400.0, 2000.0, '2026-01-02', 'pending');
+            INSERT INTO transactions (id, type, amount, account_id, transfer_account_id, note, date)
+                VALUES ('tx-inv-4', 'transfer', 28000, 'acc-inv-3', 'acc-cash-3', 'jual reksadana pas modal', '2026-01-03');
+            INSERT INTO investment_sales (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit, average_cost_per_unit, realized_pl, date, status)
+                VALUES ('is-2', 'acc-inv-3', 'tx-inv-4', NULL, 20.0, 1400.0, 1400.0, 0.0, '2026-01-03', 'pending');
+            ",
+        )
+        .expect("insert investment_sales gagal");
+    }
+
+    #[test]
+    fn insert_investment_sales_pending_dengan_average_cost_realized_pl_null_tidak_gagal() {
+        // Migrasi 0041 (2026-10-07): average_cost_per_unit/realized_pl jadi
+        // nullable -- baris 'pending' belum menghitung kedua kolom ini sama
+        // sekali (dana belum cair, average cost belum final), beda dari
+        // skema awal yang mewajibkan snapshot sejak create. transaction_id/
+        // adjustment_transaction_id JUGA NULL (belum ada transaksi apa pun
+        // selama masih pending, lihat apply-sell-investment-transaction.ts).
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        conn.execute_batch(
+            "
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-inv-5', 'Reksadana Test 5', 'investment');
+            INSERT INTO investment_accounts (account_id, unit_label, current_market_value)
+                VALUES ('acc-inv-5', 'unit', 50000.0);
+            INSERT INTO investment_sales (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit, average_cost_per_unit, realized_pl, date, status)
+                VALUES ('is-pending-1', 'acc-inv-5', NULL, NULL, 20.0, 1500.0, NULL, NULL, '2026-01-02', 'pending');
+            ",
+        )
+        .expect("insert investment_sales pending dengan kolom nullable NULL gagal");
     }
 }

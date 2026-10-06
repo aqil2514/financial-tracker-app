@@ -1,6 +1,9 @@
 "use client";
 
+import { InfoIcon } from "lucide-react";
+
 import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatCurrency } from "@/lib/format-currency";
 import { useInvestmentPurchases } from "@/shared/investments/use-investment-purchases";
 
@@ -43,7 +46,27 @@ export function SettlementBreakdown({ accountId }: { accountId: string }) {
             <p className="font-medium">{formatCurrency(settled, "IDR")}</p>
           </div>
           <div>
-            <p className="text-muted-foreground text-xs">Total</p>
+            <div className="flex items-center gap-1">
+              <p className="text-muted-foreground text-xs">Total</p>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Penjelasan total"
+                    />
+                  }
+                >
+                  <InfoIcon className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  Dihitung dari `unit × harga per unit` riwayat pembelian di bawah — BUKAN dari nominal
+                  transfer (Modal). Keduanya independen, boleh berbeda kalau unit/harga diisi tidak sesuai
+                  nominal yang benar-benar ditransfer.
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <p className="font-medium">{formatCurrency(pending + settled, "IDR")}</p>
           </div>
           {unvalued.length > 0 && (

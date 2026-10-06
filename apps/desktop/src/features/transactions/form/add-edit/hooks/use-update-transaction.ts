@@ -1,6 +1,6 @@
 "use client";
 
-import { getDb, type Transaction } from "@/lib/db";
+import { getDb, type Account, type Transaction } from "@/lib/db";
 import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { isEmptyDoc } from "@/components/rich-text";
@@ -8,10 +8,27 @@ import { useContacts } from "@/shared/contacts/use-contacts";
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { useTransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
 import { applyDebtTransactionEdit } from "@/shared/debts/apply-debt-transaction";
+import { classifyAccountPair } from "@/shared/debts/classify-account-pair";
 import { applyInvestmentTransactionEdit } from "@/shared/investments/apply-investment-transaction";
+import {
+  applySellInvestmentTransactionEdit,
+  InsufficientInvestmentUnitsError,
+} from "@/shared/investments/apply-sell-investment-transaction";
+import { getAverageCostPerUnit, getRemainingUnit } from "@/shared/investments/investment-holding-math";
 import { useTransactionInvestmentPurchase } from "@/shared/investments/use-transaction-investment-purchase";
+import { useTransactionInvestmentSale } from "@/shared/investments/use-transaction-investment-sale";
 import { transactionSchema, type TransactionFormOutput } from "../schema";
 import { pushOnWrite, pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-write";
+
+type Db = Awaited<ReturnType<typeof getDb>>;
+
+async function getAccountType(db: Db, accountId: string): Promise<Account["account_type"] | null> {
+  const rows = await db.select<Pick<Account, "account_type">[]>(
+    "SELECT account_type FROM accounts WHERE id = $1",
+    [accountId]
+  );
+  return rows[0]?.account_type ?? null;
+}
 
 type UseUpdateTransactionOptions = {
   /** Dialog terbuka atau tidak — datang dari context, dipakai untuk
@@ -32,6 +49,11 @@ export function useUpdateTransaction(
     contacts?.find((contact) => contact.id === transaction.contact_id)?.name ?? null;
   const { data: debtStatus } = useTransactionDebtStatus(transaction.id);
   const { data: investmentPurchase } = useTransactionInvestmentPurchase(transaction.id);
+  // Transaksi transfer cuma bisa berperan sebagai SALAH SATU: pembelian
+  // (investment_purchases) ATAU penjualan (investment_sales), tidak
+  // pernah dua-duanya -- query sale ini cuma relevan kalau investmentPurchase
+  // null (lihat prefill unit/price_per_unit/investment_status di bawah).
+  const { data: investmentSale } = useTransactionInvestmentSale(transaction.id);
 
   return useEntityForm({
     schema: transactionSchema,
@@ -57,9 +79,9 @@ export function useUpdateTransaction(
       // DebtActionField begitu terdeteksi perlu).
       debt_action: null,
       settle_debt_ids: [],
-      unit: investmentPurchase?.unit ?? null,
-      price_per_unit: investmentPurchase?.price_per_unit ?? null,
-      investment_status: investmentPurchase?.status ?? "pending",
+      unit: investmentPurchase?.unit ?? investmentSale?.unit ?? null,
+      price_per_unit: investmentPurchase?.price_per_unit ?? investmentSale?.price_per_unit ?? null,
+      investment_status: investmentPurchase?.status ?? investmentSale?.status ?? "pending",
     }),
     open,
     resetOnOpen: true,
@@ -71,6 +93,52 @@ export function useUpdateTransaction(
       const transferAccountId =
         values.type === "transfer" ? values.transfer_account_id : null;
 
+      // Deteksi arah investment SEBELUM update -- pola sama
+      // use-create-transaction.ts. Untuk arah jual (investment->cash),
+      // nominal yang di-UPDATE ke transactions.amount BUKAN values.amount
+      // (field itu dikunci read-only di form.tsx, cuma preview) tapi
+      // average_cost * unit SAAT INI -- dihitung ulang di titik edit ini
+      // (bukan dipakai dari nilai lama) karena average cost bisa sudah
+      // berubah sejak transaksi jual ini pertama dibuat (pembelian baru
+      // masuk, dst). Lihat docs/concept/konsep-investasi.md "Efek ke
+      // accounts.balance".
+      let isInvestmentSell = false;
+      let amount = values.amount;
+      if (values.type === "transfer" && transferAccountId != null) {
+        const [sourceType, destinationType] = await Promise.all([
+          getAccountType(db, accountId),
+          getAccountType(db, transferAccountId),
+        ]);
+        if (sourceType != null && destinationType != null) {
+          try {
+            isInvestmentSell = classifyAccountPair(sourceType, destinationType) === "investment-cash";
+          } catch {
+            // UnsupportedAccountPairError -- bukan kombinasi investment, no-op.
+          }
+        }
+      }
+      if (isInvestmentSell && values.unit != null) {
+        // Validasi oversell SEBELUM update baris transactions -- pola
+        // sama use-create-transaction.ts. Beda dari create: kalau
+        // transaksi ini SEBELUMNYA juga arah jual (investmentSale != null),
+        // unit lamanya ditambahkan balik ke remainingUnit dulu sebelum
+        // dibandingkan -- applySellInvestmentTransactionEdit SENDIRI
+        // menghapus baris investment_sales lama sebelum menghitung ulang
+        // (lihat deleteInvestmentSaleAndAdjustment), jadi pre-check ini
+        // HARUS meniru urutan yang sama supaya tidak salah menolak unit
+        // yang sebenarnya valid (mis. user cuma menambah 1 unit dari
+        // transaksi jual yang sudah ada).
+        const [averageCost, remainingUnitRaw] = await Promise.all([
+          getAverageCostPerUnit(db, accountId),
+          getRemainingUnit(db, accountId),
+        ]);
+        const remainingUnit = remainingUnitRaw + (investmentSale?.unit ?? 0);
+        if (values.unit > remainingUnit) {
+          throw new InsufficientInvestmentUnitsError(remainingUnit, values.unit);
+        }
+        amount = averageCost * values.unit;
+      }
+
       // Field yang mempengaruhi PERHITUNGAN debt — kalau salah satu
       // berubah dari nilai semula, debt/debt_payment terkait (kalau ada)
       // perlu di-recreate dari nilai baru (atau diblokir, tergantung
@@ -81,7 +149,7 @@ export function useUpdateTransaction(
         values.type !== transaction.type ||
         accountId !== transaction.account_id ||
         transferAccountId !== transaction.transfer_account_id ||
-        values.amount !== transaction.amount ||
+        amount !== transaction.amount ||
         contactId !== transaction.contact_id;
 
       await db.execute(
@@ -90,7 +158,7 @@ export function useUpdateTransaction(
          WHERE id = $10`,
         [
           values.type,
-          values.amount,
+          amount,
           values.type === "transfer" || !values.category_id
             ? null
             : values.category_id,
@@ -119,7 +187,7 @@ export function useUpdateTransaction(
         accountId,
         transferAccountId,
         contactId,
-        amount: values.amount,
+        amount,
         date: values.date,
         debtAction: values.debt_action,
         settleDebtIds: values.settle_debt_ids,
@@ -127,19 +195,40 @@ export function useUpdateTransaction(
         dangerousFieldsChanged,
       });
 
-      await applyInvestmentTransactionEdit({
-        db,
-        transactionId: transaction.id,
-        type: values.type,
-        accountId,
-        transferAccountId,
-        date: values.date,
-        unit: values.unit,
-        pricePerUnit: values.price_per_unit,
-        status: values.investment_status ?? "pending",
-      });
+      let adjustmentTransactionId: string | null = null;
+      if (isInvestmentSell) {
+        // Form transaksi utama HANYA mendukung jual 'settled' (lihat
+        // komentar sama di use-create-transaction.ts) -- transactionId
+        // transaksi utama yang SEDANG diedit dioper sebagai leg transfer
+        // utama (sudah ter-UPDATE di atas), applySellInvestmentTransactionEdit
+        // yang mencari baris investment_sales lama lewat id itu.
+        const touched = await applySellInvestmentTransactionEdit(transaction.id, {
+          db,
+          transactionId: transaction.id,
+          accountId,
+          transferAccountId,
+          date: values.date,
+          unit: values.unit as number,
+          pricePerUnit: values.price_per_unit as number,
+          status: "settled",
+        });
+        adjustmentTransactionId = touched.adjustmentTransactionId;
+      } else {
+        await applyInvestmentTransactionEdit({
+          db,
+          transactionId: transaction.id,
+          type: values.type,
+          accountId,
+          transferAccountId,
+          date: values.date,
+          unit: values.unit,
+          pricePerUnit: values.price_per_unit,
+          status: values.investment_status ?? "pending",
+        });
+      }
 
       void pushOnWrite("transactions", transaction.id);
+      if (adjustmentTransactionId != null) void pushOnWrite("transactions", adjustmentTransactionId);
       for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
       for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
       // Id LAMA dari RECREATE (field berbahaya berubah) -- Worker tidak

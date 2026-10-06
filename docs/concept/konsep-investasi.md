@@ -1,6 +1,6 @@
 # Konsep Investasi di Aplikasi Ini
 
-> Status: pencatatan pembelian (modal, unit, harga per unit, settlement, nilai pasar manual, Unrealized P/L) SUDAH diimplementasikan dan lolos smoke test manual. Bagian "Penjualan/penarikan sebagian" di bawah SUDAH disepakati secara konsep (2026-10-06) tapi BELUM diimplementasikan — dicatat dulu sebelum kode ditulis, sesuai disiplin "diskusikan dulu" di [konsep-tipe-akun.md](konsep-tipe-akun.md) bagian penutup. Model di dokumen ini adalah revisi total dari draf pertama (modal + nilai terkini sebagai dua angka manual) — draf pertama diganti total karena ternyata dibutuhkan juga pelacakan unit dan riwayat pembelian, bukan sekadar dua angka agregat.
+> Status: pencatatan pembelian (modal, unit, harga per unit, settlement, nilai pasar manual, Unrealized P/L) SUDAH diimplementasikan dan lolos smoke test manual. Bagian "Penjualan/penarikan sebagian" di bawah SUDAH diimplementasikan lengkap (logic + form + UI riwayat + aksi Settle/Hapus untuk baris pending, 2026-10-07, lihat [apps/desktop/docs/todos/plan/account-type-investment.md](../apps/desktop/docs/todos/plan/account-type-investment.md) catatan teknis) — termasuk revisi "Dana BARU cair saat settled" (lihat bagian itu di bawah). BELUM diuji manual lengkap di `tauri dev` untuk alur settle. Model di dokumen ini adalah revisi total dari draf pertama (modal + nilai terkini sebagai dua angka manual) — draf pertama diganti total karena ternyata dibutuhkan juga pelacakan unit dan riwayat pembelian, bukan sekadar dua angka agregat.
 
 ## Satu akun investasi = satu instrumen, bukan portofolio gabungan
 
@@ -84,13 +84,15 @@ Alasan memilih average cost: instrumen yang realistis dicatat di aplikasi ini (r
 
 ### Realized gain/loss dicatat sebagai info terpisah dari Unrealized P/L
 
-Saat transaksi jual dibuat, dihitung dan disimpan **Realized P/L** untuk transaksi itu:
+Begitu penjualan benar-benar **settled**, dihitung dan disimpan **Realized P/L**:
 
 ```
 realized_pl = (harga_jual_per_unit − average_cost_per_unit_saat_itu) × unit_terjual
 ```
 
 Ini angka yang SUDAH final/tidak mengambang lagi (beda dari Unrealized P/L yang masih bisa berubah tiap update `current_market_value`) — ditampilkan di riwayat transaksi/pembelian sebagai info tambahan per baris jual, TIDAK ikut campur ke hitungan Unrealized P/L akun yang masih berjalan (Unrealized P/L tetap murni `current_market_value − balance` yang tersisa, lihat bagian di atas).
+
+**Revisi 2026-10-07 — belum ditulis sampai settled**: `realized_pl` dan `average_cost_per_unit` TIDAK dihitung/disimpan sejak baris penjualan dibuat (`status: 'pending'`) — keduanya `NULL` selama masih pending, baru dihitung dari kondisi average cost SAAT settle terjadi. Alasan: average cost bisa masih bergeser kalau ada pembelian baru di antara create dan settle, dan Realized P/L secara definisi belum final sampai dana benar-benar cair — menyimpannya sejak pending berarti menyajikan angka yang masih bisa berubah sebagai kalau sudah pasti. Lihat juga bagian "Dana BARU cair saat settled" di bawah untuk alasan terkait (kenapa `pending` juga tidak membuat transaksi apa pun).
 
 ### Input jual: unit + harga jual per unit, simetris dengan beli
 
@@ -110,13 +112,30 @@ Konsekuensi: `accounts.balance` TIDAK bisa dikurangi langsung dari nominal trans
 
 ### Validasi: cegah oversell
 
-Jual yang melebihi total unit yang dimiliki (`SUM(unit)` dari `investment_purchases` berstatus `settled`) harus ditolak di titik input — berbeda dari filosofi "tidak menghakimi data" yang dipakai untuk unit/harga saat beli (lihat bagian "Unit dan harga per unit" di atas), karena oversell di sini bukan cuma estimasi yang boleh beda dari realita, tapi representasi matematis yang tidak mungkin valid (tidak bisa menjual lebih dari yang dipegang).
+Jual yang melebihi total unit yang dimiliki harus ditolak di titik input — berbeda dari filosofi "tidak menghakimi data" yang dipakai untuk unit/harga saat beli (lihat bagian "Unit dan harga per unit" di atas), karena oversell di sini bukan cuma estimasi yang boleh beda dari realita, tapi representasi matematis yang tidak mungkin valid (tidak bisa menjual lebih dari yang dipegang). "Total unit yang dimiliki" di sini bukan `SUM(unit)` murni dari `investment_purchases` — lihat rumus persis di "Keputusan implementasi" di bawah.
 
-### Yang masih belum diputuskan
+### Dana BARU cair saat settled (revisi 2026-10-07)
 
-- Skema tabel pasti (kolom baru di `investment_purchases` dengan `unit`/`price_per_unit` negatif untuk transaksi jual? atau tabel baru `investment_sales`? atau field `realized_pl` ditambahkan ke `investment_purchases` yang sudah ada?) — baru dibahas secara konsep/behavior, bukan skema, saat implementasi nanti perlu diputuskan dulu mana yang paling pas dengan pola migration copy-and-rename yang sudah ada.
-- Apakah `classifyAccountPair` ([shared/debts/classify-account-pair.ts](../../apps/desktop/src/shared/debts/classify-account-pair.ts)) perlu varian baru `investment-cash` (arah jual) di samping `cash-investment` (arah beli) yang sudah ada, atau direction dideteksi dari akun asal/tujuan saja.
-- UI breakdown "unit tersisa" dan average cost saat ini perlu ditampilkan di form jual (supaya user tahu batas maksimal sebelum submit, bukan cuma ditolak setelah submit).
+Draf pertama implementasi (lihat "Keputusan implementasi" di bawah) men-treat penjualan sama persis seperti pembelian: unit dikurangi optimis, DAN transaksi transfer ke kas langsung dibuat begitu baris dibuat — terlepas dari status `pending`/`settled`. Ternyata ini SALAH arah secara riil: untuk pembelian, uang memang sudah keluar dari kas duluan saat order dibuat (user sudah bayar), unit-nya yang belum pasti — jadi "kas berkurang langsung" itu akurat. Untuk **penjualan**, yang terjadi lebih dulu secara riil adalah **unit berkurang** (order jual sudah diajukan), BUKAN dana masuk kas — dana baru benar-benar bisa dipakai setelah settlement dikonfirmasi (reksadana T+1/T+2, saham T+2). Kalau kas langsung bertambah saat masih pending, user bisa "memakai" uang yang secara riil belum ada di tangannya.
+
+**Perbaikan**:
+
+- **Status `pending`**: HANYA baris `investment_sales` yang dibuat (unit & harga jual yang diminta/diestimasi). **TIDAK ADA baris `transactions` yang dibuat sama sekali** — kas benar-benar belum tersentuh. Unit TETAP berkurang dari holding secara optimis seperti sebelumnya (rumus "sisa unit" di bawah tidak berubah).
+- **Status `settled`**: baru di titik inilah transaksi transfer (`average_cost × unit`) + transaksi penyesuaian Realized P/L dibuat, dan `average_cost_per_unit`/`realized_pl` dihitung & disimpan permanen (lihat revisi di bagian "Realized gain/loss" di atas).
+- **Aksi "Settle"**: baris pending yang sudah ada disettle lewat aksi terpisah (tombol "Settle" di riwayat penjualan) yang meminta user memilih akun kas tujuan saat itu — `investment_sales` TIDAK menyimpan akun kas tujuan sejak create, karena belum ada transaksi/akun kas yang terlibat selama masih pending.
+- **Form transaksi utama HANYA mendukung jual `settled` langsung** — form itu secara arsitektur SELALU insert satu baris `transactions` begitu disubmit (dipakai bersama semua tipe transaksi), yang kontradiktif dengan "pending tidak boleh insert apa pun". Status `pending` untuk jual HANYA lewat dialog "Jual Investasi" khusus (yang tidak selalu insert transaksi).
+- Konsekuensi UX yang disengaja (ditunda): belum ada mekanisme umum "menu aksi per-baris untuk settle" yang berlaku lintas fitur (bukan cuma investasi) — untuk sekarang, cukup tombol dedicated di tabel riwayat penjualan.
+
+### Keputusan implementasi (2026-10-07)
+
+Diputuskan sebelum kode ditulis (bukan diasumsikan), menjawab 3 pertanyaan yang sebelumnya terbuka di sini — detail teknis lengkap ada di [apps/desktop/docs/todos/plan/account-type-investment.md](../apps/desktop/docs/todos/plan/account-type-investment.md) catatan teknis "Penjualan/penarikan sebagian":
+
+- **Skema**: tabel baru `investment_sales` (bukan kolom negatif di `investment_purchases`, bukan field `realized_pl` ditambahkan ke tabel yang sudah ada) — kolom `account_id`, `transaction_id`, `adjustment_transaction_id` (lihat poin balance di bawah), `unit`, `price_per_unit`, `average_cost_per_unit`, `realized_pl`, `date`, `status`.
+- **`classifyAccountPair` dapat varian baru `investment-cash`** (arah jual), di samping `cash-investment` (arah beli) yang sudah ada. Dikonfirmasi `apps/worker` TIDAK ikut jalur sync investment sama sekali (desktop-only) — tidak perlu perubahan di Worker.
+- **Unit dikurangi dari holding secara OPTIMIS** begitu baris `investment_sales` dibuat dengan status `pending` — simetris dengan pembelian (penjualan realitanya juga tidak selalu instan, mis. reksadana T+1/T+2), BUKAN menunggu status `settled` dulu.
+- **"Total unit yang dimiliki" (basis oversell-check + average cost) punya rumus KHUSUS**, beda dari `total_unit` yang dipakai Unrealized P/L (yang mengikutkan pending+settled, lihat "Settlement tertunda" di atas): `SUM(unit, investment_purchases WHERE status='settled') − SUM(unit, investment_sales WHERE status IN ('pending','settled'))`. Pembelian yang masih pending TIDAK ikut dihitung sebagai unit yang bisa dijual.
+- **UI breakdown "unit tersisa" + average cost** ditampilkan di form jual via `useInvestmentHoldingSummary` (query baru).
+- **Efek ke balance via 2 transaksi** (bukan 1): karena `accounts.balance` live-computed dari `SUM(transactions.amount)` dan satu baris transfer cuma punya satu kolom `amount` untuk kedua sisi, balance investment (`average_cost × unit`) dan nominal jual penuh yang diterima kas tidak bisa direpresentasikan dalam satu baris. Leg transfer utama = `average_cost × unit`; leg kedua (`income`/`expense` di akun kas, dibuat otomatis) = selisih Realized P/L. Konsekuensi yang diterima: Realized P/L ikut masuk ke laporan cashflow Pemasukan/Pengeluaran biasa (bukan murni informasional). Link ke leg kedua via FK eksplisit `adjustment_transaction_id`.
 
 ## Yang SENGAJA belum didukung
 

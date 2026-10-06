@@ -90,11 +90,12 @@ export function useTransactionForm({
       destinationAccountType: destinationAccount?.account_type,
     });
 
-  const { needsInvestmentFields, validateInvestmentFields } = useTransactionInvestmentFields({
-    type,
-    sourceAccountType: sourceAccount?.account_type,
-    destinationAccountType: destinationAccount?.account_type,
-  });
+  const { needsInvestmentFields, needsInvestmentSellFields, validateInvestmentFields } =
+    useTransactionInvestmentFields({
+      type,
+      sourceAccountType: sourceAccount?.account_type,
+      destinationAccountType: destinationAccount?.account_type,
+    });
 
   const { accountOptions, categoryOptions, renderAccountOption } = useAccountCategoryOptions({
     accounts,
@@ -140,11 +141,13 @@ export function useTransactionForm({
 
   return {
     type,
+    accountId,
     debtStatus,
     involvesDebtAccount,
     debtFieldsLocked,
     needsDebtAction,
     needsInvestmentFields,
+    needsInvestmentSellFields,
     accountOptions,
     categoryOptions,
     renderAccountOption,

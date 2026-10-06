@@ -189,21 +189,22 @@ describe("applyInvestmentTransaction", () => {
     expect(result.investmentPurchaseIds).toHaveLength(1);
   });
 
-  it("melempar UnsupportedAccountPairError untuk kombinasi investment -> cash (penarikan, belum didukung)", async () => {
-    const { db } = createFakeDb({ accounts: [INVESTMENT_ACCOUNT, CASH_ACCOUNT] });
+  it("tidak melakukan apa pun untuk kombinasi investment -> cash (penjualan, ditangani applySellInvestmentTransaction)", async () => {
+    const { db, investmentPurchases } = createFakeDb({ accounts: [INVESTMENT_ACCOUNT, CASH_ACCOUNT] });
 
-    await expect(
-      applyInvestmentTransaction({
-        db: db as never,
-        transactionId: "tx-1",
-        type: "transfer",
-        accountId: "inv-1",
-        transferAccountId: "cash-1",
-        date: "2026-01-01",
-        unit: 10,
-        pricePerUnit: 1500,
-      })
-    ).rejects.toThrow(/belum didukung/);
+    const result = await applyInvestmentTransaction({
+      db: db as never,
+      transactionId: "tx-1",
+      type: "transfer",
+      accountId: "inv-1",
+      transferAccountId: "cash-1",
+      date: "2026-01-01",
+      unit: 10,
+      pricePerUnit: 1500,
+    });
+
+    expect(investmentPurchases).toHaveLength(0);
+    expect(result).toEqual({ investmentPurchaseIds: [], deletedInvestmentPurchaseIds: [] });
   });
 
   it("melempar UnsupportedAccountPairError untuk kombinasi debt -> investment", async () => {

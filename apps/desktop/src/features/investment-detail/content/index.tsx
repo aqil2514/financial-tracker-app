@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInvestmentDetailPage } from "../page/investment-detail-page-context";
 import { SettlementBreakdown } from "./settlement-breakdown";
 import { PurchaseHistoryTable } from "./purchase-history-table";
+import { SalesHistoryTable } from "./sales-history-table";
 
 /** Nilai pasar terkini & Unrealized P/L ada di header (lihat
  * `features/investment-detail/header/investment-pl-stats.tsx`). Di sini:
- * breakdown pending/settled + riwayat pembelian per lot. Average cost per
- * unit & indikator staleness menyusul, lihat
- * docs/todos/plan/account-type-investment.md langkah 4. */
+ * breakdown pending/settled, riwayat pembelian, dan riwayat penjualan per
+ * lot (Realized P/L, lihat docs/concept/konsep-investasi.md bagian
+ * "Penjualan/penarikan sebagian"). */
 export function InvestmentDetailContent() {
   const { account, isLoading } = useInvestmentDetailPage();
 
@@ -25,6 +26,14 @@ export function InvestmentDetailContent() {
         </CardHeader>
         <CardContent>
           <PurchaseHistoryTable accountId={account.id} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Riwayat Penjualan</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SalesHistoryTable accountId={account.id} />
         </CardContent>
       </Card>
     </div>

@@ -8,6 +8,7 @@ import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { pushDeleteTransactionOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { detachDebtForDeletedTransaction, type DeletedTransactionDebtInfo } from "@/shared/debts/apply-debt-transaction";
 import { detachInvestmentPurchaseForDeletedTransaction } from "@/shared/investments/apply-investment-transaction";
+import { detachInvestmentSaleForDeletedTransaction } from "@/shared/investments/apply-sell-investment-transaction";
 
 // Pesan informatif SETELAH delete berhasil -- dialog konfirmasi tetap
 // generik ("Hapus transaksi ini?"), toast tambahan ini muncul begitu
@@ -43,6 +44,13 @@ export function useDeleteTransaction() {
       // (bukan tumpuan accounts.balance), jadi dihapus total alih-alih
       // dibiarkan yatim. Lihat apply-investment-transaction.ts.
       await detachInvestmentPurchaseForDeletedTransaction(db, id);
+      // Sama alasannya untuk investment_sales (arah jual) -- juga
+      // menghapus transaksi penyesuaian Realized P/L (leg kedua) lewat
+      // kolom adjustment_transaction_id (FK eksplisit, migrasi 0039).
+      // Dipanggil SEBELUM hard-delete leg transfer utama di bawah, pola
+      // sama detachInvestmentPurchaseForDeletedTransaction. Lihat
+      // apply-sell-investment-transaction.ts.
+      await detachInvestmentSaleForDeletedTransaction(db, id);
       await db.execute("DELETE FROM transactions WHERE id = $1", [id]);
 
       return debtInfo;

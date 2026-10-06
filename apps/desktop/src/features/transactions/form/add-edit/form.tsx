@@ -59,11 +59,13 @@ export function TransactionForm({
 }: TransactionFormProps) {
   const {
     type,
+    accountId,
     debtStatus,
     involvesDebtAccount,
     debtFieldsLocked,
     needsDebtAction,
     needsInvestmentFields,
+    needsInvestmentSellFields,
     accountOptions,
     categoryOptions,
     renderAccountOption,
@@ -139,9 +141,9 @@ export function TransactionForm({
             <FormFieldCurrency
               form={form}
               name="amount"
-              label="Nominal"
+              label={needsInvestmentSellFields ? "Nominal (otomatis dari unit × average cost)" : "Nominal"}
               useCalculator
-              disabled={debtFieldsLocked}
+              disabled={debtFieldsLocked || needsInvestmentSellFields}
             />
             <FormFieldCombobox
               form={form}
@@ -199,7 +201,13 @@ export function TransactionForm({
                 debtStatus={debtStatus}
               />
             )}
-            {needsInvestmentFields && <InvestmentFields form={form} />}
+            {needsInvestmentFields && (
+              <InvestmentFields
+                form={form}
+                isSell={needsInvestmentSellFields}
+                investmentAccountId={needsInvestmentSellFields ? accountId : undefined}
+              />
+            )}
             <FormFieldDate form={form} name="date" label="Tanggal" />
           </div>
 

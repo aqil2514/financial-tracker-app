@@ -61,11 +61,17 @@ const none: TouchedInvestmentRows = { investmentPurchaseIds: [], deletedInvestme
  *   edit baris, lihat bagian "Settlement tertunda" di dokumen itu) — tapi
  *   bisa langsung `'settled'` kalau caller sudah tahu nilainya pasti saat
  *   itu juga (lihat parameter `status` di atas).
- * - kombinasi lain yang melibatkan investment (investment -> cash, dst):
+ * - investment -> cash (penjualan/penarikan sebagian): BUKAN urusan
+ *   fungsi ini — no-op (lihat `pairKind !== "cash-investment"` di bawah).
+ *   Ditangani fungsi terpisah `applySellInvestmentTransaction`
+ *   (apply-sell-investment-transaction.ts) karena model datanya beda
+ *   total (average cost, realized P/L, validasi oversell, efek balance
+ *   non-nominal — lihat docs/concept/konsep-investasi.md bagian
+ *   "Penjualan/penarikan sebagian").
+ * - kombinasi lain yang melibatkan investment (investment-debt, dst):
  *   classifyAccountPair sudah throw UnsupportedAccountPairError lebih
- *   dulu (lihat classify-account-pair.ts) — BELUM ada model datanya
- *   (pertanyaan terbuka FIFO/realized gain-loss), jadi tidak pernah
- *   sampai ke sini.
+ *   dulu (lihat classify-account-pair.ts) — BELUM ada model datanya,
+ *   jadi tidak pernah sampai ke sini.
  *
  * Dipanggil SETELAH insert baris `transactions` selesai (butuh
  * `transactionId` untuk `investment_purchases.transaction_id`).
