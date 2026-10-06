@@ -21,7 +21,7 @@ Pendekatannya: amati sifat uang itu sendiri di dunia nyata, lalu kelompokkan ber
 
 Seiring kebutuhan baru muncul, daftar tipe ini akan terus bertambah. Beberapa yang sudah terpikirkan:
 
-- **Investasi** — uang yang ditanamkan dan nilainya bisa naik-turun (reksadana, saham, dsb). Beda dari kas: tidak bisa langsung dicairkan kapan saja, dan nilainya tidak tetap.
+- **Investasi** — uang yang ditanamkan dan nilainya bisa naik-turun (reksadana, saham, dsb). Beda dari kas: tidak bisa langsung dicairkan kapan saja, dan nilainya tidak tetap. Model akuntansinya sudah dirumuskan lebih detail di [konsep-investasi.md](konsep-investasi.md).
 - **Dana Pihak Ketiga** — uang yang secara fisik tercampur di kas kita, tapi secara substansi bukan milik kita (misalnya titipan tabungan orang lain). Sifatnya penting dibedakan dari kas biasa karena asal dan statusnya berbeda, meskipun aplikasi tidak menghakimi apakah saldo ini "boleh" dianggap kekayaan pribadi atau tidak (lihat "Laporan menampilkan angka apa adanya" di bawah).
 - **Valas** — uang dalam mata uang negara lain. Beda dari kas rupiah karena nilainya mengikuti kurs yang berubah-ubah.
 
@@ -42,7 +42,7 @@ Satu akun hanya boleh punya **satu** tipe — tidak ada akun yang "separuh kas s
 Tiap tipe akun membuka fitur yang relevan dengan sifatnya, dan menutup yang tidak relevan:
 
 - Tipe **Kas** memungkinkan fitur seperti **cash opname** (mencocokkan saldo pencatatan dengan uang fisik yang benar-benar dipegang) — fitur ini tidak masuk akal untuk tipe lain karena cuma kas yang bisa "dipegang dan dihitung langsung".
-- Tipe **Investasi** (saat sudah tersedia) memungkinkan fitur seperti **laba/rugi belum terealisasi** (selisih antara nilai beli dan nilai pasar saat ini, yang belum benar-benar dicairkan) — fitur ini juga tidak relevan untuk kas (nilainya memang tidak berubah-ubah) maupun utang/piutang (nilainya tetap, bukan mengikuti harga pasar).
+- Tipe **Investasi** (saat sudah tersedia) memungkinkan fitur seperti **laba/rugi belum terealisasi** (selisih antara modal dan nilai pasar saat ini, yang belum benar-benar dicairkan) — fitur ini juga tidak relevan untuk kas (nilainya memang tidak berubah-ubah) maupun utang/piutang (nilainya tetap, bukan mengikuti harga pasar). Lihat [konsep-investasi.md](konsep-investasi.md) untuk model akuntansinya.
 - Tipe **Utang/Piutang** punya fiturnya sendiri untuk mencatat siapa berutang berapa, status lunas/berjalan, dan riwayat cicilan — lihat [konsep-utang-piutang.md](konsep-utang-piutang.md).
 
 ## Tipe itu permanen, kondisi saat ini dicatat terpisah
