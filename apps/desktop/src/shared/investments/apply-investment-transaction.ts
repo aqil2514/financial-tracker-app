@@ -12,14 +12,25 @@ export type ApplyInvestmentTransactionInput = {
   /** Hanya terisi untuk `type === 'transfer'`. */
   transferAccountId: string | null;
   date: string;
-  /** Jumlah unit yang dibeli — WAJIB terisi saat transfer tujuannya akun
-   * `investment` (lihat use-transaction-investment-fields.ts), null di
-   * luar kasus itu. */
+  /** Jumlah unit yang dibeli — OPSIONAL (keputusan 2026-10-06, revisi dari
+   * wajib): order yang masih diproses (mis. reksadana) sering belum tahu
+   * unit pastinya sampai settlement dikonfirmasi — null berarti "belum
+   * diketahui", diisi belakangan lewat edit baris `investment_purchases`.
+   * Lihat use-transaction-investment-fields.ts + konsep-investasi.md
+   * bagian "Settlement tertunda". */
   unit: number | null;
   /** Harga per unit saat pembelian — manual, independen dari `unit`
-   * (TIDAK divalidasi terhadap nominal transfer), lihat
+   * (TIDAK divalidasi terhadap nominal transfer), juga OPSIONAL dengan
+   * alasan sama seperti `unit` di atas. Lihat
    * docs/concept/konsep-investasi.md bagian "Unit dan harga per unit". */
   pricePerUnit: number | null;
+  /** Status awal baris `investment_purchases` — default `'pending'` kalau
+   * tidak diisi (form transaksi utama belum punya switch status, selalu
+   * pending dulu). `new-purchase-form/` (dialog "Catat Pembelian") punya
+   * switch untuk langsung tandai `'settled'` kalau unit/harga sudah pasti
+   * saat itu juga — keputusan 2026-10-06, lihat schema.ts (`superRefine`
+   * mewajibkan unit/harga diisi kalau status 'settled'). */
+  status?: "pending" | "settled";
 };
 
 async function getAccountType(db: Db, accountId: string): Promise<Account["account_type"] | null> {
@@ -45,9 +56,11 @@ const none: TouchedInvestmentRows = { investmentPurchaseIds: [], deletedInvestme
  * mengikuti model di docs/concept/konsep-investasi.md bagian "Unit dan
  * harga per unit":
  *
- * - cash -> investment: satu baris `investment_purchases` baru,
- *   `status='pending'` (settlement dikonfirmasi manual belakangan lewat
- *   edit baris, lihat bagian "Settlement tertunda" di dokumen itu).
+ * - cash -> investment: satu baris `investment_purchases` baru, status
+ *   default `'pending'` (settlement dikonfirmasi manual belakangan lewat
+ *   edit baris, lihat bagian "Settlement tertunda" di dokumen itu) — tapi
+ *   bisa langsung `'settled'` kalau caller sudah tahu nilainya pasti saat
+ *   itu juga (lihat parameter `status` di atas).
  * - kombinasi lain yang melibatkan investment (investment -> cash, dst):
  *   classifyAccountPair sudah throw UnsupportedAccountPairError lebih
  *   dulu (lihat classify-account-pair.ts) — BELUM ada model datanya
@@ -66,6 +79,7 @@ export async function applyInvestmentTransaction({
   date,
   unit,
   pricePerUnit,
+  status = "pending",
 }: ApplyInvestmentTransactionInput): Promise<TouchedInvestmentRows> {
   if (type !== "transfer" || transferAccountId == null) return none;
 
@@ -86,15 +100,11 @@ export async function applyInvestmentTransaction({
 
   if (pairKind !== "cash-investment") return none;
 
-  if (unit == null || pricePerUnit == null) {
-    throw new Error("Jumlah unit dan harga per unit wajib diisi untuk transfer ke akun investasi.");
-  }
-
   const id = newId();
   await db.execute(
-    `INSERT INTO investment_purchases (id, account_id, transaction_id, unit, price_per_unit, date)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, transferAccountId, transactionId, unit, pricePerUnit, date]
+    `INSERT INTO investment_purchases (id, account_id, transaction_id, unit, price_per_unit, date, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, transferAccountId, transactionId, unit, pricePerUnit, date, status]
   );
   return { investmentPurchaseIds: [id], deletedInvestmentPurchaseIds: [] };
 }

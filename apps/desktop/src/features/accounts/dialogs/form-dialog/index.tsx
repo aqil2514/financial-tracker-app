@@ -23,8 +23,7 @@ export function AccountFormDialog() {
       title="Tambah Akun Baru"
       open={open}
       onOpenChange={setOpen}
-      contentClassName="max-h-[85vh]"
-      scrollBody
+      contentClassName="sm:!max-w-2xl"
     >
       <AccountForm form={form} onSubmit={onSubmit} isPending={isPending} />
     </EntityFormDialog>

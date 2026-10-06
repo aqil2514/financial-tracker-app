@@ -13,6 +13,7 @@ import {
   Database,
   Building2,
   ChevronRight,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 
@@ -46,6 +47,7 @@ import {
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Transaksi", url: "/transactions", icon: ArrowLeftRight },
+  { title: "Investasi", url: "/investments", icon: TrendingUp },
   { title: "Laporan", url: "/reports", icon: PieChart },
 ];
 

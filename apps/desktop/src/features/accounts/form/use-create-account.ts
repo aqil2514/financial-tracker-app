@@ -4,14 +4,16 @@ import { getDb } from "@/lib/db";
 import { newId } from "@/lib/id";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { DEFAULT_ACCOUNT_COLOR } from "@/lib/account-colors";
+import type { AccountType } from "@/lib/account-types";
 import { accountSchema, type AccountFormOutput } from "./account.schema";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 
 type UseCreateAccountOptions = {
   /** Prefill nama (mis. dari query combobox saat "buat baru" dipicu dari
-   * form lain). */
-  initialValues?: { name?: string };
+   * form lain) dan/atau tipe akun (mis. "Tambah Akun Investasi" dari
+   * halaman /investments — default tetap 'cash' kalau tidak diisi). */
+  initialValues?: { name?: string; account_type?: AccountType };
   /** Dipanggil dengan id akun yang baru dibuat — dipakai caller (mis.
    * combobox akun di form transaksi) untuk langsung memilih akun baru
    * itu tanpa user perlu cari ulang. */
@@ -29,11 +31,11 @@ export function useCreateAccount(options: UseCreateAccountOptions = {}) {
       group_id: null,
       description: null,
       is_active: "1" as const,
-      account_type: "cash" as const,
+      account_type: initialValues?.account_type ?? "cash",
       icon: null,
       color: DEFAULT_ACCOUNT_COLOR,
       unit_label: null,
-      current_price_per_unit: null,
+      current_market_value: null,
     }),
     resetOnOpen: true,
     mutationFn: async (values: AccountFormOutput) => {
@@ -55,8 +57,8 @@ export function useCreateAccount(options: UseCreateAccountOptions = {}) {
       );
       if (values.account_type === "investment") {
         await db.execute(
-          "INSERT INTO investment_accounts (account_id, unit_label, current_price_per_unit) VALUES ($1, $2, $3)",
-          [id, values.unit_label, values.current_price_per_unit]
+          "INSERT INTO investment_accounts (account_id, unit_label, current_market_value) VALUES ($1, $2, $3)",
+          [id, values.unit_label, values.current_market_value]
         );
       }
       void pushOnWrite("accounts", id);

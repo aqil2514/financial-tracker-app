@@ -17,9 +17,10 @@ type InvestmentPurchaseRow = {
   id: string;
   account_id: string;
   transaction_id: string | null;
-  unit: number;
-  price_per_unit: number;
+  unit: number | null;
+  price_per_unit: number | null;
   date: string;
+  status: "pending" | "settled";
 };
 
 function createFakeDb(
@@ -44,15 +45,24 @@ function createFakeDb(
     },
     async execute(sql: string, params: unknown[] = []): Promise<{ lastInsertId?: number }> {
       if (sql.startsWith("INSERT INTO investment_purchases")) {
-        const [id, accountId, transactionId, unit, pricePerUnit, date] = params as [
+        const [id, accountId, transactionId, unit, pricePerUnit, date, status] = params as [
           string,
           string,
           string,
-          number,
-          number,
+          number | null,
+          number | null,
           string,
+          "pending" | "settled",
         ];
-        investmentPurchases.push({ id, account_id: accountId, transaction_id: transactionId, unit, price_per_unit: pricePerUnit, date });
+        investmentPurchases.push({
+          id,
+          account_id: accountId,
+          transaction_id: transactionId,
+          unit,
+          price_per_unit: pricePerUnit,
+          date,
+          status,
+        });
         return {};
       }
       if (sql.startsWith("DELETE FROM investment_purchases")) {
@@ -73,7 +83,7 @@ const INVESTMENT_ACCOUNT: AccountRow = { id: "inv-1", account_type: "investment"
 const DEBT_ACCOUNT: AccountRow = { id: "debt-1", account_type: "debt" };
 
 describe("applyInvestmentTransaction", () => {
-  it("membuat baris investment_purchases untuk transfer cash -> investment", async () => {
+  it("membuat baris investment_purchases untuk transfer cash -> investment, status default pending", async () => {
     const { db, investmentPurchases } = createFakeDb({ accounts: [CASH_ACCOUNT, INVESTMENT_ACCOUNT] });
 
     const result = await applyInvestmentTransaction({
@@ -94,8 +104,27 @@ describe("applyInvestmentTransaction", () => {
       unit: 66.67,
       price_per_unit: 1500,
       date: "2026-01-01",
+      status: "pending",
     });
     expect(result.investmentPurchaseIds).toHaveLength(1);
+  });
+
+  it("membuat baris investment_purchases dengan status settled kalau caller sudah tahu nilainya pasti", async () => {
+    const { db, investmentPurchases } = createFakeDb({ accounts: [CASH_ACCOUNT, INVESTMENT_ACCOUNT] });
+
+    await applyInvestmentTransaction({
+      db: db as never,
+      transactionId: "tx-1",
+      type: "transfer",
+      accountId: "cash-1",
+      transferAccountId: "inv-1",
+      date: "2026-01-01",
+      unit: 66.67,
+      pricePerUnit: 1500,
+      status: "settled",
+    });
+
+    expect(investmentPurchases[0]).toMatchObject({ status: "settled" });
   });
 
   it("tidak melakukan apa pun untuk transfer cash -> cash", async () => {
@@ -135,21 +164,29 @@ describe("applyInvestmentTransaction", () => {
     expect(result).toEqual({ investmentPurchaseIds: [], deletedInvestmentPurchaseIds: [] });
   });
 
-  it("throw kalau unit/harga per unit tidak diisi untuk transfer cash -> investment", async () => {
-    const { db } = createFakeDb({ accounts: [CASH_ACCOUNT, INVESTMENT_ACCOUNT] });
+  it("membuat baris investment_purchases dengan unit/harga NULL kalau belum diisi (order masih pending)", async () => {
+    const { db, investmentPurchases } = createFakeDb({ accounts: [CASH_ACCOUNT, INVESTMENT_ACCOUNT] });
 
-    await expect(
-      applyInvestmentTransaction({
-        db: db as never,
-        transactionId: "tx-1",
-        type: "transfer",
-        accountId: "cash-1",
-        transferAccountId: "inv-1",
-        date: "2026-01-01",
-        unit: null,
-        pricePerUnit: null,
-      })
-    ).rejects.toThrow(/wajib diisi/);
+    const result = await applyInvestmentTransaction({
+      db: db as never,
+      transactionId: "tx-1",
+      type: "transfer",
+      accountId: "cash-1",
+      transferAccountId: "inv-1",
+      date: "2026-01-01",
+      unit: null,
+      pricePerUnit: null,
+    });
+
+    expect(investmentPurchases).toHaveLength(1);
+    expect(investmentPurchases[0]).toMatchObject({
+      account_id: "inv-1",
+      transaction_id: "tx-1",
+      unit: null,
+      price_per_unit: null,
+      date: "2026-01-01",
+    });
+    expect(result.investmentPurchaseIds).toHaveLength(1);
   });
 
   it("melempar UnsupportedAccountPairError untuk kombinasi investment -> cash (penarikan, belum didukung)", async () => {
@@ -214,6 +251,7 @@ describe("applyInvestmentTransactionEdit", () => {
       unit: 10,
       price_per_unit: 1000,
       date: "2026-01-01",
+      status: "pending",
     };
     const { db, investmentPurchases } = createFakeDb({
       accounts: [CASH_ACCOUNT, INVESTMENT_ACCOUNT],
@@ -255,6 +293,7 @@ describe("detachInvestmentPurchaseForDeletedTransaction", () => {
       unit: 10,
       price_per_unit: 1000,
       date: "2026-01-01",
+      status: "pending",
     };
     const { db, investmentPurchases } = createFakeDb({
       accounts: [CASH_ACCOUNT, INVESTMENT_ACCOUNT],

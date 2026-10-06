@@ -7,7 +7,6 @@ import { DialogFooter } from "@/components/ui/dialog";
 import {
   FormFieldText,
   FormFieldCurrency,
-  FormFieldNumber,
   FormFieldSelect,
   FormFieldTextarea,
   FormFieldToggleGroup,
@@ -44,74 +43,79 @@ export function AccountForm({
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <FormFieldText
-        form={form}
-        name="name"
-        label="Nama Akun"
-        placeholder="Contoh: Kartu Kredit"
-      />
-      <FormFieldCurrency form={form} name="initial_balance" label="Saldo Awal" />
-      <div className="grid grid-cols-2 gap-4">
-        <FormFieldIconPicker form={form} name="icon" label="Icon" />
-        <FormFieldColorPicker form={form} name="color" label="Warna" />
-      </div>
-      <FormFieldSelect
-        form={form}
-        name="group_id"
-        label="Group Akun"
-        placeholder="Pilih group..."
-        allowClear
-        clearLabel="Tanpa Group"
-        options={
-          groups?.map((group) => ({
-            value: String(group.id),
-            label: group.name,
-          })) ?? []
-        }
-      />
-      <FormFieldTextarea
-        form={form}
-        name="description"
-        label="Deskripsi"
-        placeholder="Catatan tambahan tentang akun ini (opsional)"
-      />
-      <FormFieldSelect
-        form={form}
-        name="account_type"
-        label="Tipe Akun"
-        disabled={accountTypeLocked}
-        options={ACCOUNT_TYPE_OPTIONS.map((option) => ({
-          ...option,
-          description: accountTypeLocked
-            ? `${option.description} Tipe terkunci karena akun ini sudah punya transaksi/piutang-utang terkait.`
-            : option.description,
-        }))}
-      />
-      {accountType === "investment" && (
-        <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-4">
           <FormFieldText
             form={form}
-            name="unit_label"
-            label="Satuan Unit"
-            placeholder="Mis. unit, lembar, gram"
+            name="name"
+            label="Nama Akun"
+            placeholder="Contoh: Kartu Kredit"
           />
-          <FormFieldNumber
+          <FormFieldCurrency form={form} name="initial_balance" label="Saldo Awal" />
+          <div className="grid grid-cols-2 gap-4">
+            <FormFieldIconPicker form={form} name="icon" label="Icon" />
+            <FormFieldColorPicker form={form} name="color" label="Warna" />
+          </div>
+          <FormFieldSelect
             form={form}
-            name="current_price_per_unit"
-            label="Harga per Unit saat ini"
-            placeholder="Mis. 1500"
+            name="group_id"
+            label="Group Akun"
+            placeholder="Pilih group..."
+            allowClear
+            clearLabel="Tanpa Group"
+            options={
+              groups?.map((group) => ({
+                value: String(group.id),
+                label: group.name,
+              })) ?? []
+            }
+          />
+          <FormFieldSelect
+            form={form}
+            name="account_type"
+            label="Tipe Akun"
+            disabled={accountTypeLocked}
+            options={ACCOUNT_TYPE_OPTIONS.map((option) => ({
+              ...option,
+              description: accountTypeLocked
+                ? `${option.description} Tipe terkunci karena akun ini sudah punya transaksi/piutang-utang terkait.`
+                : option.description,
+            }))}
+          />
+          {accountType === "investment" && (
+            <div className="grid grid-cols-2 gap-4">
+              <FormFieldText
+                form={form}
+                name="unit_label"
+                label="Satuan Unit"
+                placeholder="Mis. unit, lembar, gram"
+              />
+              <FormFieldCurrency
+                form={form}
+                name="current_market_value"
+                label="Nilai Pasar Terkini"
+              />
+            </div>
+          )}
+        </div>
+        <div className="space-y-4">
+          <FormFieldTextarea
+            form={form}
+            name="description"
+            label="Deskripsi"
+            placeholder="Catatan tambahan tentang akun ini (opsional)"
+          />
+          <FormFieldToggleGroup
+            form={form}
+            name="is_active"
+            label="Status"
+            options={[
+              { value: "1", label: "Aktif" },
+              { value: "0", label: "Nonaktif" },
+            ]}
           />
         </div>
-      )}
-      <FormFieldToggleGroup
-        form={form}
-        name="is_active"
-        label="Status"
-        options={[
-          { value: "1", label: "Aktif" },
-          { value: "0", label: "Nonaktif" },
-        ]}
-      />
+      </div>
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
           {isPending ? "Menyimpan..." : submitLabel}

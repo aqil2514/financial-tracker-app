@@ -218,6 +218,18 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0036_investment_accounts_and_purchases.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 37,
+            description: "investment_accounts_market_value",
+            sql: include_str!("../migrations/0037_investment_accounts_market_value.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 38,
+            description: "investment_purchases_nullable_unit_price",
+            sql: include_str!("../migrations/0038_investment_purchases_nullable_unit_price.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -348,11 +360,13 @@ mod tests {
         .expect("insert ke rantai FK accounts->transactions->debts->debt_payments gagal");
     }
 
-    // Migrasi 0035/0036: 'investment' harus diterima di CHECK
+    // Migrasi 0035/0036/0037: 'investment' harus diterima di CHECK
     // accounts.account_type, dan investment_accounts/investment_purchases
     // harus bisa di-insert dgn FK ke accounts/transactions -- regresi
     // sejenis 0022 kalau salah satu tabel dalam rantai FK accounts lupa
-    // ikut di-rebuild saat CHECK diubah.
+    // ikut di-rebuild saat CHECK diubah. investment_accounts pakai
+    // current_market_value (nilai pasar TOTAL, bukan per-unit lagi) sejak
+    // 0037 -- lihat docs/todos/plan/account-type-investment.md.
     #[test]
     fn insert_akun_investment_dan_riwayat_pembelian_tidak_gagal() {
         let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
@@ -361,8 +375,8 @@ mod tests {
         conn.execute_batch(
             "
             INSERT INTO accounts (id, name, account_type) VALUES ('acc-inv-1', 'Reksadana Test', 'investment');
-            INSERT INTO investment_accounts (account_id, unit_label, current_price_per_unit)
-                VALUES ('acc-inv-1', 'unit', 1500.0);
+            INSERT INTO investment_accounts (account_id, unit_label, current_market_value)
+                VALUES ('acc-inv-1', 'unit', 100500.0);
             INSERT INTO accounts (id, name, account_type) VALUES ('acc-cash-1', 'Kas Test', 'cash');
             INSERT INTO transactions (id, type, amount, account_id, transfer_account_id, note, date)
                 VALUES ('tx-inv-1', 'transfer', 100000, 'acc-cash-1', 'acc-inv-1', 'beli reksadana', '2026-01-01');
@@ -371,5 +385,29 @@ mod tests {
             ",
         )
         .expect("insert akun investment + investment_purchases gagal");
+    }
+
+    // Migrasi 0038: unit/price_per_unit di investment_purchases jadi
+    // NULLABLE -- order beli yang masih pending (mis. reksadana di Bibit)
+    // belum tahu unit pastinya sampai settlement dikonfirmasi, jadi baris
+    // riwayat harus tetap bisa dibuat tanpa kedua field itu.
+    #[test]
+    fn insert_investment_purchases_tanpa_unit_harga_tidak_gagal() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        conn.execute_batch(
+            "
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-inv-2', 'Reksadana Test 2', 'investment');
+            INSERT INTO investment_accounts (account_id, unit_label, current_market_value)
+                VALUES ('acc-inv-2', 'unit', 0.0);
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-cash-2', 'Kas Test 2', 'cash');
+            INSERT INTO transactions (id, type, amount, account_id, transfer_account_id, note, date)
+                VALUES ('tx-inv-2', 'transfer', 50000, 'acc-cash-2', 'acc-inv-2', 'beli reksadana pending', '2026-01-01');
+            INSERT INTO investment_purchases (id, account_id, transaction_id, unit, price_per_unit, date, status)
+                VALUES ('ip-2', 'acc-inv-2', 'tx-inv-2', NULL, NULL, '2026-01-01', 'pending');
+            ",
+        )
+        .expect("insert investment_purchases tanpa unit/harga gagal");
     }
 }

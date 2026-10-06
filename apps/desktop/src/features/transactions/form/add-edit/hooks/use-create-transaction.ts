@@ -70,6 +70,7 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
       settle_debt_ids: [],
       unit: null,
       price_per_unit: null,
+      investment_status: "pending" as const,
     }),
     open,
     resetOnOpen: true,
@@ -123,6 +124,7 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
         date: values.date,
         unit: values.unit,
         pricePerUnit: values.price_per_unit,
+        status: values.investment_status ?? "pending",
       });
 
       void pushOnWrite("transactions", transactionId);

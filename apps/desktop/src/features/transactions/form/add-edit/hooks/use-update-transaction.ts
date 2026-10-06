@@ -59,6 +59,7 @@ export function useUpdateTransaction(
       settle_debt_ids: [],
       unit: investmentPurchase?.unit ?? null,
       price_per_unit: investmentPurchase?.price_per_unit ?? null,
+      investment_status: investmentPurchase?.status ?? "pending",
     }),
     open,
     resetOnOpen: true,
@@ -135,6 +136,7 @@ export function useUpdateTransaction(
         date: values.date,
         unit: values.unit,
         pricePerUnit: values.price_per_unit,
+        status: values.investment_status ?? "pending",
       });
 
       void pushOnWrite("transactions", transaction.id);

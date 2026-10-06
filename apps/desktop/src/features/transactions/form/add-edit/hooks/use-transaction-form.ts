@@ -109,12 +109,21 @@ export function useTransactionForm({
     return validateDebtFields(values) ?? validateInvestmentFields(values);
   }
 
+  // Debt diperiksa lebih dulu di validateAllFields -- kalau errornya BUKAN
+  // debt (debtError null) tapi needsInvestmentFields true, pasti berasal
+  // dari validateInvestmentFields, jadi taruh di field "unit" supaya user
+  // diarahkan ke field yang relevan alih-alih "contact_name" yang tidak
+  // nyambung sama sekali.
+  function errorFieldFor(values: TransactionFormOutput): "settle_debt_ids" | "contact_name" | "unit" {
+    if (needsDebtAction && values.debt_action) return "settle_debt_ids";
+    if (needsInvestmentFields) return "unit";
+    return "contact_name";
+  }
+
   function handleSubmit(values: TransactionFormOutput) {
     const error = validateAllFields(values);
     if (error) {
-      form.setError(needsDebtAction && values.debt_action ? "settle_debt_ids" : "contact_name", {
-        message: error,
-      });
+      form.setError(errorFieldFor(values), { message: error });
       return;
     }
     onSubmit(values);
@@ -123,9 +132,7 @@ export function useTransactionForm({
   function handleSubmitAndContinue(values: TransactionFormOutput) {
     const error = validateAllFields(values);
     if (error) {
-      form.setError(needsDebtAction && values.debt_action ? "settle_debt_ids" : "contact_name", {
-        message: error,
-      });
+      form.setError(errorFieldFor(values), { message: error });
       return;
     }
     onSubmitAndContinue?.(values);

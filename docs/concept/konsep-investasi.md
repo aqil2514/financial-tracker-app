@@ -32,17 +32,18 @@ Instrumen seperti reksadana lazimnya tidak langsung "cair" jadi unit saat dana d
 - **`total_unit` (dan karenanya nilai pasar terkini & Unrealized P/L) TETAP menghitung baris `pending`** — TIDAK menunggu status `settled` dulu. `accounts.balance` TIDAK berubah mekanismenya sama sekali (tetap murni dari `transactions` seperti semua tipe akun lain, prinsip di [konsep-transaksi.md](konsep-transaksi.md) TIDAK ada pengecualian untuk investment) — representasi "total = pending + settled" ini ada di `balance` secara otomatis karena transaksi transfer sudah tercatat sejak awal, bukan hasil SUM bersyarat baru.
 - **Breakdown pending vs settled ditampilkan eksplisit** di halaman rincian investasi/laporan — tiga angka: total dana yang masih `pending`, total yang sudah `settled`, dan gabungan keduanya (= cermin `accounts.balance`). Ini murni presentasi untuk transparansi user, BUKAN mengubah cara hitung `balance`/`total_unit`.
 
-## Harga per unit terkini — satu-satunya field manual di level akun
+## Nilai pasar terkini — satu-satunya field manual di level akun
+
+> **Revisi 2026-10-06**: draf awal menyimpan `current_price_per_unit` (harga PER UNIT) di level akun, lalu nilai pasar dihitung `total_unit × current_price_per_unit`. Diganti jadi `current_market_value` (nilai pasar TOTAL langsung) karena user biasanya melihat "nilai portofolio saya sekarang Rp X" dari aplikasi investasi lain (reksadana/saham), bukan harga per unit — tidak perlu dipaksa menghitung/mengonversi ke per-unit dulu cuma untuk input manual. Harga per unit TETAP ada sebagai konsep, tapi turun ke level `investment_purchases` (lihat bagian di atas) sebagai snapshot historis harga BELI per lot, bukan sumber hitung nilai pasar terkini lagi.
 
 Tabel detail `investment_accounts` (1:1 dengan `accounts`, pola yang sama dengan rencana `credit_accounts` di [account-type.md](../apps/desktop/docs/todos/plan/account-type.md)) menyimpan:
 
 - **`unit_label`** — satuan tampilan (mis. "lembar", "unit", "gram"), murni kosmetik untuk UI.
-- **`current_price_per_unit`** — harga per unit SAAT INI, **manual**, diupdate user kapan saja (BUKAN ditarik otomatis dari API harga pasar). Ini satu-satunya angka yang perlu diupdate manual secara berkala di level akun — beda dari riwayat pembelian yang cuma dicatat sekali saat transaksi terjadi.
+- **`current_market_value`** — nilai pasar TOTAL instrumen ini SAAT INI, **manual**, diupdate user kapan saja (BUKAN ditarik otomatis dari API harga pasar, BUKAN dihitung dari unit × harga). Ini satu-satunya angka yang perlu diupdate manual secara berkala di level akun — beda dari riwayat pembelian yang cuma dicatat sekali saat transaksi terjadi.
 
-Dari sini, dua angka turunan dihitung SELALU saat ditampilkan (tidak disimpan):
+Dari sini, satu angka turunan dihitung SELALU saat ditampilkan (tidak disimpan):
 
-- **Nilai pasar terkini** = `total_unit (derived) × current_price_per_unit`.
-- **Unrealized P/L** (laba/rugi belum terealisasi, sudah disebut sebagai fitur turunan tipe Investasi di [konsep-tipe-akun.md](konsep-tipe-akun.md) bagian "Konsekuensi tipe") = `nilai pasar terkini − modal (accounts.balance)`, ditampilkan nominal DAN persentase (`nilai pasar terkini / modal − 1`).
+- **Unrealized P/L** (laba/rugi belum terealisasi, sudah disebut sebagai fitur turunan tipe Investasi di [konsep-tipe-akun.md](konsep-tipe-akun.md) bagian "Konsekuensi tipe") = `current_market_value − modal (accounts.balance)`, ditampilkan nominal DAN persentase (`current_market_value / modal − 1`).
 
 ### Persentase P/L: "return posisi aktif", bukan return total historis
 
@@ -50,11 +51,11 @@ Persentase yang ditampilkan ini SELALU berbasis **posisi yang sedang dipegang sa
 
 Ini SENGAJA, bukan bug: menghitung return total historis yang akurat butuh melacak realized gain/loss (lihat "Pertanyaan terbuka" di bawah) — belum ada konsepnya di model ini. Konsekuensi praktis: kalau user membandingkan angka persentase ini dengan aplikasi investasi lain (mis. Retailku) yang pernah mencatat transaksi jual sebagian, angkanya BISA BERBEDA — bukan berarti salah satu keliru, cuma metode hitungnya beda (posisi aktif saja vs total historis termasuk yang sudah dicairkan).
 
-## Update harga per unit terkini TIDAK mengubah saldo akun
+## Update nilai pasar terkini TIDAK mengubah saldo akun
 
 Ini titik paling penting yang membedakan Investasi dari pola "transaksi penutup" yang sudah ada di tipe lain (Koreksi Saldo, write-off piutang — lihat [konsep-transaksi.md](konsep-transaksi.md)):
 
-- Update `current_price_per_unit` **TIDAK** membuat transaksi `income`/`expense` apa pun, dan **TIDAK** mengubah `accounts.balance` sama sekali.
+- Update `current_market_value` **TIDAK** membuat transaksi `income`/`expense` apa pun, dan **TIDAK** mengubah `accounts.balance` sama sekali.
 - `accounts.balance` akun investasi SELALU murni cermin uang yang benar-benar ditanam/ditarik lewat transaksi riil — sama seperti tipe `cash`, tidak ada pengecualian.
 - Nilai pasar terkini dan Unrealized P/L murni angka turunan INFORMASIONAL yang hidup berdampingan dengan saldo, bukan menggantikannya.
 
@@ -83,6 +84,6 @@ Ini BUKAN diputuskan "tidak penting" — sekadar ditunda sampai modal pembelian 
 
 ## Yang SENGAJA belum didukung
 
-- **Harga pasar otomatis** (API/live price) — `current_price_per_unit` murni manual, tidak ada integrasi harga real-time.
+- **Harga pasar otomatis** (API/live price) — `current_market_value` murni manual, tidak ada integrasi harga real-time.
 - **FIFO/average cost saat penjualan, dan realized gain/loss** — lihat "Pertanyaan terbuka" di atas.
 - **Validasi unit × harga vs nominal transfer** — sengaja tidak divalidasi, lihat bagian "Unit dan harga per unit" di atas.

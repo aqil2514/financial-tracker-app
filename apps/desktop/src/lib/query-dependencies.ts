@@ -22,6 +22,7 @@ import { monthSummaryQueryKey } from "@/features/transactions/shared/hooks/use-m
 import { accountSummaryQueryKey } from "@/features/account-detail/header/use-account-summary";
 import { investmentAccountQueryKey } from "@/shared/investments/use-investment-account";
 import { transactionInvestmentPurchaseQueryKey } from "@/shared/investments/use-transaction-investment-purchase";
+import { investmentPurchasesQueryKey } from "@/shared/investments/use-investment-purchases";
 
 // Peta ketergantungan query key lintas fitur: kalau data sebuah DOMAIN
 // berubah (mis. transaksi ditambah/diedit/dihapus), semua query key di
@@ -53,6 +54,7 @@ export const QUERY_DEPENDENCIES = {
     debtPaymentsQueryKey,
     contactSummaryQueryKey,
     transactionInvestmentPurchaseQueryKey, // transfer cash->investment bisa membuat/edit investment_purchases
+    investmentPurchasesQueryKey, // riwayat lot per akun (features/investment-detail/content/) ikut berubah
   ],
   accounts: [
     accountsQueryKey,

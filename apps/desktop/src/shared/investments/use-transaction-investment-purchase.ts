@@ -3,7 +3,12 @@ import { getDb } from "@/lib/db";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
-export type TransactionInvestmentPurchase = { id: string; unit: number; price_per_unit: number } | null;
+export type TransactionInvestmentPurchase = {
+  id: string;
+  unit: number | null;
+  price_per_unit: number | null;
+  status: "pending" | "settled";
+} | null;
 
 // Base key -- didaftarkan di QUERY_DEPENDENCIES (lib/query-dependencies.ts)
 // domain "transactions", supaya ikut di-invalidate begitu
@@ -27,8 +32,10 @@ export async function getTransactionInvestmentPurchase(
   db: Db,
   transactionId: string
 ): Promise<TransactionInvestmentPurchase> {
-  const rows = await db.select<{ id: string; unit: number; price_per_unit: number }[]>(
-    "SELECT id, unit, price_per_unit FROM investment_purchases WHERE transaction_id = $1 LIMIT 1",
+  const rows = await db.select<
+    { id: string; unit: number | null; price_per_unit: number | null; status: "pending" | "settled" }[]
+  >(
+    "SELECT id, unit, price_per_unit, status FROM investment_purchases WHERE transaction_id = $1 LIMIT 1",
     [transactionId]
   );
   return rows[0] ?? null;

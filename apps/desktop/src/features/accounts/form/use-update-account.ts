@@ -25,7 +25,7 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
       icon: account.icon,
       color: account.color,
       unit_label: investmentAccount?.unit_label ?? null,
-      current_price_per_unit: investmentAccount?.current_price_per_unit ?? null,
+      current_market_value: investmentAccount?.current_market_value ?? null,
     }),
     resetOnOpen: true,
     onSuccess,
@@ -71,14 +71,14 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
         );
         if (existing.length > 0) {
           await db.execute(
-            `UPDATE investment_accounts SET unit_label = $1, current_price_per_unit = $2, updated_at = datetime('now')
+            `UPDATE investment_accounts SET unit_label = $1, current_market_value = $2, updated_at = datetime('now')
              WHERE account_id = $3`,
-            [values.unit_label, values.current_price_per_unit, account.id]
+            [values.unit_label, values.current_market_value, account.id]
           );
         } else {
           await db.execute(
-            "INSERT INTO investment_accounts (account_id, unit_label, current_price_per_unit) VALUES ($1, $2, $3)",
-            [account.id, values.unit_label, values.current_price_per_unit]
+            "INSERT INTO investment_accounts (account_id, unit_label, current_market_value) VALUES ($1, $2, $3)",
+            [account.id, values.unit_label, values.current_market_value]
           );
         }
       }
@@ -91,14 +91,14 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
 
   // useEntityForm's defaultValues() dipanggil SINKRON saat form mount/
   // resetOnOpen -- di titik itu useInvestmentAccount (query async) biasa
-  // BELUM selesai fetch, jadi unit_label/current_price_per_unit ikut
+  // BELUM selesai fetch, jadi unit_label/current_market_value ikut
   // ter-reset ke null walau datanya sebenarnya ada. Effect ini push
   // ulang nilai begitu query selesai, TANPA form.reset() penuh (supaya
   // tidak menimpa field lain yang mungkin sudah diubah user duluan).
   useEffect(() => {
     if (investmentAccount == null) return;
     entityForm.form.setValue("unit_label", investmentAccount.unit_label);
-    entityForm.form.setValue("current_price_per_unit", investmentAccount.current_price_per_unit);
+    entityForm.form.setValue("current_market_value", investmentAccount.current_market_value);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reaksi ke data query saja, form stabil lewat closure
   }, [investmentAccount]);
 

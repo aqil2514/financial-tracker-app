@@ -37,6 +37,7 @@ export function FormFieldNumber<TFieldValues extends FieldValues>({
             placeholder={placeholder}
             {...field}
             value={field.value ?? ""}
+            onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.value)}
           />
           {fieldState.error && (
             <p className="text-destructive text-sm">

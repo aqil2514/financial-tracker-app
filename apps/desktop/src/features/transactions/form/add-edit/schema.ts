@@ -19,13 +19,21 @@ export const transactionSchema = z
     /** Piutang (debts.id, sebagai string) yang dipilih untuk dilunasi —
      * cuma relevan saat debt_action === 'settlement'. */
     settle_debt_ids: z.array(z.string()),
-    /** Jumlah unit & harga per unit saat pembelian — WAJIB terisi hanya
-     * saat transfer tujuannya akun `investment` (lihat
+    /** Jumlah unit & harga per unit saat pembelian — relevan hanya saat
+     * transfer tujuannya akun `investment` (lihat
      * use-transaction-investment-fields.ts), null di luar kasus itu.
      * SENGAJA tidak divalidasi terhadap `amount` (lihat
-     * docs/concept/konsep-investasi.md bagian "Unit dan harga per unit"). */
+     * docs/concept/konsep-investasi.md bagian "Unit dan harga per unit").
+     * OPSIONAL kalau `investment_status` 'pending', WAJIB kalau 'settled'
+     * — divalidasi di useTransactionInvestmentFields (butuh tahu account
+     * type tujuan, tidak bisa murni di sini). */
     unit: z.coerce.number().nullable(),
     price_per_unit: z.coerce.number().nullable(),
+    /** Status baris `investment_purchases` yang akan dibuat/diupdate —
+     * cuma relevan saat transfer tujuannya akun `investment`, null di
+     * luar kasus itu. Lihat docs/concept/konsep-investasi.md bagian
+     * "Settlement tertunda". */
+    investment_status: z.enum(["pending", "settled"]).nullable(),
   })
   .superRefine((values, ctx) => {
     if (values.type === "transfer") {
