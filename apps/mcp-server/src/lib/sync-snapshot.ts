@@ -101,6 +101,18 @@ function isAlive<T extends { deletedAt: string | null }>(row: T): boolean {
   return row.deletedAt === null;
 }
 
+// `Transaction.date` TIDAK konsisten formatnya -- kadang "YYYY-MM-DD"
+// polos, kadang "YYYY-MM-DDTHH:mm" (dgn jam). Filter from/to dari user
+// SELALU "YYYY-MM-DD" tanpa jam. Perbandingan string APA ADANYA
+// ("2026-10-06T18:04" <= "2026-10-06") salah -- string yg lebih panjang
+// berprefix sama dianggap "lebih besar" secara leksikografis, jadi
+// transaksi ber-jam pada tanggal `to` itu sendiri salah tereksklusi.
+// Ambil 10 karakter pertama dulu supaya perbandingan selalu
+// tanggal-vs-tanggal, bukan tanggal-vs-datetime.
+function datePart(date: string): string {
+  return date.slice(0, 10);
+}
+
 // Dipakai tool-tool "get"/"list" buat resolve ID mentah (accountId,
 // categoryId, contactId) ke nama -- tanpa ini caller harus lookup manual
 // via get_account_balances dulu tiap kali baca transaksi/debt.
@@ -150,8 +162,8 @@ export function summarizeExpenseByCategory(
 
   for (const t of snapshot.transactions) {
     if (!isAlive(t) || t.type !== "expense") continue;
-    if (options.from && t.date < options.from) continue;
-    if (options.to && t.date > options.to) continue;
+    if (options.from && datePart(t.date) < options.from) continue;
+    if (options.to && datePart(t.date) > options.to) continue;
     const key = t.categoryId ?? "__uncategorized__";
     totals.set(key, (totals.get(key) ?? 0) + t.amount);
   }
@@ -216,8 +228,8 @@ export function summarizeCashflow(
   for (const t of snapshot.transactions) {
     if (!isAlive(t)) continue;
     if (t.type !== "income" && t.type !== "expense") continue;
-    if (options.from && t.date < options.from) continue;
-    if (options.to && t.date > options.to) continue;
+    if (options.from && datePart(t.date) < options.from) continue;
+    if (options.to && datePart(t.date) > options.to) continue;
 
     const label = labelFor(t);
     const totals = totalsByType[t.type];
@@ -313,11 +325,11 @@ export function computeBalanceTrend(
     }
     if (toMatches) net += t.amount;
 
-    if (t.date < from) {
+    if (datePart(t.date) < from) {
       openingBalance += net;
       continue;
     }
-    if (t.date > to) continue;
+    if (datePart(t.date) > to) continue;
 
     const label = bucketLabel(t.date, granularity);
     buckets.set(label, (buckets.get(label) ?? 0) + net);
@@ -339,8 +351,8 @@ export function listTransactions(
   const limit = options.limit ?? 20;
   return snapshot.transactions
     .filter((t) => isAlive(t))
-    .filter((t) => !options.from || t.date >= options.from)
-    .filter((t) => !options.to || t.date <= options.to)
+    .filter((t) => !options.from || datePart(t.date) >= options.from)
+    .filter((t) => !options.to || datePart(t.date) <= options.to)
     .filter((t) => !options.type || t.type === options.type)
     .filter((t) => !options.accountId || t.accountId === options.accountId || t.transferAccountId === options.accountId)
     .sort((a, b) => b.date.localeCompare(a.date))
