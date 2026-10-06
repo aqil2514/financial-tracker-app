@@ -82,11 +82,13 @@ sistem: sama-sama cuma penampung saldo lewat transaksi debit/kredit.
 
 **Pendekatan `financial-app`**: `accounts.account_type` (migrasi
 `0013_account_type.sql`) adalah kolom yang benar-benar dibaca logic
-aplikasi, bukan cuma tampilan. Saat ini ada 2 nilai — `cash` (default,
-akun kas/bank biasa) dan `debt` (akun virtual utang-piutang) — dan
+aplikasi, bukan cuma tampilan. Saat ini ada 3 nilai berjalan — `cash`
+(default, akun kas/bank biasa), `debt` (akun virtual utang-piutang), dan
+`investment` (migrasi `0035_account_type_investment.sql`, satu instrumen
+investasi tunggal — lihat `docs/concept/konsep-investasi.md`) — dan
 **tipe akun ini yang menentukan apakah field kontak wajib diisi, apakah
-transfer memicu pembuatan entitas `debts`, dan ke arah mana (piutang
-baru vs pelunasan)** (lihat bagian 1). Ini beda mendasar dari sekadar
+transfer memicu pembuatan entitas `debts`/`investment_purchases`, dan ke
+arah mana** (lihat bagian 1). Ini beda mendasar dari sekadar
 "kategori akun": mengubah `account_type` sebuah akun mengubah perilaku
 form transaksi terkait akun itu.
 
@@ -117,71 +119,105 @@ Beberapa hal lain yang mengiringi desain ini:
   bertahap & hati-hati (nilai baru butuh migrasi "copy-and-rename",
   bukan `ALTER TABLE` sederhana) — trade-off yang diketahui dan diterima
   sejak desain awal (`docs/todos/plan/account-type.md`).
-- **Tipe kompleks lain sudah dipetakan sebagai kandidat konkret, belum
-  diimplementasikan**: `credit` (limit, tanggal jatuh tempo, bunga),
-  `investment` (jumlah unit, harga per unit, return — juga jadi tujuan
-  akhir baris `INVESTMENT_TRANSACTION` dari sync Retailku yang untuk
-  sekarang masih menumpang di klasifikasi `transfer`, lihat bagian 3 di
-  bawah), `forex` (mata uang asal & kurs), `advance`/uang muka (uang yang sudah
-  keluar tapi belum jadi biaya, dipicu kebutuhan nyata sync
-  `PURCHASE_ORDER` Retailku), dan `third_party`/dana titipan (uang yang
-  tercampur fisik di kas tapi bukan milik pemilik akun, dipicu kebutuhan
-  nyata `CASH_OPNAME` Retailku). Semua kandidat ini punya sumber
-  kebutuhan nyata yang terdokumentasi, bukan spekulasi fitur.
-- Tiap tipe kompleks direncanakan punya **tabel detail terpisah**
-  (`credit_accounts`, `investment_accounts`, dst) yang mereferensi
-  `accounts.id`, sengaja menghindari kolom JSON generik supaya validasi
-  SQL untuk data finansial tetap ketat — beda dari pendekatan skema
-  fleksibel/NoSQL yang kadang dipakai aplikasi lain untuk field per-tipe
-  yang bervariasi.
+- **`investment` SUDAH diimplementasikan penuh** (2026-10-06, lihat
+  `docs/concept/konsep-investasi.md` & `apps/desktop/docs/todos/plan/account-type-investment.md`)
+  dan lolos smoke test manual — bukan lagi kandidat rencana. Tabel
+  detail `investment_accounts` (1:1 dengan `accounts`, kolom `unit_label`
+  + `current_market_value` manual) dan riwayat per-lot
+  `investment_purchases` (`unit`, `price_per_unit`, `status`
+  `pending`/`settled` untuk settlement tertunda spt reksadana T+1/T+2).
+  Juga jadi tujuan akhir baris `INVESTMENT_TRANSACTION` dari sync
+  Retailku yang untuk sekarang masih menumpang di klasifikasi `transfer`
+  (lihat bagian 3 di bawah — pemetaan sync-nya sendiri belum dikerjakan,
+  itu kerja terpisah).
+- **Tipe kompleks lain masih kandidat, belum diimplementasikan**:
+  `credit` (limit, tanggal jatuh tempo, bunga), `forex` (mata uang asal &
+  kurs), `advance`/uang muka (uang yang sudah keluar tapi belum jadi
+  biaya, dipicu kebutuhan nyata sync `PURCHASE_ORDER` Retailku), dan
+  `third_party`/dana titipan (uang yang tercampur fisik di kas tapi
+  bukan milik pemilik akun, dipicu kebutuhan nyata `CASH_OPNAME`
+  Retailku). Semua kandidat ini punya sumber kebutuhan nyata yang
+  terdokumentasi, bukan spekulasi fitur.
+- Tiap tipe kompleks (termasuk `investment` yang sudah jadi) punya
+  **tabel detail terpisah** (`investment_accounts`, rencana
+  `credit_accounts`, dst) yang mereferensi `accounts.id`, sengaja
+  menghindari kolom JSON generik supaya validasi SQL untuk data
+  finansial tetap ketat — beda dari pendekatan skema fleksibel/NoSQL
+  yang kadang dipakai aplikasi lain untuk field per-tipe yang bervariasi.
 
 ### Potensi vs realita: tidak semua tipe kandidat punya bobot diferensiasi yang sama
 
-Penting dipisahkan supaya tidak menyamaratakan — kalau kelima tipe
-kandidat di atas benar-benar dibangun, kedalaman diferensiasinya
-**tidak seragam**:
+Penting dipisahkan supaya tidak menyamaratakan — kedalaman diferensiasi
+antar tipe (baik yang sudah dibangun maupun masih kandidat) **tidak
+seragam**:
 
-- **`credit`, `investment`, `forex` — dangkal sebagai diferensiasi**,
-  walau tetap berguna. Rencananya baru berupa field tambahan (limit,
-  jatuh tempo, bunga / unit, harga, return / kurs). Ini persis fitur
-  yang sudah jadi standar di aplikasi finance personal kelas
-  menengah-atas (Spendee, Money Lover, YNAB) — kartu kredit dengan
-  limit & jatuh tempo, akun investasi dengan return, bukan hal baru.
-  Kalau cuma menambah kolom tanpa logic lintas-fitur yang khas, ini
+- **`investment` (SUDAH dibangun) — lebih dalam dari sekadar field
+  tambahan, tapi tidak seunik `advance`/`third_party` di bawah.** Model
+  akhirnya BUKAN cuma kolom `unit`/`harga`/`return` seperti rencana awal
+  — ada riwayat per-lot (`investment_purchases`) dengan lifecycle
+  settlement (`pending`→`settled`, menangani kasus nyata reksadana
+  T+1/T+2 yang unit finalnya belum diketahui saat beli), nilai pasar
+  manual yang sengaja terpisah dari saldo akun supaya tidak pernah
+  diam-diam mengubah modal (lihat `konsep-investasi.md` bagian "Update
+  nilai pasar terkini TIDAK mengubah saldo akun"), dan Unrealized P/L
+  yang dihitung sebagai "return posisi aktif" bukan return historis
+  total. Ini memang masih **fitur yang sudah jadi standar** di aplikasi
+  finance personal kelas menengah-atas (Spendee, Money Lover, YNAB) dari
+  sisi KEBUTUHAN-nya — jadi tetap **mengejar ketertinggalan** kalau
+  dibandingkan cakupan fitur mereka, bukan pembeda baru dari sisi "apa
+  yang user lihat". Yang jadi bukti diferensiasi di sini bukan fiturnya
+  sendiri, tapi **pola arsitektur gate `account_type`-nya terbukti
+  kokoh** menghadapi tipe non-trivial pertama (lihat paragraf "Batas
+  klaim" di bawah, direvisi) — bukan lagi klaim yang masih tertunda.
+- **`credit`, `forex` — masih kandidat, dangkal sebagai diferensiasi**,
+  walau tetap berguna kalau dibangun. Rencananya baru berupa field
+  tambahan (limit, jatuh tempo, bunga / kurs) — persis fitur standar di
+  aplikasi finance personal kelas menengah-atas, bukan hal baru. Kalau
+  cuma menambah kolom tanpa logic lintas-fitur yang khas, ini akan
   **mengejar ketertinggalan**, bukan membuat pembeda baru.
-- **`advance` (uang muka) dan `third_party` (dana titipan) — berpotensi
-  tetap mendalam**. Keduanya bukan "jenis akun" dalam pengertian umum
-  (kartu kredit, saham), melainkan **konsep neraca akuntansi** (uang
-  keluar tapi belum jadi biaya; uang di kas tapi bukan milik pemilik
-  akun) yang lahir langsung dari kebutuhan nyata sync Retailku
-  (`PURCHASE_ORDER`, `CASH_OPNAME`). Aplikasi pencatatan keuangan
-  personal pada umumnya tidak punya konsep ini sama sekali, karena
-  mereka tidak berurusan dengan uang muka pembelian atau dana
-  konsinyasi pihak ketiga. Kalau diimplementasikan penuh — bukan cuma
-  kolom tambahan, tapi logic realisasi `advance` → beban/persediaan
+- **`advance` (uang muka) dan `third_party` (dana titipan) — masih
+  kandidat, berpotensi tetap mendalam**. Keduanya bukan "jenis akun"
+  dalam pengertian umum (kartu kredit, saham), melainkan **konsep
+  neraca akuntansi** (uang keluar tapi belum jadi biaya; uang di kas
+  tapi bukan milik pemilik akun) yang lahir langsung dari kebutuhan
+  nyata sync Retailku (`PURCHASE_ORDER`, `CASH_OPNAME`). Aplikasi
+  pencatatan keuangan personal pada umumnya tidak punya konsep ini sama
+  sekali, karena mereka tidak berurusan dengan uang muka pembelian atau
+  dana konsinyasi pihak ketiga. Kalau diimplementasikan penuh — bukan
+  cuma kolom tambahan, tapi logic realisasi `advance` → beban/persediaan
   saat `PURCHASE_RECEIVING`, dan pemisahan saldo `third_party` dari
-  saldo pemilik akun — ini jadi diferensiasi yang sulit ditiru
-  aplikasi personal-finance lain, karena mereka tidak punya *alasan*
-  domain untuk membangunnya.
+  saldo pemilik akun — ini jadi diferensiasi yang sulit ditiru aplikasi
+  personal-finance lain, karena mereka tidak punya *alasan* domain untuk
+  membangunnya.
 
 Ringkasnya: kedalaman potensi diferensiasi account-type bukan soal
-*berapa banyak* tipe yang selesai, tapi **tipe mana** yang selesai.
+*berapa banyak* tipe yang selesai, tapi **tipe mana** yang selesai —
+dan untuk `investment`, diferensiasinya ada di pola arsitekturnya yang
+terbukti bertahan untuk tipe non-trivial, bukan di fitur itu sendiri
+yang (dari sisi cakupan) masih sejajar aplikasi lain.
 
-Secara kematangan: baru 2 dari banyak tipe yang direncanakan sudah
-diimplementasikan (`cash`, `debt`) — kredit/investasi/valas belum ada
-sama sekali. Diferensiasinya ada di **arsitektur & niat desain**
-(tipe akun sebagai penggerak perilaku dengan jejak kebutuhan nyata di
-baliknya), bukan di cakupan tipe akun yang sudah jadi.
+Secara kematangan: 3 dari banyak tipe yang direncanakan sudah
+diimplementasikan (`cash`, `debt`, `investment`) — kredit/valas/advance/
+third_party belum ada sama sekali. Diferensiasinya ada di **arsitektur
+& niat desain** (tipe akun sebagai penggerak perilaku dengan jejak
+kebutuhan nyata di baliknya), bukan di cakupan tipe akun yang sudah jadi.
 
-**Batas klaim yang jujur perlu dipasang di sini**: kekokohan pola ini
-baru terbukti untuk 2 nilai, dan `debt` sendiri adalah akun *virtual*
-(bukan representasi uang riil) — jenis logic yang relatif sederhana
-(flag arah transfer). Belum ada bukti pola "gate lintas-fitur" ini tetap
-kokoh saat tipe ketiga yang jauh lebih kompleks (`investment`, dengan
-unit/harga/return, bukan cuma boolean-like) benar-benar dibangun. Sampai
-itu terjadi, ini masih **potensi arsitektur**, bukan pembuktian yang
-selesai — lihat pemetaan kedalaman per tipe kandidat di bagian
-"Potensi vs realita" di bawah.
+**Batas klaim yang jujur (direvisi 2026-10-06)**: pola ini sebelumnya
+baru terbukti untuk 2 nilai, dengan `debt` sebagai akun *virtual*
+berlogic relatif sederhana (flag arah transfer, boolean-like). Sekarang
+tipe ketiga (`investment`) sudah dibangun dan lolos smoke test manual —
+ini TIDAK lagi boolean-like: melibatkan riwayat per-lot dengan lifecycle
+status sendiri, nilai turunan (Unrealized P/L) yang harus dijaga tidak
+pernah bocor ke saldo akun, dan field opsional-jadi-wajib bersyarat
+status (`pending`/`settled`). Gate `account_type` tetap kokoh menghadapi
+kompleksitas ini tanpa perlu restrukturisasi pola yang sudah ada untuk
+`cash`/`debt` — jadi klaim "pola gate lintas-fitur kokoh untuk tipe
+kompleks" sekarang punya **satu bukti nyata**, bukan lagi murni potensi
+arsitektur yang tertunda. Catatan: penjualan/penarikan sebagian investasi
+(FIFO vs average cost, realized gain/loss) masih **disepakati secara
+konsep tapi belum diimplementasikan** (lihat `konsep-investasi.md`) —
+jadi klaim ini soal pembelian/pencatatan posisi, belum menyentuh
+kompleksitas transaksi dua arah pada tipe yang sama.
 
 Detail lengkap: `apps/desktop/docs/todos/plan/account-type.md`.
 
@@ -293,9 +329,10 @@ kelompok aplikasi ini secara umum:
   seperti di `financial-app`. Perlu dicatat: aplikasi kelas
   menengah-atas (mis. yang sudah dukung akun kartu kredit dengan limit &
   jatuh tempo secara matang) kemungkinan justru **lebih unggul** dari
-  sisi cakupan tipe akun yang sudah jadi — `financial-app` baru punya 2
-  tipe berjalan (`cash`, `debt`), diferensiasinya di niat arsitektur,
-  bukan cakupan fitur saat ini.
+  sisi cakupan tipe akun yang sudah jadi — `financial-app` baru punya 3
+  tipe berjalan (`cash`, `debt`, `investment`), diferensiasinya di niat
+  arsitektur & pola yang terbukti kokoh lintas tipe, bukan cakupan fitur
+  saat ini (kredit/valas/advance/dana titipan masih belum ada).
 - **Sync dari sistem bisnis pihak ketiga (Retailku)** — ini kasus
   penggunaan yang sangat spesifik (pemilik usaha kecil yang juga pakai
   POS/akuntansi bisnis terpisah) dan kemungkinan besar tidak ada

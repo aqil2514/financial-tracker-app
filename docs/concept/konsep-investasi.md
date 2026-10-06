@@ -1,6 +1,6 @@
 # Konsep Investasi di Aplikasi Ini
 
-> Status: BARU DISEPAKATI secara konsep (2026-10-06), BELUM diimplementasikan. Dicatat sebelum kode ditulis, sesuai disiplin "diskusikan dulu" di [konsep-tipe-akun.md](konsep-tipe-akun.md) bagian penutup. Model di dokumen ini adalah revisi total dari draf pertama (modal + nilai terkini sebagai dua angka manual) — draf pertama diganti total karena ternyata dibutuhkan juga pelacakan unit dan riwayat pembelian, bukan sekadar dua angka agregat.
+> Status: pencatatan pembelian (modal, unit, harga per unit, settlement, nilai pasar manual, Unrealized P/L) SUDAH diimplementasikan dan lolos smoke test manual. Bagian "Penjualan/penarikan sebagian" di bawah SUDAH disepakati secara konsep (2026-10-06) tapi BELUM diimplementasikan — dicatat dulu sebelum kode ditulis, sesuai disiplin "diskusikan dulu" di [konsep-tipe-akun.md](konsep-tipe-akun.md) bagian penutup. Model di dokumen ini adalah revisi total dari draf pertama (modal + nilai terkini sebagai dua angka manual) — draf pertama diganti total karena ternyata dibutuhkan juga pelacakan unit dan riwayat pembelian, bukan sekadar dua angka agregat.
 
 ## Satu akun investasi = satu instrumen, bukan portofolio gabungan
 
@@ -72,18 +72,53 @@ Unrealized P/L, sesuai namanya, memang belum final — baru jadi peristiwa riil 
 
 Supaya konsisten dengan prinsip "laporan menampilkan angka apa adanya" ([konsep-tipe-akun.md](konsep-tipe-akun.md)) dan tidak diam-diam mencampur dua basis penilaian berbeda, agregat total kekayaan (dashboard, laporan Per Tipe Akun, dst) TETAP menjumlah `accounts.balance` untuk SEMUA tipe akun termasuk Investasi — bukan nilai pasar terkini. Nilai pasar terkini dan Unrealized P/L ditampilkan sebagai info tambahan di samping (misalnya di detail akun atau kartu ringkasan investasi), bukan ikut masuk ke angka SUM total.
 
-## Pertanyaan terbuka: penjualan/penarikan sebagian
+## Penjualan/penarikan sebagian (disepakati 2026-10-06, BELUM diimplementasikan)
 
-Begitu ada riwayat pembelian per-lot (unit + harga beli masing-masing), penarikan sebagian dari akun investasi (transfer investment → kas) memunculkan pertanyaan akuntansi yang SENGAJA belum dijawab di dokumen ini:
+Setelah modal pembelian terbukti cukup lewat pemakaian nyata (smoke test, tanpa bug ditemukan), pertanyaan yang sebelumnya ditunda di bawah ini sudah dijawab secara konsep. Belum ada satu baris kode pun untuk bagian ini — dicatat dulu sebelum implementasi, sesuai disiplin "diskusikan dulu" di [konsep-tipe-akun.md](konsep-tipe-akun.md) bagian penutup.
 
-- Unit mana yang dianggap "terjual" saat penarikan sebagian — FIFO (lot tertua duluan, pola yang sudah dipakai pelunasan piutang di [konsep-utang-piutang.md](konsep-utang-piutang.md)), rata-rata harga beli (average cost), atau dipilih manual oleh user?
-- Apakah penarikan sebagian ini perlu mencatat **realized gain/loss** (selisih harga jual vs harga beli lot yang terjual) sebagai informasi terpisah dari Unrealized P/L di atas?
-- Apakah penarikan sebagian WAJIB juga mengisi field unit+harga (simetris dengan pembelian), atau boleh berbeda perlakuan?
+### Cost basis: average cost, bukan FIFO atau manual
 
-Ini BUKAN diputuskan "tidak penting" — sekadar ditunda sampai modal pembelian (bagian di atas) terbukti cukup lewat pemakaian nyata, sebelum menambah lapisan kompleksitas lebih jauh. Didiskusikan dulu sebelum diimplementasikan, sesuai disiplin yang digariskan di [konsep-tipe-akun.md](konsep-tipe-akun.md) bagian penutup.
+Unit yang "terjual" saat penarikan sebagian dihitung berbasis **average cost**, BUKAN FIFO (lot tertua duluan) dan BUKAN pemilihan lot manual oleh user. Average cost per unit = `SUM(unit × price_per_unit) / SUM(unit)` dari seluruh baris `investment_purchases` berstatus `settled` milik akun ini — satu angka rata-rata yang dipakai untuk SEMUA unit yang dijual, tidak peduli dari transaksi beli mana asalnya.
+
+Alasan memilih average cost: instrumen yang realistis dicatat di aplikasi ini (reksadana, saham, emas, kripto) pada praktiknya memang dilacak dengan average cost oleh platform/broker aslinya (mis. aplikasi reksadana, sekuritas lokal) — bukan per-lot seperti yang dibutuhkan untuk pelaporan pajak capital gain di beberapa negara lain. FIFO yang sudah dipakai untuk pelunasan piutang ([konsep-utang-piutang.md](konsep-utang-piutang.md)) TIDAK dipakai di sini karena konteksnya berbeda — piutang per kontak punya identitas transaksi yang jelas harus dilunasi urut, sedangkan unit investasi fungible (satu lembar saham X tidak bisa dibedakan dari lembar saham X lainnya yang dibeli di harga berbeda).
+
+### Realized gain/loss dicatat sebagai info terpisah dari Unrealized P/L
+
+Saat transaksi jual dibuat, dihitung dan disimpan **Realized P/L** untuk transaksi itu:
+
+```
+realized_pl = (harga_jual_per_unit − average_cost_per_unit_saat_itu) × unit_terjual
+```
+
+Ini angka yang SUDAH final/tidak mengambang lagi (beda dari Unrealized P/L yang masih bisa berubah tiap update `current_market_value`) — ditampilkan di riwayat transaksi/pembelian sebagai info tambahan per baris jual, TIDAK ikut campur ke hitungan Unrealized P/L akun yang masih berjalan (Unrealized P/L tetap murni `current_market_value − balance` yang tersisa, lihat bagian di atas).
+
+### Input jual: unit + harga jual per unit, simetris dengan beli
+
+Form jual investasi (investment → cash) butuh field yang SAMA dengan form beli: jumlah unit yang dijual, dan harga jual per unit saat itu (termasuk toggle Satuan/Total yang sudah ada di form beli). Nominal transaksi (uang masuk ke kas) = `unit × harga_jual_per_unit`, dihitung otomatis seperti pola beli.
+
+### Efek ke `accounts.balance`: average cost, bukan nominal uang yang diterima
+
+Ini titik paling krusial yang membedakan jual dari transaksi transfer biasa — `accounts.balance` akun investasi dikurangi sebesar:
+
+```
+pengurangan_balance = average_cost_per_unit × unit_terjual
+```
+
+**BUKAN** sebesar nominal uang yang benar-benar diterima dari penjualan. Selisih antara nominal jual dan pengurangan balance inilah yang jadi Realized P/L di atas. Ini konsisten dengan prinsip "`balance` = modal murni dari kas" (bagian "Modal tetap dari saldo akun" di atas) — kalau balance dikurangi sebesar nominal jual (yang sudah termasuk untung/rugi), balance jadi tercampur dua basis (modal + P/L), persis masalah yang sudah dihindari untuk `current_market_value`.
+
+Konsekuensi: `accounts.balance` TIDAK bisa dikurangi langsung dari nominal transaksi seperti transfer biasa — perlu logic khusus (mirip `applyInvestmentTransaction` untuk arah beli) yang menghitung average cost dulu, lalu mengurangi balance sebesar `average_cost × unit`, BUKAN sebesar nominal transfer. Nominal transfer tetap yang masuk ke `transactions` (untuk cashflow/laporan transaksi biasa), tapi efeknya ke `accounts.balance` akun investasi berbeda dari nominal itu sendiri — pola baru yang belum ada presedennya di tipe akun lain.
+
+### Validasi: cegah oversell
+
+Jual yang melebihi total unit yang dimiliki (`SUM(unit)` dari `investment_purchases` berstatus `settled`) harus ditolak di titik input — berbeda dari filosofi "tidak menghakimi data" yang dipakai untuk unit/harga saat beli (lihat bagian "Unit dan harga per unit" di atas), karena oversell di sini bukan cuma estimasi yang boleh beda dari realita, tapi representasi matematis yang tidak mungkin valid (tidak bisa menjual lebih dari yang dipegang).
+
+### Yang masih belum diputuskan
+
+- Skema tabel pasti (kolom baru di `investment_purchases` dengan `unit`/`price_per_unit` negatif untuk transaksi jual? atau tabel baru `investment_sales`? atau field `realized_pl` ditambahkan ke `investment_purchases` yang sudah ada?) — baru dibahas secara konsep/behavior, bukan skema, saat implementasi nanti perlu diputuskan dulu mana yang paling pas dengan pola migration copy-and-rename yang sudah ada.
+- Apakah `classifyAccountPair` ([shared/debts/classify-account-pair.ts](../../apps/desktop/src/shared/debts/classify-account-pair.ts)) perlu varian baru `investment-cash` (arah jual) di samping `cash-investment` (arah beli) yang sudah ada, atau direction dideteksi dari akun asal/tujuan saja.
+- UI breakdown "unit tersisa" dan average cost saat ini perlu ditampilkan di form jual (supaya user tahu batas maksimal sebelum submit, bukan cuma ditolak setelah submit).
 
 ## Yang SENGAJA belum didukung
 
 - **Harga pasar otomatis** (API/live price) — `current_market_value` murni manual, tidak ada integrasi harga real-time.
-- **FIFO/average cost saat penjualan, dan realized gain/loss** — lihat "Pertanyaan terbuka" di atas.
-- **Validasi unit × harga vs nominal transfer** — sengaja tidak divalidasi, lihat bagian "Unit dan harga per unit" di atas.
+- **Validasi unit × harga vs nominal transfer SAAT BELI** — sengaja tidak divalidasi, lihat bagian "Unit dan harga per unit" di atas (beli tetap longgar, beda dari jual yang divalidasi cegah oversell).
