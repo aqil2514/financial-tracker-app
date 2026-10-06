@@ -87,25 +87,41 @@ export function AccountTypeSection() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              {chartData.map((row) => (
-                <Card key={row.account_type}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-sm font-normal">
-                      <span
-                        className="size-2.5 rounded-full"
-                        style={{ backgroundColor: row.color }}
-                      />
-                      <span className="text-muted-foreground">{row.label}</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-semibold">{formatCurrency(row.total, "IDR")}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {row.percent.toFixed(0)}% dari total
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+              {chartData.map((row) => {
+                // Unrealized P/L cuma relevan utk tipe investment (lihat
+                // use-balances-by-account-type.ts) -- MURNI informasional,
+                // TIDAK pernah ikut ke `row.total`/pie chart (prinsip
+                // "agregat kekayaan tetap berbasis modal", lihat
+                // docs/concept/konsep-investasi.md).
+                const pl = row.total_market_value != null ? row.total_market_value - row.total : null;
+                const plColor = pl != null && pl >= 0 ? "text-green-600" : "text-red-600";
+
+                return (
+                  <Card key={row.account_type}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-sm font-normal">
+                        <span
+                          className="size-2.5 rounded-full"
+                          style={{ backgroundColor: row.color }}
+                        />
+                        <span className="text-muted-foreground">{row.label}</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-2xl font-semibold">{formatCurrency(row.total, "IDR")}</p>
+                      <p className="text-muted-foreground text-sm">
+                        {row.percent.toFixed(0)}% dari total
+                      </p>
+                      {pl != null && (
+                        <p className={`mt-1 text-sm ${plColor}`}>
+                          Unrealized P/L: {pl >= 0 ? "+" : ""}
+                          {formatCurrency(pl, "IDR")}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </>
         )}

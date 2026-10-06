@@ -2,8 +2,9 @@
 
 import type { UseFormReturn } from "react-hook-form";
 
-import { FormFieldNumber, FormFieldToggleGroup } from "@/components/forms/form-fields";
+import { FormFieldToggleGroup } from "@/components/forms/form-fields";
 import { PricePerUnitField } from "@/shared/investments/price-per-unit-field";
+import { UnitAmountField } from "@/shared/investments/unit-amount-field";
 import type { TransactionFormOutput, TransactionFormValues } from "../schema";
 
 type InvestmentFieldsProps = {
@@ -44,12 +45,7 @@ export function InvestmentFields({ form }: InvestmentFieldsProps) {
           { value: "settled", label: "Settled" },
         ]}
       />
-      <FormFieldNumber
-        form={form}
-        name="unit"
-        label={isSettled ? "Jumlah Unit" : "Jumlah Unit (opsional)"}
-        placeholder={isSettled ? "Mis. 66.67" : "Mis. 66.67 — kosongkan kalau belum tahu"}
-      />
+      <UnitAmountField form={form} name="unit" optional={!isSettled} />
       <PricePerUnitField form={form} name="price_per_unit" unitFieldName="unit" optional={!isSettled} />
     </div>
   );

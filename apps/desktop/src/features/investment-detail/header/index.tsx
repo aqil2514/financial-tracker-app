@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, InfoIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatCurrency } from "@/lib/format-currency";
 import { AccountEditDialog } from "@/features/accounts";
 import { NewInvestmentPurchaseDialog } from "@/shared/investments/new-purchase-form/new-investment-purchase-dialog";
@@ -28,19 +29,41 @@ export function InvestmentDetailHeader() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={account.name}
-        description={`Modal: ${formatCurrency(account.balance, "IDR")}`}
-        actions={
-          <div className="flex items-center gap-2">
-            {account.group_name && <Badge variant="secondary">{account.group_name}</Badge>}
-            {!account.is_active && <Badge variant="outline">Nonaktif</Badge>}
-            <NewInvestmentPurchaseDialog investmentAccountId={account.id} />
-            <AccountEditDialog account={account} />
-            <BackButton onClick={() => router.back()} />
-          </div>
-        }
-      />
+      <div className="space-y-1">
+        <PageHeader
+          title={account.name}
+          actions={
+            <div className="flex items-center gap-2">
+              {account.group_name && <Badge variant="secondary">{account.group_name}</Badge>}
+              {!account.is_active && <Badge variant="outline">Nonaktif</Badge>}
+              <NewInvestmentPurchaseDialog investmentAccountId={account.id} />
+              <AccountEditDialog account={account} />
+              <BackButton onClick={() => router.back()} />
+            </div>
+          }
+        />
+        <div className="flex items-center gap-1">
+          <p className="text-muted-foreground text-sm">Modal: {formatCurrency(account.balance, "IDR")}</p>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Penjelasan modal"
+                />
+              }
+            >
+              <InfoIcon className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs">
+              Total uang yang ditanamkan lewat transfer kas ke akun ini (saldo akun, accounts.balance) —
+              BUKAN nilai pasar terkini. Sama seperti saldo akun tipe lain, dihitung dari saldo awal +
+              transfer masuk/keluar, TIDAK terpengaruh update nilai pasar.
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
       <InvestmentPlStats accountId={account.id} balance={account.balance} />
     </div>
   );

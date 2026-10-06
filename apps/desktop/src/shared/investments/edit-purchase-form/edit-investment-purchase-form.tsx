@@ -4,8 +4,9 @@ import type { UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
-import { FormFieldNumber, FormFieldSelect } from "@/components/forms/form-fields";
+import { FormFieldSelect } from "@/components/forms/form-fields";
 import { PricePerUnitField } from "../price-per-unit-field";
+import { UnitAmountField } from "../unit-amount-field";
 import { PURCHASE_STATUS_LABEL } from "../purchase-status-labels";
 import type { EditInvestmentPurchaseFormOutput, EditInvestmentPurchaseFormValues } from "./schema";
 
@@ -23,12 +24,7 @@ const STATUS_OPTIONS = Object.entries(PURCHASE_STATUS_LABEL).map(([value, label]
 export function EditInvestmentPurchaseForm({ form, onSubmit, isPending }: EditInvestmentPurchaseFormProps) {
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <FormFieldNumber
-        form={form}
-        name="unit"
-        label="Jumlah Unit (opsional)"
-        placeholder="Kosongkan kalau belum tahu"
-      />
+      <UnitAmountField form={form} name="unit" />
       <PricePerUnitField form={form} name="price_per_unit" unitFieldName="unit" />
       <FormFieldSelect form={form} name="status" label="Status" options={STATUS_OPTIONS} />
       <DialogFooter>

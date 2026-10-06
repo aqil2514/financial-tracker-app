@@ -72,7 +72,13 @@ export function PricePerUnitField<TFieldValues extends FieldValues>({
               // yang salah makna, biarkan field.value tidak berubah.
               return;
             }
-            field.onChange(parsed / unitValue);
+            // Dibulatkan ke 2 desimal -- tanpa ini, hasil pembagian floating
+            // point bisa tersimpan dgn presisi 13+ digit (mis.
+            // 1311.80228515958) yang tidak pernah bisa diketik ulang persis
+            // sama oleh user, dan janggal ditampilkan di UI. 2 desimal
+            // cukup presisi untuk harga Rupiah per unit (konsisten dgn
+            // `decimalsLimit={2}` di CurrencyInput itu sendiri).
+            field.onChange(Math.round((parsed / unitValue) * 100) / 100);
             return;
           }
           field.onChange(parsed);

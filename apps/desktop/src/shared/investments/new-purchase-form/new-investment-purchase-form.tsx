@@ -8,12 +8,12 @@ import {
   FormFieldCombobox,
   FormFieldCurrency,
   FormFieldDate,
-  FormFieldNumber,
   FormFieldText,
   FormFieldToggleGroup,
 } from "@/components/forms/form-fields";
 import { useAccounts } from "@/features/accounts";
 import { PricePerUnitField } from "@/shared/investments/price-per-unit-field";
+import { UnitAmountField } from "@/shared/investments/unit-amount-field";
 import type { NewInvestmentPurchaseFormOutput, NewInvestmentPurchaseFormValues } from "./schema";
 
 type NewInvestmentPurchaseFormProps = {
@@ -90,12 +90,7 @@ export function NewInvestmentPurchaseForm({
         <FormFieldCurrency form={form} name="amount" label="Nominal" useCalculator />
         <p className="text-muted-foreground text-xs">Uang yang keluar dari akun kas saat ini.</p>
       </div>
-      <FormFieldNumber
-        form={form}
-        name="unit"
-        label={isSettled ? "Jumlah Unit" : "Jumlah Unit (opsional)"}
-        placeholder={isSettled ? "Mis. 66.67" : "Kosongkan kalau belum tahu"}
-      />
+      <UnitAmountField form={form} name="unit" optional={!isSettled} />
       <PricePerUnitField form={form} name="price_per_unit" unitFieldName="unit" optional={!isSettled} />
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
