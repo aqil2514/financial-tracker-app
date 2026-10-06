@@ -8,6 +8,8 @@ import { useContacts } from "@/shared/contacts/use-contacts";
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { useTransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
 import { applyDebtTransactionEdit } from "@/shared/debts/apply-debt-transaction";
+import { applyInvestmentTransactionEdit } from "@/shared/investments/apply-investment-transaction";
+import { useTransactionInvestmentPurchase } from "@/shared/investments/use-transaction-investment-purchase";
 import { transactionSchema, type TransactionFormOutput } from "../schema";
 import { pushOnWrite, pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-write";
 
@@ -29,6 +31,7 @@ export function useUpdateTransaction(
   const contactName =
     contacts?.find((contact) => contact.id === transaction.contact_id)?.name ?? null;
   const { data: debtStatus } = useTransactionDebtStatus(transaction.id);
+  const { data: investmentPurchase } = useTransactionInvestmentPurchase(transaction.id);
 
   return useEntityForm({
     schema: transactionSchema,
@@ -54,6 +57,8 @@ export function useUpdateTransaction(
       // DebtActionField begitu terdeteksi perlu).
       debt_action: null,
       settle_debt_ids: [],
+      unit: investmentPurchase?.unit ?? null,
+      price_per_unit: investmentPurchase?.price_per_unit ?? null,
     }),
     open,
     resetOnOpen: true,
@@ -119,6 +124,17 @@ export function useUpdateTransaction(
         settleDebtIds: values.settle_debt_ids,
         status: debtStatus,
         dangerousFieldsChanged,
+      });
+
+      await applyInvestmentTransactionEdit({
+        db,
+        transactionId: transaction.id,
+        type: values.type,
+        accountId,
+        transferAccountId,
+        date: values.date,
+        unit: values.unit,
+        pricePerUnit: values.price_per_unit,
       });
 
       void pushOnWrite("transactions", transaction.id);

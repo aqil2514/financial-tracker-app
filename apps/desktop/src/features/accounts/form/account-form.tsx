@@ -1,12 +1,13 @@
 "use client";
 
-import type { UseFormReturn } from "react-hook-form";
+import { useWatch, type UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
   FormFieldText,
   FormFieldCurrency,
+  FormFieldNumber,
   FormFieldSelect,
   FormFieldTextarea,
   FormFieldToggleGroup,
@@ -39,6 +40,7 @@ export function AccountForm({
   accountTypeLocked = false,
 }: AccountFormProps) {
   const { data: groups } = useAccountGroups();
+  const accountType = useWatch({ control: form.control, name: "account_type" });
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
@@ -85,6 +87,22 @@ export function AccountForm({
             : option.description,
         }))}
       />
+      {accountType === "investment" && (
+        <div className="grid grid-cols-2 gap-4">
+          <FormFieldText
+            form={form}
+            name="unit_label"
+            label="Satuan Unit"
+            placeholder="Mis. unit, lembar, gram"
+          />
+          <FormFieldNumber
+            form={form}
+            name="current_price_per_unit"
+            label="Harga per Unit saat ini"
+            placeholder="Mis. 1500"
+          />
+        </div>
+      )}
       <FormFieldToggleGroup
         form={form}
         name="is_active"

@@ -120,9 +120,11 @@ export async function applyDebtTransaction({
   // (use-transaction-debt-fields.ts), ini safety net.
   const pairKind = classifyAccountPair(sourceType, destinationType);
 
-  if (pairKind === "cash-cash" || pairKind === "debt-debt") {
-    // "kas -> kas" (bukan urusan debt) maupun "debt -> debt" (di luar
-    // scope, lihat dokumen desain) — tidak melakukan apa-apa.
+  if (pairKind === "cash-cash" || pairKind === "debt-debt" || pairKind === "cash-investment") {
+    // "kas -> kas" (bukan urusan debt), "debt -> debt" (di luar scope),
+    // maupun "cash -> investment" (urusan applyInvestmentTransaction,
+    // lihat apply-investment-transaction.ts) — tidak melakukan apa-apa
+    // di sini.
     return none;
   }
 

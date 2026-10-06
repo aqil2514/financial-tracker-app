@@ -10,8 +10,17 @@ import type { AccountType } from "@/lib/account-types";
  * Worker apps/worker/src/modules/debts/service.ts) — classifyAccountPair
  * throw UnsupportedAccountPairError utk kombinasi yang belum dikenal
  * daripada diam-diam disamakan dgn cash atau di-no-op-kan.
+ *
+ * `cash-investment` ditambahkan (bukan `investment-cash`/`investment-debt`/
+ * `investment-investment`) karena HANYA pembelian (kas -> investment) yang
+ * punya model data final (lihat docs/concept/konsep-investasi.md,
+ * "Unit dan harga per unit"). Penarikan/penjualan sebagian (investment ->
+ * cash) sengaja BELUM didukung — pertanyaan terbuka FIFO/average cost +
+ * realized gain/loss belum dijawab (lihat bagian "Pertanyaan terbuka" di
+ * dokumen itu) — kombinasi itu tetap throw UnsupportedAccountPairError
+ * sampai didiskusikan ulang, bukan diam-diam di-no-op-kan.
  */
-export type AccountPairKind = "cash-cash" | "cash-debt" | "debt-cash" | "debt-debt";
+export type AccountPairKind = "cash-cash" | "cash-debt" | "debt-cash" | "debt-debt" | "cash-investment";
 
 export class UnsupportedAccountPairError extends Error {
   constructor(sourceType: string, destinationType: string) {
@@ -31,5 +40,6 @@ export function classifyAccountPair(
   if (sourceType === "cash" && destinationType === "debt") return "cash-debt";
   if (sourceType === "debt" && destinationType === "cash") return "debt-cash";
   if (sourceType === "debt" && destinationType === "debt") return "debt-debt";
+  if (sourceType === "cash" && destinationType === "investment") return "cash-investment";
   throw new UnsupportedAccountPairError(sourceType, destinationType);
 }

@@ -19,6 +19,13 @@ export const transactionSchema = z
     /** Piutang (debts.id, sebagai string) yang dipilih untuk dilunasi —
      * cuma relevan saat debt_action === 'settlement'. */
     settle_debt_ids: z.array(z.string()),
+    /** Jumlah unit & harga per unit saat pembelian — WAJIB terisi hanya
+     * saat transfer tujuannya akun `investment` (lihat
+     * use-transaction-investment-fields.ts), null di luar kasus itu.
+     * SENGAJA tidak divalidasi terhadap `amount` (lihat
+     * docs/concept/konsep-investasi.md bagian "Unit dan harga per unit"). */
+    unit: z.coerce.number().nullable(),
+    price_per_unit: z.coerce.number().nullable(),
   })
   .superRefine((values, ctx) => {
     if (values.type === "transfer") {

@@ -9,6 +9,7 @@ import { isEmptyDoc } from "@/components/rich-text";
 import { saveAttachmentToTransaction } from "@/shared/attachments/use-add-attachment";
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
+import { applyInvestmentTransaction } from "@/shared/investments/apply-investment-transaction";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
 import { transactionSchema, type TransactionFormOutput } from "../schema";
@@ -67,6 +68,8 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
       contact_name: null,
       debt_action: null,
       settle_debt_ids: [],
+      unit: null,
+      price_per_unit: null,
     }),
     open,
     resetOnOpen: true,
@@ -109,6 +112,17 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
         date: values.date,
         debtAction: values.debt_action,
         settleDebtIds: values.settle_debt_ids,
+      });
+
+      await applyInvestmentTransaction({
+        db,
+        transactionId,
+        type: values.type,
+        accountId,
+        transferAccountId,
+        date: values.date,
+        unit: values.unit,
+        pricePerUnit: values.price_per_unit,
       });
 
       void pushOnWrite("transactions", transactionId);

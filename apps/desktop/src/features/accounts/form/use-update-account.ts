@@ -1,14 +1,19 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { getDb, type Account } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { accountSchema, type AccountFormOutput } from "./account.schema";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { isAccountInUse } from "./is-account-in-use";
+import { useInvestmentAccount } from "@/shared/investments/use-investment-account";
 
 export function useUpdateAccount(account: Account, onSuccess?: () => void) {
-  return useEntityForm({
+  const { data: investmentAccount } = useInvestmentAccount(account.id);
+
+  const entityForm = useEntityForm({
     schema: accountSchema,
     defaultValues: () => ({
       name: account.name,
@@ -19,6 +24,8 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
       account_type: account.account_type,
       icon: account.icon,
       color: account.color,
+      unit_label: investmentAccount?.unit_label ?? null,
+      current_price_per_unit: investmentAccount?.current_price_per_unit ?? null,
     }),
     resetOnOpen: true,
     onSuccess,
@@ -51,10 +58,49 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
           account.id,
         ]
       );
+      if (values.account_type === "investment") {
+        // Upsert manual (query dulu, lalu INSERT atau UPDATE) -- pola
+        // konsisten dgn konvensi app ini (lihat applyDebtTransactionEdit
+        // dkk), bukan ON CONFLICT yg belum ada precedent-nya di
+        // codebase. Akun bisa baru BERGANTI ke tipe investment di edit
+        // ini (belum pernah punya baris investment_accounts), atau sudah
+        // investment sejak awal (sekadar update unit_label/harga).
+        const existing = await db.select<{ account_id: string }[]>(
+          "SELECT account_id FROM investment_accounts WHERE account_id = $1",
+          [account.id]
+        );
+        if (existing.length > 0) {
+          await db.execute(
+            `UPDATE investment_accounts SET unit_label = $1, current_price_per_unit = $2, updated_at = datetime('now')
+             WHERE account_id = $3`,
+            [values.unit_label, values.current_price_per_unit, account.id]
+          );
+        } else {
+          await db.execute(
+            "INSERT INTO investment_accounts (account_id, unit_label, current_price_per_unit) VALUES ($1, $2, $3)",
+            [account.id, values.unit_label, values.current_price_per_unit]
+          );
+        }
+      }
       void pushOnWrite("accounts", account.id);
     },
     invalidateKey: QUERY_DEPENDENCIES.accounts,
     successMessage: "Akun berhasil diperbarui",
     errorMessage: "Gagal memperbarui akun",
   });
+
+  // useEntityForm's defaultValues() dipanggil SINKRON saat form mount/
+  // resetOnOpen -- di titik itu useInvestmentAccount (query async) biasa
+  // BELUM selesai fetch, jadi unit_label/current_price_per_unit ikut
+  // ter-reset ke null walau datanya sebenarnya ada. Effect ini push
+  // ulang nilai begitu query selesai, TANPA form.reset() penuh (supaya
+  // tidak menimpa field lain yang mungkin sudah diubah user duluan).
+  useEffect(() => {
+    if (investmentAccount == null) return;
+    entityForm.form.setValue("unit_label", investmentAccount.unit_label);
+    entityForm.form.setValue("current_price_per_unit", investmentAccount.current_price_per_unit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reaksi ke data query saja, form stabil lewat closure
+  }, [investmentAccount]);
+
+  return entityForm;
 }

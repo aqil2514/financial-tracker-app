@@ -7,6 +7,7 @@ import { useDbMutation } from "@/hooks/use-db-mutation";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { pushDeleteTransactionOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { detachDebtForDeletedTransaction, type DeletedTransactionDebtInfo } from "@/shared/debts/apply-debt-transaction";
+import { detachInvestmentPurchaseForDeletedTransaction } from "@/shared/investments/apply-investment-transaction";
 
 // Pesan informatif SETELAH delete berhasil -- dialog konfirmasi tetap
 // generik ("Hapus transaksi ini?"), toast tambahan ini muncul begitu
@@ -37,6 +38,11 @@ export function useDeleteTransaction() {
 
       const db = await getDb();
       const debtInfo = await detachDebtForDeletedTransaction(db, id);
+      // Beda dari debts (transaction_id SET NULL, principal tetap ada) --
+      // investment_purchases TIDAK punya makna tanpa transaksi asalnya
+      // (bukan tumpuan accounts.balance), jadi dihapus total alih-alih
+      // dibiarkan yatim. Lihat apply-investment-transaction.ts.
+      await detachInvestmentPurchaseForDeletedTransaction(db, id);
       await db.execute("DELETE FROM transactions WHERE id = $1", [id]);
 
       return debtInfo;

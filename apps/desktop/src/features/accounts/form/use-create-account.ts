@@ -32,6 +32,8 @@ export function useCreateAccount(options: UseCreateAccountOptions = {}) {
       account_type: "cash" as const,
       icon: null,
       color: DEFAULT_ACCOUNT_COLOR,
+      unit_label: null,
+      current_price_per_unit: null,
     }),
     resetOnOpen: true,
     mutationFn: async (values: AccountFormOutput) => {
@@ -51,6 +53,12 @@ export function useCreateAccount(options: UseCreateAccountOptions = {}) {
           values.color,
         ]
       );
+      if (values.account_type === "investment") {
+        await db.execute(
+          "INSERT INTO investment_accounts (account_id, unit_label, current_price_per_unit) VALUES ($1, $2, $3)",
+          [id, values.unit_label, values.current_price_per_unit]
+        );
+      }
       void pushOnWrite("accounts", id);
       return id;
     },

@@ -228,14 +228,16 @@ describe("applyDebtTransaction", () => {
     expect(debts).toHaveLength(0);
   });
 
-  it("melempar UnsupportedAccountPairError untuk kombinasi tipe akun di luar cash/debt", async () => {
-    // Tipe fiktif "investment" -- simulasi tipe akun ketiga yang belum
+  it("melempar UnsupportedAccountPairError untuk kombinasi tipe akun di luar cash/debt/cash-investment", async () => {
+    // Tipe fiktif "forex" -- simulasi tipe akun keempat yang belum
     // ditambahkan ke union account_type sungguhan (lihat
     // classify-account-pair.ts dan audit-kepatuhan-konsep-tipe-akun.md
     // pertanyaan #4: kombinasi tak dikenal harus fail loud, bukan
-    // diam-diam dianggap no-op/cash).
-    const investmentAccount = { id: "inv-1", account_type: "investment" } as unknown as AccountRow;
-    const { db } = createFakeDb({ accounts: [CASH_ACCOUNT, investmentAccount] });
+    // diam-diam dianggap no-op/cash). "investment" TIDAK dipakai lagi di
+    // sini sejak tipe itu benar-benar ditambahkan (sekarang varian valid
+    // cash-investment, ditangani apply-investment-transaction.ts).
+    const forexAccount = { id: "forex-1", account_type: "forex" } as unknown as AccountRow;
+    const { db } = createFakeDb({ accounts: [CASH_ACCOUNT, forexAccount] });
 
     await expect(
       applyDebtTransaction({
@@ -243,7 +245,7 @@ describe("applyDebtTransaction", () => {
         transactionId: "tx-1",
         type: "transfer",
         accountId: "cash-1",
-        transferAccountId: "inv-1",
+        transferAccountId: "forex-1",
         contactId: null,
         amount: 1000,
         date: "2026-01-01",
@@ -251,6 +253,29 @@ describe("applyDebtTransaction", () => {
         settleDebtIds: [],
       })
     ).rejects.toThrow(/belum didukung/);
+  });
+
+  it("tidak melakukan apa pun (no-op) untuk transfer cash -> investment", async () => {
+    // cash-investment adalah urusan apply-investment-transaction.ts, BUKAN
+    // apply-debt-transaction.ts -- lihat komentar pairKind di
+    // apply-debt-transaction.ts.
+    const investmentAccount = { id: "inv-1", account_type: "investment" } as unknown as AccountRow;
+    const { db } = createFakeDb({ accounts: [CASH_ACCOUNT, investmentAccount] });
+
+    const result = await applyDebtTransaction({
+      db: db as never,
+      transactionId: "tx-1",
+      type: "transfer",
+      accountId: "cash-1",
+      transferAccountId: "inv-1",
+      contactId: null,
+      amount: 1000,
+      date: "2026-01-01",
+      debtAction: null,
+      settleDebtIds: [],
+    });
+
+    expect(result).toEqual({ debtIds: [], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] });
   });
 
   it("tidak melakukan apa pun untuk transfer debt ke debt", async () => {

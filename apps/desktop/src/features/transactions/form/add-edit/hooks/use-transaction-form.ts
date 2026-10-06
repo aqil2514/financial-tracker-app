@@ -8,6 +8,7 @@ import { useCategories } from "@/features/categories";
 import { useContacts } from "@/shared/contacts/use-contacts";
 import { useAccountCategoryOptions } from "./use-account-category-options";
 import { useTransactionDebtFields } from "./use-transaction-debt-fields";
+import { useTransactionInvestmentFields } from "./use-transaction-investment-fields";
 import type { TransactionFormOutput, TransactionFormValues } from "../schema";
 
 type UseTransactionFormParams = {
@@ -89,6 +90,12 @@ export function useTransactionForm({
       destinationAccountType: destinationAccount?.account_type,
     });
 
+  const { needsInvestmentFields, validateInvestmentFields } = useTransactionInvestmentFields({
+    type,
+    sourceAccountType: sourceAccount?.account_type,
+    destinationAccountType: destinationAccount?.account_type,
+  });
+
   const { accountOptions, categoryOptions, renderAccountOption } = useAccountCategoryOptions({
     accounts,
     categories,
@@ -98,8 +105,12 @@ export function useTransactionForm({
     categoryId,
   });
 
+  function validateAllFields(values: TransactionFormOutput): string | null {
+    return validateDebtFields(values) ?? validateInvestmentFields(values);
+  }
+
   function handleSubmit(values: TransactionFormOutput) {
-    const error = validateDebtFields(values);
+    const error = validateAllFields(values);
     if (error) {
       form.setError(needsDebtAction && values.debt_action ? "settle_debt_ids" : "contact_name", {
         message: error,
@@ -110,7 +121,7 @@ export function useTransactionForm({
   }
 
   function handleSubmitAndContinue(values: TransactionFormOutput) {
-    const error = validateDebtFields(values);
+    const error = validateAllFields(values);
     if (error) {
       form.setError(needsDebtAction && values.debt_action ? "settle_debt_ids" : "contact_name", {
         message: error,
@@ -126,6 +137,7 @@ export function useTransactionForm({
     involvesDebtAccount,
     debtFieldsLocked,
     needsDebtAction,
+    needsInvestmentFields,
     accountOptions,
     categoryOptions,
     renderAccountOption,

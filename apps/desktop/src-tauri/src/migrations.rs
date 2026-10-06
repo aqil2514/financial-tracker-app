@@ -206,6 +206,18 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0034_cloud_sync_queue_debts.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 35,
+            description: "account_type_investment",
+            sql: include_str!("../migrations/0035_account_type_investment.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 36,
+            description: "investment_accounts_and_purchases",
+            sql: include_str!("../migrations/0036_investment_accounts_and_purchases.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -334,5 +346,30 @@ mod tests {
             ",
         )
         .expect("insert ke rantai FK accounts->transactions->debts->debt_payments gagal");
+    }
+
+    // Migrasi 0035/0036: 'investment' harus diterima di CHECK
+    // accounts.account_type, dan investment_accounts/investment_purchases
+    // harus bisa di-insert dgn FK ke accounts/transactions -- regresi
+    // sejenis 0022 kalau salah satu tabel dalam rantai FK accounts lupa
+    // ikut di-rebuild saat CHECK diubah.
+    #[test]
+    fn insert_akun_investment_dan_riwayat_pembelian_tidak_gagal() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        conn.execute_batch(
+            "
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-inv-1', 'Reksadana Test', 'investment');
+            INSERT INTO investment_accounts (account_id, unit_label, current_price_per_unit)
+                VALUES ('acc-inv-1', 'unit', 1500.0);
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-cash-1', 'Kas Test', 'cash');
+            INSERT INTO transactions (id, type, amount, account_id, transfer_account_id, note, date)
+                VALUES ('tx-inv-1', 'transfer', 100000, 'acc-cash-1', 'acc-inv-1', 'beli reksadana', '2026-01-01');
+            INSERT INTO investment_purchases (id, account_id, transaction_id, unit, price_per_unit, date, status)
+                VALUES ('ip-1', 'acc-inv-1', 'tx-inv-1', 66.67, 1500.0, '2026-01-01', 'pending');
+            ",
+        )
+        .expect("insert akun investment + investment_purchases gagal");
     }
 }

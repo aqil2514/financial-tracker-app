@@ -66,6 +66,8 @@ export function AccountEditDialog({
       title="Edit Akun"
       open={isControlled ? controlledOpen : open}
       onOpenChange={handleOpenChange}
+      contentClassName="max-h-[85vh]"
+      scrollBody
     >
       <AccountForm
         form={form}

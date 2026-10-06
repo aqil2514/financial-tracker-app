@@ -26,6 +26,7 @@ import { ContactField } from "./fields/contact-field";
 import { useTransactionForm } from "./hooks/use-transaction-form";
 import type { TransactionFormOutput, TransactionFormValues } from "./schema";
 import { DebtActionField } from "./fields/debt-action-field";
+import { InvestmentFields } from "./fields/investment-fields";
 
 type TransactionFormProps = {
   form: UseFormReturn<TransactionFormValues, unknown, TransactionFormOutput>;
@@ -62,6 +63,7 @@ export function TransactionForm({
     involvesDebtAccount,
     debtFieldsLocked,
     needsDebtAction,
+    needsInvestmentFields,
     accountOptions,
     categoryOptions,
     renderAccountOption,
@@ -197,6 +199,7 @@ export function TransactionForm({
                 debtStatus={debtStatus}
               />
             )}
+            {needsInvestmentFields && <InvestmentFields form={form} />}
             <FormFieldDate form={form} name="date" label="Tanggal" />
           </div>
 

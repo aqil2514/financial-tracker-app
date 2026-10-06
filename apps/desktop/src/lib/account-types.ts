@@ -6,9 +6,9 @@
  * constraint (migrations/0013_account_type.sql) tetap butuh migrasi
  * baru sendiri — tidak bisa di-reuse dari sini.
  */
-export type AccountType = "cash" | "debt";
+export type AccountType = "cash" | "debt" | "investment";
 
-export const ACCOUNT_TYPES = ["cash", "debt"] as const satisfies readonly AccountType[];
+export const ACCOUNT_TYPES = ["cash", "debt", "investment"] as const satisfies readonly AccountType[];
 
 export const ACCOUNT_TYPE_OPTIONS: Array<{
   value: AccountType;
@@ -24,5 +24,10 @@ export const ACCOUNT_TYPE_OPTIONS: Array<{
     value: "debt",
     label: "Utang Piutang",
     description: "Akun virtual untuk melacak pinjaman ke/dari orang lain — bukan uang sungguhan.",
+  },
+  {
+    value: "investment",
+    label: "Investasi",
+    description: "Satu instrumen investasi tunggal (reksadana, saham, dst) — melacak unit dan harga per unit",
   },
 ];
