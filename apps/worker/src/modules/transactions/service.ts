@@ -12,6 +12,11 @@ import {
   DebtEditBlockedError,
   type DeletedTransactionDebtInfo,
 } from "../debts/service";
+import {
+  applyInvestmentTransaction,
+  applyInvestmentTransactionEdit,
+  detachInvestmentPurchaseForDeletedTransaction,
+} from "../investments/service";
 import { resolveContactId } from "../contacts/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
@@ -227,6 +232,25 @@ async function createTransactionRow(
       settleDebtIds: payload.settleDebtIds ?? [],
       syncSource,
     });
+
+    // Logic pembelian investasi -- PEMILIK-nya modul investments, dipicu
+    // dari sini sama persis applyDebtTransaction di atas (lihat
+    // docs/todos/plan/investment-sync.md Tahap 2). syncSource !== 'pc'
+    // sama alasannya: transaksi dari PC SUDAH punya baris
+    // investment_purchases sendiri (apply-investment-transaction.ts
+    // lokal, dipush terpisah ke /investments/purchases/push) -- derivasi
+    // Worker di sini KHUSUS utk transaksi yg TIDAK py padanan lokal (MCP).
+    await applyInvestmentTransaction(env, {
+      transactionId: payload.id,
+      type: payload.type,
+      accountId: payload.accountId,
+      transferAccountId: payload.transferAccountId ?? null,
+      date: payload.date,
+      unit: payload.unit ?? null,
+      pricePerUnit: payload.pricePerUnit ?? null,
+      status: payload.investmentStatus,
+      syncSource,
+    });
   }
 
   return { status: "ok" };
@@ -423,6 +447,22 @@ async function updateTransactionRow(
       dangerousFieldsChanged: fieldsChanged,
     });
     if (result.status === "rejected") return result;
+
+    // Pola sama applyDebtEditAction di atas -- field unit/harga TIDAK
+    // divalidasi terhadap nominal (lihat applyInvestmentTransactionEdit),
+    // jadi tidak ada kasus "diblokir"/rejected utk investment, cukup
+    // panggil langsung tanpa cek hasil.
+    await applyInvestmentTransactionEdit(env, {
+      transactionId: id,
+      type: payload.type,
+      accountId: payload.accountId ?? "",
+      transferAccountId: payload.transferAccountId ?? null,
+      date: payload.date,
+      unit: payload.unit ?? null,
+      pricePerUnit: payload.pricePerUnit ?? null,
+      status: payload.investmentStatus,
+      syncSource,
+    });
   }
 
   return { status: "ok" };
@@ -448,6 +488,12 @@ export async function deleteTransaction(env: Env, id: string): Promise<DeleteTra
   // konsisten dgn pola "resolve debt dulu baru commit transaksi" di
   // updateTransactionRow.
   const debtInfo = await detachDebtForDeletedTransaction(env, id);
+  // Pola sama detachDebtForDeletedTransaction -- dipanggil TANPA guard
+  // syncSource (beda dari applyInvestmentTransaction/Edit yg hanya utk
+  // transaksi tanpa padanan lokal) krn fungsi ini CUMA soft-delete baris
+  // investment_purchases turunan, tidak menyentuh/menduplikasi apa pun
+  // yg desktop tulis sendiri -- aman dipanggil apa pun syncSource-nya.
+  await detachInvestmentPurchaseForDeletedTransaction(env, id);
 
   const now = nowText();
   await env.DB.prepare("UPDATE transactions SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")

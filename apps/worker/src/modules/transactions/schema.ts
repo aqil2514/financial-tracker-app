@@ -30,6 +30,15 @@ export type PushTransactionPayload = {
   // debts.id yang dipilih utk dilunasi, cuma dipakai saat
   // debtAction === 'settlement'.
   settleDebtIds?: string[];
+  // Hanya relevan saat type='transfer' DAN arah cash->investment (lahir
+  // baris investment_purchases) ATAU investment->cash (lahir baris
+  // investment_sales, BELUM diport ke Worker -- lihat
+  // docs/todos/plan/investment-sync.md Tahap 2). Opsional/nullable sama
+  // alasan dgn investment_purchases.unit/price_per_unit di desktop (order
+  // pending yg belum tahu nilai pasti).
+  unit?: number | null;
+  pricePerUnit?: number | null;
+  investmentStatus?: "pending" | "settled";
   // Provenance baris -- SAMA dgn kolom `source`/`source_ref` di PC
   // (0017_transaction_source.sql) & D1 (0001_initial.sql). Opsional:
   // tidak dikirim -> INSERT jatuh ke default kolom ('manual'/NULL),
@@ -63,6 +72,17 @@ function isValidAccountFields(v: Record<string, unknown>): boolean {
   return true;
 }
 
+// Dipakai isPushTransactionPayload & isPatchTransactionPayload -- bentuk
+// field investment sama persis di keduanya (unit/pricePerUnit nullable,
+// investmentStatus opsional), lihat komentar PushTransactionPayload.
+function isValidInvestmentFields(v: Record<string, unknown>): boolean {
+  return (
+    (v.unit === undefined || v.unit === null || typeof v.unit === "number") &&
+    (v.pricePerUnit === undefined || v.pricePerUnit === null || typeof v.pricePerUnit === "number") &&
+    (v.investmentStatus === undefined || v.investmentStatus === "pending" || v.investmentStatus === "settled")
+  );
+}
+
 export function isPushTransactionPayload(value: unknown): value is PushTransactionPayload {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -85,6 +105,7 @@ export function isPushTransactionPayload(value: unknown): value is PushTransacti
     debtActionValid &&
     settleDebtIdsValid &&
     contactNameValid &&
+    isValidInvestmentFields(v) &&
     isValidSourceFields(v) &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
@@ -115,6 +136,7 @@ export function isPatchTransactionPayload(value: unknown): value is PatchTransac
     debtActionValid &&
     settleDebtIdsValid &&
     contactNameValid &&
+    isValidInvestmentFields(v) &&
     isValidSourceFields(v) &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
