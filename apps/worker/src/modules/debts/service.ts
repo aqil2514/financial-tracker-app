@@ -222,9 +222,17 @@ export async function applyDebtTransaction(
   // di sini murni safety net, seharusnya tidak pernah tercapai.
   const pairKind = classifyAccountPair(sourceType, destinationType);
 
-  if (pairKind === "cash-cash" || pairKind === "debt-debt") {
+  if (
+    pairKind === "cash-cash" ||
+    pairKind === "debt-debt" ||
+    pairKind === "cash-investment" ||
+    pairKind === "investment-cash"
+  ) {
     // "kas -> kas" (bukan urusan debt) ATAU "debt -> debt" (di luar
-    // scope) -- tidak melakukan apa-apa.
+    // scope) ATAU pasangan investment (BUKAN urusan modul debts --
+    // modul investments/ terpisah yang jadi pemilik logic itu, lihat
+    // docs/todos/plan/investment-sync.md Tahap 2) -- tidak melakukan
+    // apa-apa DI SINI.
     return { status: "ok" };
   }
 
@@ -242,8 +250,9 @@ export async function applyDebtTransaction(
     return { status: "ok" };
   }
 
-  // pairKind === "debt-cash" (satu-satunya variant tersisa): butuh
-  // keputusan eksplisit dari caller.
+  // pairKind === "debt-cash" (satu-satunya variant tersisa setelah guard
+  // no-op di atas menyaring cash-cash/debt-debt/cash-investment/
+  // investment-cash): butuh keputusan eksplisit dari caller.
   if (debtAction === "payable") {
     await env.DB.prepare(
       `INSERT INTO debts
