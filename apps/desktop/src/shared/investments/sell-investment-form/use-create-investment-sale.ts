@@ -78,10 +78,6 @@ export function useCreateInvestmentSale(options: UseCreateInvestmentSaleOptions 
         );
       }
 
-      // investment_sales BELUM termasuk tabel yang disync cloud (sama
-      // pola investment_purchases, lihat apply-investment-transaction.ts)
-      // -- cuma transaksinya sendiri (+ transaksi penyesuaian P/L, kalau
-      // status settled) yang perlu di-push.
       const touched = await applySellInvestmentTransaction({
         db,
         transactionId,
@@ -96,6 +92,9 @@ export function useCreateInvestmentSale(options: UseCreateInvestmentSaleOptions 
       if (transactionId != null) void pushOnWrite("transactions", transactionId);
       if (touched.adjustmentTransactionId != null) {
         void pushOnWrite("transactions", touched.adjustmentTransactionId);
+      }
+      if (touched.investmentSaleIds[0]) {
+        void pushOnWrite("investment_sales", touched.investmentSaleIds[0]);
       }
 
       return touched.investmentSaleIds[0];

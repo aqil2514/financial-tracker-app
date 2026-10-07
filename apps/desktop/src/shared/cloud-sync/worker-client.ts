@@ -204,6 +204,55 @@ export function pushDebtPayment(creds: CloudSyncCredentials, payload: PushDebtPa
   return pushUpsert(creds, "/debts/payments/push", payload);
 }
 
+// Push baris investment_accounts/investment_purchases/investment_sales
+// yg PC SUDAH buat sendiri lewat apply-investment-transaction.ts/
+// apply-sell-investment-transaction.ts lokal -- upsert-by-id MURNI, pola
+// PERSIS pushDebt/pushDebtPayment (lihat
+// apps/worker/src/modules/investments/schema.ts).
+export type PushInvestmentAccountPayload = {
+  accountId: string;
+  unitLabel: string;
+  currentMarketValue: number;
+  updatedAt?: string;
+};
+
+export function pushInvestmentAccount(creds: CloudSyncCredentials, payload: PushInvestmentAccountPayload) {
+  return pushUpsert(creds, "/investments/accounts/push", payload);
+}
+
+export type PushInvestmentPurchasePayload = {
+  id: string;
+  accountId: string;
+  transactionId: string;
+  unit: number | null;
+  pricePerUnit: number | null;
+  date: string;
+  status?: "pending" | "settled";
+  updatedAt?: string;
+};
+
+export function pushInvestmentPurchase(creds: CloudSyncCredentials, payload: PushInvestmentPurchasePayload) {
+  return pushUpsert(creds, "/investments/purchases/push", payload);
+}
+
+export type PushInvestmentSalePayload = {
+  id: string;
+  accountId: string;
+  transactionId: string | null;
+  adjustmentTransactionId: string | null;
+  unit: number;
+  pricePerUnit: number;
+  averageCostPerUnit: number | null;
+  realizedPl: number | null;
+  date: string;
+  status?: "pending" | "settled";
+  updatedAt?: string;
+};
+
+export function pushInvestmentSale(creds: CloudSyncCredentials, payload: PushInvestmentSalePayload) {
+  return pushUpsert(creds, "/investments/sales/push", payload);
+}
+
 // --- Pull: GET /sync?since= ---
 // Bentuk response SAMA PERSIS dgn apps/worker/src/modules/sync/service.ts
 // (SyncResponse) -- camelCase, termasuk baris `deletedAt` terisi.
@@ -311,13 +360,24 @@ export type DeleteCloudPayload =
   // hapus lama, insert baru dgn id BARU) -- TANPA payload (beda skenario
   // dari delete transaksi, lihat deletePushedDebt di Worker service.ts).
   | { table: "debts" }
-  | { table: "debt_payments" };
+  | { table: "debt_payments" }
+  // Sejajar debts/debt_payments di atas -- soft-delete baris
+  // investment_purchases/investment_sales yg PC hapus lokal sbg bagian
+  // dari RECREATE (applyInvestmentTransactionEdit/
+  // applySellInvestmentTransactionEdit lokal). investment_accounts TIDAK
+  // perlu entry di sini -- baris itu TIDAK PERNAH direcreate (1:1 dgn
+  // accounts, dihapus hanya lewat DELETE /accounts yg Worker tangani via
+  // CASCADE di D1, bukan jalur push desktop).
+  | { table: "investment_purchases" }
+  | { table: "investment_sales" };
 
 const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
   account_groups: "/account-groups",
   accounts: "/accounts",
   categories: "/categories",
   contacts: "/contacts",
+  investment_purchases: "/investments/purchases/push",
+  investment_sales: "/investments/sales/push",
   transactions: "/transactions",
   debts: "/debts/push",
   debt_payments: "/debts/payments/push",

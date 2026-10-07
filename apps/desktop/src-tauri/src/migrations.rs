@@ -248,6 +248,12 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0041_investment_sales_nullable_realized_pl.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 42,
+            description: "investment_cloud_sync_columns",
+            sql: include_str!("../migrations/0042_investment_cloud_sync_columns.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -487,5 +493,97 @@ mod tests {
             ",
         )
         .expect("insert investment_sales pending dengan kolom nullable NULL gagal");
+    }
+
+    #[test]
+    fn migrasi_0042_kolom_cloud_sync_investment_default_dan_trigger_jalan() {
+        // Migrasi 0042: updated_at/deleted_at/sync_source ditambah ke 3
+        // tabel investment -- default sync_source='pc', deleted_at NULL,
+        // dan trigger auto-refresh updated_at saat UPDATE (pola PERSIS
+        // 0028_cloud_sync_columns.sql utk 7 tabel non-investment).
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        conn.execute_batch(
+            "
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-inv-6', 'Reksadana Test 6', 'investment');
+            INSERT INTO investment_accounts (account_id, unit_label, current_market_value)
+                VALUES ('acc-inv-6', 'unit', 10000.0);
+            INSERT INTO investment_purchases (id, account_id, unit, price_per_unit, date, status)
+                VALUES ('ip-sync-1', 'acc-inv-6', 10.0, 1000.0, '2026-01-02', 'settled');
+            INSERT INTO investment_sales (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit, average_cost_per_unit, realized_pl, date, status)
+                VALUES ('is-sync-1', 'acc-inv-6', NULL, NULL, 5.0, 1200.0, NULL, NULL, '2026-01-03', 'pending');
+            ",
+        )
+        .expect("insert data investment gagal");
+
+        let (acc_sync_source, acc_deleted_at): (String, Option<String>) = conn
+            .query_row(
+                "SELECT sync_source, deleted_at FROM investment_accounts WHERE account_id = 'acc-inv-6'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("query investment_accounts gagal");
+        assert_eq!(acc_sync_source, "pc");
+        assert_eq!(acc_deleted_at, None);
+
+        // updated_at TIDAK diisi otomatis saat INSERT (pola sama 7 tabel
+        // non-investment di 0028 -- nullable tanpa default, kode TS yang
+        // mengisi eksplisit utk baris hasil pull dari cloud, lihat
+        // pull-sync.ts). Baris baru lokal murni (seperti di sini) WAJAR
+        // NULL sampai pertama kali di-UPDATE.
+        let purchase_updated_at: Option<String> = conn
+            .query_row(
+                "SELECT updated_at FROM investment_purchases WHERE id = 'ip-sync-1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("query investment_purchases gagal");
+        assert_eq!(purchase_updated_at, None);
+
+        // Trigger `WHEN NEW.updated_at = OLD.updated_at` TIDAK terpicu kalau
+        // keduanya NULL (SQL: NULL = NULL menghasilkan NULL, bukan TRUE) --
+        // gap lama yang SUDAH ADA sejak 0028_cloud_sync_columns.sql (berlaku
+        // jg utk 7 tabel non-investment, dikonfirmasi berperilaku sama),
+        // BUKAN regresi baru dari migrasi ini. Test ini SENGAJA
+        // mendokumentasikan perilaku nyata (updated_at TETAP NULL di sini),
+        // bukan memperbaikinya -- perbaikan trigger lama di luar scope
+        // investment-sync.md Tahap 3.
+        conn.execute(
+            "UPDATE investment_sales SET price_per_unit = 1300.0 WHERE id = 'is-sync-1'",
+            [],
+        )
+        .expect("update investment_sales gagal");
+        let (sale_updated_at, sale_deleted_at): (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT updated_at, deleted_at FROM investment_sales WHERE id = 'is-sync-1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("query investment_sales gagal");
+        assert_eq!(sale_updated_at, None);
+        assert_eq!(sale_deleted_at, None);
+
+        // Trigger JALAN BENAR begitu updated_at sudah pernah terisi
+        // (NULL != 'nilai lama' bukan NULL, kondisi WHEN jadi FALSE seperti
+        // seharusnya, trigger terpicu me-refresh).
+        conn.execute(
+            "UPDATE investment_sales SET updated_at = '2026-01-01 00:00:00' WHERE id = 'is-sync-1'",
+            [],
+        )
+        .expect("set updated_at awal gagal");
+        conn.execute(
+            "UPDATE investment_sales SET price_per_unit = 1400.0 WHERE id = 'is-sync-1'",
+            [],
+        )
+        .expect("update kedua investment_sales gagal");
+        let sale_updated_at_after: String = conn
+            .query_row(
+                "SELECT updated_at FROM investment_sales WHERE id = 'is-sync-1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("query investment_sales kedua gagal");
+        assert_ne!(sale_updated_at_after, "2026-01-01 00:00:00", "trigger harus refresh updated_at setelah terisi sekali");
     }
 }

@@ -62,6 +62,9 @@ export function useCreateAccount(options: UseCreateAccountOptions = {}) {
         );
       }
       void pushOnWrite("accounts", id);
+      if (values.account_type === "investment") {
+        void pushOnWrite("investment_accounts", id);
+      }
       return id;
     },
     invalidateKey: QUERY_DEPENDENCIES.accounts,

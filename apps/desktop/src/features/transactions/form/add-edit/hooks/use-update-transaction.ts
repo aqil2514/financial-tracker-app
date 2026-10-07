@@ -196,6 +196,10 @@ export function useUpdateTransaction(
       });
 
       let adjustmentTransactionId: string | null = null;
+      let investmentPurchaseId: string | null = null;
+      let deletedInvestmentPurchaseIds: string[] = [];
+      let investmentSaleId: string | null = null;
+      let deletedInvestmentSaleIds: string[] = [];
       if (isInvestmentSell) {
         // Form transaksi utama HANYA mendukung jual 'settled' (lihat
         // komentar sama di use-create-transaction.ts) -- transactionId
@@ -213,8 +217,10 @@ export function useUpdateTransaction(
           status: "settled",
         });
         adjustmentTransactionId = touched.adjustmentTransactionId;
+        investmentSaleId = touched.investmentSaleIds[0] ?? null;
+        deletedInvestmentSaleIds = touched.deletedInvestmentSaleIds;
       } else {
-        await applyInvestmentTransactionEdit({
+        const touched = await applyInvestmentTransactionEdit({
           db,
           transactionId: transaction.id,
           type: values.type,
@@ -225,10 +231,14 @@ export function useUpdateTransaction(
           pricePerUnit: values.price_per_unit,
           status: values.investment_status ?? "pending",
         });
+        investmentPurchaseId = touched.investmentPurchaseIds[0] ?? null;
+        deletedInvestmentPurchaseIds = touched.deletedInvestmentPurchaseIds;
       }
 
       void pushOnWrite("transactions", transaction.id);
       if (adjustmentTransactionId != null) void pushOnWrite("transactions", adjustmentTransactionId);
+      if (investmentPurchaseId != null) void pushOnWrite("investment_purchases", investmentPurchaseId);
+      if (investmentSaleId != null) void pushOnWrite("investment_sales", investmentSaleId);
       for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
       for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
       // Id LAMA dari RECREATE (field berbahaya berubah) -- Worker tidak
@@ -237,6 +247,10 @@ export function useUpdateTransaction(
       for (const debtId of touchedDebtRows.deletedDebtIds) void pushDeleteOnWrite("debts", debtId, {});
       for (const debtPaymentId of touchedDebtRows.deletedDebtPaymentIds)
         void pushDeleteOnWrite("debt_payments", debtPaymentId, {});
+      for (const purchaseId of deletedInvestmentPurchaseIds)
+        void pushDeleteOnWrite("investment_purchases", purchaseId, {});
+      for (const saleId of deletedInvestmentSaleIds)
+        void pushDeleteOnWrite("investment_sales", saleId, {});
     },
     invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil diperbarui",

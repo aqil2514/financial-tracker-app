@@ -34,7 +34,10 @@ export type QueueableTable =
   | "categories"
   | "contacts"
   | "debts"
-  | "debt_payments";
+  | "debt_payments"
+  | "investment_accounts"
+  | "investment_purchases"
+  | "investment_sales";
 export type DeletableTable = DeleteCloudPayload["table"];
 
 export async function enqueueUpsertPush(table: QueueableTable, id: string) {

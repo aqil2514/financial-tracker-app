@@ -83,6 +83,9 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
         }
       }
       void pushOnWrite("accounts", account.id);
+      if (values.account_type === "investment") {
+        void pushOnWrite("investment_accounts", account.id);
+      }
     },
     invalidateKey: QUERY_DEPENDENCIES.accounts,
     successMessage: "Akun berhasil diperbarui",

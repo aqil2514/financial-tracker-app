@@ -67,10 +67,7 @@ export function useCreateInvestmentPurchase(options: UseCreateInvestmentPurchase
         ]
       );
 
-      // investment_purchases BELUM termasuk tabel yang disync cloud (lihat
-      // apply-investment-transaction.ts) -- cuma transaksinya sendiri yang
-      // perlu di-push.
-      await applyInvestmentTransaction({
+      const touched = await applyInvestmentTransaction({
         db,
         transactionId,
         type: "transfer",
@@ -83,6 +80,9 @@ export function useCreateInvestmentPurchase(options: UseCreateInvestmentPurchase
       });
 
       void pushOnWrite("transactions", transactionId);
+      if (touched.investmentPurchaseIds[0]) {
+        void pushOnWrite("investment_purchases", touched.investmentPurchaseIds[0]);
+      }
 
       return transactionId;
     },

@@ -3,6 +3,7 @@
 import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { dependentKeysOf } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import type { InvestmentPurchaseRow } from "../use-investment-purchases";
 import { editInvestmentPurchaseSchema, type EditInvestmentPurchaseFormOutput } from "./schema";
 
@@ -32,6 +33,7 @@ export function useUpdateInvestmentPurchase(purchase: InvestmentPurchaseRow, onS
         "UPDATE investment_purchases SET unit = $1, price_per_unit = $2, status = $3 WHERE id = $4",
         [values.unit, values.price_per_unit, values.status, purchase.id]
       );
+      void pushOnWrite("investment_purchases", purchase.id);
     },
     invalidateKey: dependentKeysOf("transactions"),
     successMessage: "Pembelian investasi berhasil diperbarui",

@@ -17,6 +17,9 @@ import {
   pushTransaction,
   pushDebt,
   pushDebtPayment,
+  pushInvestmentAccount,
+  pushInvestmentPurchase,
+  pushInvestmentSale,
 } from "./worker-client";
 import type { QueueableTable } from "./push-queue";
 
@@ -211,6 +214,91 @@ export async function pushRowPayload(
         date: row.date,
         source: row.source,
         sourceRef: row.source_ref,
+        updatedAt: row.updated_at ?? undefined,
+      });
+    }
+    case "investment_accounts": {
+      const rows = await db.select<
+        { account_id: string; unit_label: string; current_market_value: number; updated_at: string | null }[]
+      >(
+        "SELECT account_id, unit_label, current_market_value, updated_at FROM investment_accounts WHERE account_id = $1",
+        [id]
+      );
+      const row = rows[0];
+      if (!row) return null;
+      return pushInvestmentAccount(creds, {
+        accountId: row.account_id,
+        unitLabel: row.unit_label,
+        currentMarketValue: row.current_market_value,
+        updatedAt: row.updated_at ?? undefined,
+      });
+    }
+    case "investment_purchases": {
+      const rows = await db.select<
+        {
+          id: string;
+          account_id: string;
+          transaction_id: string | null;
+          unit: number | null;
+          price_per_unit: number | null;
+          date: string;
+          status: "pending" | "settled";
+          updated_at: string | null;
+        }[]
+      >(
+        "SELECT id, account_id, transaction_id, unit, price_per_unit, date, status, updated_at FROM investment_purchases WHERE id = $1",
+        [id]
+      );
+      const row = rows[0];
+      if (!row) return null;
+      // transaction_id null berarti baris belum ter-link ke transaksi --
+      // push di-skip SEMENTARA, sama pola dgn "debts" di atas (endpoint
+      // Worker mewajibkan transactionId). Beda dari investment_sales di
+      // bawah yang MEMANG boleh null selama status pending.
+      if (!row.transaction_id) return null;
+      return pushInvestmentPurchase(creds, {
+        id: row.id,
+        accountId: row.account_id,
+        transactionId: row.transaction_id,
+        unit: row.unit,
+        pricePerUnit: row.price_per_unit,
+        date: row.date,
+        status: row.status,
+        updatedAt: row.updated_at ?? undefined,
+      });
+    }
+    case "investment_sales": {
+      const rows = await db.select<
+        {
+          id: string;
+          account_id: string;
+          transaction_id: string | null;
+          adjustment_transaction_id: string | null;
+          unit: number;
+          price_per_unit: number;
+          average_cost_per_unit: number | null;
+          realized_pl: number | null;
+          date: string;
+          status: "pending" | "settled";
+          updated_at: string | null;
+        }[]
+      >(
+        "SELECT id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit, average_cost_per_unit, realized_pl, date, status, updated_at FROM investment_sales WHERE id = $1",
+        [id]
+      );
+      const row = rows[0];
+      if (!row) return null;
+      return pushInvestmentSale(creds, {
+        id: row.id,
+        accountId: row.account_id,
+        transactionId: row.transaction_id,
+        adjustmentTransactionId: row.adjustment_transaction_id,
+        unit: row.unit,
+        pricePerUnit: row.price_per_unit,
+        averageCostPerUnit: row.average_cost_per_unit,
+        realizedPl: row.realized_pl,
+        date: row.date,
+        status: row.status,
         updatedAt: row.updated_at ?? undefined,
       });
     }

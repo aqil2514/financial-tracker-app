@@ -29,6 +29,7 @@ export function useSettleInvestmentSale(sale: InvestmentSaleRow, onSuccess?: () 
       if (result.adjustmentTransactionId != null) {
         void pushOnWrite("transactions", result.adjustmentTransactionId);
       }
+      void pushOnWrite("investment_sales", sale.id);
     },
     invalidateKey: dependentKeysOf("transactions"),
     successMessage: "Penjualan investasi berhasil disettle",

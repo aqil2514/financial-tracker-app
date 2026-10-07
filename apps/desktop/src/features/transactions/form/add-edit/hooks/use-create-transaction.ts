@@ -172,6 +172,8 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
       });
 
       let adjustmentTransactionId: string | null = null;
+      let investmentPurchaseId: string | null = null;
+      let investmentSaleId: string | null = null;
       if (isInvestmentSell) {
         // unit/price_per_unit WAJIB diisi untuk arah jual -- divalidasi di
         // useTransactionInvestmentFields (validateInvestmentFields)
@@ -193,8 +195,9 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
           status: "settled",
         });
         adjustmentTransactionId = touched.adjustmentTransactionId;
+        investmentSaleId = touched.investmentSaleIds[0] ?? null;
       } else {
-        await applyInvestmentTransaction({
+        const touched = await applyInvestmentTransaction({
           db,
           transactionId,
           type: values.type,
@@ -205,10 +208,13 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
           pricePerUnit: values.price_per_unit,
           status: values.investment_status ?? "pending",
         });
+        investmentPurchaseId = touched.investmentPurchaseIds[0] ?? null;
       }
 
       void pushOnWrite("transactions", transactionId);
       if (adjustmentTransactionId != null) void pushOnWrite("transactions", adjustmentTransactionId);
+      if (investmentPurchaseId != null) void pushOnWrite("investment_purchases", investmentPurchaseId);
+      if (investmentSaleId != null) void pushOnWrite("investment_sales", investmentSaleId);
       for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
       for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
 

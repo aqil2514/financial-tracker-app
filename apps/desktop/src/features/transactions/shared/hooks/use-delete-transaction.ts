@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { getDb } from "@/lib/db";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
-import { pushDeleteTransactionOnWrite } from "@/shared/cloud-sync/push-on-write";
+import { pushDeleteTransactionOnWrite, pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { detachDebtForDeletedTransaction, type DeletedTransactionDebtInfo } from "@/shared/debts/apply-debt-transaction";
 import { detachInvestmentPurchaseForDeletedTransaction } from "@/shared/investments/apply-investment-transaction";
 import { detachInvestmentSaleForDeletedTransaction } from "@/shared/investments/apply-sell-investment-transaction";
@@ -43,14 +43,23 @@ export function useDeleteTransaction() {
       // investment_purchases TIDAK punya makna tanpa transaksi asalnya
       // (bukan tumpuan accounts.balance), jadi dihapus total alih-alih
       // dibiarkan yatim. Lihat apply-investment-transaction.ts.
-      await detachInvestmentPurchaseForDeletedTransaction(db, id);
+      const purchaseInfo = await detachInvestmentPurchaseForDeletedTransaction(db, id);
+      if (purchaseInfo.role === "purchase") {
+        await pushDeleteOnWrite("investment_purchases", purchaseInfo.investmentPurchaseId, {});
+      }
       // Sama alasannya untuk investment_sales (arah jual) -- juga
       // menghapus transaksi penyesuaian Realized P/L (leg kedua) lewat
       // kolom adjustment_transaction_id (FK eksplisit, migrasi 0039).
       // Dipanggil SEBELUM hard-delete leg transfer utama di bawah, pola
       // sama detachInvestmentPurchaseForDeletedTransaction. Lihat
       // apply-sell-investment-transaction.ts.
-      await detachInvestmentSaleForDeletedTransaction(db, id);
+      const saleInfo = await detachInvestmentSaleForDeletedTransaction(db, id);
+      if (saleInfo.role === "sale") {
+        await pushDeleteOnWrite("investment_sales", saleInfo.investmentSaleId, {});
+        if (saleInfo.adjustmentTransactionId != null) {
+          await pushDeleteOnWrite("transactions", saleInfo.adjustmentTransactionId, {});
+        }
+      }
       await db.execute("DELETE FROM transactions WHERE id = $1", [id]);
 
       return debtInfo;

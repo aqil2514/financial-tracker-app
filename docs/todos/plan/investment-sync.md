@@ -6,14 +6,14 @@ Index ini HANYA navigasi + checklist ringkas. Detail keputusan desain, riset, da
 
 ## Status & TODO saat ini (ringkas)
 
-Sisi Worker (Tahap 0-2) SELESAI — skema D1 + logic bisnis penuh (beli+jual) sudah diverifikasi di lokal. Sisi desktop (Tahap 3, wiring push) dan MCP (Tahap 4) BELUM dikerjakan. Penjelasan lengkap tiap poin ada di bagian "Latar belakang" dan "Checklist tahapan" di bawah.
+Sisi Worker (Tahap 0-2) SELESAI — skema D1 + logic bisnis penuh (beli+jual) sudah diverifikasi di lokal. Sisi desktop (Tahap 3, migrasi + wiring push) SELESAI juga (2026-10-07) — PC sekarang mem-push ketiga tabel investment ke Worker di SEMUA titik mutasi. MCP (Tahap 4) BELUM dikerjakan. Penjelasan lengkap tiap poin ada di bagian "Latar belakang" dan "Checklist tahapan" di bawah.
 
 - [x] Tipe akun `investment` selesai diimplementasikan penuh di `apps/desktop` (termasuk penjualan/penarikan sebagian), sudah di-smoke-test manual — lihat [`apps/desktop/docs/todos/plan/account-type-investment.md`](../../../apps/desktop/docs/todos/plan/account-type-investment.md).
 - [x] Riset peta gap Worker vs desktop — selesai (2026-10-07), lihat ringkasan di bagian "Latar belakang" di bawah.
 - [x] Tahap 0 — Keputusan desain scope sync: **replikasi logic penuh** (bukan CRUD data mentah) — lihat bagian "Tahap 0" di bawah.
 - [x] Tahap 1 — Migrasi D1 (`schema/0002_account_type_investment.sql`) ditulis + diverifikasi di D1 LOKAL (2026-10-07), lihat bagian "Tahap 1" di bawah. BELUM di-apply ke `--remote`/production — ditunda sampai Tahap 2 (modul `investments/`) siap.
 - [x] Tahap 2 — `classifyAccountPair` + modul `investments/` PEMBELIAN **dan** PENJUALAN (average cost, Realized P/L, validasi oversell, settle, delete pending) SELESAI + diverifikasi penuh via `wrangler dev`/`d1 execute --local` (2026-10-07) — lihat bagian "Tahap 2" di bawah utk daftar lengkap + 1 bug nyata yang ditemukan+diperbaiki saat verifikasi.
-- [ ] Tahap 3 — Desktop: perluas whitelist sync (`QueueableTable`/`DeletableTable`) + fungsi push investment — belum dikerjakan.
+- [x] Tahap 3 — Desktop: migrasi kolom cloud-sync (`0042`) + wiring `pushOnWrite`/`pushDeleteOnWrite` di SEMUA titik mutasi (10 hook) SELESAI (2026-10-07) — lihat bagian "Tahap 3" di bawah. BELUM diverifikasi end-to-end nyata (itu Tahap 5).
 - [ ] Tahap 4 — MCP server: tool investasi baru — belum dikerjakan, belum diputuskan tool apa saja.
 - [ ] Tahap 5 — Verifikasi end-to-end (dogfooding nyata) — belum dikerjakan.
 
@@ -110,8 +110,22 @@ Wiring pemicu arah jual di `transactions/service.ts`: `applySellInvestmentTransa
 
 **Diverifikasi end-to-end via `wrangler dev` + `d1 execute --local`** (skenario lengkap, semua lulus setelah fix amount di atas): beli 10 unit settled; jual 5 unit settled dgn untung (avg cost 1000, jual 1500 → transfer amount 5000 ✓, realized_pl 2500 ✓, adjustment leg income 2500 ✓); **oversell ditolak 422 SEBELUM insert transaksi** (jual 15 padahal sisa 10, transaksi tidak tersimpan sama sekali); jual **pending** via push langsung (TANPA transaksi apa pun, sesuai desain); **settle** baris pending (average cost & realized_pl dihitung SAAT settle, kedua FK terisi); **edit** transaksi jual settled (amount di-recreate benar dari unit/harga baru, baris lama soft-deleted, baris baru realized_pl benar); **delete** baris pending (soft-delete, sisa unit kembali bertambah). Catatan proses: endpoint push TIDAK re-validasi oversell (upsert-by-id murni, trust desktop sbg sumber kebenaran datanya sendiri — konsisten dgn `pushDebtFromPc` yg juga tidak re-validasi FIFO, BUKAN bug). `tsc --noEmit` bersih. Semua data uji coba dibersihkan setelahnya (termasuk 1 baris orphan `account_id=NULL` hasil `ON DELETE SET NULL` dari pembersihan test sebelumnya — ditemukan & dibersihkan, murni housekeeping test, bukan bug produksi).
 
+## Tahap 3 — Desktop: migrasi kolom cloud-sync + wiring push (SELESAI, 2026-10-07)
+
+**Migrasi `0042_investment_cloud_sync_columns.sql`**: tambah `deleted_at`/`sync_source` ke `investment_accounts`, `updated_at`/`deleted_at`/`sync_source` ke `investment_purchases`/`investment_sales` (pola persis migrasi `0028` 7 tabel non-investment), plus trigger auto-refresh `updated_at` ketiganya. `investment_accounts.updated_at` TIDAK ditambah ulang — sudah ada sejak migrasi `0037` utk fitur staleness nilai pasar (semantiknya kebetulan cocok dipakai jg sbg LWW). Didaftarkan di `migrations.rs` versi 42, 8 test Rust lulus (termasuk test baru yang mendokumentasikan bug lama trigger `WHEN NEW.x = OLD.x` tidak terpicu kalau keduanya NULL — berlaku sejak migrasi `0028` utk SEMUA tabel sync-able, bukan regresi baru, sengaja TIDAK diperbaiki krn di luar scope).
+
+**Wiring push**: `push-queue.ts` (`QueueableTable`) dan `worker-client.ts` (`DeleteCloudPayload`, 3 payload type + 3 fungsi `pushInvestmentAccount`/`pushInvestmentPurchase`/`pushInvestmentSale`, `DELETE_PATH`) diperluas utk 3 tabel baru. `push-row.ts` ditambah 3 case baca-row-terbaru-lalu-format-payload (pola sama 7 tabel lain).
+
+Lalu di-petakan (via subagent riset) SEMUA titik mutasi aktual yang menyentuh ketiga tabel — ditemukan **10 hook** yang sebelumnya cuma push `transactions`/`debts` tapi TIDAK push baris investment itu sendiri (beberapa bahkan masih punya komentar basi "belum termasuk tabel yang disync cloud", ditulis sebelum endpoint Worker ada). Semua 10 diperbaiki:
+
+- `investment_accounts`: `use-create-account.ts`, `use-update-account.ts` (push setelah push `accounts`), `use-update-market-value.ts` (push baru ditambah, sebelumnya tidak ada wiring cloud-sync apa pun di file ini). Tidak perlu `pushDeleteOnWrite` sendiri — baris ini cuma hilang lewat cascade `DELETE /accounts`, sudah ditangani `use-delete-account.ts`.
+- `investment_purchases`: `use-create-investment-purchase.ts`, `use-update-investment-purchase.ts` (push langsung). `use-create-transaction.ts`/`use-update-transaction.ts` (jalur beli form transaksi utama) — tangkap return value `applyInvestmentTransaction`/`Edit` yang sebelumnya diabaikan, push baris baru + `pushDeleteOnWrite` utk id lama hasil RECREATE (field berbahaya berubah). `use-delete-transaction.ts` — `pushDeleteOnWrite` SEBELUM hard-delete, pakai hasil `detachInvestmentPurchaseForDeletedTransaction`.
+- `investment_sales`: `use-create-investment-sale.ts`, `use-settle-investment-sale.ts` (push langsung, komentar basi dihapus). `use-delete-pending-investment-sale.ts` — `pushDeleteOnWrite` sebelum hard-delete baris pending. `use-create-transaction.ts`/`use-update-transaction.ts` (jalur jual) — sejajar pola purchase. `use-delete-transaction.ts` — paling kompleks: `pushDeleteOnWrite` utk baris `investment_sales` **dan** transaksi adjustment Realized P/L yang ikut terhapus (`detachInvestmentSaleForDeletedTransaction` mengembalikan `adjustmentTransactionId`) — kalau tidak di-push-delete, baris itu jadi yatim di cloud.
+
+Diverifikasi: `tsc --noEmit` bersih setelah seluruh wiring. **Belum** diverifikasi end-to-end nyata (push betul-betul sampai ke Worker lokal lalu dicek via `d1 execute`) — itu scope Tahap 5.
+
 ## Checklist tahapan
-- [ ] **Tahap 3** — Desktop: perluas `QueueableTable`/`DeletableTable`/`SyncResponse` (`shared/cloud-sync/push-queue.ts`, `worker-client.ts`) utk 3 tabel investment baru, tambah `pushInvestmentAccount`/`pushInvestmentPurchase`/`pushInvestmentSale` + wiring `pushOnWrite` di hook-hook yang relevan (pola sama `pushDebt`/`pushDebtPayment`). Endpoint push PEMBELIAN **dan PENJUALAN** di sisi Worker SUDAH ada (lihat Tahap 2) — desktop tinggal memanggilnya, TIDAK ADA pekerjaan Worker lagi yang menunggu di Tahap 3.
+- [x] **Tahap 3** — selesai, lihat bagian "Tahap 3" di atas.
 - [ ] **Tahap 4** — MCP server: tool baru utk investasi (BELUM diputuskan tool apa saja — kandidat: lihat `get_investment_summary` yang sudah lama jadi item terbuka di `account-type-investment.md`).
 - [ ] **Tahap 5** — Verifikasi end-to-end (dogfooding nyata, pola sama Tahap 7 `cloud-sync-mcp.md` — bukan skenario test formal).
 

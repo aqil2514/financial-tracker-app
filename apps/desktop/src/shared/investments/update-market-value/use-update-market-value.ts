@@ -3,6 +3,7 @@
 import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { dependentKeysOf } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { updateMarketValueSchema, type UpdateMarketValueFormOutput } from "./schema";
 
 /**
@@ -33,6 +34,7 @@ export function useUpdateMarketValue(
         "UPDATE investment_accounts SET current_market_value = $1, updated_at = datetime('now') WHERE account_id = $2",
         [values.current_market_value, accountId]
       );
+      void pushOnWrite("investment_accounts", accountId);
     },
     invalidateKey: dependentKeysOf("accounts"),
     successMessage: "Nilai pasar terkini berhasil diperbarui",
