@@ -408,6 +408,32 @@ describe("applySellInvestmentTransaction", () => {
     ).rejects.toThrow(InsufficientInvestmentUnitsError);
   });
 
+  it("menolak oversell SAAT STATUS PENDING dengan transferAccountId null (regresi: form Jual Investasi mengirim cash_account_id null utk pending)", async () => {
+    // Bug nyata yg pernah lolos: guard `transferAccountId == null` dulu
+    // ditaruh SEBELUM validasi oversell, jadi oversell saat pending
+    // (transferAccountId SELALU null di jalur ini) tidak pernah tertangkap
+    // -- toast sukses muncul padahal tidak ada baris yg masuk ke DB. Lihat
+    // urutan guard di applySellInvestmentTransaction di atas.
+    const { db, investmentSales } = createFakeDb({
+      accounts: [INVESTMENT_ACCOUNT, CASH_ACCOUNT],
+      investmentPurchases: [SETTLED_PURCHASE], // 100 unit settled
+    });
+
+    await expect(
+      applySellInvestmentTransaction({
+        db: db as never,
+        transactionId: null,
+        accountId: "inv-1",
+        transferAccountId: null,
+        date: "2026-02-01",
+        unit: 150,
+        pricePerUnit: 1200,
+        status: "pending",
+      })
+    ).rejects.toThrow(InsufficientInvestmentUnitsError);
+    expect(investmentSales).toHaveLength(0);
+  });
+
   it("unit dari pembelian PENDING tidak ikut dihitung sebagai sisa yang bisa dijual", async () => {
     const pendingPurchase: InvestmentPurchaseRow = {
       id: "p-2",
@@ -468,8 +494,15 @@ describe("applySellInvestmentTransaction", () => {
     ).rejects.toThrow(InsufficientInvestmentUnitsError);
   });
 
-  it("tidak melakukan apa pun kalau transferAccountId null", async () => {
-    const { db, investmentSales } = createFakeDb({ accounts: [INVESTMENT_ACCOUNT, CASH_ACCOUNT] });
+  it("status pending dengan transferAccountId null tetap membuat baris pending (akun kas belum relevan)", async () => {
+    // Beda dari desain lama -- cash_account_id di form "Jual Investasi"
+    // sekarang nullable utk status pending (lihat sell-investment-form
+    // schema.ts), jadi transferAccountId null itu kasus NORMAL utk
+    // pending, bukan kasus yg harus no-op.
+    const { db, investmentSales } = createFakeDb({
+      accounts: [INVESTMENT_ACCOUNT, CASH_ACCOUNT],
+      investmentPurchases: [SETTLED_PURCHASE], // 100 settled -- cukup utk unit:10, bukan oversell yg diuji di sini
+    });
 
     const result = await applySellInvestmentTransaction({
       db: db as never,
@@ -481,18 +514,37 @@ describe("applySellInvestmentTransaction", () => {
       pricePerUnit: 1000,
     });
 
-    expect(investmentSales).toHaveLength(0);
-    expect(result).toEqual({
-      investmentSaleIds: [],
-      deletedInvestmentSaleIds: [],
-      adjustmentTransactionId: null,
+    expect(investmentSales).toHaveLength(1);
+    expect(result.investmentSaleIds).toHaveLength(1);
+  });
+
+  it("melempar error kalau status settled tapi transferAccountId null", async () => {
+    const { db } = createFakeDb({
+      accounts: [INVESTMENT_ACCOUNT, CASH_ACCOUNT],
+      investmentPurchases: [SETTLED_PURCHASE],
     });
+
+    await expect(
+      applySellInvestmentTransaction({
+        db: db as never,
+        transactionId: "tx-1",
+        accountId: "inv-1",
+        transferAccountId: null,
+        date: "2026-01-01",
+        unit: 10,
+        pricePerUnit: 1000,
+        status: "settled",
+      })
+    ).rejects.toThrow("transferAccountId wajib diisi untuk status 'settled'.");
   });
 
   it("tidak melakukan apa pun untuk arah cash -> investment (bukan penjualan)", async () => {
     const { db, investmentSales } = createFakeDb({
       accounts: [CASH_ACCOUNT, INVESTMENT_ACCOUNT],
-      investmentPurchases: [SETTLED_PURCHASE],
+      // account_id "cash-1" (bukan "inv-1") -- accountId sumber di call
+      // di bawah adalah cash-1, holding harus cukup supaya yg menolak
+      // no-op ini classifyAccountPair, bukan validasi oversell.
+      investmentPurchases: [{ ...SETTLED_PURCHASE, account_id: "cash-1" }],
     });
 
     const result = await applySellInvestmentTransaction({
@@ -510,7 +562,13 @@ describe("applySellInvestmentTransaction", () => {
   });
 
   it("melempar UnsupportedAccountPairError untuk kombinasi debt -> cash", async () => {
-    const { db } = createFakeDb({ accounts: [DEBT_ACCOUNT, CASH_ACCOUNT] });
+    const { db } = createFakeDb({
+      accounts: [DEBT_ACCOUNT, CASH_ACCOUNT],
+      // account_id "debt-1" -- accountId sumber di call adalah debt-1,
+      // holding harus cukup supaya yg menolak no-op ini classifyAccountPair,
+      // bukan validasi oversell.
+      investmentPurchases: [{ ...SETTLED_PURCHASE, account_id: "debt-1" }],
+    });
 
     // debt-cash valid di classifyAccountPair tapi bukan investment-cash --
     // fungsi ini no-op, BUKAN melempar (lihat pairKind !== "investment-cash").

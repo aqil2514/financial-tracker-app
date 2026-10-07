@@ -46,7 +46,7 @@ export function useCreateInvestmentSale(options: UseCreateInvestmentSaleOptions 
   return useEntityForm({
     schema: sellInvestmentSchema,
     defaultValues: () => ({
-      cash_account_id: "",
+      cash_account_id: null,
       investment_account_id: investmentAccountId ?? "",
       unit: 0,
       price_per_unit: 0,
@@ -59,7 +59,11 @@ export function useCreateInvestmentSale(options: UseCreateInvestmentSaleOptions 
       const db = await getDb();
 
       let transactionId: string | null = null;
-      if (values.status === "settled") {
+      // Schema (superRefine) menjamin cash_account_id terisi kalau status
+      // settled -- narrow eksplisit di sini supaya tidak perlu non-null
+      // assertion di pemanggilan db.execute/applySellInvestmentTransaction.
+      if (values.status === "settled" && values.cash_account_id != null) {
+        const cashAccountId = values.cash_account_id;
         // Nominal leg transfer utama HARUS average cost * unit (bukan
         // pricePerUnit * unit) -- lihat docs/concept/konsep-investasi.md
         // "Efek ke accounts.balance". Dihitung lewat getAverageCostPerUnit
@@ -70,14 +74,7 @@ export function useCreateInvestmentSale(options: UseCreateInvestmentSaleOptions 
         await db.execute(
           `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date)
            VALUES ($1, 'transfer', $2, NULL, $3, $4, $5, NULL, $6)`,
-          [
-            transactionId,
-            averageCost * values.unit,
-            values.investment_account_id,
-            values.cash_account_id,
-            values.note,
-            values.date,
-          ]
+          [transactionId, averageCost * values.unit, values.investment_account_id, cashAccountId, values.note, values.date]
         );
       }
 

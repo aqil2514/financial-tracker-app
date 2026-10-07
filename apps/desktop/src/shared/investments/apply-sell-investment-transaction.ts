@@ -157,24 +157,16 @@ export async function applySellInvestmentTransaction({
   pricePerUnit,
   status = "pending",
 }: ApplySellInvestmentTransactionInput): Promise<TouchedInvestmentSaleRows> {
-  if (transferAccountId == null) return none;
+  // accountId harus bertipe investment -- berlaku utk KEDUA status. Untuk
+  // status 'pending' belum ada transferAccountId (null, baris pending
+  // tidak menyimpan akun kas) jadi pasangan lengkap baru bisa divalidasi
+  // lewat classifyAccountPair di cabang 'settled' di bawah; di sini cukup
+  // cegat accountId yang BUKAN investment supaya tidak lolos diam-diam.
+  const sourceType = await getAccountType(db, accountId);
+  if (sourceType !== "investment") return none;
 
-  const [sourceType, destinationType] = await Promise.all([
-    getAccountType(db, accountId),
-    getAccountType(db, transferAccountId),
-  ]);
-
-  if (sourceType == null || destinationType == null) {
-    throw new Error("Akun sumber/tujuan transfer tidak ditemukan.");
-  }
-
-  // classifyAccountPair throw utk kombinasi investment di luar
-  // cash-investment/investment-cash (lihat classify-account-pair.ts) --
-  // seharusnya sudah dicegat lebih dulu oleh validasi form, ini safety net
-  // sama seperti di apply-investment-transaction.ts.
-  const pairKind = classifyAccountPair(sourceType, destinationType);
-  if (pairKind !== "investment-cash") return none;
-
+  // Validasi oversell WAJIB dicek sebelum cabang status di bawah -- berlaku
+  // utk KEDUA status (lihat komentar panjang di atas fungsi ini).
   const remainingUnit = await getRemainingUnit(db, accountId);
   if (unit > remainingUnit) {
     throw new InsufficientInvestmentUnitsError(remainingUnit, unit);
@@ -194,6 +186,21 @@ export async function applySellInvestmentTransaction({
   if (transactionId == null) {
     throw new Error("transactionId wajib diisi untuk status 'settled' (leg transfer utama harus sudah di-insert).");
   }
+  if (transferAccountId == null) {
+    throw new Error("transferAccountId wajib diisi untuk status 'settled'.");
+  }
+
+  const destinationType = await getAccountType(db, transferAccountId);
+  if (destinationType == null) {
+    throw new Error("Akun sumber/tujuan transfer tidak ditemukan.");
+  }
+
+  // classifyAccountPair throw utk kombinasi investment di luar
+  // cash-investment/investment-cash (lihat classify-account-pair.ts) --
+  // seharusnya sudah dicegat lebih dulu oleh validasi form, ini safety net
+  // sama seperti di apply-investment-transaction.ts.
+  const pairKind = classifyAccountPair(sourceType, destinationType);
+  if (pairKind !== "investment-cash") return none;
 
   const averageCost = await getAverageCostPerUnit(db, accountId);
   const { adjustmentTransactionId, realizedPl } = await createAdjustmentTransaction(db, {

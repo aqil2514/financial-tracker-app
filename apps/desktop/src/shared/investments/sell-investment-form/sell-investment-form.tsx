@@ -15,10 +15,17 @@ import { formatCurrency } from "@/lib/format-currency";
 import { PricePerUnitField } from "@/shared/investments/price-per-unit-field";
 import { UnitAmountField } from "@/shared/investments/unit-amount-field";
 import { useInvestmentHoldingSummary } from "@/shared/investments/use-investment-holding-summary";
-import type { SellInvestmentFormOutput, SellInvestmentFormValues } from "./schema";
+import type {
+  SellInvestmentFormOutput,
+  SellInvestmentFormValues,
+} from "./schema";
 
 type SellInvestmentFormProps = {
-  form: UseFormReturn<SellInvestmentFormValues, unknown, SellInvestmentFormOutput>;
+  form: UseFormReturn<
+    SellInvestmentFormValues,
+    unknown,
+    SellInvestmentFormOutput
+  >;
   onSubmit: (values: SellInvestmentFormOutput) => void;
   isPending: boolean;
   /** true kalau akun investasi sumber sudah terkunci dari konteks
@@ -41,23 +48,31 @@ export function SellInvestmentForm({
   const isSettled = status === "settled";
 
   const { data: holding } = useInvestmentHoldingSummary(
-    investmentAccountId ? String(investmentAccountId) : undefined
+    investmentAccountId ? String(investmentAccountId) : undefined,
   );
 
   const cashAccountOptions =
     accounts
-      ?.filter((account) => account.account_type === "cash" && account.is_active)
+      ?.filter(
+        (account) => account.account_type === "cash" && account.is_active,
+      )
       .map((account) => ({
         value: String(account.id),
-        label: account.group_name ? `${account.name} — ${account.group_name}` : account.name,
+        label: account.group_name
+          ? `${account.name} — ${account.group_name}`
+          : account.name,
       })) ?? [];
 
   const investmentAccountOptions =
     accounts
-      ?.filter((account) => account.account_type === "investment" && account.is_active)
+      ?.filter(
+        (account) => account.account_type === "investment" && account.is_active,
+      )
       .map((account) => ({
         value: String(account.id),
-        label: account.group_name ? `${account.name} — ${account.group_name}` : account.name,
+        label: account.group_name
+          ? `${account.name} — ${account.group_name}`
+          : account.name,
       })) ?? [];
 
   // Nominal transfer (uang yang BENAR-benar masuk ke kas) = unit * harga
@@ -67,12 +82,18 @@ export function SellInvestmentForm({
   // sebesar average cost (bukan nominal ini), jadi field ini MURNI
   // informasi "uang yang akan diterima", tidak pernah jadi sumber
   // kebenaran utk balance yang disimpan ke transactions.amount.
-  const displayAmount = unit && pricePerUnit ? Number(unit) * Number(pricePerUnit) : 0;
+  const displayAmount =
+    unit && pricePerUnit ? Number(unit) * Number(pricePerUnit) : 0;
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
       <div className="grid grid-cols-2 gap-4">
-        <FormFieldText form={form} name="note" label="Catatan" placeholder="Mis. Jual sebagian reksadana" />
+        <FormFieldText
+          form={form}
+          name="note"
+          label="Catatan"
+          placeholder="Mis. Jual sebagian reksadana"
+        />
         <FormFieldDate form={form} name="date" label="Tanggal" />
       </div>
       <FormFieldToggleGroup
@@ -89,7 +110,11 @@ export function SellInvestmentForm({
           { value: "settled", label: "Settled" },
         ]}
       />
-      <div className={investmentAccountLocked ? "" : "grid grid-cols-2 gap-4"}>
+      <div
+        className={
+          investmentAccountLocked && !isSettled ? "" : "grid grid-cols-2 gap-4"
+        }
+      >
         {!investmentAccountLocked && (
           <FormFieldCombobox
             form={form}
@@ -99,21 +124,29 @@ export function SellInvestmentForm({
             options={investmentAccountOptions}
           />
         )}
-        <FormFieldCombobox
-          form={form}
-          name="cash_account_id"
-          label="Akun Kas"
-          placeholder="Cari akun kas..."
-          options={cashAccountOptions}
-        />
+        {isSettled && (
+          <div className="col-span-2">
+            <FormFieldCombobox
+              form={form}
+              name="cash_account_id"
+              label="Akun Kas"
+              placeholder="Cari akun kas..."
+              options={cashAccountOptions}
+            />
+          </div>
+        )}
       </div>
       {holding && (
         <div className="grid grid-cols-2 gap-4 rounded-lg border p-3 text-sm">
           <p>
-            Sisa unit: <span className="font-medium">{holding.remainingUnit}</span>
+            Sisa unit:{" "}
+            <span className="font-medium">{holding.remainingUnit}</span>
           </p>
           <p>
-            Avg. cost/unit: <span className="font-medium">{formatCurrency(holding.averageCostPerUnit, "IDR")}</span>
+            Avg. cost/unit:{" "}
+            <span className="font-medium">
+              {formatCurrency(holding.averageCostPerUnit, "IDR")}
+            </span>
           </p>
         </div>
       )}
@@ -128,7 +161,10 @@ export function SellInvestmentForm({
         />
       </div>
       <p className="text-muted-foreground text-xs">
-        Nominal yang masuk ke akun kas: <span className="font-medium">{formatCurrency(displayAmount, "IDR")}</span>{" "}
+        Nominal yang masuk ke akun kas:{" "}
+        <span className="font-medium">
+          {formatCurrency(displayAmount, "IDR")}
+        </span>{" "}
         (otomatis dari unit × harga jual).
       </p>
       <DialogFooter>
