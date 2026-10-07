@@ -16,6 +16,12 @@ import {
   applyInvestmentTransaction,
   applyInvestmentTransactionEdit,
   detachInvestmentPurchaseForDeletedTransaction,
+  applySellInvestmentTransaction,
+  applySellInvestmentTransactionEdit,
+  detachInvestmentSaleForDeletedTransaction,
+  validateInvestmentSaleUnits,
+  getTransactionInvestmentSaleUnit,
+  resolveInvestmentSellAmount,
 } from "../investments/service";
 import { resolveContactId } from "../contacts/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
@@ -174,6 +180,21 @@ async function createTransactionRow(
     if (precheck.status === "rejected") return precheck;
   }
 
+  // Precheck oversell penjualan investasi (arah investment->cash) --
+  // SEBELUM insert baris transaksi, sama alasannya dgn precheck debt
+  // settlement di atas. unit WAJIB diisi utk jual (beda dari beli yang
+  // opsional) -- payload.unit == null di sini berarti bukan transaksi
+  // jual investasi sama sekali (precheck no-op lewat validateInvestmentSaleUnits
+  // kalau accountId bukan investment).
+  if (payload.type === "transfer" && payload.accountId && payload.unit != null) {
+    const precheck = await validateInvestmentSaleUnits(env, {
+      accountId: payload.accountId,
+      transferAccountId: payload.transferAccountId ?? null,
+      unit: payload.unit,
+    });
+    if (precheck.status === "rejected") return precheck;
+  }
+
   if (await hasSourceRefConflict(env, payload.id, payload)) {
     return { status: "rejected", reason: SOURCE_REF_CONFLICT_REASON };
   }
@@ -181,6 +202,18 @@ async function createTransactionRow(
   const resolvedContactId = await resolveFinalContactId(env, payload, syncSource);
   const contactPrecheck = await validateResolvedContactExists(env, resolvedContactId);
   if (contactPrecheck.status === "rejected") return contactPrecheck;
+
+  // Sumber kebenaran nominal transfer investment->cash (jual) BUKAN
+  // payload.amount dari client -- dihitung ULANG dari averageCost x unit
+  // SEBELUM insert (pola PERSIS use-create-transaction.ts desktop, lihat
+  // resolveInvestmentSellAmount). null kalau bukan arah jual, payload.amount
+  // dipakai apa adanya.
+  const resolvedSellAmount = await resolveInvestmentSellAmount(env, {
+    accountId: payload.accountId,
+    transferAccountId: payload.transferAccountId ?? null,
+    unit: payload.unit ?? null,
+  });
+  const amount = resolvedSellAmount ?? payload.amount;
 
   const now = nowText();
   await env.DB.prepare(
@@ -193,7 +226,7 @@ async function createTransactionRow(
     .bind(
       payload.id,
       payload.type,
-      payload.amount,
+      amount,
       payload.type === "transfer" ? null : payload.categoryId ?? null,
       payload.accountId ?? null,
       payload.transferAccountId ?? null,
@@ -249,6 +282,25 @@ async function createTransactionRow(
       unit: payload.unit ?? null,
       pricePerUnit: payload.pricePerUnit ?? null,
       status: payload.investmentStatus,
+      syncSource,
+    });
+
+    // Logic penjualan investasi -- PEMILIK-nya modul investments, sama
+    // alasan pemicu dgn pembelian di atas. BEDA penting: status SELALU
+    // dipaksa 'settled' -- form transaksi utama desktop (fields/
+    // investment-fields.tsx) cuma mendukung jual settled, jual 'pending'
+    // HANYA lewat dialog "Jual Investasi" khusus yang TIDAK PERNAH lewat
+    // transactions/service.ts sama sekali (lihat applySellInvestmentTransaction
+    // di investments/service.ts: pending TIDAK membuat transaksi apa pun).
+    // Oversell SUDAH divalidasi di precheck sebelum insert di atas.
+    await applySellInvestmentTransaction(env, {
+      transactionId: payload.id,
+      accountId: payload.accountId,
+      transferAccountId: payload.transferAccountId ?? null,
+      date: payload.date,
+      unit: payload.unit ?? 0,
+      pricePerUnit: payload.pricePerUnit ?? 0,
+      status: "settled",
       syncSource,
     });
   }
@@ -375,6 +427,22 @@ async function updateTransactionRow(
     if (precheck.status === "rejected") return precheck;
   }
 
+  // Precheck oversell penjualan investasi -- sama alasannya dgn
+  // createTransactionRow. excludeUnit = unit milik baris investment_sales
+  // LAMA transaksi ini (kalau ada) -- dikompensasi dulu krn baris lama
+  // akan direcreate (dihapus+dibuat ulang) oleh applySellInvestmentTransactionEdit
+  // di bawah, meniru urutan fungsi itu sendiri.
+  if (payload.type === "transfer" && payload.accountId && payload.unit != null) {
+    const excludeUnit = await getTransactionInvestmentSaleUnit(env, id);
+    const precheck = await validateInvestmentSaleUnits(env, {
+      accountId: payload.accountId,
+      transferAccountId: payload.transferAccountId ?? null,
+      unit: payload.unit,
+      excludeUnit,
+    });
+    if (precheck.status === "rejected") return precheck;
+  }
+
   // Logic #2 pre-check: resolve status SEBELUM update baris transaksi
   // -- kalau nanti DebtEditBlockedError dilempar, UPDATE transactions
   // belum sempat jalan (konsisten dgn pola "validasi dulu baru tulis").
@@ -396,6 +464,16 @@ async function updateTransactionRow(
     return { status: "rejected", reason: SOURCE_REF_CONFLICT_REASON };
   }
 
+  // Sama alasannya dgn createTransactionRow -- sumber kebenaran nominal
+  // transfer investment->cash BUKAN payload.amount, dihitung ULANG dari
+  // averageCost x unit SEBELUM UPDATE.
+  const resolvedSellAmount = await resolveInvestmentSellAmount(env, {
+    accountId: payload.accountId,
+    transferAccountId: payload.transferAccountId ?? null,
+    unit: payload.unit ?? null,
+  });
+  const amount = resolvedSellAmount ?? payload.amount;
+
   // LWW menang CLEAR deleted_at juga, lihat account-groups/service.ts.
   // `source`/`source_ref` cuma ditimpa kalau payload EKSPLISIT kirim
   // `source` (?12 = 1) -- penulis lain (mis. MCP PATCH) yg tidak tahu
@@ -410,7 +488,7 @@ async function updateTransactionRow(
   )
     .bind(
       payload.type,
-      payload.amount,
+      amount,
       payload.type === "transfer" ? null : payload.categoryId ?? null,
       payload.accountId ?? null,
       payload.transferAccountId ?? null,
@@ -463,6 +541,21 @@ async function updateTransactionRow(
       status: payload.investmentStatus,
       syncSource,
     });
+
+    // Pola sama applyInvestmentTransactionEdit di atas -- status SELALU
+    // dipaksa 'settled' (sama alasan dgn createTransactionRow: form
+    // transaksi utama desktop cuma mendukung jual settled). Oversell
+    // SUDAH divalidasi di precheck sebelum UPDATE baris transaksi di atas.
+    await applySellInvestmentTransactionEdit(env, id, {
+      transactionId: id,
+      accountId: payload.accountId ?? "",
+      transferAccountId: payload.transferAccountId ?? null,
+      date: payload.date,
+      unit: payload.unit ?? 0,
+      pricePerUnit: payload.pricePerUnit ?? 0,
+      status: "settled",
+      syncSource,
+    });
   }
 
   return { status: "ok" };
@@ -494,6 +587,9 @@ export async function deleteTransaction(env: Env, id: string): Promise<DeleteTra
   // investment_purchases turunan, tidak menyentuh/menduplikasi apa pun
   // yg desktop tulis sendiri -- aman dipanggil apa pun syncSource-nya.
   await detachInvestmentPurchaseForDeletedTransaction(env, id);
+  // Sejajar detachInvestmentPurchaseForDeletedTransaction di atas, utk
+  // arah jual -- juga TANPA guard syncSource sama alasannya.
+  await detachInvestmentSaleForDeletedTransaction(env, id);
 
   const now = nowText();
   await env.DB.prepare("UPDATE transactions SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")

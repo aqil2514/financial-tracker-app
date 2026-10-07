@@ -3,13 +3,142 @@ import type { Env } from "../../shared/env";
 import type { SyncSource } from "../../shared/auth";
 import { classifyAccountPair } from "../debts/classify-account-pair";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
-import type { PushInvestmentAccountPayload, PushInvestmentPurchasePayload } from "./schema";
+import type {
+  PushInvestmentAccountPayload,
+  PushInvestmentPurchasePayload,
+  PushInvestmentSalePayload,
+} from "./schema";
 
 async function getAccountType(env: Env, accountId: string): Promise<string | null> {
   const row = await env.DB.prepare("SELECT account_type FROM accounts WHERE id = ?1 AND deleted_at IS NULL")
     .bind(accountId)
     .first<{ account_type: string }>();
   return row?.account_type ?? null;
+}
+
+// Port PERSIS dari
+// apps/desktop/src/shared/investments/investment-holding-math.ts --
+// SATU-SATUNYA sumber rumus ini di Worker (sama alasan dgn desktop:
+// dipakai applySellInvestmentTransaction/settleInvestmentSale, supaya
+// tidak drift). BEDA dari desktop: filter `deleted_at IS NULL` ditambah
+// di KEDUA query (desktop tidak py kolom ini di investment_purchases/
+// investment_sales) -- baris soft-deleted (hasil edit/delete transaksi
+// via jalur MCP/push) TIDAK boleh ikut dihitung.
+export async function getAverageCostPerUnit(env: Env, accountId: string): Promise<number> {
+  const row = await env.DB.prepare(
+    `SELECT SUM(unit * price_per_unit) AS total_cost, SUM(unit) AS total_unit
+     FROM investment_purchases
+     WHERE account_id = ?1 AND status = 'settled' AND deleted_at IS NULL`
+  )
+    .bind(accountId)
+    .first<{ total_cost: number | null; total_unit: number | null }>();
+  const totalUnit = row?.total_unit ?? 0;
+  if (!totalUnit) return 0;
+  return (row?.total_cost ?? 0) / totalUnit;
+}
+
+// Port PERSIS dari investment-holding-math.ts (getRemainingUnit) -- sisa
+// unit yang BISA DIJUAL, bukan total_unit (yang mengikutkan pembelian
+// pending, dipakai Unrealized P/L -- basis BEDA, lihat komentar desktop).
+async function getRemainingUnit(env: Env, accountId: string): Promise<number> {
+  const [purchaseRow, saleRow] = await Promise.all([
+    env.DB.prepare(
+      `SELECT SUM(unit) AS total_unit FROM investment_purchases
+       WHERE account_id = ?1 AND status = 'settled' AND deleted_at IS NULL`
+    )
+      .bind(accountId)
+      .first<{ total_unit: number | null }>(),
+    env.DB.prepare(
+      `SELECT SUM(unit) AS total_unit FROM investment_sales
+       WHERE account_id = ?1 AND status IN ('pending', 'settled') AND deleted_at IS NULL`
+    )
+      .bind(accountId)
+      .first<{ total_unit: number | null }>(),
+  ]);
+
+  const settledPurchased = purchaseRow?.total_unit ?? 0;
+  const sold = saleRow?.total_unit ?? 0;
+  return settledPurchased - sold;
+}
+
+// Port PERSIS dari InsufficientInvestmentUnitsError (desktop) -- dilempar
+// saat unit yang mau dijual > sisa unit yang dimiliki, WAJIB ditolak
+// (beda dari filosofi "tidak menghakimi data" saat BELI).
+export class InsufficientInvestmentUnitsError extends Error {
+  constructor(remainingUnit: number, requestedUnit: number) {
+    super(
+      `Unit yang dijual (${requestedUnit}) melebihi sisa unit yang dimiliki (${remainingUnit}). ` +
+        `Kurangi jumlah unit yang dijual, atau periksa kembali riwayat pembelian/penjualan akun ini.`
+    );
+    this.name = "InsufficientInvestmentUnitsError";
+  }
+}
+
+export type ValidateInvestmentSaleResult = { status: "ok" } | { status: "rejected"; reason: string };
+
+// Pre-check REJECT SEBELUM SIMPAN -- dipanggil dari transactions/service.ts
+// SEBELUM insert/update baris `transactions` arah investment->cash (jual),
+// pola PERSIS validateDebtSettlementAmount (debts/service.ts): kalau
+// reject terjadi SETELAH insert (di dalam applySellInvestmentTransaction),
+// baris transaksi sudah terlanjur tersimpan tanpa investment_sales terkait
+// (tidak atomic). `excludeSaleAccountIdUnit` dipakai jalur EDIT -- unit
+// milik baris LAMA (yang akan direcreate) dikompensasi dulu sebelum
+// membandingkan dengan unit baru, meniru urutan applySellInvestmentTransactionEdit
+// yang menghapus baris lama SEBELUM menghitung ulang sisa unit.
+export async function validateInvestmentSaleUnits(
+  env: Env,
+  {
+    accountId,
+    transferAccountId,
+    unit,
+    excludeUnit = 0,
+  }: { accountId: string; transferAccountId: string | null; unit: number; excludeUnit?: number }
+): Promise<ValidateInvestmentSaleResult> {
+  if (transferAccountId == null) return { status: "ok" };
+
+  const sourceType = await getAccountType(env, accountId);
+  if (sourceType !== "investment") return { status: "ok" };
+
+  const remainingUnit = (await getRemainingUnit(env, accountId)) + excludeUnit;
+  if (unit > remainingUnit) {
+    return {
+      status: "rejected",
+      reason: new InsufficientInvestmentUnitsError(remainingUnit, unit).message,
+    };
+  }
+  return { status: "ok" };
+}
+
+// Port PERSIS logic deteksi+koreksi amount dari use-create-transaction.ts/
+// use-update-transaction.ts (desktop) -- SUMBER KEBENARAN nominal transfer
+// investment->cash BUKAN payload.amount yang dikirim client (field itu
+// dikunci read-only di form desktop, cuma preview), melainkan
+// averageCost x unit, dihitung ulang di SINI SEBELUM baris `transactions`
+// di-insert/update (lihat konsep-investasi.md "Efek ke accounts.balance").
+// null kalau bukan arah jual (bukan urusan fungsi ini) -- caller pakai
+// payload.amount apa adanya.
+export async function resolveInvestmentSellAmount(
+  env: Env,
+  { accountId, transferAccountId, unit }: { accountId: string; transferAccountId: string | null; unit: number | null }
+): Promise<number | null> {
+  if (transferAccountId == null || unit == null) return null;
+
+  const [sourceType, destinationType] = await Promise.all([
+    getAccountType(env, accountId),
+    getAccountType(env, transferAccountId),
+  ]);
+  if (sourceType == null || destinationType == null) return null;
+
+  let pairKind: string;
+  try {
+    pairKind = classifyAccountPair(sourceType, destinationType);
+  } catch {
+    return null; // UnsupportedAccountPairError -- bukan kombinasi investment, no-op.
+  }
+  if (pairKind !== "investment-cash") return null;
+
+  const averageCost = await getAverageCostPerUnit(env, accountId);
+  return averageCost * unit;
 }
 
 export type ApplyInvestmentTransactionInput = {
@@ -145,6 +274,377 @@ export async function detachInvestmentPurchaseForDeletedTransaction(
   return { role: "purchase", investmentPurchaseId: existingId };
 }
 
+// ============================================================
+// Penjualan/penarikan sebagian -- port PERSIS
+// apps/desktop/src/shared/investments/apply-sell-investment-transaction.ts.
+// Jauh lebih kompleks dari pembelian: average cost, Realized P/L snapshot,
+// validasi oversell, dua jalur status (pending TANPA transaksi apa pun
+// sama sekali, settled DENGAN leg transfer + leg penyesuaian P/L) -- lihat
+// komentar panjang applySellInvestmentTransaction desktop utk penjelasan
+// lengkap keputusan arsitektur "dana BARU cair saat settled".
+// ============================================================
+
+export type ApplySellInvestmentTransactionInput = {
+  // Id baris `transactions` leg transfer UTAMA (investment -> cash,
+  // amount = averageCost x unit) yang SUDAH di-INSERT oleh caller SEBELUM
+  // memanggil fungsi ini -- WAJIB diisi kalau status 'settled', HARUS
+  // null kalau status 'pending'.
+  transactionId: string | null;
+  accountId: string;
+  transferAccountId: string | null;
+  date: string;
+  unit: number;
+  pricePerUnit: number;
+  status?: "pending" | "settled";
+  syncSource: SyncSource;
+};
+
+export type TouchedInvestmentSaleRows = {
+  investmentSaleIds: string[];
+  deletedInvestmentSaleIds: string[];
+  adjustmentTransactionId: string | null;
+};
+
+const noneSale: TouchedInvestmentSaleRows = {
+  investmentSaleIds: [],
+  deletedInvestmentSaleIds: [],
+  adjustmentTransactionId: null,
+};
+
+// Port PERSIS applySellInvestmentTransaction (desktop) -- dipanggil dari
+// transactions/service.ts SETELAH baris `transactions` tersimpan (status
+// settled) ATAU langsung tanpa transaksi apa pun (status pending, lihat
+// endpoint POST /investments/sales khusus di bawah -- BEDA dari pembelian
+// yang SELALU dipicu dari transactions/service.ts, jual pending TIDAK
+// pernah melibatkan transactions/service.ts sama sekali).
+export async function applySellInvestmentTransaction(
+  env: Env,
+  input: ApplySellInvestmentTransactionInput
+): Promise<TouchedInvestmentSaleRows> {
+  const { transactionId, accountId, transferAccountId, date, unit, pricePerUnit, status = "pending" } = input;
+
+  // accountId harus bertipe investment -- berlaku utk KEDUA status. Lihat
+  // komentar desktop: transferAccountId SELALU null utk pending (baris
+  // pending tidak menyimpan akun kas), jadi pasangan lengkap baru bisa
+  // divalidasi lewat classifyAccountPair di cabang 'settled' di bawah.
+  const sourceType = await getAccountType(env, accountId);
+  if (sourceType !== "investment") return noneSale;
+
+  // Validasi oversell WAJIB dicek sebelum cabang status -- berlaku utk
+  // KEDUA status (unit sudah dikurangi optimis sejak pending).
+  const remainingUnit = await getRemainingUnit(env, accountId);
+  if (unit > remainingUnit) {
+    throw new InsufficientInvestmentUnitsError(remainingUnit, unit);
+  }
+
+  const saleId = uuidv7();
+  const now = nowText();
+
+  if (status === "pending") {
+    await env.DB.prepare(
+      `INSERT INTO investment_sales
+         (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit,
+          average_cost_per_unit, realized_pl, date, status, created_at, updated_at, sync_source)
+       VALUES (?1, ?2, NULL, NULL, ?3, ?4, NULL, NULL, ?5, 'pending', ?6, ?6, ?7)`
+    )
+      .bind(saleId, accountId, unit, pricePerUnit, date, now, input.syncSource)
+      .run();
+    return { investmentSaleIds: [saleId], deletedInvestmentSaleIds: [], adjustmentTransactionId: null };
+  }
+
+  if (transactionId == null) {
+    throw new Error("transactionId wajib diisi untuk status 'settled' (leg transfer utama harus sudah di-insert).");
+  }
+  if (transferAccountId == null) {
+    throw new Error("transferAccountId wajib diisi untuk status 'settled'.");
+  }
+
+  const destinationType = await getAccountType(env, transferAccountId);
+  if (destinationType == null) {
+    throw new Error("Akun sumber/tujuan transfer tidak ditemukan.");
+  }
+
+  const pairKind = classifyAccountPair(sourceType, destinationType);
+  if (pairKind !== "investment-cash") return noneSale;
+
+  const averageCost = await getAverageCostPerUnit(env, accountId);
+  const { adjustmentTransactionId, realizedPl } = await createAdjustmentTransaction(env, {
+    transferAccountId,
+    date,
+    unit,
+    pricePerUnit,
+    averageCost,
+    syncSource: input.syncSource,
+  });
+
+  await env.DB.prepare(
+    `INSERT INTO investment_sales
+       (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit,
+        average_cost_per_unit, realized_pl, date, status, created_at, updated_at, sync_source)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'settled', ?10, ?10, ?11)`
+  )
+    .bind(
+      saleId,
+      accountId,
+      transactionId,
+      adjustmentTransactionId,
+      unit,
+      pricePerUnit,
+      averageCost,
+      realizedPl,
+      date,
+      now,
+      input.syncSource
+    )
+    .run();
+
+  return { investmentSaleIds: [saleId], deletedInvestmentSaleIds: [], adjustmentTransactionId };
+}
+
+// Port PERSIS createAdjustmentTransaction (desktop) -- leg penyesuaian P/L
+// (kalau ada selisih realizedPl), dipakai BERSAMA applySellInvestmentTransaction
+// (settled langsung saat create) dan settleInvestmentSale (settle baris
+// pending). Average cost dihitung CALLER, dioper sbg parameter.
+async function createAdjustmentTransaction(
+  env: Env,
+  params: {
+    transferAccountId: string;
+    date: string;
+    unit: number;
+    pricePerUnit: number;
+    averageCost: number;
+    syncSource: SyncSource;
+  }
+): Promise<{ adjustmentTransactionId: string | null; realizedPl: number }> {
+  const { transferAccountId, date, unit, pricePerUnit, averageCost, syncSource } = params;
+  const realizedPl = (pricePerUnit - averageCost) * unit;
+
+  let adjustmentTransactionId: string | null = null;
+  if (realizedPl !== 0) {
+    adjustmentTransactionId = uuidv7();
+    const adjustmentType = realizedPl > 0 ? "income" : "expense";
+    const now = nowText();
+    await env.DB.prepare(
+      `INSERT INTO transactions
+         (id, type, amount, category_id, account_id, transfer_account_id, note, date, description,
+          created_at, updated_at, sync_source)
+       VALUES (?1, ?2, ?3, NULL, ?4, NULL, ?5, ?6, NULL, ?7, ?7, ?8)`
+    )
+      .bind(
+        adjustmentTransactionId,
+        adjustmentType,
+        Math.abs(realizedPl),
+        transferAccountId,
+        "Realized P/L penjualan investasi",
+        date,
+        now,
+        syncSource
+      )
+      .run();
+  }
+
+  return { adjustmentTransactionId, realizedPl };
+}
+
+// Port PERSIS settleInvestmentSale (desktop) -- settle satu baris pending,
+// baru di titik INI dana benar-benar "cair": leg transfer utama +
+// penyesuaian P/L dibuat, average cost & Realized P/L dihitung dari
+// kondisi SAAT INI dan disimpan permanen. transferAccountId (akun kas
+// tujuan) WAJIB dioper eksplisit oleh caller -- investment_sales TIDAK
+// menyimpan akun kas tujuan sejak create.
+export type SettleInvestmentSaleResult =
+  | { status: "ok"; transactionId: string; adjustmentTransactionId: string | null }
+  | { status: "not_found" }
+  | { status: "rejected"; reason: string };
+
+export async function settleInvestmentSale(
+  env: Env,
+  saleId: string,
+  transferAccountId: string,
+  syncSource: SyncSource
+): Promise<SettleInvestmentSaleResult> {
+  const sale = await env.DB.prepare(
+    `SELECT account_id, unit, price_per_unit, date, status, transaction_id
+     FROM investment_sales WHERE id = ?1 AND deleted_at IS NULL`
+  )
+    .bind(saleId)
+    .first<{
+      account_id: string;
+      unit: number;
+      price_per_unit: number;
+      date: string;
+      status: string;
+      transaction_id: string | null;
+    }>();
+  if (sale == null) return { status: "not_found" };
+  if (sale.status === "settled" || sale.transaction_id != null) {
+    return { status: "rejected", reason: "Penjualan ini sudah settled." };
+  }
+
+  // Tidak perlu validasi oversell ulang -- unit baris ini SUDAH ikut
+  // dihitung sebagai "terjual" oleh getRemainingUnit sejak status pending,
+  // sudah ditegakkan saat applySellInvestmentTransaction membuat baris ini.
+
+  const averageCostForTransfer = await getAverageCostPerUnit(env, sale.account_id);
+  const transactionId = uuidv7();
+  const now = nowText();
+  await env.DB.prepare(
+    `INSERT INTO transactions
+       (id, type, amount, category_id, account_id, transfer_account_id, note, date, description,
+        created_at, updated_at, sync_source)
+     VALUES (?1, 'transfer', ?2, NULL, ?3, ?4, ?5, ?6, NULL, ?7, ?7, ?8)`
+  )
+    .bind(
+      transactionId,
+      averageCostForTransfer * sale.unit,
+      sale.account_id,
+      transferAccountId,
+      "Settlement penjualan investasi",
+      sale.date,
+      now,
+      syncSource
+    )
+    .run();
+
+  const { adjustmentTransactionId, realizedPl } = await createAdjustmentTransaction(env, {
+    transferAccountId,
+    date: sale.date,
+    unit: sale.unit,
+    pricePerUnit: sale.price_per_unit,
+    averageCost: averageCostForTransfer,
+    syncSource,
+  });
+
+  await env.DB.prepare(
+    `UPDATE investment_sales
+     SET transaction_id = ?1, adjustment_transaction_id = ?2, average_cost_per_unit = ?3, realized_pl = ?4,
+         status = 'settled', updated_at = ?5
+     WHERE id = ?6`
+  )
+    .bind(transactionId, adjustmentTransactionId, averageCostForTransfer, realizedPl, now, saleId)
+    .run();
+
+  return { status: "ok", transactionId, adjustmentTransactionId };
+}
+
+async function getTransactionInvestmentSale(env: Env, transactionId: string): Promise<{ id: string } | null> {
+  const row = await env.DB.prepare(
+    "SELECT id FROM investment_sales WHERE transaction_id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(transactionId)
+    .first<{ id: string }>();
+  return row ?? null;
+}
+
+// Dipakai transactions/service.ts (precheck oversell jalur EDIT) --
+// ambil unit milik baris investment_sales LAMA transaksi yang sedang
+// diedit, utk dikompensasi SEBELUM membandingkan dengan unit baru (meniru
+// urutan applySellInvestmentTransactionEdit yang menghapus baris lama
+// dulu sebelum menghitung ulang sisa unit). 0 kalau transaksi ini belum
+// pernah jadi baris investment_sales (create murni, bukan edit).
+export async function getTransactionInvestmentSaleUnit(env: Env, transactionId: string): Promise<number> {
+  const row = await env.DB.prepare(
+    "SELECT unit FROM investment_sales WHERE transaction_id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(transactionId)
+    .first<{ unit: number }>();
+  return row?.unit ?? 0;
+}
+
+// Port PERSIS applySellInvestmentTransactionEdit (desktop) -- HANYA
+// dipanggil dari transactions/service.ts (form transaksi utama, yang
+// cuma mendukung jual 'settled') -- baris investment_sales yang diedit di
+// sini SELALU sudah py transaction_id terisi.
+export async function applySellInvestmentTransactionEdit(
+  env: Env,
+  transactionId: string,
+  input: ApplySellInvestmentTransactionInput
+): Promise<TouchedInvestmentSaleRows> {
+  const existing = await getTransactionInvestmentSale(env, transactionId);
+
+  if (existing == null) {
+    return applySellInvestmentTransaction(env, { ...input, status: "settled" });
+  }
+
+  await deleteInvestmentSaleAndAdjustment(env, existing.id);
+  const result = await applySellInvestmentTransaction(env, { ...input, status: "settled" });
+  return {
+    investmentSaleIds: result.investmentSaleIds,
+    deletedInvestmentSaleIds: [existing.id, ...result.deletedInvestmentSaleIds],
+    adjustmentTransactionId: result.adjustmentTransactionId,
+  };
+}
+
+// Port PERSIS deleteInvestmentSaleAndAdjustment (desktop) -- BEDA: soft-
+// delete (bukan hard DELETE SQL) utk KEDUA baris (investment_sales +
+// transaksi penyesuaian P/L miliknya) krn keduanya ikut sync. Mengembalikan
+// id transaksi penyesuaian yang ikut di-soft-delete (atau null).
+async function deleteInvestmentSaleAndAdjustment(env: Env, saleId: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    "SELECT adjustment_transaction_id FROM investment_sales WHERE id = ?1"
+  )
+    .bind(saleId)
+    .first<{ adjustment_transaction_id: string | null }>();
+  const adjustmentId = row?.adjustment_transaction_id ?? null;
+
+  const now = nowText();
+  await env.DB.prepare("UPDATE investment_sales SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
+    .bind(now, saleId)
+    .run();
+
+  if (adjustmentId != null) {
+    await env.DB.prepare("UPDATE transactions SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
+      .bind(now, adjustmentId)
+      .run();
+  }
+  return adjustmentId;
+}
+
+export type DeletedTransactionInvestmentSaleInfo =
+  | { role: "none" }
+  | { role: "sale"; investmentSaleId: string; adjustmentTransactionId: string | null };
+
+// Port PERSIS detachInvestmentSaleForDeletedTransaction (desktop) --
+// dipanggil dari transactions/service.ts deleteTransaction, TANPA guard
+// syncSource (pola sama detachInvestmentPurchaseForDeletedTransaction).
+export async function detachInvestmentSaleForDeletedTransaction(
+  env: Env,
+  transactionId: string
+): Promise<DeletedTransactionInvestmentSaleInfo> {
+  const existing = await getTransactionInvestmentSale(env, transactionId);
+  if (existing == null) return { role: "none" };
+
+  const adjustmentTransactionId = await deleteInvestmentSaleAndAdjustment(env, existing.id);
+  return { role: "sale", investmentSaleId: existing.id, adjustmentTransactionId };
+}
+
+export type DeletePendingInvestmentSaleResult =
+  | { status: "ok" }
+  | { status: "not_found" }
+  | { status: "rejected"; reason: string };
+
+// Port PERSIS deletePendingInvestmentSale (desktop) -- hapus baris
+// investment_sales yang MASIH pending, dipanggil LANGSUNG dari UI riwayat
+// penjualan (BUKAN dari jalur hapus transaksi). BEDA: soft-delete (bukan
+// hard DELETE).
+export async function deletePendingInvestmentSale(env: Env, saleId: string): Promise<DeletePendingInvestmentSaleResult> {
+  const sale = await env.DB.prepare(
+    "SELECT status, transaction_id FROM investment_sales WHERE id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(saleId)
+    .first<{ status: string; transaction_id: string | null }>();
+  if (sale == null) return { status: "not_found" };
+  if (sale.status === "settled" || sale.transaction_id != null) {
+    return { status: "rejected", reason: "Penjualan yang sudah settled hanya bisa dihapus lewat hapus transaksinya." };
+  }
+
+  const now = nowText();
+  await env.DB.prepare("UPDATE investment_sales SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
+    .bind(now, saleId)
+    .run();
+  return { status: "ok" };
+}
+
 export type PushResult = { status: "ok"; id: string } | { status: "stale" };
 
 // Upsert-by-id MURNI utk baris investment_accounts yg desktop SUDAH buat
@@ -272,6 +772,92 @@ export async function deletePushedInvestmentPurchase(env: Env, id: string): Prom
 
   const now = nowText();
   await env.DB.prepare("UPDATE investment_purchases SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
+    .bind(now, id)
+    .run();
+  return { status: "ok" };
+}
+
+// Sejajar pushInvestmentPurchaseFromPc, utk investment_sales -- upsert-by-id
+// MURNI dipakai desktop utk jalur yang TIDAK dipicu insert transaksi baru
+// di Worker: status 'pending' (TIDAK PERNAH melibatkan transactions/
+// service.ts sama sekali, lihat applySellInvestmentTransaction) ATAU
+// 'settled' hasil dialog "Jual Investasi" khusus (transaksinya di-push
+// terpisah via /transactions/push, baris investment_sales-nya di sini).
+export async function pushInvestmentSaleFromPc(
+  env: Env,
+  payload: PushInvestmentSalePayload,
+  syncSource: SyncSource
+): Promise<PushResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM investment_sales WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  const now = nowText();
+  if (existing) {
+    await env.DB.prepare(
+      `UPDATE investment_sales
+       SET account_id = ?1, transaction_id = ?2, adjustment_transaction_id = ?3, unit = ?4, price_per_unit = ?5,
+           average_cost_per_unit = ?6, realized_pl = ?7, date = ?8, status = ?9, updated_at = ?10, deleted_at = NULL
+       WHERE id = ?11`
+    )
+      .bind(
+        payload.accountId,
+        payload.transactionId,
+        payload.adjustmentTransactionId,
+        payload.unit,
+        payload.pricePerUnit,
+        payload.averageCostPerUnit,
+        payload.realizedPl,
+        payload.date,
+        payload.status ?? "pending",
+        decision.updatedAt,
+        payload.id
+      )
+      .run();
+    return { status: "ok", id: payload.id };
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO investment_sales
+       (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit,
+        average_cost_per_unit, realized_pl, date, status, created_at, updated_at, sync_source)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`
+  )
+    .bind(
+      payload.id,
+      payload.accountId,
+      payload.transactionId,
+      payload.adjustmentTransactionId,
+      payload.unit,
+      payload.pricePerUnit,
+      payload.averageCostPerUnit,
+      payload.realizedPl,
+      payload.date,
+      payload.status ?? "pending",
+      now,
+      decision.updatedAt,
+      syncSource
+    )
+    .run();
+
+  return { status: "ok", id: payload.id };
+}
+
+// Sejajar deletePushedInvestmentPurchase, utk investment_sales -- soft-
+// delete murni utk baris yg PC hapus lokal sbg bagian dari RECREATE
+// (applySellInvestmentTransactionEdit lokal).
+export async function deletePushedInvestmentSale(env: Env, id: string): Promise<DeletePushedResult> {
+  const existing = await env.DB.prepare("SELECT id FROM investment_sales WHERE id = ?1 AND deleted_at IS NULL")
+    .bind(id)
+    .first<{ id: string }>();
+  if (!existing) return { status: "not_found" };
+
+  const now = nowText();
+  await env.DB.prepare("UPDATE investment_sales SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
     .bind(now, id)
     .run();
   return { status: "ok" };

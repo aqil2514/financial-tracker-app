@@ -58,3 +58,58 @@ export function isPushInvestmentPurchasePayload(value: unknown): value is PushIn
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
 }
+
+// Payload POST /investments/sales/push -- upsert-by-id MURNI utk baris
+// investment_sales yg desktop SUDAH buat sendiri (apply-sell-investment-
+// transaction.ts lokal, pending ATAU settled). transactionId/
+// adjustmentTransactionId NULLABLE -- NULL selama status 'pending' (lihat
+// desktop: TIDAK ADA transaksi sama sekali sampai settled), terisi begitu
+// settled. average_cost_per_unit/realized_pl juga nullable sama alasan
+// (lihat skema desktop migrasi 0041).
+export type PushInvestmentSalePayload = {
+  id: string;
+  accountId: string;
+  transactionId: string | null;
+  adjustmentTransactionId: string | null;
+  unit: number;
+  pricePerUnit: number;
+  averageCostPerUnit: number | null;
+  realizedPl: number | null;
+  date: string;
+  status?: "pending" | "settled";
+  updatedAt?: string;
+};
+
+export function isPushInvestmentSalePayload(value: unknown): value is PushInvestmentSalePayload {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "string" &&
+    typeof v.accountId === "string" &&
+    v.accountId.length > 0 &&
+    (v.transactionId === null || typeof v.transactionId === "string") &&
+    (v.adjustmentTransactionId === null || typeof v.adjustmentTransactionId === "string") &&
+    typeof v.unit === "number" &&
+    typeof v.pricePerUnit === "number" &&
+    (v.averageCostPerUnit === null || typeof v.averageCostPerUnit === "number") &&
+    (v.realizedPl === null || typeof v.realizedPl === "number") &&
+    typeof v.date === "string" &&
+    (v.status === undefined || v.status === "pending" || v.status === "settled") &&
+    (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
+  );
+}
+
+// Payload POST /investments/sales/:id/settle -- settle satu baris pending
+// (pola PERSIS settleInvestmentSale desktop): akun kas tujuan WAJIB
+// dioper eksplisit (investment_sales TIDAK menyimpan akun kas tujuan
+// sejak create, lihat komentar settleInvestmentSale di
+// apply-sell-investment-transaction.ts desktop).
+export type SettleInvestmentSalePayload = {
+  transferAccountId: string;
+};
+
+export function isSettleInvestmentSalePayload(value: unknown): value is SettleInvestmentSalePayload {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.transferAccountId === "string" && v.transferAccountId.length > 0;
+}
