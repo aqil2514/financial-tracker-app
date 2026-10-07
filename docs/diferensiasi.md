@@ -1,383 +1,112 @@
 # Diferensiasi `financial-app`
 
-> Dokumen ini merangkum apa yang membedakan `financial-app` dari aplikasi
-> pencatatan keuangan pribadi yang sudah ada (acuan utama: **Money
-> Manager**, aplikasi yang sebelumnya dipakai dan datanya diimpor ke
-> aplikasi ini — lihat `internal/backups/`). Proyek ini portofolio-only,
-> jadi diferensiasi di sini soal kualitas produk & teknik, bukan strategi
-> monetisasi.
+> Dokumen ini merangkum apa yang membedakan `financial-app` dari aplikasi pencatatan keuangan pribadi yang sudah ada (acuan utama: **Money Manager**, aplikasi yang sebelumnya dipakai dan datanya diimpor ke aplikasi ini`). Proyek ini portofolio-only, jadi diferensiasi di sini soal kualitas produk & teknik, bukan strategi monetisasi.
 
 ## Status per platform
 
-- **Desktop** (`apps/desktop`, Tauri + Next.js) — platform utama, paling
-  matang. Semua fitur di bawah ini dibangun & diverifikasi di sini.
-- **Mobile** (`apps/mobile`, Expo/React Native) — **belum selesai**, baru
-  skeleton project (`App.tsx`, belum ada fitur). Rencana awal ada di
-  `finance-app-plan.md` (fitur core, AI assistant, dst) tapi belum
-  diimplementasikan. Jangan asumsikan paritas fitur dengan desktop.
+- **Desktop** (`apps/desktop`, Tauri + Next.js) — platform utama, paling matang. Semua fitur di bawah ini dibangun & diverifikasi di sini.
+- **Mobile** (`apps/mobile`, Expo/React Native) — **belum selesai**, baru skeleton project (`App.tsx`, belum ada fitur). Rencana awal ada di `finance-app-plan.md` (fitur core, AI assistant, dst) tapi belum diimplementasikan. Jangan asumsikan paritas fitur dengan desktop.
 
 ## 1. Utang-piutang sebagai entitas, bukan sekadar transaksi
 
-**Masalah nyata di Money Manager**: utang-piutang cuma bisa dicatat lewat
-akun virtual (mis. akun "Piutang" bertag) yang ditransfer masuk/keluar.
-Tidak ada rangkuman "si X total masih pinjam berapa ke saya sekarang" —
-kalau ditanya langsung, harus dihitung manual di luar app.
+**Masalah nyata di Money Manager**: utang-piutang cuma bisa dicatat lewat akun virtual (mis. akun "Piutang" bertag) yang ditransfer masuk/keluar. Tidak ada rangkuman "si X total masih pinjam berapa ke saya sekarang" — kalau ditanya langsung, harus dihitung manual di luar app.
 
 **Pendekatan `financial-app`**:
-- Tabel `debts`/`debt_payments` terpisah dengan lifecycle sendiri
-  (`ongoing` → `paid`/`written_off`), bukan cuma akun virtual.
-- **Dideteksi otomatis dari arah transfer** (kas ↔ akun bertipe `debt`) —
-  bukan form terpisah yang harus diingat-ingat untuk diisi. Transfer biasa
-  yang sudah jadi kebiasaan lama tetap jalan seperti biasa, sistem yang
-  menafsirkan.
-- **Kontak sebagai entitas umum** (`contacts`), bukan teks bebas —
-  ditemukan dari data nyata bahwa nama yang sama ditulis tidak konsisten
-  ("Mama Minjem" vs "mama balikin"), yang akan memecah rangkuman per
-  orang kalau tetap pakai teks bebas.
-- Pelunasan mendukung **multi-piutang sekaligus** dengan alokasi FIFO
-  otomatis (piutang terlama dilunasi duluan), termasuk pembayaran
-  sebagian (cicilan).
-- Halaman `/debts`, `/debts/receivables`, `/debts/payables` menjawab
-  langsung pain point: ringkasan per kontak, siapa berutang/dipinjami
-  berapa, kapan pun dilihat — tanpa hitung manual.
 
-**Terverifikasi di database production** (`finance.db`, dicek 2026-09-27,
-bukan cuma `finance.dev.db`) — fitur ini sudah dipakai untuk mencatat
-data finansial riil, bukan cuma demo/uji coba yang ditinggal:
+- Tabel `debts`/`debt_payments` terpisah dengan lifecycle sendiri (`ongoing` → `paid`/`written_off`), bukan cuma akun virtual.
+- **Dideteksi otomatis dari arah transfer** (kas ↔ akun bertipe `debt`) — bukan form terpisah yang harus diingat-ingat untuk diisi. Transfer biasa yang sudah jadi kebiasaan lama tetap jalan seperti biasa, sistem yang menafsirkan.
+- **Kontak sebagai entitas umum** (`contacts`), bukan teks bebas — ditemukan dari data nyata bahwa nama yang sama ditulis tidak konsisten ("Mama Minjem" vs "mama balikin"), yang akan memecah rangkuman per orang kalau tetap pakai teks bebas.
+- Pelunasan mendukung **multi-piutang sekaligus** dengan alokasi FIFO otomatis (piutang terlama dilunasi duluan), termasuk pembayaran sebagian (cicilan).
+- Halaman `/debts`, `/debts/receivables`, `/debts/payables` menjawab langsung pain point: ringkasan per kontak, siapa berutang/dipinjami berapa, kapan pun dilihat — tanpa hitung manual.
+
+**Terverifikasi di database production** (`finance.db`, dicek 2026-09-27, bukan cuma `finance.dev.db`) — fitur ini sudah dipakai untuk mencatat data finansial riil, bukan cuma demo/uji coba yang ditinggal:
+
 - 5 baris `debts` (semua `type='receivable'`), 3 baris `debt_payments`.
-- Status campuran: 2 sudah `paid` (Kak Ipit Rp196.243, Mama Dicky
-  Rp150.000), 3 masih `ongoing` (2 piutang Nde Munan total Rp4.000.000,
-  1 piutang baru Mama Dicky Rp300.000) — bukti lifecycle status
-  benar-benar dipakai, bukan cuma satu snapshot statis.
-- 3 akun `account_type='debt'` yang dipakai (Keluarga, Orang Lain,
-  Bisnis) adalah akun virtual LAMA yang sama persis dengan yang dulu
-  dipakai manual di Money Manager (lihat "Masalah nyata" di atas) — jadi
-  transisinya alami, bukan alur baru yang harus dipelajari ulang.
+- Status campuran: 2 sudah `paid` (Kak Ipit Rp196.243, Mama Dicky Rp150.000), 3 masih `ongoing` (2 piutang Nde Munan total Rp4.000.000, 1 piutang baru Mama Dicky Rp300.000) — bukti lifecycle status benar-benar dipakai, bukan cuma satu snapshot statis.
+- 3 akun `account_type='debt'` yang dipakai (Keluarga, Orang Lain, Bisnis) adalah akun virtual LAMA yang sama persis dengan yang dulu dipakai manual di Money Manager (lihat "Masalah nyata" di atas) — jadi transisinya alami, bukan alur baru yang harus dipelajari ulang.
 
-**Batas penting soal apa yang dibuktikan data ini**: ini membuktikan
-fitur *berfungsi dan dipakai sungguhan* — kematangan produk naik dari
-"sudah diuji" jadi "sudah dipakai nyata". Ini **tidak** menambah bukti
-baru untuk klaim diferensiasi terhadap kompetitor — klaim itu tetap
-berdiri di atas bukti yang sudah ada (pola 70 transaksi "minjem"/
-"balikin" yang terjebak tanpa rangkuman di Money Manager). Kedua hal ini
-dijaga tetap terpisah supaya tidak tertukar.
+**Batas penting soal apa yang dibuktikan data ini**: ini membuktikan fitur *berfungsi dan dipakai sungguhan* — kematangan produk naik dari "sudah diuji" jadi "sudah dipakai nyata". Ini **tidak** menambah bukti baru untuk klaim diferensiasi terhadap kompetitor — klaim itu tetap berdiri di atas bukti yang sudah ada (pola 70 transaksi "minjem"/"balikin" yang terjebak tanpa rangkuman di Money Manager). Kedua hal ini dijaga tetap terpisah supaya tidak tertukar.
 
-**UPDATE 2026-10-03**: penanganan penghapusan transaksi yang berkaitan
-dengan piutang/utang juga diperhalus — menghapus transaksi tidak lagi
-diam-diam merusak jejak piutang (gap lama yang baru ditutup), nominal
-piutang/utang dijamin tidak pernah berubah akibat penghapusan transaksi
-apa pun. Konsep lengkap (ditulis utk audiens non-teknis): lihat
-`docs/concept/konsep-utang-piutang.md`.
+**UPDATE 2026-10-03**: penanganan penghapusan transaksi yang berkaitan dengan piutang/utang juga diperhalus — menghapus transaksi tidak lagi diam-diam merusak jejak piutang (gap lama yang baru ditutup), nominal piutang/utang dijamin tidak pernah berubah akibat penghapusan transaksi apa pun. Konsep lengkap (ditulis utk audiens non-teknis): lihat `docs/concept/konsep-utang-piutang.md`.
 
 Detail teknis lengkap: `apps/desktop/docs/todos/done/debt-receivable-tracking.md`.
 
 ## 2. Tipe akun (`account_type`) yang mempengaruhi perilaku, bukan cuma label
 
-**Pendekatan umum di aplikasi pencatatan keuangan** (termasuk Money
-Manager): akun biasanya cuma punya nama + grup/kategori pengelompokan
-bebas (`group_id` di `financial-app` sebelum ini) — sekadar label
-kosmetik untuk sortir tampilan, tidak mempengaruhi logic apa pun. Semua
-akun (kas, bank, "akun" utang-piutang virtual) diperlakukan identik oleh
-sistem: sama-sama cuma penampung saldo lewat transaksi debit/kredit.
+**Pendekatan umum di aplikasi pencatatan keuangan** (termasuk Money Manager): akun biasanya cuma punya nama + grup/kategori pengelompokan bebas (`group_id` di `financial-app` sebelum ini) — sekadar label kosmetik untuk sortir tampilan, tidak mempengaruhi logic apa pun. Semua akun (kas, bank, "akun" utang-piutang virtual) diperlakukan identik oleh sistem: sama-sama cuma penampung saldo lewat transaksi debit/kredit.
 
-**Pendekatan `financial-app`**: `accounts.account_type` (migrasi
-`0013_account_type.sql`) adalah kolom yang benar-benar dibaca logic
-aplikasi, bukan cuma tampilan. Saat ini ada 3 nilai berjalan — `cash`
-(default, akun kas/bank biasa), `debt` (akun virtual utang-piutang), dan
-`investment` (migrasi `0035_account_type_investment.sql`, satu instrumen
-investasi tunggal — lihat `docs/concept/konsep-investasi.md`) — dan
-**tipe akun ini yang menentukan apakah field kontak wajib diisi, apakah
-transfer memicu pembuatan entitas `debts`/`investment_purchases`, dan ke
-arah mana** (lihat bagian 1). Ini beda mendasar dari sekadar
-"kategori akun": mengubah `account_type` sebuah akun mengubah perilaku
-form transaksi terkait akun itu.
+**Pendekatan `financial-app`**: `accounts.account_type` (migrasi `0013_account_type.sql`) adalah kolom yang benar-benar dibaca logic aplikasi, bukan cuma tampilan. Saat ini ada 3 nilai berjalan — `cash` (default, akun kas/bank biasa), `debt` (akun virtual utang-piutang), dan `investment` (migrasi `0035_account_type_investment.sql`, satu instrumen investasi tunggal — lihat `docs/concept/konsep-investasi.md`) — dan **tipe akun ini yang menentukan apakah field kontak wajib diisi, apakah transfer memicu pembuatan entitas `debts`/`investment_purchases`, dan ke arah mana** (lihat bagian 1). Ini beda mendasar dari sekadar "kategori akun": mengubah `account_type` sebuah akun mengubah perilaku form transaksi terkait akun itu.
 
-**Bukti konkret dari kode** (bukan cuma niat di dokumen rencana) —
-`account_type` dipakai sebagai *gate* keputusan di tiga fitur berbeda,
-bukan satu tempat terisolasi:
-- `features/transactions/form/add-edit/hooks/use-transaction-form.ts` —
-  `sourceAccount.account_type === "debt"` menentukan field kontak &
-  `DebtActionField` muncul atau tidak di form transaksi.
-- `features/retailku/sync-cashflow/.../use-sync-prerequisites.ts` —
-  akun yang boleh dipetakan sebagai tujuan sync cashflow Retailku
-  **difilter** ke `account_type === "cash"` saja; akun `debt` sengaja
-  dikecualikan karena secara ekonomi bukan akun kas/bank sungguhan.
-- `shared/debts/apply-debt-transaction.ts` — query balik ke DB untuk
-  ambil `account_type` tiap transaksi transfer diproses, jadi penentu
-  utama alur mana yang berjalan (piutang baru / pelunasan / dilewati
-  sepenuhnya untuk kasus `debt↔debt`).
+**Bukti konkret dari kode** (bukan cuma niat di dokumen rencana) — `account_type` dipakai sebagai *gate* keputusan di tiga fitur berbeda, bukan satu tempat terisolasi:
 
-Dua fitur independen (sync Retailku, tracking utang-piutang) sama-sama
-bersandar pada satu kontrak (`account_type`) tanpa duplikasi logic
-klasifikasi akun masing-masing — tanda desain yang koheren lintas
-domain, bukan solusi lokal per fitur.
+- `features/transactions/form/add-edit/hooks/use-transaction-form.ts` — `sourceAccount.account_type === "debt"` menentukan field kontak & `DebtActionField` muncul atau tidak di form transaksi.
+- `features/retailku/sync-cashflow/.../use-sync-prerequisites.ts` — akun yang boleh dipetakan sebagai tujuan sync cashflow Retailku **difilter** ke `account_type === "cash"` saja; akun `debt` sengaja dikecualikan karena secara ekonomi bukan akun kas/bank sungguhan.
+- `shared/debts/apply-debt-transaction.ts` — query balik ke DB untuk ambil `account_type` tiap transaksi transfer diproses, jadi penentu utama alur mana yang berjalan (piutang baru / pelunasan / dilewati sepenuhnya untuk kasus `debt↔debt`).
+
+Dua fitur independen (sync Retailku, tracking utang-piutang) sama-sama bersandar pada satu kontrak (`account_type`) tanpa duplikasi logic klasifikasi akun masing-masing — tanda desain yang koheren lintas domain, bukan solusi lokal per fitur.
 
 Beberapa hal lain yang mengiringi desain ini:
-- **Constraint di level database** (`CHECK (account_type IN (...))`),
-  bukan cuma divalidasi di aplikasi — SQLite tidak izinkan `ALTER` bebas
-  ke `CHECK` yang sudah ada, jadi daftar tipe akun sengaja dibuat
-  bertahap & hati-hati (nilai baru butuh migrasi "copy-and-rename",
-  bukan `ALTER TABLE` sederhana) — trade-off yang diketahui dan diterima
-  sejak desain awal (`docs/todos/plan/account-type.md`).
-- **`investment` SUDAH diimplementasikan penuh** (2026-10-06, lihat
-  `docs/concept/konsep-investasi.md` & `apps/desktop/docs/todos/plan/account-type-investment.md`)
-  dan lolos smoke test manual — bukan lagi kandidat rencana. Tabel
-  detail `investment_accounts` (1:1 dengan `accounts`, kolom `unit_label`
-  + `current_market_value` manual) dan riwayat per-lot
-  `investment_purchases` (`unit`, `price_per_unit`, `status`
-  `pending`/`settled` untuk settlement tertunda spt reksadana T+1/T+2).
-  Juga jadi tujuan akhir baris `INVESTMENT_TRANSACTION` dari sync
-  Retailku yang untuk sekarang masih menumpang di klasifikasi `transfer`
-  (lihat bagian 3 di bawah — pemetaan sync-nya sendiri belum dikerjakan,
-  itu kerja terpisah).
-- **Tipe kompleks lain masih kandidat, belum diimplementasikan**:
-  `credit` (limit, tanggal jatuh tempo, bunga), `forex` (mata uang asal &
-  kurs), `advance`/uang muka (uang yang sudah keluar tapi belum jadi
-  biaya, dipicu kebutuhan nyata sync `PURCHASE_ORDER` Retailku), dan
-  `third_party`/dana titipan (uang yang tercampur fisik di kas tapi
-  bukan milik pemilik akun, dipicu kebutuhan nyata `CASH_OPNAME`
-  Retailku). Semua kandidat ini punya sumber kebutuhan nyata yang
-  terdokumentasi, bukan spekulasi fitur.
-- Tiap tipe kompleks (termasuk `investment` yang sudah jadi) punya
-  **tabel detail terpisah** (`investment_accounts`, rencana
-  `credit_accounts`, dst) yang mereferensi `accounts.id`, sengaja
-  menghindari kolom JSON generik supaya validasi SQL untuk data
-  finansial tetap ketat — beda dari pendekatan skema fleksibel/NoSQL
-  yang kadang dipakai aplikasi lain untuk field per-tipe yang bervariasi.
+
+- **Constraint di level database** (`CHECK (account_type IN (...))`), bukan cuma divalidasi di aplikasi — SQLite tidak izinkan `ALTER` bebas ke `CHECK` yang sudah ada, jadi daftar tipe akun sengaja dibuat bertahap & hati-hati (nilai baru butuh migrasi "copy-and-rename", bukan `ALTER TABLE` sederhana) — trade-off yang diketahui dan diterima sejak desain awal (`docs/todos/plan/account-type.md`).
+- **`investment` SUDAH diimplementasikan penuh** (2026-10-06, lihat `docs/concept/konsep-investasi.md` & `apps/desktop/docs/todos/plan/account-type-investment.md`) dan lolos smoke test manual — bukan lagi kandidat rencana. Tabel detail `investment_accounts` (1:1 dengan `accounts`, kolom `unit_label` + `current_market_value` manual) dan riwayat per-lot `investment_purchases` (`unit`, `price_per_unit`, `status` `pending`/`settled` untuk settlement tertunda spt reksadana T+1/T+2). Juga jadi tujuan akhir baris `INVESTMENT_TRANSACTION` dari sync Retailku yang untuk sekarang masih menumpang di klasifikasi `transfer` (lihat bagian 3 di bawah — pemetaan sync-nya sendiri belum dikerjakan, itu kerja terpisah).
+- **Tipe kompleks lain masih kandidat, belum diimplementasikan**: `credit` (limit, tanggal jatuh tempo, bunga), `forex` (mata uang asal & kurs), `advance`/uang muka (uang yang sudah keluar tapi belum jadi biaya, dipicu kebutuhan nyata sync `PURCHASE_ORDER` Retailku), dan `third_party`/dana titipan (uang yang tercampur fisik di kas tapi bukan milik pemilik akun, dipicu kebutuhan nyata `CASH_OPNAME` Retailku). Semua kandidat ini punya sumber kebutuhan nyata yang terdokumentasi, bukan spekulasi fitur.
+- Tiap tipe kompleks (termasuk `investment` yang sudah jadi) punya **tabel detail terpisah** (`investment_accounts`, rencana `credit_accounts`, dst) yang mereferensi `accounts.id`, sengaja menghindari kolom JSON generik supaya validasi SQL untuk data finansial tetap ketat — beda dari pendekatan skema fleksibel/NoSQL yang kadang dipakai aplikasi lain untuk field per-tipe yang bervariasi.
 
 ### Potensi vs realita: tidak semua tipe kandidat punya bobot diferensiasi yang sama
 
-Penting dipisahkan supaya tidak menyamaratakan — kedalaman diferensiasi
-antar tipe (baik yang sudah dibangun maupun masih kandidat) **tidak
-seragam**:
+Penting dipisahkan supaya tidak menyamaratakan — kedalaman diferensiasi antar tipe (baik yang sudah dibangun maupun masih kandidat) **tidak seragam**:
 
-- **`investment` (SUDAH dibangun) — lebih dalam dari sekadar field
-  tambahan, tapi tidak seunik `advance`/`third_party` di bawah.** Model
-  akhirnya BUKAN cuma kolom `unit`/`harga`/`return` seperti rencana awal
-  — ada riwayat per-lot (`investment_purchases`) dengan lifecycle
-  settlement (`pending`→`settled`, menangani kasus nyata reksadana
-  T+1/T+2 yang unit finalnya belum diketahui saat beli), nilai pasar
-  manual yang sengaja terpisah dari saldo akun supaya tidak pernah
-  diam-diam mengubah modal (lihat `konsep-investasi.md` bagian "Update
-  nilai pasar terkini TIDAK mengubah saldo akun"), dan Unrealized P/L
-  yang dihitung sebagai "return posisi aktif" bukan return historis
-  total. Ini memang masih **fitur yang sudah jadi standar** di aplikasi
-  finance personal kelas menengah-atas (Spendee, Money Lover, YNAB) dari
-  sisi KEBUTUHAN-nya — jadi tetap **mengejar ketertinggalan** kalau
-  dibandingkan cakupan fitur mereka, bukan pembeda baru dari sisi "apa
-  yang user lihat". Yang jadi bukti diferensiasi di sini bukan fiturnya
-  sendiri, tapi **pola arsitektur gate `account_type`-nya terbukti
-  kokoh** menghadapi tipe non-trivial pertama (lihat paragraf "Batas
-  klaim" di bawah, direvisi) — bukan lagi klaim yang masih tertunda.
-- **`credit`, `forex` — masih kandidat, dangkal sebagai diferensiasi**,
-  walau tetap berguna kalau dibangun. Rencananya baru berupa field
-  tambahan (limit, jatuh tempo, bunga / kurs) — persis fitur standar di
-  aplikasi finance personal kelas menengah-atas, bukan hal baru. Kalau
-  cuma menambah kolom tanpa logic lintas-fitur yang khas, ini akan
-  **mengejar ketertinggalan**, bukan membuat pembeda baru.
-- **`advance` (uang muka) dan `third_party` (dana titipan) — masih
-  kandidat, berpotensi tetap mendalam**. Keduanya bukan "jenis akun"
-  dalam pengertian umum (kartu kredit, saham), melainkan **konsep
-  neraca akuntansi** (uang keluar tapi belum jadi biaya; uang di kas
-  tapi bukan milik pemilik akun) yang lahir langsung dari kebutuhan
-  nyata sync Retailku (`PURCHASE_ORDER`, `CASH_OPNAME`). Aplikasi
-  pencatatan keuangan personal pada umumnya tidak punya konsep ini sama
-  sekali, karena mereka tidak berurusan dengan uang muka pembelian atau
-  dana konsinyasi pihak ketiga. Kalau diimplementasikan penuh — bukan
-  cuma kolom tambahan, tapi logic realisasi `advance` → beban/persediaan
-  saat `PURCHASE_RECEIVING`, dan pemisahan saldo `third_party` dari
-  saldo pemilik akun — ini jadi diferensiasi yang sulit ditiru aplikasi
-  personal-finance lain, karena mereka tidak punya *alasan* domain untuk
-  membangunnya.
+- **`investment` (SUDAH dibangun) — lebih dalam dari sekadar field tambahan, tapi tidak seunik `advance`/`third_party` di bawah.** Model akhirnya BUKAN cuma kolom `unit`/`harga`/`return` seperti rencana awal — ada riwayat per-lot (`investment_purchases`) dengan lifecycle settlement (`pending`→`settled`, menangani kasus nyata reksadana T+1/T+2 yang unit finalnya belum diketahui saat beli), nilai pasar manual yang sengaja terpisah dari saldo akun supaya tidak pernah diam-diam mengubah modal (lihat `konsep-investasi.md` bagian "Update nilai pasar terkini TIDAK mengubah saldo akun"), dan Unrealized P/L yang dihitung sebagai "return posisi aktif" bukan return historis total. Ini memang masih **fitur yang sudah jadi standar** di aplikasi finance personal kelas menengah-atas (Spendee, Money Lover, YNAB) dari sisi KEBUTUHAN-nya — jadi tetap **mengejar ketertinggalan** kalau dibandingkan cakupan fitur mereka, bukan pembeda baru dari sisi "apa yang user lihat". Yang jadi bukti diferensiasi di sini bukan fiturnya sendiri, tapi **pola arsitektur gate `account_type`-nya terbukti kokoh** menghadapi tipe non-trivial pertama (lihat paragraf "Batas klaim" di bawah, direvisi) — bukan lagi klaim yang masih tertunda.
+- **`credit`, `forex` — masih kandidat, dangkal sebagai diferensiasi**, walau tetap berguna kalau dibangun. Rencananya baru berupa field tambahan (limit, jatuh tempo, bunga / kurs) — persis fitur standar di aplikasi finance personal kelas menengah-atas, bukan hal baru. Kalau cuma menambah kolom tanpa logic lintas-fitur yang khas, ini akan **mengejar ketertinggalan**, bukan membuat pembeda baru.
+- **`advance` (uang muka) dan `third_party` (dana titipan) — masih kandidat, berpotensi tetap mendalam**. Keduanya bukan "jenis akun" dalam pengertian umum (kartu kredit, saham), melainkan **konsep neraca akuntansi** (uang keluar tapi belum jadi biaya; uang di kas tapi bukan milik pemilik akun) yang lahir langsung dari kebutuhan nyata sync Retailku (`PURCHASE_ORDER`, `CASH_OPNAME`). Aplikasi pencatatan keuangan personal pada umumnya tidak punya konsep ini sama sekali, karena mereka tidak berurusan dengan uang muka pembelian atau dana konsinyasi pihak ketiga. Kalau diimplementasikan penuh — bukan cuma kolom tambahan, tapi logic realisasi `advance` → beban/persediaan saat `PURCHASE_RECEIVING`, dan pemisahan saldo `third_party` dari saldo pemilik akun — ini jadi diferensiasi yang sulit ditiru aplikasi personal-finance lain, karena mereka tidak punya *alasan* domain untuk membangunnya.
 
-Ringkasnya: kedalaman potensi diferensiasi account-type bukan soal
-*berapa banyak* tipe yang selesai, tapi **tipe mana** yang selesai —
-dan untuk `investment`, diferensiasinya ada di pola arsitekturnya yang
-terbukti bertahan untuk tipe non-trivial, bukan di fitur itu sendiri
-yang (dari sisi cakupan) masih sejajar aplikasi lain.
+Ringkasnya: kedalaman potensi diferensiasi account-type bukan soal *berapa banyak* tipe yang selesai, tapi **tipe mana** yang selesai — dan untuk `investment`, diferensiasinya ada di pola arsitekturnya yang terbukti bertahan untuk tipe non-trivial, bukan di fitur itu sendiri yang (dari sisi cakupan) masih sejajar aplikasi lain.
 
-Secara kematangan: 3 dari banyak tipe yang direncanakan sudah
-diimplementasikan (`cash`, `debt`, `investment`) — kredit/valas/advance/
-third_party belum ada sama sekali. Diferensiasinya ada di **arsitektur
-& niat desain** (tipe akun sebagai penggerak perilaku dengan jejak
-kebutuhan nyata di baliknya), bukan di cakupan tipe akun yang sudah jadi.
+Secara kematangan: 3 dari banyak tipe yang direncanakan sudah diimplementasikan (`cash`, `debt`, `investment`) — kredit/valas/advance/third_party belum ada sama sekali. Diferensiasinya ada di **arsitektur & niat desain** (tipe akun sebagai penggerak perilaku dengan jejak kebutuhan nyata di baliknya), bukan di cakupan tipe akun yang sudah jadi.
 
-**Batas klaim yang jujur (direvisi 2026-10-06)**: pola ini sebelumnya
-baru terbukti untuk 2 nilai, dengan `debt` sebagai akun *virtual*
-berlogic relatif sederhana (flag arah transfer, boolean-like). Sekarang
-tipe ketiga (`investment`) sudah dibangun dan lolos smoke test manual —
-ini TIDAK lagi boolean-like: melibatkan riwayat per-lot dengan lifecycle
-status sendiri, nilai turunan (Unrealized P/L) yang harus dijaga tidak
-pernah bocor ke saldo akun, dan field opsional-jadi-wajib bersyarat
-status (`pending`/`settled`). Gate `account_type` tetap kokoh menghadapi
-kompleksitas ini tanpa perlu restrukturisasi pola yang sudah ada untuk
-`cash`/`debt` — jadi klaim "pola gate lintas-fitur kokoh untuk tipe
-kompleks" sekarang punya **satu bukti nyata**, bukan lagi murni potensi
-arsitektur yang tertunda. Catatan: penjualan/penarikan sebagian investasi
-(FIFO vs average cost, realized gain/loss) masih **disepakati secara
-konsep tapi belum diimplementasikan** (lihat `konsep-investasi.md`) —
-jadi klaim ini soal pembelian/pencatatan posisi, belum menyentuh
-kompleksitas transaksi dua arah pada tipe yang sama.
+**Batas klaim yang jujur (direvisi 2026-10-07)**: pola ini sebelumnya baru terbukti untuk 2 nilai, dengan `debt` sebagai akun *virtual* berlogic relatif sederhana (flag arah transfer, boolean-like). Sekarang tipe ketiga (`investment`) sudah dibangun penuh (pembelian **dan** penjualan/penarikan sebagian) dan lolos smoke test manual — ini TIDAK lagi boolean-like: melibatkan riwayat per-lot dengan lifecycle status sendiri, nilai turunan (Unrealized P/L) yang harus dijaga tidak pernah bocor ke saldo akun, field opsional-jadi-wajib bersyarat status (`pending`/`settled`), DAN transaksi dua arah pada tipe yang sama (beli = cash→investment, jual = investment→cash) dengan model cost basis average cost (bukan FIFO) serta Realized P/L yang dihitung & disimpan sebagai snapshot permanen saat settle — bukan dihitung ulang terus menerus. Gate `account_type` tetap kokoh menghadapi kompleksitas penuh ini tanpa perlu restrukturisasi pola yang sudah ada untuk `cash`/`debt` — jadi klaim "pola gate lintas-fitur kokoh untuk tipe kompleks" sekarang punya **bukti nyata yang mencakup kedua arah transaksi**, bukan lagi cuma sisi pembelian/pencatatan posisi.
 
 Detail lengkap: `apps/desktop/docs/todos/plan/account-type.md`.
 
 ## 3. Sinkronisasi satu arah dari Retailku (bisnis kecil → keuangan pribadi)
 
-Kebutuhan yang tidak ada padanannya di aplikasi pencatatan keuangan
-personal pada umumnya: pemilik usaha kecil (warung/toko) yang memakai
-Retailku sebagai sistem POS/akuntansi bisnis, tapi tetap butuh cashflow
-bisnis itu masuk ke pencatatan keuangan pribadinya (mis. profit yang
-ditarik, dana masuk dari operasional toko).
+Kebutuhan yang tidak ada padanannya di aplikasi pencatatan keuangan personal pada umumnya: pemilik usaha kecil (warung/toko) yang memakai Retailku sebagai sistem POS/akuntansi bisnis, tapi tetap butuh cashflow bisnis itu masuk ke pencatatan keuangan pribadinya (mis. profit yang ditarik, dana masuk dari operasional toko).
 
-- Sync **satu arah** — Retailku selalu jadi sumber kebenaran, hanya
-  menyerap data agregasi cashflow harian (bukan sinkron dua arah dengan
-  konflik).
-- **Klasifikasi baris cashflow otomatis** berdasar kombinasi `sourceType`
-  + flag ekonomi (piutang/utang dagang, payout provider PPOB,
-  consignment, transfer, dll) — bukan cuma menyalin mentah. Lihat
-  `apps/desktop/docs/reference/retailku-cashflow-row-classification.md`
-  untuk detail aturan & bukti dari data nyata.
-- Konfigurasi mapping akun/kategori per toko (`sync-cashflow` feature) —
-  fleksibel karena tiap toko bisa punya struktur akun yang beda.
+- Sync **satu arah** — Retailku selalu jadi sumber kebenaran, hanya menyerap data agregasi cashflow harian (bukan sinkron dua arah dengan konflik).
+- **Klasifikasi baris cashflow otomatis** berdasar kombinasi `sourceType` + flag ekonomi (piutang/utang dagang, payout provider PPOB, consignment, transfer, dll) — bukan cuma menyalin mentah. Lihat `apps/desktop/docs/reference/retailku-cashflow-row-classification.md` untuk detail aturan & bukti dari data nyata.
+- Konfigurasi mapping akun/kategori per toko (`sync-cashflow` feature) — fleksibel karena tiap toko bisa punya struktur akun yang beda.
 
-Ini bukan fitur generik "import CSV" — ada domain accounting logic
-di baliknya (AR/AP, consignment, uang muka pembelian) yang dibangun
-khusus dari kebutuhan nyata mengelola Warung Aqil.
+Ini bukan fitur generik "import CSV" — ada domain accounting logic di baliknya (AR/AP, consignment, uang muka pembelian) yang dibangun khusus dari kebutuhan nyata mengelola Warung Aqil.
 
 ## 4. Offline-first sungguhan, dengan cloud sync yang sadar trade-off (fungsional, diperluas bertahap)
 
-- Data tersimpan **lokal** (SQLite via Tauri), tidak butuh koneksi untuk
-  input/lihat data sehari-hari.
-- Sync dua sumber tulis (PC ↔ Cloudflare Worker ↔ MCP server atas nama
-  Claude/HP) secara eksplisit membedakan dirinya dari sync Retailku: di
-  sini **dua arah, banyak sumber tulis**, sehingga butuh strategi
-  conflict resolution (bukan "server selalu benar" seperti kasus
-  Retailku) — last-write-wins via `updated_at` per baris, PC wajib pull
-  sebelum push, soft delete (`deleted_at`) supaya hapus di satu sisi
-  tidak ambigu kalau sisi lain sempat update baris yang sama. Trade-off
-  ini didesain dari awal (termasuk sadar menolak alternatif
-  event-sourcing/log terpusat karena effort jangka panjangnya tidak
-  sepadan untuk skala personal), bukan ditambal belakangan.
-- **UPDATE 2026-10-03 — integrasi klien PC SELESAI secara fungsional,
-  dua arah terverifikasi di production nyata**: push on-write (PC→D1,
-  17 mutation hook), pull otomatis saat app dibuka (D1→PC), retry queue
-  utk kegagalan jaringan, dan UI Settings (toggle, kredensial, tombol
-  "Tes Koneksi", backfill data lama) semua sudah ada & dipakai — bukan
-  lagi tahap "mulai dibangun". Ketujuh logic bisnis kritis (formula
-  saldo, koreksi saldo, FIFO pelunasan, larangan akun `debt`, guard
-  edit, validasi pelunasan, deteksi field berbahaya) **7 dari 7 sudah
-  di-port** ke Worker. Endpoint CRUD penuh utk `transactions`,
-  `accounts`, `account_groups`, `categories`, `contacts` (termasuk
-  DELETE dgn penanganan khusus utk transaksi yg berkaitan piutang/utang
-  — lihat `docs/concept/hapus-transaksi-piutang-utang.md`). Data
-  production sungguhan (bukan data uji) sudah tersinkron: ribuan baris
-  transaksi + seluruh akun/kategori/kontak.
-- **`apps/mcp-server` SUDAH ADA & live di Vercel** (bukan lagi "belum
-  disentuh sama sekali") — OAuth shim custom + 5 tool BACA (saldo akun,
-  ringkasan pengeluaran per kategori, daftar transaksi, ringkasan
-  utang-piutang, riwayat per kontak), **sudah dicoba dari client MCP
-  sungguhan** (Claude Web, bukan simulasi): berhasil connect dan
-  menjawab pertanyaan ringkasan keuangan bulan berjalan memakai data
-  asli. Ini bukti konkret pertama "kelola data dari HP lewat asisten
-  AI" — meski baru sisi BACA, belum TULIS.
-- **Batas jujur yang masih berlaku**: tool MCP yang ada baru bisa
-  MEMBACA data, belum bisa menambah/mengubah/menghapus transaksi dari
-  HP — jadi klaim "kelola data keuangan dari HP" belum genap, baru
-  "tanya & lihat data dari HP". Tool TULIS masih tahap perencanaan
-  (daftar final belum diputuskan). `apps/mobile` sendiri masih
-  skeleton, tidak berubah. Detail lengkap & status terkini:
-  `apps/worker/docs/todos/done/cloud-sync.md`.
+- Data tersimpan **lokal** (SQLite via Tauri), tidak butuh koneksi untuk input/lihat data sehari-hari.
+- Sync dua sumber tulis (PC ↔ Cloudflare Worker ↔ MCP server atas nama Claude/HP) secara eksplisit membedakan dirinya dari sync Retailku: di sini **dua arah, banyak sumber tulis**, sehingga butuh strategi conflict resolution (bukan "server selalu benar" seperti kasus Retailku) — last-write-wins via `updated_at` per baris, PC wajib pull sebelum push, soft delete (`deleted_at`) supaya hapus di satu sisi tidak ambigu kalau sisi lain sempat update baris yang sama. Trade-off ini didesain dari awal (termasuk sadar menolak alternatif event-sourcing/log terpusat karena effort jangka panjangnya tidak sepadan untuk skala personal), bukan ditambal belakangan.
+- **UPDATE 2026-10-03 — integrasi klien PC SELESAI secara fungsional, dua arah terverifikasi di production nyata**: push on-write (PC→D1, 17 mutation hook), pull otomatis saat app dibuka (D1→PC), retry queue utk kegagalan jaringan, dan UI Settings (toggle, kredensial, tombol "Tes Koneksi", backfill data lama) semua sudah ada & dipakai — bukan lagi tahap "mulai dibangun". Ketujuh logic bisnis kritis (formula saldo, koreksi saldo, FIFO pelunasan, larangan akun `debt`, guard edit, validasi pelunasan, deteksi field berbahaya) **7 dari 7 sudah di-port** ke Worker. Endpoint CRUD penuh utk `transactions`, `accounts`, `account_groups`, `categories`, `contacts` (termasuk DELETE dgn penanganan khusus utk transaksi yg berkaitan piutang/utang — lihat `docs/concept/hapus-transaksi-piutang-utang.md`). Data production sungguhan (bukan data uji) sudah tersinkron: ribuan baris transaksi + seluruh akun/kategori/kontak.
+- **Catatan yang diperbarui 2026-10-07**: klaim lama di dokumen ini ("tool MCP baru BACA, TULIS masih rencana") sudah usang — `apps/mcp-server` sebenarnya sudah lebih dulu punya tool TULIS sebelum sesi ini (`create_account`/`update_account`/`delete_account`, `create_transaction`/`update_transaction`/`delete_transaction`, `create_debt_direct`/`pay_debt_non_cash`/`write_off_debt`), cuma dokumen ini belum sempat disesuaikan. Yang baru DARI sesi 2026-10-07 adalah: akun Investasi (`investment_accounts`/`investment_purchases`/`investment_sales`) ikut push on-write dua arah (desktop↔Worker), diverifikasi end-to-end via smoke test lokal (22 dari 23 skenario berhasil — satu-satunya gap tersisa adalah pull data yang dibuat dari MCP balik ke desktop, lihat bagian "Yang belum jadi diferensiasi" di bawah), dan 4 tool MCP baru khusus investasi (`get_investment_summary`, `get_investment_detail`, `settle_investment_sale`, `delete_pending_investment_sale`) melengkapi tool tulis yang sudah ada. Klaim "kelola data keuangan dari HP lewat asisten AI" genap mencakup TULIS termasuk untuk domain investasi sekarang — lihat batas yang masih berlaku di bawah.
+- **Batas jujur yang masih berlaku**: `apps/mobile` sendiri masih skeleton, tidak berubah — tool MCP TULIS baru bisa dipanggil lewat client MCP generik (Claude Web/Desktop), belum ada UI mobile khusus yang memanfaatkannya. Pull data yang dibuat/diubah dari MCP balik ke desktop juga belum ada (desktop cuma push, belum pull data investment dari cloud) — jadi data investasi yang dicatat lewat asisten AI tidak akan terlihat otomatis di desktop sampai jalur pull ini dibangun. Detail lengkap & status terkini: `apps/worker/docs/todos/done/cloud-sync.md` dan `docs/todos/plan/investment-sync.md`.
 
 ## 5. Audit histori data, bukan cuma migrasi buta
 
-Saat mengimpor data lama dari Money Manager, dilakukan audit tabel demi
-tabel (termasuk tabel yang ternyata tidak terpakai seperti
-`FAVTRANSACTION`, `TAG`/`TX_TAG` kosong) untuk memastikan tidak ada data
-bermakna yang hilang diam-diam, dan untuk menemukan fitur yang sudah
-"dipakai diam-diam" oleh kebiasaan lama tapi belum ada padanannya —
-misalnya budget per kategori (lihat
-`apps/desktop/docs/todos/plan/budget-feature.md`, belum dibangun, dicatat
-sebagai referensi kebutuhan nyata untuk nanti).
+Saat mengimpor data lama dari Money Manager, dilakukan audit tabel demi tabel (termasuk tabel yang ternyata tidak terpakai seperti `FAVTRANSACTION`, `TAG`/`TX_TAG` kosong) untuk memastikan tidak ada data bermakna yang hilang diam-diam, dan untuk menemukan fitur yang sudah "dipakai diam-diam" oleh kebiasaan lama tapi belum ada padanannya — misalnya budget per kategori (lihat `apps/desktop/docs/todos/plan/budget-feature.md`, belum dibangun, dicatat sebagai referensi kebutuhan nyata untuk nanti).
 
 ## Perbandingan dengan aplikasi populer lain (berbasis pengetahuan umum, bukan pengalaman pakai langsung)
 
-> **Catatan penting soal keandalan bagian ini**: berbeda dari perbandingan
-> dengan Money Manager di atas (berbasis data backup nyata & keluhan yang
-> benar-benar dialami), bagian ini disusun dari pengetahuan umum tentang
-> fitur aplikasi-aplikasi populer berikut — bukan dari pemakaian langsung
-> atau audit data. Fitur aplikasi kompetitor bisa saja sudah berubah sejak
-> pengetahuan ini terbentuk. Perlakukan sebagai perkiraan arah, bukan
-> fakta yang sudah diverifikasi.
+> **Catatan penting soal keandalan bagian ini**: berbeda dari perbandingan dengan Money Manager di atas (berbasis data backup nyata & keluhan yang benar-benar dialami), bagian ini disusun dari pengetahuan umum tentang fitur aplikasi-aplikasi populer berikut — bukan dari pemakaian langsung atau audit data. Fitur aplikasi kompetitor bisa saja sudah berubah sejak pengetahuan ini terbentuk. Perlakukan sebagai perkiraan arah, bukan fakta yang sudah diverifikasi.
 
-Aplikasi pencatatan keuangan personal populer (Wallet by BudgetBros,
-Monefy, Spendee, Money Lover, dan sejenisnya) umumnya kuat di:
-pencatatan transaksi cepat, kategori & anggaran (budget), grafik/laporan
-visual, dan beberapa punya sync cloud multi-device bawaan. Dibanding
-kelompok aplikasi ini secara umum:
+Aplikasi pencatatan keuangan personal populer (Wallet by BudgetBros, Monefy, Spendee, Money Lover, dan sejenisnya) umumnya kuat di: pencatatan transaksi cepat, kategori & anggaran (budget), grafik/laporan visual, dan beberapa punya sync cloud multi-device bawaan. Dibanding kelompok aplikasi ini secara umum:
 
-- **Utang-piutang berbasis kontak dengan lifecycle** (lihat bagian 1) —
-  kebanyakan aplikasi populer di atas menangani utang-piutang mirip
-  Money Manager: sebagai akun/kategori transaksi biasa, tanpa rangkuman
-  per-orang yang punya status (ongoing/lunas/dihapuskan) dan deteksi
-  otomatis dari arah transfer. Ini kemungkinan besar tetap jadi
-  diferensiasi nyata, karena akar masalahnya sama seperti yang dialami
-  di Money Manager.
-- **Tipe akun yang mempengaruhi perilaku** (lihat bagian 2) — sebagian
-  aplikasi populer punya "jenis akun" untuk keperluan tampilan/ikon (mis.
-  kategori "kartu kredit" di UI), tapi umumnya tidak sampai
-  mempengaruhi logic form transaksi dengan constraint database formal
-  seperti di `financial-app`. Perlu dicatat: aplikasi kelas
-  menengah-atas (mis. yang sudah dukung akun kartu kredit dengan limit &
-  jatuh tempo secara matang) kemungkinan justru **lebih unggul** dari
-  sisi cakupan tipe akun yang sudah jadi — `financial-app` baru punya 3
-  tipe berjalan (`cash`, `debt`, `investment`), diferensiasinya di niat
-  arsitektur & pola yang terbukti kokoh lintas tipe, bukan cakupan fitur
-  saat ini (kredit/valas/advance/dana titipan masih belum ada).
-- **Sync dari sistem bisnis pihak ketiga (Retailku)** — ini kasus
-  penggunaan yang sangat spesifik (pemilik usaha kecil yang juga pakai
-  POS/akuntansi bisnis terpisah) dan kemungkinan besar tidak ada
-  padanannya di aplikasi pencatatan keuangan **personal** mana pun,
-  karena aplikasi personal umumnya tidak didesain untuk terhubung ke
-  sistem akuntansi bisnis eksternal. Diferensiasi ini kemungkinan kuat,
-  tapi belum diverifikasi dengan mencoba aplikasi-aplikasi tersebut
-  secara langsung.
-- **Budget/anggaran** — ini justru area di mana `financial-app` **kalah**
-  dari hampir semua aplikasi populer di atas, bukan cuma dari Money
-  Manager. Budget per kategori dengan visualisasi progress adalah fitur
-  standar di kelas aplikasi ini, bukan pembeda.
-- **Sync cloud multi-device** — aplikasi seperti Spendee/Money Lover
-  umumnya sudah punya ini sebagai fitur matang (akun cloud, multi-device
-  otomatis). `financial-app` baru di tahap dokumen rencana (lihat bagian
-  4) — dari sisi kematangan fitur ini, `financial-app` saat ini
-  **tertinggal**, bukan unggul.
-- **AI assistant berbasis API key milik user sendiri** — beberapa
-  aplikasi populer mulai menambahkan fitur AI/insight otomatis, tapi
-  umumnya terikat ke layanan/API milik penyedia aplikasi (bagian dari
-  model bisnis mereka). Pendekatan "user pakai API key sendiri" (lihat
-  `finance-app-plan.md`) berpotensi jadi pembeda dari sisi privasi/kendali
-  data — TAPI ini baru rencana, belum diimplementasikan di platform mana
-  pun, jadi belum bisa diklaim sebagai keunggulan nyata saat ini.
+- **Utang-piutang berbasis kontak dengan lifecycle** (lihat bagian 1) — kebanyakan aplikasi populer di atas menangani utang-piutang mirip Money Manager: sebagai akun/kategori transaksi biasa, tanpa rangkuman per-orang yang punya status (ongoing/lunas/dihapuskan) dan deteksi otomatis dari arah transfer. Ini kemungkinan besar tetap jadi diferensiasi nyata, karena akar masalahnya sama seperti yang dialami di Money Manager.
+- **Tipe akun yang mempengaruhi perilaku** (lihat bagian 2) — sebagian aplikasi populer punya "jenis akun" untuk keperluan tampilan/ikon (mis. kategori "kartu kredit" di UI), tapi umumnya tidak sampai mempengaruhi logic form transaksi dengan constraint database formal seperti di `financial-app`. Perlu dicatat: aplikasi kelas menengah-atas (mis. yang sudah dukung akun kartu kredit dengan limit & jatuh tempo secara matang) kemungkinan justru **lebih unggul** dari sisi cakupan tipe akun yang sudah jadi — `financial-app` baru punya 3 tipe berjalan (`cash`, `debt`, `investment`), diferensiasinya di niat arsitektur & pola yang terbukti kokoh lintas tipe, bukan cakupan fitur saat ini (kredit/valas/advance/dana titipan masih belum ada).
+- **Sync dari sistem bisnis pihak ketiga (Retailku)** — ini kasus penggunaan yang sangat spesifik (pemilik usaha kecil yang juga pakai POS/akuntansi bisnis terpisah) dan kemungkinan besar tidak ada padanannya di aplikasi pencatatan keuangan **personal** mana pun, karena aplikasi personal umumnya tidak didesain untuk terhubung ke sistem akuntansi bisnis eksternal. Diferensiasi ini kemungkinan kuat, tapi belum diverifikasi dengan mencoba aplikasi-aplikasi tersebut secara langsung.
+- **Budget/anggaran** — ini justru area di mana `financial-app` **kalah** dari hampir semua aplikasi populer di atas, bukan cuma dari Money Manager. Budget per kategori dengan visualisasi progress adalah fitur standar di kelas aplikasi ini, bukan pembeda.
+- **Sync cloud multi-device** — aplikasi seperti Spendee/Money Lover umumnya sudah punya ini sebagai fitur matang (akun cloud, multi-device otomatis). `financial-app` sudah fungsional dua arah untuk desktop↔cloud (lihat bagian 4), tapi belum punya UI mobile yang memanfaatkannya (`apps/mobile` masih skeleton) — dari sisi kematangan fitur multi-device YANG TERLIHAT USER, `financial-app` saat ini masih **tertinggal**, meski fondasi sync-nya sendiri sudah matang.
+- **AI assistant berbasis API key milik user sendiri** — beberapa aplikasi populer mulai menambahkan fitur AI/insight otomatis, tapi umumnya terikat ke layanan/API milik penyedia aplikasi (bagian dari model bisnis mereka). Pendekatan "user pakai API key sendiri" (lihat `finance-app-plan.md`) berpotensi jadi pembeda dari sisi privasi/kendali data — `apps/mcp-server` sudah live dengan tool BACA dan TULIS yang bisa dipanggil client MCP generik (Claude Web/Desktop) memakai kredensial milik user sendiri, jadi bagian ini sudah mulai terbukti nyata, bukan cuma rencana — tapi belum ada integrasi khusus ke aplikasi mobile sendiri.
 
-**Kesimpulan bagian ini**: diferensiasi paling kredibel dari
-`financial-app` tetap tiga hal dari bagian 1, 2 & 3 (utang-piutang
-berbasis kontak, tipe akun yang mempengaruhi perilaku, sync Retailku) —
-semuanya lahir dari kebutuhan nyata yang dialami sendiri. Untuk klaim
-yang menyentuh aplikasi populer di luar Money Manager, sebaiknya
-diverifikasi dengan mencoba aplikasi tersebut langsung sebelum ditulis
-sebagai fakta di materi portofolio manapun.
+**Kesimpulan bagian ini**: diferensiasi paling kredibel dari `financial-app` tetap tiga hal dari bagian 1, 2 & 3 (utang-piutang berbasis kontak, tipe akun yang mempengaruhi perilaku, sync Retailku) — semuanya lahir dari kebutuhan nyata yang dialami sendiri. Untuk klaim yang menyentuh aplikasi populer di luar Money Manager, sebaiknya diverifikasi dengan mencoba aplikasi tersebut langsung sebelum ditulis sebagai fakta di materi portofolio manapun.
 
 ## Yang belum jadi diferensiasi (transparansi, bukan klaim)
 
-- **Budget/anggaran** — belum ada fitur ini sama sekali; Money Manager
-  justru sudah punya (budget per kategori & total, dengan override
-  bulanan). Dicatat sebagai gap, bukan keunggulan.
+- **Budget/anggaran** — belum ada fitur ini sama sekali; Money Manager justru sudah punya (budget per kategori & total, dengan override bulanan). Dicatat sebagai gap, bukan keunggulan.
 - **Mobile** — belum ada fitur berjalan, baru rencana & skeleton project.
-- **AI assistant** — ada di rencana awal (`finance-app-plan.md`) tapi
-  belum diimplementasikan di platform mana pun.
-- **Multi-device sync** — UPDATE 2026-10-03: integrasi PC↔Worker sudah
-  SELESAI fungsional dua arah (lihat bagian 4), `apps/mcp-server` sudah
-  live dengan 5 tool BACA terverifikasi lewat client MCP sungguhan.
-  Yang masih jadi gap nyata: tool TULIS MCP belum ada (jadi belum bisa
-  diklaim "kelola data dari HP", baru "lihat data dari HP"), dan
-  `apps/mobile` tetap belum tersentuh — jadi masih belum genap, tapi
-  sudah jauh melewati tahap "dokumen rencana".
+- **Multi-device sync** — UPDATE 2026-10-07: integrasi PC↔Worker↔MCP sudah SELESAI fungsional dua arah untuk transaksi, akun, utang-piutang, DAN investasi (lihat bagian 4), `apps/mcp-server` sudah live dengan tool BACA maupun TULIS. Yang masih jadi gap nyata: pull data yang dibuat/diubah lewat MCP balik ke desktop BELUM ada (desktop cuma push, data investment/akun baru dari asisten AI tidak otomatis terlihat di desktop), dan `apps/mobile` tetap belum tersentuh — jadi klaim "kelola data dari mana saja" masih belum genap sepenuhnya, tapi sudah jauh melewati tahap "baca saja lewat HP".
