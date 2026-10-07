@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { accountFields } from "./create-account";
+import { accountFields, validateInvestmentAccountFields } from "./create-account";
 
 export function registerUpdateAccount(server: McpServer) {
   server.registerTool(
@@ -13,6 +13,11 @@ export function registerUpdateAccount(server: McpServer) {
       inputSchema: z.object({ accountId: z.string(), ...accountFields }),
     },
     async ({ accountId, ...rest }, ctx) => {
+      const validationError = validateInvestmentAccountFields(rest);
+      if (validationError) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: validationError }, null, 2) }], isError: true };
+      }
+
       const token = getToken(ctx);
       const result = await workerFetch(token, `/accounts/${accountId}`, {
         method: "PATCH",

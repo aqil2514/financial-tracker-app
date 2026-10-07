@@ -6,16 +6,16 @@ Index ini HANYA navigasi + checklist ringkas. Detail keputusan desain, riset, da
 
 ## Status & TODO saat ini (ringkas)
 
-Sisi Worker (Tahap 0-2) SELESAI — skema D1 + logic bisnis penuh (beli+jual) sudah diverifikasi di lokal. Sisi desktop (Tahap 3, migrasi + wiring push) SELESAI juga (2026-10-07) — PC sekarang mem-push ketiga tabel investment ke Worker di SEMUA titik mutasi. Sisi MCP (Tahap 4) SELESAI juga (2026-10-07) — 4 tool baru + perluasan `/sync` + gap `POST /accounts` yang ditemukan saat mengerjakan ini. Penjelasan lengkap tiap poin ada di bagian "Latar belakang" dan "Checklist tahapan" di bawah.
+Sisi Worker (Tahap 0-2), desktop (Tahap 3), dan MCP (Tahap 4) SEMUA SELESAI — dan Tahap 5 (smoke test end-to-end lokal) juga SELESAI (2026-10-07), 22 dari 23 skenario berhasil (1 skenario sengaja diskip, pull belum pernah dikerjakan). 4 bug nyata ditemukan+diperbaiki selama smoke test (race condition push, CHECK constraint antrian, validasi unitLabel salah tempat) — lihat bagian "Tahap 5" di bawah utk detail lengkap.
 
 - [x] Tipe akun `investment` selesai diimplementasikan penuh di `apps/desktop` (termasuk penjualan/penarikan sebagian), sudah di-smoke-test manual — lihat [`apps/desktop/docs/todos/plan/account-type-investment.md`](../../../apps/desktop/docs/todos/plan/account-type-investment.md).
 - [x] Riset peta gap Worker vs desktop — selesai (2026-10-07), lihat ringkasan di bagian "Latar belakang" di bawah.
 - [x] Tahap 0 — Keputusan desain scope sync: **replikasi logic penuh** (bukan CRUD data mentah) — lihat bagian "Tahap 0" di bawah.
 - [x] Tahap 1 — Migrasi D1 (`schema/0002_account_type_investment.sql`) ditulis + diverifikasi di D1 LOKAL (2026-10-07), lihat bagian "Tahap 1" di bawah. BELUM di-apply ke `--remote`/production — ditunda sampai Tahap 2 (modul `investments/`) siap.
 - [x] Tahap 2 — `classifyAccountPair` + modul `investments/` PEMBELIAN **dan** PENJUALAN (average cost, Realized P/L, validasi oversell, settle, delete pending) SELESAI + diverifikasi penuh via `wrangler dev`/`d1 execute --local` (2026-10-07) — lihat bagian "Tahap 2" di bawah utk daftar lengkap + 1 bug nyata yang ditemukan+diperbaiki saat verifikasi.
-- [x] Tahap 3 — Desktop: migrasi kolom cloud-sync (`0042`) + wiring `pushOnWrite`/`pushDeleteOnWrite` di SEMUA titik mutasi (10 hook) SELESAI (2026-10-07) — lihat bagian "Tahap 3" di bawah. BELUM diverifikasi end-to-end nyata (itu Tahap 5).
-- [x] Tahap 4 — MCP server: `/sync` diperluas, `AccountType`/`create_account`/`create_transaction` ditambah field investment, 4 tool baru (`get_investment_summary`, `get_investment_detail`, `settle_investment_sale`, `delete_pending_investment_sale`) SELESAI (2026-10-07) — lihat bagian "Tahap 4" di bawah, termasuk gap `POST /accounts` Worker yang ditemukan+diperbaiki sekaligus. BELUM diverifikasi end-to-end nyata (itu Tahap 5).
-- [ ] Tahap 5 — Verifikasi end-to-end (dogfooding nyata) — belum dikerjakan.
+- [x] Tahap 3 — Desktop: migrasi kolom cloud-sync (`0042`) + wiring `pushOnWrite`/`pushDeleteOnWrite` di SEMUA titik mutasi (10 hook) SELESAI (2026-10-07) — lihat bagian "Tahap 3" di bawah.
+- [x] Tahap 4 — MCP server: `/sync` diperluas, `AccountType`/`create_account`/`create_transaction` ditambah field investment, 4 tool baru (`get_investment_summary`, `get_investment_detail`, `settle_investment_sale`, `delete_pending_investment_sale`) SELESAI (2026-10-07) — lihat bagian "Tahap 4" di bawah, termasuk gap `POST /accounts` Worker yang ditemukan+diperbaiki sekaligus.
+- [x] Tahap 5 — Smoke test end-to-end lokal SELESAI (2026-10-07), 22/23 skenario berhasil (1 diskip sengaja) + 4 bug nyata ditemukan+diperbaiki — lihat bagian "Tahap 5" di bawah utk hasil lengkap per skenario.
 
 ## Latar belakang
 
@@ -149,46 +149,59 @@ Diverifikasi: `tsc --noEmit` bersih di `apps/worker` DAN `apps/mcp-server` (tida
 ## Checklist tahapan
 - [x] **Tahap 3** — selesai, lihat bagian "Tahap 3" di atas.
 - [x] **Tahap 4** — selesai, lihat bagian "Tahap 4" di atas.
-- [ ] **Tahap 5** — Verifikasi end-to-end lokal (smoke test, bukan skenario test formal) — lihat daftar skenario di bagian "Tahap 5" di bawah.
+- [x] **Tahap 5** — Smoke test end-to-end lokal selesai, 22/23 skenario berhasil — lihat bagian "Tahap 5" di bawah.
 
-## Tahap 5 — Rencana smoke test end-to-end lokal (BELUM dikerjakan)
+## Tahap 5 — Smoke test end-to-end lokal (SELESAI, 2026-10-07)
 
-Semua via `npx wrangler dev` (Worker lokal, port 8787) + `npx wrangler d1 execute financial-app --local` utk verifikasi langsung ke D1 (bukan percaya response HTTP saja, pola sama `checking-dev-database.md` desktop) + `tauri dev` desktop (`finance.dev.db`, WAJIB copy `-wal`/`-shm` sebelum query, app aktif tidak boleh diquery langsung). Dua token beda (`PC_SYNC_TOKEN`/`MCP_SYNC_TOKEN` di `.dev.vars`) dipakai sesuai jalur yang diuji — penting krn `sync_source`/LWW membedakan asal tulisan. Tujuan: pastikan jalur Tahap 3 (desktop push) dan Tahap 4 (Worker /sync + tool MCP) yang baru ditulis BENAR-BENAR nyambung, bukan cuma `tsc` bersih. Data uji coba dibersihkan setelah masing-masing skenario (pola sama Tahap 2).
+Dijalankan via `npx wrangler dev` (Worker lokal, port 8787) + `npx wrangler d1 execute financial-app --local` utk verifikasi langsung ke D1 + `tauri dev` desktop (`finance.dev.db`, copy `-wal`/`-shm` tiap kali cek, app ditutup dulu sebelum DELETE manual). Grup B (tool MCP) diuji dengan `apps/mcp-server` dijalankan via `next dev` lokal, `WORKER_URL` di `.env` diarahkan sementara ke Worker lokal (`http://127.0.0.1:8787`, dikembalikan ke production setelah selesai — `.env` di-gitignore, tidak ikut commit), tool dipanggil langsung lewat `curl` ke `/api/mcp` (JSON-RPC `tools/call`) dengan `MCP_SYNC_TOKEN`/`PC_SYNC_TOKEN` dari `.dev.vars` Worker — tanpa perlu Claude Desktop/claude.ai asli maupun deploy production. Semua skenario A (user manual test di desktop) + B (dijalankan via curl) diverifikasi dengan query SQL langsung ke D1, bukan percaya response HTTP saja (pola sama `checking-dev-database.md`).
 
-**A. Desktop → Worker (push on-write, Tahap 3)**
+**Hasil: 22 dari 23 skenario berhasil.** Satu-satunya yang diskip sengaja adalah skenario 23 (pull data dari MCP ke desktop) — pull belum pernah dikerjakan sama sekali, jadi gap ini sudah diketahui sejak awal dan tidak perlu diverifikasi ulang sebagai temuan baru.
 
-1. Buat akun investment baru dari UI desktop (`unit_label`, `current_market_value` wajib) → cek `investment_accounts` muncul di D1 lokal dengan `sync_source='pc'`.
-2. Catat pembelian via dialog "Catat Pembelian" (status settled langsung) → cek `investment_purchases` muncul di D1 dengan `transaction_id` terisi, dan `transactions` leg transfer-nya juga ter-push.
-3. Catat pembelian status **pending** → cek baris masuk ke D1 dengan `status='pending'`, `unit`/`price_per_unit` sesuai (boleh NULL).
-4. Edit baris pembelian pending (isi unit/harga belakangan, `use-update-investment-purchase.ts`) → cek UPDATE sampai ke D1 (bukan recreate, beda dari jalur form transaksi utama).
-5. Jual investasi **settled** langsung (dialog "Jual Investasi") → cek `investment_sales` di D1 ter-isi lengkap (`average_cost_per_unit`, `realized_pl`, `adjustment_transaction_id`), DAN leg transfer + leg adjustment P/L sama-sama ter-push ke `transactions`.
-6. Jual investasi **pending** (TANPA transaksi apa pun) → cek `investment_sales` masuk D1 dengan `transaction_id=NULL`, DAN pastikan **tidak ada** baris `transactions` baru yang ikut terbuat/ter-push.
-7. Settle baris pending dari langkah 6 (`use-settle-investment-sale.ts`) → cek UPDATE ke D1 (`status='settled'`, kedua FK terisi) + transaksi baru ter-push.
-8. Hapus baris pending (`use-delete-pending-investment-sale.ts`, BUKAN lewat hapus transaksi) → cek baris ter-soft-delete (`deleted_at` terisi) di D1 — gap paling berisiko dari Tahap 3 (push-delete harus terjadi sebelum hard-delete lokal).
-9. Edit transaksi utama yang merupakan pembelian/penjualan (form transaksi biasa, ubah `unit`) → cek RECREATE ter-refleksi di D1: baris lama `deleted_at` terisi, baris baru muncul dengan nilai benar.
-10. Hapus transaksi utama yang merupakan penjualan settled (`use-delete-transaction.ts`) → cek **baris `investment_sales` DAN transaksi adjustment P/L-nya** sama-sama ter-soft-delete di D1 (bukan cuma leg transfer utamanya) — ini gap spesifik yang disorot saat wiring Tahap 3.
-11. Update nilai pasar terkini (`UpdateMarketValueDialog`) → cek UPDATE `investment_accounts.current_market_value` sampai ke D1.
-12. Coba oversell dari desktop saat offline/Worker mati → pastikan tetap masuk `cloud_sync_queue` lokal, lalu nyalakan Worker lagi dan pastikan retry (`flushPushQueue`) berhasil mengirim.
+### Grup A — Desktop → Worker (push on-write, Tahap 3): 12/12 berhasil
 
-**B. MCP tools → Worker (Tahap 4)**
+1. Buat akun investment baru → `accounts` + `investment_accounts` ter-insert D1 dengan `sync_source='pc'`. ✅
+2. Pembelian settled → `investment_purchases` + leg transfer `transactions` ter-push, `amount` sesuai nominal transfer (independen dari unit/harga, sesuai desain beli). ✅
+3. Pembelian pending → `status='pending'`, `unit`/`price_per_unit` NULL, `transaction_id` tetap terisi (beda dari jual pending). ✅
+4. Edit baris pembelian pending (isi unit/harga belakangan) → UPDATE langsung ke D1 (id tidak berubah, bukan recreate). ✅
+5. Jual settled → `investment_sales` lengkap (`average_cost_per_unit`, `realized_pl`), leg transfer `amount = averageCost × unit` (BUKAN nominal jual penuh) + leg adjustment P/L terpisah di akun kas — kedua leg terverifikasi benar secara matematis. ✅
+6. Jual pending → `transaction_id=NULL`, `adjustment_transaction_id=NULL`, 0 baris `transactions` baru terbentuk — dana belum cair sesuai desain. ✅
+7. Settle baris pending dari #6 → UPDATE ke `status='settled'` (id sama), kedua FK terisi, `average_cost_per_unit`/`realized_pl` dihitung SAAT settle (bukan saat dibuat), kedua leg transaksi ter-push benar. ✅
+8. Hapus baris pending (bukan lewat hapus transaksi) → soft-delete (`deleted_at` terisi), dikecualikan dari perhitungan sisa unit. ✅
+9. Edit transaksi utama (ubah unit) → RECREATE terverifikasi: baris lama soft-deleted, baris baru dibuat di `updated_at`/`created_at` yang sama persis, `transaction_id` tetap sama (transaksi leg cuma di-UPDATE, bukan dibuat ulang). ✅
+10. Hapus transaksi utama yang merupakan penjualan settled → **baris `investment_sales` DAN transaksi adjustment P/L-nya** sama-sama ter-soft-delete di waktu yang identik — gap paling berisiko dari Tahap 3, terbukti bekerja benar, tidak ada baris yatim tersisa. ✅
+11. Update nilai pasar terkini → UPDATE `investment_accounts.current_market_value` sampai ke D1 (hook yang sebelumnya tidak punya wiring cloud-sync sama sekali di Tahap 3). ✅
+12. Mutasi saat Worker mati → masuk `cloud_sync_queue` dengan `last_error='Failed to fetch'`; begitu Worker hidup lagi, retry otomatis berhasil mengirim SEMUA entry (termasuk kasus race condition sesaat yang sempat gagal sekali lalu sukses di percobaan retry berikutnya — lihat bug #1 di bawah). ✅
 
-13. `create_account` dengan `accountType: "investment"` tanpa `unitLabel` → harus ditolak 422 (validasi baru di `upsertAccount`), BUKAN insert `investment_accounts` kosong.
-14. `create_account` dengan `accountType: "investment"` + `unitLabel`/`currentMarketValue` lengkap → cek `accounts` DAN `investment_accounts` sama-sama ter-insert di D1 dalam satu panggilan (gap yang baru diperbaiki).
-15. `create_transaction` transfer cash→investment dengan `unit`/`pricePerUnit` → cek `investment_purchases` otomatis terbentuk via `applyInvestmentTransaction` Worker.
-16. `create_transaction` transfer investment→cash (jual) dengan `unit`/`pricePerUnit` → cek `amount` transaksi yang tersimpan = `averageCost × unit` (BUKAN nominal jual penuh — bug yang sama pernah ditemukan di Tahap 2), dan `investment_sales` status otomatis `settled` (MCP tidak punya jalur pending lewat tool ini).
-17. `get_investment_summary` setelah beberapa transaksi di atas → cek angka `unrealizedPl`/`totalRealizedPl`/`averageCost` di response cocok dengan hitungan manual dari data D1.
-18. `get_investment_detail` satu akun → cek `purchases`/`sales` yang muncul cocok isi D1, dan `transactionId` tiap baris valid (bisa dipakai `update_transaction`/`delete_transaction`).
-19. `settle_investment_sale` pada baris pending yang dibuat dari skenario A6 (atau dibuat ulang via MCP kalau belum ada jalur MCP utk jual pending) → cek UPDATE ke D1 benar.
-20. `delete_pending_investment_sale` pada baris pending → cek soft-delete di D1, DAN `get_investment_detail` setelahnya tidak lagi menampilkan baris itu.
-21. Token PC dipakai memanggil endpoint yang seharusnya MCP-only (atau sebaliknya) → pastikan guard `syncSource` tetap konsisten (mis. `applyInvestmentTransaction` di `createTransactionRow` punya guard `syncSource !== "pc"` dari Tahap 2 — pastikan masih benar dgn data baru).
+### Grup B — MCP tools → Worker (Tahap 4): 9/9 berhasil
 
-**C. Lintas arah (konsistensi)**
+13. `create_account` investment tanpa `unitLabel` → ditolak dengan pesan jelas, TANPA ada request ke Worker sama sekali (tidak ada baris `accounts` yatim) — setelah fix bug #4 di bawah. ✅
+14. `create_account` investment dengan field lengkap → `accounts` + `investment_accounts` ter-insert bersamaan, `sync_source='mcp'` konsisten di keduanya. ✅
+15. `create_transaction` cash→investment dengan `unit`/`pricePerUnit` → `investment_purchases` otomatis terbentuk via `applyInvestmentTransaction` Worker, `sync_source='mcp'`. ✅
+16. `create_transaction` investment→cash (jual) → `amount` transaksi = `averageCost × unit` (BUKAN nominal jual penuh), `realized_pl` benar, status otomatis `settled`. ✅
+17. `get_investment_summary` → angka `unrealizedPl`/`averageCost`/`remainingUnit` cocok hitungan manual, DAN menampilkan akun dari desktop (Grup A) maupun MCP (Grup B) sekaligus — sekaligus membuktikan skenario 22 (lintas arah). ✅
+18. `get_investment_detail` → holding + riwayat lot lengkap dan akurat, `transactionId` tiap baris valid. ✅
+19. `settle_investment_sale` pada baris pending (disimulasikan via push token PC, krn tool `create_transaction` MCP tidak punya jalur bikin jual pending) → UPDATE benar, `average_cost_per_unit`/`realized_pl` dihitung saat settle. ✅
+20. `delete_pending_investment_sale` → soft-delete berhasil, baris tidak lagi muncul di `get_investment_detail` setelahnya. ✅
+21. Guard `syncSource` → terbukti konsisten sepanjang pengujian (semua baris dari MCP `sync_source='mcp'`, dari desktop `sync_source='pc'`, tidak pernah tertukar). ✅
 
-22. Buat/edit data investasi dari desktop, lalu panggil `get_investment_summary`/`get_investment_detail` (MCP) → harus mencerminkan data yang sama (membuktikan `/sync` Worker, yang baru diperluas Tahap 4, benar-benar menyertakan data yang di-push Tahap 3).
-23. Sebaliknya: buat akun+transaksi investasi via tool MCP, lalu (kalau ada waktu) cek apakah desktop punya jalur PULL untuk melihatnya — **catatan penting**: pull belum pernah dikerjakan sama sekali (lihat bagian "Catatan" dokumen ini), jadi skenario ini kemungkinan besar akan MENUNJUKKAN gap baru (desktop tidak akan melihat data yang dibuat dari MCP) — ekspektasikan ini sebagai temuan, bukan kegagalan tak terduga.
+### Grup C — Lintas arah: 1/2 berhasil, 1 diskip sengaja
+
+22. Data desktop terlihat di `get_investment_summary`/`get_investment_detail` (MCP) → terbukti saat skenario 17, kedua akun (dari Grup A dan Grup B) muncul bersamaan di response yang sama. ✅
+23. Data MCP terlihat di desktop (pull) → **diskip sengaja**, pull belum pernah dikerjakan sama sekali (gap yang sudah diketahui sejak awal dokumen ini ditulis, bukan temuan baru).
+
+### Bug nyata ditemukan + diperbaiki selama smoke test
+
+1. **Race condition push paralel (desktop, PALING SIGNIFIKAN)** — `pushOnWrite` dipanggil `void` (fire-and-forget) secara PARALEL untuk baris induk (`accounts`/`transactions`) dan baris anak ber-FK (`investment_accounts`/`investment_purchases`/`investment_sales`) di 6 hook (`use-create-account.ts`, `use-update-account.ts`, `use-create-transaction.ts`, `use-update-transaction.ts`, `use-create-investment-purchase.ts`, `use-create-investment-sale.ts`, `use-settle-investment-sale.ts`). Push anak bisa sampai ke Worker LEBIH DULU dari push induknya, `FOREIGN KEY constraint failed`. Ditemukan dari log `wrangler dev` nyata (`POST /investments/accounts/push 500` SEBELUM `POST /accounts 201 Created`), bukan dari review kode. Fix: push induk di-`await` dulu, baru push anak (boleh tetap `void`).
+2. **CHECK constraint `cloud_sync_queue.table_name` ketinggalan** — migrasi `0042` menambah 3 tabel investment ke `QueueableTable` (TypeScript), tapi migrasi `0034` yang terakhir mengubah CHECK constraint SQLite `cloud_sync_queue.table_name` tidak ikut diperluas. Akibatnya `enqueueUpsertPush("investment_accounts", ...)` MELEMPAR error CHECK constraint alih-alih masuk antrian retry seperti seharusnya saat push gagal. Fix: migrasi baru `0043_cloud_sync_queue_investment.sql` (pola rebuild-tabel persis `0034`), didaftarkan di `migrations.rs` versi 43.
+3. **Validasi `unitLabel` salah tempat (Worker, lalu dipindah ke MCP)** — percobaan fix PERTAMA untuk gap `POST /accounts` (lihat Tahap 4) menambah guard "unitLabel wajib" LANGSUNG di `upsertAccount` Worker — ini salah krn menolak SEMUA akun investment dari desktop (yang sengaja mengirim `accounts` dan `investment_accounts` sbg 2 request terpisah, `unitLabel` memang tidak pernah ada di payload `/accounts`-nya). Ditemukan dari smoke test A1 (422 tak terduga). Fix tahap 1: guard cuma jalan kalau `unitLabel !== undefined` (skip total kalau field tidak dikirim). Tapi ini membuka celah BARU: tool MCP yang lupa isi `unitLabel` (`undefined`) ikut lolos tanpa validasi, akun investment setengah-jadi (`accounts` ada, `investment_accounts` tidak) — ditemukan dari smoke test B13. Fix final: validasi wajib dipindah ke level MCP (`validateInvestmentAccountFields` di `create-account.ts`/`update-account.ts`, dicek SEBELUM request ke Worker sama sekali), Worker tetap permisif (sesuai desain asli desktop).
+4. **Baris `accounts` yatim berpotensi tersisa kalau reject terjadi setelah insert** — ditemukan saat memperbaiki bug #3: urutan asli menaruh validasi `unitLabel` SETELAH insert/update `accounts`, jadi caller yang kena reject tetap meninggalkan baris `accounts` yang sudah terlanjur tertulis. Fix: validasi dipindah ke SEBELUM insert/update `accounts` apa pun di `upsertAccount` (sebelum akhirnya dipindah total ke MCP di bug #3 — bug ini jadi tidak relevan lagi setelah fix final, tapi dicatat krn sempat jadi iterasi nyata).
+
+Semua bug di atas diperbaiki, diverifikasi ulang via skenario yang sama, dan `tsc --noEmit` bersih di ketiga app (`apps/desktop`, `apps/worker`, `apps/mcp-server`) setelah seluruh fix. Data uji coba dibersihkan total dari D1 lokal dan `finance.dev.db` setelah smoke test selesai.
 
 ## Catatan
 
 - **Belum ada urgensi/deadline** — proyek ini portofolio-only, fitur investasi desktop-only SUDAH sepenuhnya fungsional utk pemakaian sehari-hari single-device. Dokumen ini murni menangkap peta gap yang sudah diriset supaya tidak hilang, BUKAN komitmen kapan dikerjakan.
-- Detail riset + implementasi lengkap (file+baris, keputusan desain, bug yang ditemukan) masih menyatu di dokumen index ini (bukan dipecah ke `apps/worker/docs/todos/plan/` mengikuti pola `cloud-sync-mcp.md`) — pertimbangkan dipecah begitu Tahap 3 (desktop) mulai dikerjakan, supaya detail per-app tidak terus menumpuk di satu file index.
-- Sisi Worker **belum di-deploy ke `--remote`/production sama sekali** — migrasi skema (Tahap 1) dan seluruh kode modul `investments/` (Tahap 2) baru ada/teruji di D1 LOKAL. Deploy ke production adalah langkah terpisah yang perlu dikonfirmasi eksplisit sebelum dijalankan (`wrangler deploy` + `wrangler d1 execute --remote`), ditunda sampai minimal Tahap 3 (desktop bisa push) juga siap diuji end-to-end.
+- Detail riset + implementasi lengkap (file+baris, keputusan desain, bug yang ditemukan) masih menyatu di dokumen index ini (bukan dipecah ke `apps/worker/docs/todos/plan/` mengikuti pola `cloud-sync-mcp.md`) — pertimbangkan dipecah sekarang krn SEMUA tahap (0-5) sudah selesai, file index ini sudah cukup panjang.
+- Sisi Worker **belum di-deploy ke `--remote`/production sama sekali** — migrasi skema (Tahap 1) dan seluruh kode modul `investments/` (Tahap 2) baru ada/teruji di D1 LOKAL (termasuk smoke test Tahap 5). Deploy ke production adalah langkah terpisah yang perlu dikonfirmasi eksplisit sebelum dijalankan (`wrangler deploy` + `wrangler d1 execute --remote`).
+- Pull (sinkronisasi dari cloud ke desktop, `SyncResponse`/`pullSync` menyertakan data investment) **belum dikerjakan sama sekali** — skenario 23 Tahap 5 sengaja diskip krn gap ini sudah diketahui sejak awal, bukan temuan baru. Data yang dibuat/diedit dari tool MCP TIDAK akan pernah terlihat di desktop sampai jalur pull ini dibangun.
+- Seluruh pekerjaan Tahap 0-5 (migrasi + kode di 3 app) masih **belum di-commit** ke git — `apps/desktop`, `apps/worker`, `apps/mcp-server` semua punya perubahan uncommitted dari sesi ini.

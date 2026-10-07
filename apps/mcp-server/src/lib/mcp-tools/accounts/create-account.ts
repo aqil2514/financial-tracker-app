@@ -20,6 +20,31 @@ export const accountFields = {
     .describe("Wajib diisi kalau accountType='investment' -- nilai pasar TOTAL instrumen saat ini"),
 };
 
+// `inputSchema` tool MCP cuma terima raw shape (ZodRawShapeCompat), BUKAN
+// ZodObject/ZodEffects -- superRefine lintas-field (pola accountSchema
+// desktop) tidak bisa dipasang di level skema di sini, jadi divalidasi
+// manual di handler SEBELUM request ke Worker. Worker SENDIRI (upsertAccount)
+// sengaja TIDAK menolak unitLabel kosong kalau field itu `undefined` --
+// desktop push "accounts" dan "investment_accounts" sbg 2 request
+// TERPISAH (lihat komentar di apps/worker/src/modules/accounts/service.ts),
+// jadi Worker tidak bisa membedakan "desktop sengaja belum kirim" vs "MCP
+// lupa isi". Validasi wajib utk caller yg SATU PAYLOAD lengkap (spt tool
+// ini) jadi tanggung jawab MCP, bukan Worker.
+function validateInvestmentAccountFields(args: {
+  accountType: string;
+  unitLabel?: string;
+  currentMarketValue?: number;
+}): string | null {
+  if (args.accountType !== "investment") return null;
+  if (!args.unitLabel?.trim()) {
+    return "unitLabel wajib diisi untuk accountType='investment'.";
+  }
+  if (args.currentMarketValue == null || args.currentMarketValue < 0) {
+    return "currentMarketValue wajib diisi (>= 0) untuk accountType='investment'.";
+  }
+  return null;
+}
+
 export function registerCreateAccount(server: McpServer) {
   server.registerTool(
     "create_account",
@@ -30,6 +55,11 @@ export function registerCreateAccount(server: McpServer) {
       inputSchema: z.object(accountFields),
     },
     async (args, ctx) => {
+      const validationError = validateInvestmentAccountFields(args);
+      if (validationError) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: validationError }, null, 2) }], isError: true };
+      }
+
       const token = getToken(ctx);
       const result = await workerFetch(token, "/accounts", {
         method: "POST",
@@ -39,3 +69,5 @@ export function registerCreateAccount(server: McpServer) {
     }
   );
 }
+
+export { validateInvestmentAccountFields };
