@@ -211,7 +211,14 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
         investmentPurchaseId = touched.investmentPurchaseIds[0] ?? null;
       }
 
-      void pushOnWrite("transactions", transactionId);
+      // debts/debt_payments/investment_purchases/investment_sales SEMUA
+      // punya FK ke transactions(id) -- await push "transactions" (leg
+      // utama) SELESAI dulu sebelum push baris turunan mana pun, supaya
+      // tidak race (bug nyata ditemukan Tahap 5: push kedua bisa sampai
+      // ke Worker LEBIH DULU dari leg utamanya, FOREIGN KEY constraint
+      // failed). adjustmentTransactionId TIDAK direferensikan FK oleh
+      // apa pun di sini, tapi tetap diurutkan setelah supaya konsisten.
+      await pushOnWrite("transactions", transactionId);
       if (adjustmentTransactionId != null) void pushOnWrite("transactions", adjustmentTransactionId);
       if (investmentPurchaseId != null) void pushOnWrite("investment_purchases", investmentPurchaseId);
       if (investmentSaleId != null) void pushOnWrite("investment_sales", investmentSaleId);

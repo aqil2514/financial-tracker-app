@@ -25,7 +25,10 @@ export function useSettleInvestmentSale(sale: InvestmentSaleRow, onSuccess?: () 
     mutationFn: async (values: SettleSaleFormOutput) => {
       const db = await getDb();
       const result = await settleInvestmentSale(db, sale.id, values.cash_account_id);
-      void pushOnWrite("transactions", result.transactionId);
+      // investment_sales (baris sale.id, baru di-UPDATE dgn transaction_id
+      // terisi) punya FK ke transactions(id) -- await push "transactions"
+      // dulu, sama alasan dgn hook lain.
+      await pushOnWrite("transactions", result.transactionId);
       if (result.adjustmentTransactionId != null) {
         void pushOnWrite("transactions", result.adjustmentTransactionId);
       }

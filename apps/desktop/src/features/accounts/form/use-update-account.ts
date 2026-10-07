@@ -82,7 +82,12 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
           );
         }
       }
-      void pushOnWrite("accounts", account.id);
+      // Sama alasan dgn use-create-account.ts -- investment_accounts punya
+      // FK ke accounts(id), await push "accounts" dulu sebelum push
+      // "investment_accounts" supaya tidak race (terutama kasus akun yg
+      // BARU berganti tipe jadi investment, baris investment_accounts-nya
+      // baru pertama kali dibuat di request kedua ini).
+      await pushOnWrite("accounts", account.id);
       if (values.account_type === "investment") {
         void pushOnWrite("investment_accounts", account.id);
       }

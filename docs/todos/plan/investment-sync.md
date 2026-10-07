@@ -149,7 +149,43 @@ Diverifikasi: `tsc --noEmit` bersih di `apps/worker` DAN `apps/mcp-server` (tida
 ## Checklist tahapan
 - [x] **Tahap 3** — selesai, lihat bagian "Tahap 3" di atas.
 - [x] **Tahap 4** — selesai, lihat bagian "Tahap 4" di atas.
-- [ ] **Tahap 5** — Verifikasi end-to-end (dogfooding nyata, pola sama Tahap 7 `cloud-sync-mcp.md` — bukan skenario test formal).
+- [ ] **Tahap 5** — Verifikasi end-to-end lokal (smoke test, bukan skenario test formal) — lihat daftar skenario di bagian "Tahap 5" di bawah.
+
+## Tahap 5 — Rencana smoke test end-to-end lokal (BELUM dikerjakan)
+
+Semua via `npx wrangler dev` (Worker lokal, port 8787) + `npx wrangler d1 execute financial-app --local` utk verifikasi langsung ke D1 (bukan percaya response HTTP saja, pola sama `checking-dev-database.md` desktop) + `tauri dev` desktop (`finance.dev.db`, WAJIB copy `-wal`/`-shm` sebelum query, app aktif tidak boleh diquery langsung). Dua token beda (`PC_SYNC_TOKEN`/`MCP_SYNC_TOKEN` di `.dev.vars`) dipakai sesuai jalur yang diuji — penting krn `sync_source`/LWW membedakan asal tulisan. Tujuan: pastikan jalur Tahap 3 (desktop push) dan Tahap 4 (Worker /sync + tool MCP) yang baru ditulis BENAR-BENAR nyambung, bukan cuma `tsc` bersih. Data uji coba dibersihkan setelah masing-masing skenario (pola sama Tahap 2).
+
+**A. Desktop → Worker (push on-write, Tahap 3)**
+
+1. Buat akun investment baru dari UI desktop (`unit_label`, `current_market_value` wajib) → cek `investment_accounts` muncul di D1 lokal dengan `sync_source='pc'`.
+2. Catat pembelian via dialog "Catat Pembelian" (status settled langsung) → cek `investment_purchases` muncul di D1 dengan `transaction_id` terisi, dan `transactions` leg transfer-nya juga ter-push.
+3. Catat pembelian status **pending** → cek baris masuk ke D1 dengan `status='pending'`, `unit`/`price_per_unit` sesuai (boleh NULL).
+4. Edit baris pembelian pending (isi unit/harga belakangan, `use-update-investment-purchase.ts`) → cek UPDATE sampai ke D1 (bukan recreate, beda dari jalur form transaksi utama).
+5. Jual investasi **settled** langsung (dialog "Jual Investasi") → cek `investment_sales` di D1 ter-isi lengkap (`average_cost_per_unit`, `realized_pl`, `adjustment_transaction_id`), DAN leg transfer + leg adjustment P/L sama-sama ter-push ke `transactions`.
+6. Jual investasi **pending** (TANPA transaksi apa pun) → cek `investment_sales` masuk D1 dengan `transaction_id=NULL`, DAN pastikan **tidak ada** baris `transactions` baru yang ikut terbuat/ter-push.
+7. Settle baris pending dari langkah 6 (`use-settle-investment-sale.ts`) → cek UPDATE ke D1 (`status='settled'`, kedua FK terisi) + transaksi baru ter-push.
+8. Hapus baris pending (`use-delete-pending-investment-sale.ts`, BUKAN lewat hapus transaksi) → cek baris ter-soft-delete (`deleted_at` terisi) di D1 — gap paling berisiko dari Tahap 3 (push-delete harus terjadi sebelum hard-delete lokal).
+9. Edit transaksi utama yang merupakan pembelian/penjualan (form transaksi biasa, ubah `unit`) → cek RECREATE ter-refleksi di D1: baris lama `deleted_at` terisi, baris baru muncul dengan nilai benar.
+10. Hapus transaksi utama yang merupakan penjualan settled (`use-delete-transaction.ts`) → cek **baris `investment_sales` DAN transaksi adjustment P/L-nya** sama-sama ter-soft-delete di D1 (bukan cuma leg transfer utamanya) — ini gap spesifik yang disorot saat wiring Tahap 3.
+11. Update nilai pasar terkini (`UpdateMarketValueDialog`) → cek UPDATE `investment_accounts.current_market_value` sampai ke D1.
+12. Coba oversell dari desktop saat offline/Worker mati → pastikan tetap masuk `cloud_sync_queue` lokal, lalu nyalakan Worker lagi dan pastikan retry (`flushPushQueue`) berhasil mengirim.
+
+**B. MCP tools → Worker (Tahap 4)**
+
+13. `create_account` dengan `accountType: "investment"` tanpa `unitLabel` → harus ditolak 422 (validasi baru di `upsertAccount`), BUKAN insert `investment_accounts` kosong.
+14. `create_account` dengan `accountType: "investment"` + `unitLabel`/`currentMarketValue` lengkap → cek `accounts` DAN `investment_accounts` sama-sama ter-insert di D1 dalam satu panggilan (gap yang baru diperbaiki).
+15. `create_transaction` transfer cash→investment dengan `unit`/`pricePerUnit` → cek `investment_purchases` otomatis terbentuk via `applyInvestmentTransaction` Worker.
+16. `create_transaction` transfer investment→cash (jual) dengan `unit`/`pricePerUnit` → cek `amount` transaksi yang tersimpan = `averageCost × unit` (BUKAN nominal jual penuh — bug yang sama pernah ditemukan di Tahap 2), dan `investment_sales` status otomatis `settled` (MCP tidak punya jalur pending lewat tool ini).
+17. `get_investment_summary` setelah beberapa transaksi di atas → cek angka `unrealizedPl`/`totalRealizedPl`/`averageCost` di response cocok dengan hitungan manual dari data D1.
+18. `get_investment_detail` satu akun → cek `purchases`/`sales` yang muncul cocok isi D1, dan `transactionId` tiap baris valid (bisa dipakai `update_transaction`/`delete_transaction`).
+19. `settle_investment_sale` pada baris pending yang dibuat dari skenario A6 (atau dibuat ulang via MCP kalau belum ada jalur MCP utk jual pending) → cek UPDATE ke D1 benar.
+20. `delete_pending_investment_sale` pada baris pending → cek soft-delete di D1, DAN `get_investment_detail` setelahnya tidak lagi menampilkan baris itu.
+21. Token PC dipakai memanggil endpoint yang seharusnya MCP-only (atau sebaliknya) → pastikan guard `syncSource` tetap konsisten (mis. `applyInvestmentTransaction` di `createTransactionRow` punya guard `syncSource !== "pc"` dari Tahap 2 — pastikan masih benar dgn data baru).
+
+**C. Lintas arah (konsistensi)**
+
+22. Buat/edit data investasi dari desktop, lalu panggil `get_investment_summary`/`get_investment_detail` (MCP) → harus mencerminkan data yang sama (membuktikan `/sync` Worker, yang baru diperluas Tahap 4, benar-benar menyertakan data yang di-push Tahap 3).
+23. Sebaliknya: buat akun+transaksi investasi via tool MCP, lalu (kalau ada waktu) cek apakah desktop punya jalur PULL untuk melihatnya — **catatan penting**: pull belum pernah dikerjakan sama sekali (lihat bagian "Catatan" dokumen ini), jadi skenario ini kemungkinan besar akan MENUNJUKKAN gap baru (desktop tidak akan melihat data yang dibuat dari MCP) — ekspektasikan ini sebagai temuan, bukan kegagalan tak terduga.
 
 ## Catatan
 

@@ -61,7 +61,13 @@ export function useCreateAccount(options: UseCreateAccountOptions = {}) {
           [id, values.unit_label, values.current_market_value]
         );
       }
-      void pushOnWrite("accounts", id);
+      // investment_accounts punya FK ke accounts(id) di sisi Worker --
+      // push "accounts" WAJIB di-await SELESAI dulu sebelum push
+      // "investment_accounts" dikirim, supaya tidak ada race condition
+      // (keduanya fire-and-forget paralel bisa membuat request kedua
+      // sampai ke Worker LEBIH DULU, FOREIGN KEY constraint failed --
+      // bug nyata ditemukan saat smoke test Tahap 5).
+      await pushOnWrite("accounts", id);
       if (values.account_type === "investment") {
         void pushOnWrite("investment_accounts", id);
       }

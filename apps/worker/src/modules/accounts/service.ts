@@ -63,11 +63,26 @@ export async function upsertAccount(
     };
   }
 
-  // Port validasi superRefine account.schema.ts desktop -- unit_label
-  // NOT NULL di D1 (lihat investment_accounts), jadi WAJIB ditolak di
-  // sini (bukan diam-diam insert string kosong/null) kalau caller
-  // (mis. tool MCP) tidak mengisinya.
-  if (payload.accountType === "investment" && !payload.unitLabel?.trim()) {
+  // Port use-create-account.ts/use-update-account.ts (desktop): baris
+  // investment_accounts dibuat/di-upsert BARENG dalam mutasi yang sama
+  // saat accountType === 'investment', bukan lewat endpoint push terpisah
+  // (itu /investments/accounts/push, utk jalur sync PC yang sudah punya
+  // baris lokal -- lihat pushInvestmentAccountFromPc). Caller non-PC
+  // (mis. tool MCP create_account/update_account) TIDAK pernah tahu
+  // endpoint push itu, jadi perlu jalur ini supaya akun investment yg
+  // dibuat/diupdate lewat /accounts tetap lengkap datanya.
+  //
+  // `unitLabel === undefined` di-SKIP (bukan ditolak 422) -- desktop
+  // SENGAJA mengirim `accounts` dan `investment_accounts` sbg 2 request
+  // terpisah (push-row.ts: pushOnWrite("accounts", id) LALU
+  // pushOnWrite("investment_accounts", id)), jadi payload /accounts dari
+  // desktop TIDAK PERNAH membawa unitLabel sama sekali -- menolaknya di
+  // sini akan memblokir SEMUA akun investment yang dibuat dari desktop.
+  // Validasi dicek SEBELUM tulis apa pun ke `accounts` (bukan setelah) --
+  // supaya reject tidak meninggalkan baris `accounts` yatim tanpa
+  // `investment_accounts` kalau caller (mis. tool MCP) kirim unitLabel
+  // kosong/string blank.
+  if (payload.accountType === "investment" && payload.unitLabel !== undefined && !payload.unitLabel?.trim()) {
     return { status: "rejected", reason: "unitLabel wajib diisi untuk akun bertipe 'investment'." };
   }
 
@@ -117,15 +132,7 @@ export async function upsertAccount(
       .run();
   }
 
-  // Port use-create-account.ts/use-update-account.ts (desktop): baris
-  // investment_accounts dibuat/di-upsert BARENG dalam mutasi yang sama
-  // saat accountType === 'investment', bukan lewat endpoint push terpisah
-  // (itu /investments/accounts/push, utk jalur sync PC yang sudah punya
-  // baris lokal -- lihat pushInvestmentAccountFromPc). Caller non-PC
-  // (mis. tool MCP create_account/update_account) TIDAK pernah tahu
-  // endpoint push itu, jadi perlu jalur ini supaya akun investment yg
-  // dibuat/diupdate lewat /accounts tetap lengkap datanya.
-  if (payload.accountType === "investment") {
+  if (payload.accountType === "investment" && payload.unitLabel !== undefined) {
     const existingInvestmentAccount = await env.DB.prepare(
       "SELECT account_id FROM investment_accounts WHERE account_id = ?1"
     )

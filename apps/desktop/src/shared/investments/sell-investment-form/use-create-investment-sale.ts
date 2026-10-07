@@ -89,7 +89,12 @@ export function useCreateInvestmentSale(options: UseCreateInvestmentSaleOptions 
         status: values.status,
       });
 
-      if (transactionId != null) void pushOnWrite("transactions", transactionId);
+      // investment_sales punya FK ke transactions(id) (transaction_id,
+      // terisi hanya kalau status settled) -- await push "transactions"
+      // dulu sebelum push "investment_sales", sama alasan dgn
+      // use-create-transaction.ts. Status pending: transactionId null,
+      // tidak ada apa pun utk di-await di sini.
+      if (transactionId != null) await pushOnWrite("transactions", transactionId);
       if (touched.adjustmentTransactionId != null) {
         void pushOnWrite("transactions", touched.adjustmentTransactionId);
       }

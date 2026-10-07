@@ -79,7 +79,9 @@ export function useCreateInvestmentPurchase(options: UseCreateInvestmentPurchase
         status: values.status,
       });
 
-      void pushOnWrite("transactions", transactionId);
+      // investment_purchases punya FK ke transactions(id) -- await push
+      // "transactions" dulu, sama alasan dgn use-create-transaction.ts.
+      await pushOnWrite("transactions", transactionId);
       if (touched.investmentPurchaseIds[0]) {
         void pushOnWrite("investment_purchases", touched.investmentPurchaseIds[0]);
       }

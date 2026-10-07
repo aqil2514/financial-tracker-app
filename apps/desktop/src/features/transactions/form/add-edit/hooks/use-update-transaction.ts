@@ -235,7 +235,10 @@ export function useUpdateTransaction(
         deletedInvestmentPurchaseIds = touched.deletedInvestmentPurchaseIds;
       }
 
-      void pushOnWrite("transactions", transaction.id);
+      // Sama alasan dgn use-create-transaction.ts -- await push
+      // "transactions" dulu sebelum push baris turunan (FK ke
+      // transactions(id)).
+      await pushOnWrite("transactions", transaction.id);
       if (adjustmentTransactionId != null) void pushOnWrite("transactions", adjustmentTransactionId);
       if (investmentPurchaseId != null) void pushOnWrite("investment_purchases", investmentPurchaseId);
       if (investmentSaleId != null) void pushOnWrite("investment_sales", investmentSaleId);

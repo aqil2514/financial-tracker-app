@@ -254,6 +254,12 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0042_investment_cloud_sync_columns.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 43,
+            description: "cloud_sync_queue_investment",
+            sql: include_str!("../migrations/0043_cloud_sync_queue_investment.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
