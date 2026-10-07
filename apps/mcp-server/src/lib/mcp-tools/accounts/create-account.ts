@@ -13,6 +13,11 @@ export const accountFields = {
   isActive: z.boolean().optional(),
   icon: z.string().optional(),
   color: z.string().optional(),
+  unitLabel: z.string().optional().describe("Wajib diisi kalau accountType='investment' (mis. 'unit', 'lembar', 'gram')"),
+  currentMarketValue: z
+    .number()
+    .optional()
+    .describe("Wajib diisi kalau accountType='investment' -- nilai pasar TOTAL instrumen saat ini"),
 };
 
 export function registerCreateAccount(server: McpServer) {
@@ -20,7 +25,8 @@ export function registerCreateAccount(server: McpServer) {
     "create_account",
     {
       title: "Tambah Akun",
-      description: "Tambah akun baru (kas/bank, atau akun bertipe debt untuk tracking utang-piutang).",
+      description:
+        "Tambah akun baru (kas/bank, akun bertipe debt untuk tracking utang-piutang, atau akun bertipe investment -- wajib isi unitLabel & currentMarketValue untuk investment).",
       inputSchema: z.object(accountFields),
     },
     async (args, ctx) => {

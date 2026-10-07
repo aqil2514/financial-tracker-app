@@ -4,6 +4,6 @@
  * #6) — begitu tipe akun ketiga ditambahkan, cukup edit file ini, bukan
  * grep 2+ lokasi tersebar.
  */
-export type AccountType = "cash" | "debt";
+export type AccountType = "cash" | "debt" | "investment";
 
-export const ACCOUNT_TYPES = ["cash", "debt"] as const satisfies readonly AccountType[];
+export const ACCOUNT_TYPES = ["cash", "debt", "investment"] as const satisfies readonly AccountType[];

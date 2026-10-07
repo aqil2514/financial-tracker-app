@@ -6,7 +6,7 @@ Index ini HANYA navigasi + checklist ringkas. Detail keputusan desain, riset, da
 
 ## Status & TODO saat ini (ringkas)
 
-Sisi Worker (Tahap 0-2) SELESAI — skema D1 + logic bisnis penuh (beli+jual) sudah diverifikasi di lokal. Sisi desktop (Tahap 3, migrasi + wiring push) SELESAI juga (2026-10-07) — PC sekarang mem-push ketiga tabel investment ke Worker di SEMUA titik mutasi. MCP (Tahap 4) BELUM dikerjakan. Penjelasan lengkap tiap poin ada di bagian "Latar belakang" dan "Checklist tahapan" di bawah.
+Sisi Worker (Tahap 0-2) SELESAI — skema D1 + logic bisnis penuh (beli+jual) sudah diverifikasi di lokal. Sisi desktop (Tahap 3, migrasi + wiring push) SELESAI juga (2026-10-07) — PC sekarang mem-push ketiga tabel investment ke Worker di SEMUA titik mutasi. Sisi MCP (Tahap 4) SELESAI juga (2026-10-07) — 4 tool baru + perluasan `/sync` + gap `POST /accounts` yang ditemukan saat mengerjakan ini. Penjelasan lengkap tiap poin ada di bagian "Latar belakang" dan "Checklist tahapan" di bawah.
 
 - [x] Tipe akun `investment` selesai diimplementasikan penuh di `apps/desktop` (termasuk penjualan/penarikan sebagian), sudah di-smoke-test manual — lihat [`apps/desktop/docs/todos/plan/account-type-investment.md`](../../../apps/desktop/docs/todos/plan/account-type-investment.md).
 - [x] Riset peta gap Worker vs desktop — selesai (2026-10-07), lihat ringkasan di bagian "Latar belakang" di bawah.
@@ -14,7 +14,7 @@ Sisi Worker (Tahap 0-2) SELESAI — skema D1 + logic bisnis penuh (beli+jual) su
 - [x] Tahap 1 — Migrasi D1 (`schema/0002_account_type_investment.sql`) ditulis + diverifikasi di D1 LOKAL (2026-10-07), lihat bagian "Tahap 1" di bawah. BELUM di-apply ke `--remote`/production — ditunda sampai Tahap 2 (modul `investments/`) siap.
 - [x] Tahap 2 — `classifyAccountPair` + modul `investments/` PEMBELIAN **dan** PENJUALAN (average cost, Realized P/L, validasi oversell, settle, delete pending) SELESAI + diverifikasi penuh via `wrangler dev`/`d1 execute --local` (2026-10-07) — lihat bagian "Tahap 2" di bawah utk daftar lengkap + 1 bug nyata yang ditemukan+diperbaiki saat verifikasi.
 - [x] Tahap 3 — Desktop: migrasi kolom cloud-sync (`0042`) + wiring `pushOnWrite`/`pushDeleteOnWrite` di SEMUA titik mutasi (10 hook) SELESAI (2026-10-07) — lihat bagian "Tahap 3" di bawah. BELUM diverifikasi end-to-end nyata (itu Tahap 5).
-- [ ] Tahap 4 — MCP server: tool investasi baru — belum dikerjakan, belum diputuskan tool apa saja.
+- [x] Tahap 4 — MCP server: `/sync` diperluas, `AccountType`/`create_account`/`create_transaction` ditambah field investment, 4 tool baru (`get_investment_summary`, `get_investment_detail`, `settle_investment_sale`, `delete_pending_investment_sale`) SELESAI (2026-10-07) — lihat bagian "Tahap 4" di bawah, termasuk gap `POST /accounts` Worker yang ditemukan+diperbaiki sekaligus. BELUM diverifikasi end-to-end nyata (itu Tahap 5).
 - [ ] Tahap 5 — Verifikasi end-to-end (dogfooding nyata) — belum dikerjakan.
 
 ## Latar belakang
@@ -124,9 +124,31 @@ Lalu di-petakan (via subagent riset) SEMUA titik mutasi aktual yang menyentuh ke
 
 Diverifikasi: `tsc --noEmit` bersih setelah seluruh wiring. **Belum** diverifikasi end-to-end nyata (push betul-betul sampai ke Worker lokal lalu dicek via `d1 execute`) — itu scope Tahap 5.
 
+## Tahap 4 — MCP server: perluasan `/sync` + tool investasi (SELESAI, 2026-10-07)
+
+Keputusan scope (ditanya eksplisit ke user sebelum mulai, krn ada 2 app yang disentuh): **baca + aksi penuh** — bukan cuma read-only. Artinya selain `get_investment_summary`/`get_investment_detail`, juga `settle_investment_sale`/`delete_pending_investment_sale` (mapping endpoint Worker yang sudah ada dari Tahap 2 tapi belum punya tool MCP).
+
+**Worker — perluasan `/sync`** (`sync/service.ts`): `SyncResponse` + `getSyncSnapshot` ditambah `investmentAccounts`/`investmentPurchases`/`investmentSales` (query D1 + mapping camelCase, pola sama 7 tabel lain). Tanpa ini snapshot yang dipakai SEMUA tool MCP baca (`fetchFullSnapshot`) tidak akan pernah melihat data investment sama sekali, terlepas dari tool apa pun yang dibuat.
+
+**Bug ditemukan+diperbaiki saat mengerjakan ini** (bukan dari rencana awal, baru ketahuan saat menelusuri jalur `create_account`): `POST /accounts`/`PATCH /accounts/:id` Worker (`accounts/service.ts` `upsertAccount`) TERNYATA tidak pernah membuat/update baris `investment_accounts` sama sekali — beda dari desktop (`use-create-account.ts`/`use-update-account.ts`) yang insert/upsert `investment_accounts` BARENG dalam mutasi yang sama saat `account_type === 'investment'`. Konsekuensinya: akun investment yang dibuat lewat `/accounts` (termasuk dari tool MCP `create_account`) akan punya baris `accounts` tapi TANPA `investment_accounts` — tidak lengkap, fitur P/L tidak akan jalan. Fix: `AccountPayload` (`accounts/schema.ts`) ditambah `unitLabel`/`currentMarketValue` opsional, `upsertAccount` ditambah validasi (`unitLabel` wajib diisi utk `accountType === 'investment'`, port `superRefine` desktop — ditolak 422 kalau tidak, BUKAN diam-diam insert kosong krn kolom itu `NOT NULL` di D1) + logic upsert manual `investment_accounts` (query dulu, lalu INSERT atau UPDATE, pola sama desktop) dalam fungsi yang sama. Endpoint push khusus (`/investments/accounts/push`, `pushInvestmentAccountFromPc`) TETAP ada terpisah utk jalur sync PC yang sudah punya baris lokalnya sendiri — fix ini melengkapi jalur LAIN (`/accounts` generik) yang sebelumnya bolong.
+
+**MCP — perluasan tool existing**: `account-types.ts` (`AccountType`/`ACCOUNT_TYPES`) diperluas jadi `"cash" | "debt" | "investment"` (sama bug yang ditemukan di Worker Tahap 2, ternyata juga ada salinannya di MCP — tidak ada package bersama lintas-app, 3 tempat definisi `AccountType` yang harus disinkronkan manual: desktop, Worker, MCP). `accountFields` (`create-account.ts`, direuse `update-account.ts`) ditambah `unitLabel`/`currentMarketValue` opsional. `transactionFields` (`create-transaction.ts`, direuse `update-transaction.ts`) ditambah `unit`/`pricePerUnit`/`investmentStatus` opsional — field ini sudah diterima Worker sejak Tahap 2 (`isValidInvestmentFields`) tapi sebelumnya tidak ada tempat mengirimnya dari MCP sama sekali, jadi tool `create_transaction` yang sudah bisa transfer cash↔investment (Worker tidak membatasi tipe akun di endpoint itu) sebenarnya tidak lengkap tanpa field ini.
+
+**MCP — `sync-snapshot.ts`**: tipe `InvestmentAccount`/`InvestmentPurchase`/`InvestmentSale` ditambah ke `SyncSnapshot`. 5 fungsi baru, SEMUA port rumus PERSIS dari `investment-holding-math.ts`+`investment-pl-stats.tsx` desktop (supaya tidak drift, sama prinsip dgn Worker Tahap 2): `getAverageCostPerUnit`/`getRemainingUnit` (basis validasi oversell — purchases settled only vs sales pending+settled), `getInvestmentHolding` (holding SATU akun: balance dari `computeAccountBalance` yang sudah ada, marketValue, Unrealized P/L nominal+persen, averageCost dari `balance / totalUnit` — BUKAN dari `getAverageCostPerUnit`, basis beda sengaja sama seperti desktop), `summarizeInvestments` (lintas SEMUA akun + total Realized P/L kumulatif dari seluruh `investment_sales` settled), `listInvestmentDetail` (riwayat lot satu akun, pola sama `listDebtDetails`).
+
+**MCP — 4 tool baru** (`mcp-tools/investments/`, didaftarkan di `mcp-tools/index.ts`):
+- `get_investment_summary` — ringkasan lintas semua akun (pola sama `get_debt_summary`).
+- `get_investment_detail` — holding + riwayat lot satu akun, termasuk `transactionId` tiap baris (pola sama `get_debt_detail`, supaya `update_transaction`/`delete_transaction` yang sudah ada bisa dipakai langsung utk edit/hapus satu lot).
+- `settle_investment_sale` — mapping `POST /investments/sales/:id/settle`, cairkan dana jual pending ke akun kas tujuan.
+- `delete_pending_investment_sale` — mapping `DELETE /investments/sales/:id`, batalkan order jual pending (wajib `confirm: true`, pola sama `write_off_debt`).
+
+Endpoint push (`/investments/accounts/push`, `/purchases/push`, `/sales/push`) **SENGAJA TIDAK** dimapping ke tool MCP apa pun — itu jalur sync PC murni (upsert-by-id dari baris yang desktop sudah buat sendiri), tidak ada kasus pakai dari asisten AI yang masuk akal utk memanggilnya langsung (sama seperti `/debts/push` tidak punya tool MCP).
+
+Diverifikasi: `tsc --noEmit` bersih di `apps/worker` DAN `apps/mcp-server` (tidak ada test otomatis di kedua app ini, sama seperti Tahap 2). **Belum** diverifikasi end-to-end nyata (panggil tool lewat Claude asli, cek balasan Worker via `wrangler dev` + `d1 execute --local`) — itu scope Tahap 5.
+
 ## Checklist tahapan
 - [x] **Tahap 3** — selesai, lihat bagian "Tahap 3" di atas.
-- [ ] **Tahap 4** — MCP server: tool baru utk investasi (BELUM diputuskan tool apa saja — kandidat: lihat `get_investment_summary` yang sudah lama jadi item terbuka di `account-type-investment.md`).
+- [x] **Tahap 4** — selesai, lihat bagian "Tahap 4" di atas.
 - [ ] **Tahap 5** — Verifikasi end-to-end (dogfooding nyata, pola sama Tahap 7 `cloud-sync-mcp.md` — bukan skenario test formal).
 
 ## Catatan

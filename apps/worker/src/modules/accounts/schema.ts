@@ -31,6 +31,11 @@ export type AccountPayload = {
   icon?: string | null;
   color?: string | null;
   updatedAt?: string;
+  // Hanya relevan saat accountType === 'investment' (lihat
+  // investment_accounts) -- port field unit_label/current_market_value
+  // dari use-create-account.ts/use-update-account.ts desktop.
+  unitLabel?: string | null;
+  currentMarketValue?: number | null;
 };
 
 export function isAccountPayload(value: unknown): value is AccountPayload {
@@ -47,7 +52,9 @@ export function isAccountPayload(value: unknown): value is AccountPayload {
     isAccountType(v.accountType) &&
     (v.icon === undefined || v.icon === null || typeof v.icon === "string") &&
     (v.color === undefined || v.color === null || typeof v.color === "string") &&
-    (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
+    (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt)) &&
+    (v.unitLabel === undefined || v.unitLabel === null || typeof v.unitLabel === "string") &&
+    (v.currentMarketValue === undefined || v.currentMarketValue === null || typeof v.currentMarketValue === "number")
   );
 }
 

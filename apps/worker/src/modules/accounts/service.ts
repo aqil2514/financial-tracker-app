@@ -63,8 +63,16 @@ export async function upsertAccount(
     };
   }
 
+  // Port validasi superRefine account.schema.ts desktop -- unit_label
+  // NOT NULL di D1 (lihat investment_accounts), jadi WAJIB ditolak di
+  // sini (bukan diam-diam insert string kosong/null) kalau caller
+  // (mis. tool MCP) tidak mengisinya.
+  if (payload.accountType === "investment" && !payload.unitLabel?.trim()) {
+    return { status: "rejected", reason: "unitLabel wajib diisi untuk akun bertipe 'investment'." };
+  }
+
+  const now = nowText();
   if (!existing) {
-    const now = nowText();
     await env.DB.prepare(
       `INSERT INTO accounts
          (id, name, icon, initial_balance, group_id, description, is_active, account_type, color,
@@ -107,6 +115,40 @@ export async function upsertAccount(
         payload.id
       )
       .run();
+  }
+
+  // Port use-create-account.ts/use-update-account.ts (desktop): baris
+  // investment_accounts dibuat/di-upsert BARENG dalam mutasi yang sama
+  // saat accountType === 'investment', bukan lewat endpoint push terpisah
+  // (itu /investments/accounts/push, utk jalur sync PC yang sudah punya
+  // baris lokal -- lihat pushInvestmentAccountFromPc). Caller non-PC
+  // (mis. tool MCP create_account/update_account) TIDAK pernah tahu
+  // endpoint push itu, jadi perlu jalur ini supaya akun investment yg
+  // dibuat/diupdate lewat /accounts tetap lengkap datanya.
+  if (payload.accountType === "investment") {
+    const existingInvestmentAccount = await env.DB.prepare(
+      "SELECT account_id FROM investment_accounts WHERE account_id = ?1"
+    )
+      .bind(payload.id)
+      .first<{ account_id: string }>();
+
+    if (existingInvestmentAccount) {
+      await env.DB.prepare(
+        `UPDATE investment_accounts
+         SET unit_label = ?1, current_market_value = ?2, updated_at = ?3, deleted_at = NULL
+         WHERE account_id = ?4`
+      )
+        .bind(payload.unitLabel, payload.currentMarketValue ?? 0, now, payload.id)
+        .run();
+    } else {
+      await env.DB.prepare(
+        `INSERT INTO investment_accounts
+           (account_id, unit_label, current_market_value, created_at, updated_at, sync_source)
+         VALUES (?1, ?2, ?3, ?4, ?4, ?5)`
+      )
+        .bind(payload.id, payload.unitLabel, payload.currentMarketValue ?? 0, now, syncSource)
+        .run();
+    }
   }
 
   return { status: "ok", id: payload.id };

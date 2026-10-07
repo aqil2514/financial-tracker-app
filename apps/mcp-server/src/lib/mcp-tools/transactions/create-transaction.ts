@@ -26,6 +26,24 @@ export const transactionFields = {
     .array(z.string())
     .optional()
     .describe("ID piutang/utang yang dilunasi, hanya dipakai saat debtAction=settlement"),
+  unit: z
+    .number()
+    .optional()
+    .describe(
+      "Jumlah unit investasi -- WAJIB diisi utk transfer cash<->investment. Arah jual (investment->cash) WAJIB dibarengi pricePerUnit; arah beli (cash->investment) opsional (order pending boleh belum tahu unit pasti)."
+    ),
+  pricePerUnit: z
+    .number()
+    .optional()
+    .describe(
+      "Harga per unit investasi saat transaksi ini -- WAJIB diisi utk arah jual (investment->cash), opsional utk arah beli."
+    ),
+  investmentStatus: z
+    .enum(["pending", "settled"])
+    .optional()
+    .describe(
+      "Status settlement baris investment_purchases/investment_sales -- default 'pending'. Arah jual (investment->cash) via tool ini SELALU dipaksa 'settled' oleh Worker (jual 'pending' tanpa transaksi apa pun hanya bisa lewat endpoint khusus, belum ada tool MCP-nya)."
+    ),
 };
 
 export function registerCreateTransaction(server: McpServer) {

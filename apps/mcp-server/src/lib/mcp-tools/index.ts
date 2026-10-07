@@ -5,6 +5,7 @@ import { registerDebtsMcpTools } from "./debts";
 import { registerContactsMcpTools } from "./contacts";
 import { registerCategoriesMcpTools } from "./categories";
 import { registerAccountGroupsMcpTools } from "./account-groups";
+import { registerInvestmentsMcpTools } from "./investments";
 
 export function registerAllMcpTools(server: McpServer) {
   registerAccountsMcpTools(server);
@@ -13,4 +14,5 @@ export function registerAllMcpTools(server: McpServer) {
   registerContactsMcpTools(server);
   registerCategoriesMcpTools(server);
   registerAccountGroupsMcpTools(server);
+  registerInvestmentsMcpTools(server);
 }

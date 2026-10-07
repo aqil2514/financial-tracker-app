@@ -84,6 +84,38 @@ export type SyncResponse = {
     updatedAt: string | null;
     deletedAt: string | null;
   }>;
+  investmentAccounts: Array<{
+    accountId: string;
+    unitLabel: string;
+    currentMarketValue: number;
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
+  investmentPurchases: Array<{
+    id: string;
+    accountId: string;
+    transactionId: string | null;
+    unit: number | null;
+    pricePerUnit: number | null;
+    date: string;
+    status: "pending" | "settled";
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
+  investmentSales: Array<{
+    id: string;
+    accountId: string;
+    transactionId: string | null;
+    adjustmentTransactionId: string | null;
+    unit: number;
+    pricePerUnit: number;
+    averageCostPerUnit: number | null;
+    realizedPl: number | null;
+    date: string;
+    status: "pending" | "settled";
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
 };
 
 // `since` null -> first sync, full snapshot SEMUA baris (termasuk yg
@@ -102,7 +134,18 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
   const filter = since !== null ? "WHERE updated_at > ?1" : "";
   const bind = since !== null ? [since] : [];
 
-  const [accountGroups, categories, contacts, accounts, transactions, debts, debtPayments] = await Promise.all([
+  const [
+    accountGroups,
+    categories,
+    contacts,
+    accounts,
+    transactions,
+    debts,
+    debtPayments,
+    investmentAccounts,
+    investmentPurchases,
+    investmentSales,
+  ] = await Promise.all([
     env.DB.prepare(`SELECT id, name, updated_at, deleted_at FROM account_groups ${filter}`)
       .bind(...bind)
       .all<{ id: string; name: string; updated_at: string | null; deleted_at: string | null }>(),
@@ -203,6 +246,51 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
         updated_at: string | null;
         deleted_at: string | null;
       }>(),
+    env.DB.prepare(`SELECT account_id, unit_label, current_market_value, updated_at, deleted_at FROM investment_accounts ${filter}`)
+      .bind(...bind)
+      .all<{
+        account_id: string;
+        unit_label: string;
+        current_market_value: number;
+        updated_at: string | null;
+        deleted_at: string | null;
+      }>(),
+    env.DB.prepare(
+      `SELECT id, account_id, transaction_id, unit, price_per_unit, date, status, updated_at, deleted_at
+       FROM investment_purchases ${filter}`
+    )
+      .bind(...bind)
+      .all<{
+        id: string;
+        account_id: string;
+        transaction_id: string | null;
+        unit: number | null;
+        price_per_unit: number | null;
+        date: string;
+        status: "pending" | "settled";
+        updated_at: string | null;
+        deleted_at: string | null;
+      }>(),
+    env.DB.prepare(
+      `SELECT id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit,
+              average_cost_per_unit, realized_pl, date, status, updated_at, deleted_at
+       FROM investment_sales ${filter}`
+    )
+      .bind(...bind)
+      .all<{
+        id: string;
+        account_id: string;
+        transaction_id: string | null;
+        adjustment_transaction_id: string | null;
+        unit: number;
+        price_per_unit: number;
+        average_cost_per_unit: number | null;
+        realized_pl: number | null;
+        date: string;
+        status: "pending" | "settled";
+        updated_at: string | null;
+        deleted_at: string | null;
+      }>(),
   ]);
 
   return {
@@ -284,6 +372,38 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
       date: r.date,
       source: r.source,
       sourceRef: r.source_ref,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+    })),
+    investmentAccounts: investmentAccounts.results.map((r) => ({
+      accountId: r.account_id,
+      unitLabel: r.unit_label,
+      currentMarketValue: r.current_market_value,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+    })),
+    investmentPurchases: investmentPurchases.results.map((r) => ({
+      id: r.id,
+      accountId: r.account_id,
+      transactionId: r.transaction_id,
+      unit: r.unit,
+      pricePerUnit: r.price_per_unit,
+      date: r.date,
+      status: r.status,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+    })),
+    investmentSales: investmentSales.results.map((r) => ({
+      id: r.id,
+      accountId: r.account_id,
+      transactionId: r.transaction_id,
+      adjustmentTransactionId: r.adjustment_transaction_id,
+      unit: r.unit,
+      pricePerUnit: r.price_per_unit,
+      averageCostPerUnit: r.average_cost_per_unit,
+      realizedPl: r.realized_pl,
+      date: r.date,
+      status: r.status,
       updatedAt: r.updated_at,
       deletedAt: r.deleted_at,
     })),

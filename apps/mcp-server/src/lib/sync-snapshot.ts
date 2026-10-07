@@ -80,6 +80,41 @@ export type DebtPayment = {
   deletedAt: string | null;
 };
 
+export type InvestmentAccount = {
+  accountId: string;
+  unitLabel: string;
+  currentMarketValue: number;
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
+export type InvestmentPurchase = {
+  id: string;
+  accountId: string;
+  transactionId: string | null;
+  unit: number | null;
+  pricePerUnit: number | null;
+  date: string;
+  status: "pending" | "settled";
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
+export type InvestmentSale = {
+  id: string;
+  accountId: string;
+  transactionId: string | null;
+  adjustmentTransactionId: string | null;
+  unit: number;
+  pricePerUnit: number;
+  averageCostPerUnit: number | null;
+  realizedPl: number | null;
+  date: string;
+  status: "pending" | "settled";
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
 export type SyncSnapshot = {
   checkpoint: string;
   accountGroups: AccountGroup[];
@@ -89,6 +124,9 @@ export type SyncSnapshot = {
   transactions: Transaction[];
   debts: Debt[];
   debtPayments: DebtPayment[];
+  investmentAccounts: InvestmentAccount[];
+  investmentPurchases: InvestmentPurchase[];
+  investmentSales: InvestmentSale[];
 };
 
 export async function fetchFullSnapshot(
@@ -416,4 +454,150 @@ export function listDebtDetails(
       const paid = payments.reduce((sum, p) => sum + p.amount, 0);
       return { ...d, remaining: d.amount - paid, payments };
     });
+}
+
+// Port PERSIS getAverageCostPerUnit (apps/desktop/.../investment-holding-math.ts
+// DAN apps/worker/.../investments/service.ts) -- SATU-SATUNYA rumus
+// average cost, dipakai validasi oversell (getRemainingUnit di bawah)
+// DAN tampilan ringkasan. Cuma baris `status='settled'` yg ikut dihitung
+// (baris pending belum pasti unit/harganya).
+export function getAverageCostPerUnit(snapshot: SyncSnapshot, accountId: string): number {
+  let totalCost = 0;
+  let totalUnit = 0;
+  for (const p of snapshot.investmentPurchases) {
+    if (!isAlive(p) || p.accountId !== accountId || p.status !== "settled") continue;
+    totalCost += (p.unit ?? 0) * (p.pricePerUnit ?? 0);
+    totalUnit += p.unit ?? 0;
+  }
+  return totalUnit !== 0 ? totalCost / totalUnit : 0;
+}
+
+// Port PERSIS getRemainingUnit -- sisa unit yang BISA DIJUAL (validasi
+// oversell), BEDA dari totalUnit di getInvestmentHolding (yang
+// mengikutkan pembelian pending, basis Unrealized P/L). Penjualan
+// pending SUDAH dikurangi (optimis, simetris pembelian).
+export function getRemainingUnit(snapshot: SyncSnapshot, accountId: string): number {
+  let settledPurchased = 0;
+  for (const p of snapshot.investmentPurchases) {
+    if (!isAlive(p) || p.accountId !== accountId || p.status !== "settled") continue;
+    settledPurchased += p.unit ?? 0;
+  }
+  let sold = 0;
+  for (const s of snapshot.investmentSales) {
+    if (!isAlive(s) || s.accountId !== accountId) continue;
+    if (s.status !== "pending" && s.status !== "settled") continue;
+    sold += s.unit;
+  }
+  return settledPurchased - sold;
+}
+
+// Port PERSIS InvestmentPlStats (desktop) -- Unrealized P/L dihitung dari
+// `balance` akun (modal posisi aktif, live dari transactions via
+// computeAccountBalance), BUKAN average cost x remainingUnit. `totalUnit`
+// di sini SUM SEMUA pembelian (termasuk pending yg unit-nya terisi) --
+// basis BEDA dari getRemainingUnit (yg cuma settled), lihat komentar
+// investment-pl-stats.tsx desktop soal kenapa dua "total unit" ini
+// sengaja berbeda.
+export function getInvestmentHolding(
+  snapshot: SyncSnapshot,
+  accountId: string
+): {
+  balance: number;
+  marketValue: number;
+  unrealizedPl: number;
+  unrealizedPlPercent: number;
+  totalUnit: number;
+  averageCost: number | null;
+  remainingUnit: number;
+} | null {
+  const investmentAccount = snapshot.investmentAccounts.find((a) => a.accountId === accountId && isAlive(a));
+  if (!investmentAccount) return null;
+
+  const balance = computeAccountBalance(snapshot, accountId) ?? 0;
+  const marketValue = investmentAccount.currentMarketValue;
+  const unrealizedPl = marketValue - balance;
+  const unrealizedPlPercent = balance !== 0 ? (unrealizedPl / balance) * 100 : 0;
+
+  let totalUnit = 0;
+  for (const p of snapshot.investmentPurchases) {
+    if (!isAlive(p) || p.accountId !== accountId) continue;
+    totalUnit += p.unit ?? 0;
+  }
+  const averageCost = totalUnit !== 0 ? balance / totalUnit : null;
+
+  return {
+    balance,
+    marketValue,
+    unrealizedPl,
+    unrealizedPlPercent,
+    totalUnit,
+    averageCost,
+    remainingUnit: getRemainingUnit(snapshot, accountId),
+  };
+}
+
+// Ringkasan LINTAS semua akun investment -- pola sama summarizeDebts,
+// dipakai get_investment_summary (tool baru, Tahap 4). Realized P/L
+// dihitung dari SELURUH investment_sales berstatus settled (snapshot
+// permanen saat settle, lihat apply-sell-investment-transaction.ts),
+// tanpa filter tanggal -- cermin halaman /investments ringkasan desktop.
+export function summarizeInvestments(snapshot: SyncSnapshot): {
+  accounts: Array<{
+    accountId: string;
+    accountName: string;
+    unitLabel: string;
+    balance: number;
+    marketValue: number;
+    unrealizedPl: number;
+    unrealizedPlPercent: number;
+    totalUnit: number;
+    averageCost: number | null;
+    remainingUnit: number;
+  }>;
+  totalUnrealizedPl: number;
+  totalRealizedPl: number;
+};
+export function summarizeInvestments(snapshot: SyncSnapshot) {
+  const accountById = new Map(snapshot.accounts.map((a) => [a.id, a]));
+
+  const accounts = snapshot.investmentAccounts
+    .filter((a) => isAlive(a))
+    .map((a) => {
+      const holding = getInvestmentHolding(snapshot, a.accountId);
+      const account = accountById.get(a.accountId);
+      return {
+        accountId: a.accountId,
+        accountName: account?.name ?? "Tidak diketahui",
+        unitLabel: a.unitLabel,
+        balance: holding?.balance ?? 0,
+        marketValue: holding?.marketValue ?? a.currentMarketValue,
+        unrealizedPl: holding?.unrealizedPl ?? 0,
+        unrealizedPlPercent: holding?.unrealizedPlPercent ?? 0,
+        totalUnit: holding?.totalUnit ?? 0,
+        averageCost: holding?.averageCost ?? null,
+        remainingUnit: holding?.remainingUnit ?? 0,
+      };
+    });
+
+  const totalUnrealizedPl = accounts.reduce((sum, a) => sum + a.unrealizedPl, 0);
+  const totalRealizedPl = snapshot.investmentSales
+    .filter((s) => isAlive(s) && s.status === "settled")
+    .reduce((sum, s) => sum + (s.realizedPl ?? 0), 0);
+
+  return { accounts, totalUnrealizedPl, totalRealizedPl };
+}
+
+// Riwayat lot (pembelian + penjualan) satu akun investment -- pola sama
+// listDebtDetails, dipakai get_investment_detail (tool baru, Tahap 4).
+export function listInvestmentDetail(
+  snapshot: SyncSnapshot,
+  accountId: string
+): {
+  purchases: InvestmentPurchase[];
+  sales: InvestmentSale[];
+} {
+  return {
+    purchases: snapshot.investmentPurchases.filter((p) => isAlive(p) && p.accountId === accountId),
+    sales: snapshot.investmentSales.filter((s) => isAlive(s) && s.accountId === accountId),
+  };
 }
