@@ -18,10 +18,13 @@ import {
   detachInvestmentPurchaseForDeletedTransaction,
   applySellInvestmentTransaction,
   applySellInvestmentTransactionEdit,
+  applyWriteOffInvestmentTransactionEdit,
+  getTransactionWriteOff,
   detachInvestmentSaleForDeletedTransaction,
   validateInvestmentSaleUnits,
   getTransactionInvestmentSaleUnit,
   resolveInvestmentSellAmount,
+  getAverageCostPerUnit,
 } from "../investments/service";
 import { resolveContactId } from "../contacts/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
@@ -472,7 +475,21 @@ async function updateTransactionRow(
     transferAccountId: payload.transferAccountId ?? null,
     unit: payload.unit ?? null,
   });
-  const amount = resolvedSellAmount ?? payload.amount;
+
+  // Write-off (income/expense LANGSUNG pada akun investment, TANPA
+  // transfer_account_id -- lihat konsep-investasi.md "Unit yang berubah
+  // TANPA transfer kas", arah berkurang) BUKAN jalur resolveInvestmentSellAmount
+  // di atas (itu khusus transfer). Dideteksi terpisah dari baris
+  // investment_sales dengan price_per_unit = 0 (lihat getTransactionWriteOff).
+  // amount SAMA prinsipnya dgn jual: BUKAN payload.amount dari client,
+  // dihitung ulang dari averageCost x unit SAAT INI -- unit sendiri
+  // dipakai apa adanya dari baris lama (form transaksi utama desktop
+  // tidak pernah mengirim unit utk kasus ini, field itu tersembunyi).
+  const writeOffSale = await getTransactionWriteOff(env, id);
+  const resolvedWriteOffAmount =
+    writeOffSale != null ? (await getAverageCostPerUnit(env, payload.accountId)) * writeOffSale.unit : null;
+
+  const amount = resolvedSellAmount ?? resolvedWriteOffAmount ?? payload.amount;
 
   // LWW menang CLEAR deleted_at juga, lihat account-groups/service.ts.
   // `source`/`source_ref` cuma ditimpa kalau payload EKSPLISIT kirim
@@ -526,36 +543,58 @@ async function updateTransactionRow(
     });
     if (result.status === "rejected") return result;
 
-    // Pola sama applyDebtEditAction di atas -- field unit/harga TIDAK
-    // divalidasi terhadap nominal (lihat applyInvestmentTransactionEdit),
-    // jadi tidak ada kasus "diblokir"/rejected utk investment, cukup
-    // panggil langsung tanpa cek hasil.
-    await applyInvestmentTransactionEdit(env, {
-      transactionId: id,
-      type: payload.type,
-      accountId: payload.accountId ?? "",
-      transferAccountId: payload.transferAccountId ?? null,
-      date: payload.date,
-      unit: payload.unit ?? null,
-      pricePerUnit: payload.pricePerUnit ?? null,
-      status: payload.investmentStatus,
-      syncSource,
-    });
-
-    // Pola sama applyInvestmentTransactionEdit di atas -- status SELALU
-    // dipaksa 'settled' (sama alasan dgn createTransactionRow: form
-    // transaksi utama desktop cuma mendukung jual settled). Oversell
-    // SUDAH divalidasi di precheck sebelum UPDATE baris transaksi di atas.
-    await applySellInvestmentTransactionEdit(env, id, {
-      transactionId: id,
-      accountId: payload.accountId ?? "",
-      transferAccountId: payload.transferAccountId ?? null,
-      date: payload.date,
-      unit: payload.unit ?? 0,
-      pricePerUnit: payload.pricePerUnit ?? 0,
-      status: "settled",
-      syncSource,
-    });
+    if (writeOffSale != null) {
+      // Write-off -- UPDATE in-place baris investment_sales yang sama,
+      // BEDA dari applyInvestmentTransactionEdit/applySellInvestmentTransactionEdit
+      // di bawah (tidak ada leg kedua, tidak ada baris investment_purchases
+      // sama sekali). unit dipakai apa adanya dari baris lama (writeOffSale.unit)
+      // -- form transaksi utama tidak pernah mengirim unit utk kasus ini.
+      await applyWriteOffInvestmentTransactionEdit(env, {
+        transactionId: id,
+        accountId: payload.accountId,
+        unit: writeOffSale.unit,
+        syncSource,
+      });
+    } else if (resolvedSellAmount != null) {
+      // Arah JUAL (investment -> cash, resolvedSellAmount != null berarti
+      // classifyAccountPair sudah mengonfirmasi "investment-cash" di
+      // resolveInvestmentSellAmount sebelumnya) -- status SELALU dipaksa
+      // 'settled' (sama alasan dgn createTransactionRow: form transaksi
+      // utama desktop cuma mendukung jual settled). Oversell SUDAH
+      // divalidasi di precheck sebelum UPDATE baris transaksi di atas.
+      await applySellInvestmentTransactionEdit(env, id, {
+        transactionId: id,
+        accountId: payload.accountId ?? "",
+        transferAccountId: payload.transferAccountId ?? null,
+        date: payload.date,
+        unit: payload.unit ?? 0,
+        pricePerUnit: payload.pricePerUnit ?? 0,
+        status: "settled",
+        syncSource,
+      });
+    } else {
+      // Sisanya: transfer cash->investment (pembelian biasa) ATAU
+      // income/expense direct-purchase (record_mode:'direct', TIDAK
+      // pernah arah jual -- bug ditemukan 2026-10-08: applySellInvestmentTransactionEdit
+      // SEBELUMNYA selalu dipanggil tanpa syarat di cabang ini, throw
+      // "transferAccountId wajib diisi" begitu transaksi direct-purchase
+      // diedit via MCP, krn transferAccountId memang selalu null utk
+      // kasus ini. Field unit/harga TIDAK divalidasi terhadap nominal
+      // (lihat applyInvestmentTransactionEdit), jadi tidak ada kasus
+      // "diblokir"/rejected utk investment, cukup panggil langsung tanpa
+      // cek hasil.
+      await applyInvestmentTransactionEdit(env, {
+        transactionId: id,
+        type: payload.type,
+        accountId: payload.accountId ?? "",
+        transferAccountId: payload.transferAccountId ?? null,
+        date: payload.date,
+        unit: payload.unit ?? null,
+        pricePerUnit: payload.pricePerUnit ?? null,
+        status: payload.investmentStatus,
+        syncSource,
+      });
+    }
   }
 
   return { status: "ok" };

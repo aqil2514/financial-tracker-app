@@ -214,41 +214,73 @@ export async function applyInvestmentTransaction(
   return { investmentPurchaseIds: [id], deletedInvestmentPurchaseIds: [] };
 }
 
-async function getTransactionInvestmentPurchaseId(env: Env, transactionId: string): Promise<string | null> {
+async function getTransactionInvestmentPurchaseRow(
+  env: Env,
+  transactionId: string
+): Promise<{ id: string; unit: number | null; price_per_unit: number | null } | null> {
   const row = await env.DB.prepare(
-    "SELECT id FROM investment_purchases WHERE transaction_id = ?1 AND deleted_at IS NULL"
+    "SELECT id, unit, price_per_unit FROM investment_purchases WHERE transaction_id = ?1 AND deleted_at IS NULL"
   )
     .bind(transactionId)
-    .first<{ id: string }>();
-  return row?.id ?? null;
+    .first<{ id: string; unit: number | null; price_per_unit: number | null }>();
+  return row ?? null;
 }
 
 // Port PERSIS dari applyInvestmentTransactionEdit (desktop) -- field
 // unit/harga tidak divalidasi terhadap nominal, tidak ada baris lain
 // yang bergantung ke satu investment_purchases (beda dari debts yang
-// bisa sudah dicicil) -- field berbahaya berubah -> hapus baris lama,
-// buat baris baru dari nilai saat ini, selalu aman. Soft-delete (bukan
-// hard DELETE SQL) krn baris ini ikut sync -- beda dari desktop yang
-// hard-delete (desktop tidak punya kolom deleted_at di tabel ini).
+// bisa sudah dicicil). Soft-delete (bukan hard DELETE SQL) krn baris ini
+// ikut sync -- beda dari desktop yang hard-delete (desktop tidak punya
+// kolom deleted_at di tabel ini).
+//
+// **Revisi 2026-10-08 (bug ditemukan lewat dogfooding, sama akar dgn
+// desktop)**: delete-lalu-`applyInvestmentTransaction` HANYA aman utk
+// `type === 'transfer'` -- fungsi itu `return none` utk income/expense,
+// jadi baris lahir dari `record_mode: 'direct'` (income LANGSUNG pada
+// akun investment, lihat createDirectInvestmentPurchase di bawah) yang
+// diedit via MCP (`update_transaction`, tetap type='income') akan
+// kehilangan baris `investment_purchases`-nya TANPA pengganti. Perbaikan
+// PERSIS pola desktop: `type !== 'transfer'` -> UPDATE in-place, dengan
+// fallback ke nilai LAMA kalau payload baru `null` (field unit/harga
+// TIDAK PERNAH ditampilkan di form edit transaksi utama utk kasus ini,
+// `null` dari situ berarti "belum terisi", bukan "user sengaja
+// mengosongkan" -- lihat komentar sama di desktop).
 export async function applyInvestmentTransactionEdit(
   env: Env,
   input: ApplyInvestmentTransactionInput
 ): Promise<TouchedInvestmentRows> {
-  const existingId = await getTransactionInvestmentPurchaseId(env, input.transactionId);
+  const existing = await getTransactionInvestmentPurchaseRow(env, input.transactionId);
 
-  if (existingId == null) {
+  if (existing == null) {
     return applyInvestmentTransaction(env, input);
   }
 
   const now = nowText();
+
+  if (input.type !== "transfer") {
+    await env.DB.prepare(
+      "UPDATE investment_purchases SET unit = ?1, price_per_unit = ?2, date = ?3, updated_at = ?4, sync_source = ?5 WHERE id = ?6"
+    )
+      .bind(
+        input.unit ?? existing.unit,
+        input.pricePerUnit ?? existing.price_per_unit,
+        input.date,
+        now,
+        input.syncSource,
+        existing.id
+      )
+      .run();
+    return { investmentPurchaseIds: [existing.id], deletedInvestmentPurchaseIds: [] };
+  }
+
   await env.DB.prepare("UPDATE investment_purchases SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
-    .bind(now, existingId)
+    .bind(now, existing.id)
     .run();
 
   const result = await applyInvestmentTransaction(env, input);
   return {
     investmentPurchaseIds: result.investmentPurchaseIds,
-    deletedInvestmentPurchaseIds: [existingId, ...result.deletedInvestmentPurchaseIds],
+    deletedInvestmentPurchaseIds: [existing.id, ...result.deletedInvestmentPurchaseIds],
   };
 }
 
@@ -265,15 +297,15 @@ export async function detachInvestmentPurchaseForDeletedTransaction(
   env: Env,
   transactionId: string
 ): Promise<DeletedTransactionInvestmentInfo> {
-  const existingId = await getTransactionInvestmentPurchaseId(env, transactionId);
-  if (existingId == null) return { role: "none" };
+  const existing = await getTransactionInvestmentPurchaseRow(env, transactionId);
+  if (existing == null) return { role: "none" };
 
   const now = nowText();
   await env.DB.prepare("UPDATE investment_purchases SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
-    .bind(now, existingId)
+    .bind(now, existing.id)
     .run();
 
-  return { role: "purchase", investmentPurchaseId: existingId };
+  return { role: "purchase", investmentPurchaseId: existing.id };
 }
 
 // ============================================================
@@ -529,9 +561,18 @@ export async function settleInvestmentSale(
   return { status: "ok", transactionId, adjustmentTransactionId };
 }
 
+// price_per_unit > 0 membedakan JUAL biasa dari write-off (price_per_unit
+// SELALU 0 utk write-off, lihat writeOffInvestment di bawah) -- PENTING:
+// tanpa filter ini, transaksi write-off yang diedit via MCP salah
+// terdeteksi sbg jual oleh applySellInvestmentTransactionEdit (ditemukan
+// 2026-10-08, port dari gap yang sama di desktop/apply-write-off-
+// investment-transaction.ts getTransactionWriteOffSale -- `deleted_at IS
+// NULL` ATAU `adjustment_transaction_id IS NULL` saja TIDAK CUKUP, jual
+// biasa dgn realizedPl kebetulan 0 juga punya adjustment_transaction_id
+// NULL).
 async function getTransactionInvestmentSale(env: Env, transactionId: string): Promise<{ id: string } | null> {
   const row = await env.DB.prepare(
-    "SELECT id FROM investment_sales WHERE transaction_id = ?1 AND deleted_at IS NULL"
+    "SELECT id FROM investment_sales WHERE transaction_id = ?1 AND deleted_at IS NULL AND price_per_unit > 0"
   )
     .bind(transactionId)
     .first<{ id: string }>();
@@ -543,10 +584,13 @@ async function getTransactionInvestmentSale(env: Env, transactionId: string): Pr
 // diedit, utk dikompensasi SEBELUM membandingkan dengan unit baru (meniru
 // urutan applySellInvestmentTransactionEdit yang menghapus baris lama
 // dulu sebelum menghitung ulang sisa unit). 0 kalau transaksi ini belum
-// pernah jadi baris investment_sales (create murni, bukan edit).
+// pernah jadi baris investment_sales (create murni, bukan edit), ATAU
+// baris itu sebenarnya write-off (price_per_unit = 0, bukan urusan precheck
+// oversell JUAL -- write-off punya validasi oversell sendiri di
+// writeOffInvestment).
 export async function getTransactionInvestmentSaleUnit(env: Env, transactionId: string): Promise<number> {
   const row = await env.DB.prepare(
-    "SELECT unit FROM investment_sales WHERE transaction_id = ?1 AND deleted_at IS NULL"
+    "SELECT unit FROM investment_sales WHERE transaction_id = ?1 AND deleted_at IS NULL AND price_per_unit > 0"
   )
     .bind(transactionId)
     .first<{ unit: number }>();
@@ -1016,4 +1060,72 @@ export async function writeOffInvestment(
     .run();
 
   return { status: "ok", id: payload.id, transactionId, averageCost };
+}
+
+// price_per_unit = 0 adalah ciri KHUSUS write-off -- lihat komentar
+// panjang di getTransactionInvestmentSale di atas (price_per_unit > 0
+// membedakan jual dari write-off, bukan adjustment_transaction_id).
+async function getTransactionWriteOffSale(
+  env: Env,
+  transactionId: string
+): Promise<{ id: string; unit: number } | null> {
+  const row = await env.DB.prepare(
+    "SELECT id, unit FROM investment_sales WHERE transaction_id = ?1 AND deleted_at IS NULL AND price_per_unit = 0"
+  )
+    .bind(transactionId)
+    .first<{ id: string; unit: number }>();
+  return row ?? null;
+}
+
+// Dipakai transactions/service.ts SEBELUM memutuskan cabang edit mana
+// yang dipanggil (direct-purchase/write-off/jual/transfer biasa) -- port
+// PERSIS getTransactionWriteOff (desktop).
+export async function getTransactionWriteOff(
+  env: Env,
+  transactionId: string
+): Promise<{ id: string; unit: number } | null> {
+  return getTransactionWriteOffSale(env, transactionId);
+}
+
+export type ApplyWriteOffInvestmentTransactionEditInput = {
+  transactionId: string;
+  accountId: string;
+  unit: number;
+  syncSource: SyncSource;
+};
+
+export type WriteOffInvestmentTransactionEditResult = {
+  amount: number;
+  averageCost: number;
+};
+
+// Port PERSIS applyWriteOffInvestmentTransactionEdit (desktop) -- UPDATE
+// in-place pada baris investment_sales yang sama (BUKAN delete+recreate
+// seperti applySellInvestmentTransactionEdit -- write-off TIDAK PERNAH
+// punya leg penyesuaian P/L di akun kas, jadi tidak ada transaksi kedua
+// yang perlu diurus). amount/realized_pl dihitung ULANG dari averageCost
+// SAAT INI (bisa sudah bergeser sejak baris ini pertama dibuat) -- caller
+// (transactions/service.ts) WAJIB menulis amount hasil ini ke kolom
+// transactions.amount, persis pola applySellInvestmentTransactionEdit.
+export async function applyWriteOffInvestmentTransactionEdit(
+  env: Env,
+  { transactionId, accountId, unit, syncSource }: ApplyWriteOffInvestmentTransactionEditInput
+): Promise<WriteOffInvestmentTransactionEditResult> {
+  const existing = await getTransactionWriteOffSale(env, transactionId);
+  if (existing == null) {
+    throw new Error("Baris write-off investasi untuk transaksi ini tidak ditemukan.");
+  }
+
+  const averageCost = await getAverageCostPerUnit(env, accountId);
+  const amount = averageCost * unit;
+  const realizedPl = -amount;
+
+  const now = nowText();
+  await env.DB.prepare(
+    "UPDATE investment_sales SET unit = ?1, average_cost_per_unit = ?2, realized_pl = ?3, updated_at = ?4, sync_source = ?5 WHERE id = ?6"
+  )
+    .bind(unit, averageCost, realizedPl, now, syncSource, existing.id)
+    .run();
+
+  return { amount, averageCost };
 }
