@@ -68,7 +68,8 @@ export async function handleListAttachments(c: Context<AppContext>) {
     return c.json({ error: "Invalid 'since' format, expected 'YYYY-MM-DD HH:mm:ss'" }, 400);
   }
 
-  const result = await listAttachmentsSince(c.env, parsed.since);
+  const transactionId = c.req.query("transactionId") ?? null;
+  const result = await listAttachmentsSince(c.env, parsed.since, transactionId);
   return c.json(result, 200);
 }
 

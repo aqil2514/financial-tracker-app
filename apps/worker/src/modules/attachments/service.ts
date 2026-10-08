@@ -126,10 +126,28 @@ export type AttachmentListResponse = { checkpoint: string; attachments: Attachme
 // desktop: push & pull"). `checkpoint` diambil SEBELUM query jalan (sama
 // alasan dgn modules/sync/service.ts) supaya baris yg berubah PAS SAAT
 // query berjalan tetap tercakup di pull berikutnya.
-export async function listAttachmentsSince(env: Env, since: string | null): Promise<AttachmentListResponse> {
+//
+// `transactionId` opsional -- TAMBAHAN utk tool MCP `list_attachments`
+// (lihat apps/mcp-server), yang butuh "lampiran transaksi X" bukan
+// "semua yg berubah sejak kapan". Dua filter independen (`since` DAN
+// `transactionId` boleh dipakai bersamaan), TIDAK saling exclusive.
+export async function listAttachmentsSince(
+  env: Env,
+  since: string | null,
+  transactionId: string | null = null
+): Promise<AttachmentListResponse> {
   const checkpoint = nowText();
-  const filter = since !== null ? "WHERE updated_at > ?1" : "";
-  const bind = since !== null ? [since] : [];
+  const conditions: string[] = [];
+  const bind: string[] = [];
+  if (since !== null) {
+    conditions.push(`updated_at > ?${bind.length + 1}`);
+    bind.push(since);
+  }
+  if (transactionId !== null) {
+    conditions.push(`transaction_id = ?${bind.length + 1}`);
+    bind.push(transactionId);
+  }
+  const filter = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const result = await env.DB.prepare(
     `SELECT id, transaction_id, content_type, size_bytes, updated_at, deleted_at
