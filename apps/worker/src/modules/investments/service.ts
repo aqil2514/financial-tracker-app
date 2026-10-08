@@ -7,6 +7,8 @@ import type {
   PushInvestmentAccountPayload,
   PushInvestmentPurchasePayload,
   PushInvestmentSalePayload,
+  CreateDirectInvestmentPurchasePayload,
+  WriteOffInvestmentPayload,
 } from "./schema";
 
 async function getAccountType(env: Env, accountId: string): Promise<string | null> {
@@ -861,4 +863,157 @@ export async function deletePushedInvestmentSale(env: Env, id: string): Promise<
     .bind(now, id)
     .run();
   return { status: "ok" };
+}
+
+// ============================================================
+// Unit yang berubah TANPA transfer kas -- port PERSIS
+// apps/desktop/src/shared/investments/{apply-investment-transaction.ts
+// cabang direct, apply-write-off-investment-transaction.ts}. Pola yg
+// dipakai PERSIS createDirectDebt/writeOffDebt (modul debts) -- satu
+// transaksi income/expense LANGSUNG pada akun investment itu sendiri,
+// BUKAN upsert-by-id push (desktop TIDAK bisa membuat baris ini lebih
+// dulu di sini, karena endpoint ini jg dipanggil LANGSUNG dari MCP tanpa
+// lewat desktop sama sekali). Lihat docs/concept/konsep-investasi.md
+// "Unit yang berubah TANPA transfer kas".
+// ============================================================
+
+export type CreateDirectInvestmentPurchaseResult =
+  | { status: "ok"; id: string; transactionId: string }
+  | { status: "stale" }
+  | { status: "rejected"; reason: string };
+
+// Port PERSIS cabang record_mode='direct' di
+// apps/desktop/src/shared/investments/new-purchase-form/use-create-investment-purchase.ts.
+// accountId WAJIB akun bertipe 'investment'. transaction_id TIDAK NULL
+// (satu transaksi income dibuat LANGSUNG di sini, arah sebaliknya dari
+// write-off di bawah) -- status investment_purchases SELALU 'settled'
+// (nilainya sudah pasti saat diterima, tidak ada konsep pending utk
+// hibah/bonus).
+export async function createDirectInvestmentPurchase(
+  env: Env,
+  payload: CreateDirectInvestmentPurchasePayload,
+  syncSource: SyncSource
+): Promise<CreateDirectInvestmentPurchaseResult> {
+  const existing = await env.DB.prepare(
+    "SELECT updated_at, transaction_id FROM investment_purchases WHERE id = ?1"
+  )
+    .bind(payload.id)
+    .first<{ updated_at: string | null; transaction_id: string | null }>();
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  const accountType = await getAccountType(env, payload.accountId);
+  if (accountType == null) {
+    return { status: "rejected", reason: "Akun tidak ditemukan." };
+  }
+  if (accountType !== "investment") {
+    return {
+      status: "rejected",
+      reason: "Pembelian investasi mode langsung wajib menunjuk ke akun bertipe 'investment'.",
+    };
+  }
+
+  // Idempotency MURNI (bukan edit) -- endpoint ini create-only dari MCP
+  // (tidak ada jalur edit mode direct), existing cuma relevan kalau
+  // permintaan yang sama dikirim ulang (timeout, retry) -- transaksi
+  // income LAMA tetap apa adanya, transactionId-nya yang sudah tersimpan
+  // dikembalikan ulang.
+  if (existing && existing.transaction_id != null) {
+    return { status: "ok", id: payload.id, transactionId: existing.transaction_id };
+  }
+
+  const now = nowText();
+  const transactionId = uuidv7();
+  await env.DB.prepare(
+    `INSERT INTO transactions
+       (id, type, amount, category_id, account_id, transfer_account_id, note, date, description,
+        created_at, updated_at, sync_source)
+     VALUES (?1, 'income', ?2, NULL, ?3, NULL, ?4, ?5, NULL, ?6, ?6, ?7)`
+  )
+    .bind(transactionId, payload.amount, payload.accountId, payload.note ?? null, payload.date, now, syncSource)
+    .run();
+
+  await env.DB.prepare(
+    `INSERT INTO investment_purchases
+       (id, account_id, transaction_id, unit, price_per_unit, date, status, created_at, updated_at, sync_source)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'settled', ?7, ?7, ?8)`
+  )
+    .bind(payload.id, payload.accountId, transactionId, payload.unit, payload.pricePerUnit, payload.date, now, syncSource)
+    .run();
+
+  return { status: "ok", id: payload.id, transactionId };
+}
+
+export type WriteOffInvestmentResult =
+  | { status: "ok"; id: string; transactionId: string; averageCost: number }
+  | { status: "stale" }
+  | { status: "rejected"; reason: string };
+
+// Port PERSIS apply-write-off-investment-transaction.ts (desktop) --
+// BEDA dari applySellInvestmentTransaction: TIDAK PERNAH punya akun kas
+// tujuan, jadi TIDAK bisa reuse fungsi itu (transferAccountId wajib di
+// sana utk status settled). Satu transaksi 'expense' dibuat LANGSUNG
+// pada akun investment itu sendiri (pola write_off_debt, bukan
+// applySellInvestmentTransaction), sebesar averageCost x unit -- user
+// cuma kirim unit, nominal DIHITUNG di sini (bukan dari payload).
+export async function writeOffInvestment(
+  env: Env,
+  payload: WriteOffInvestmentPayload,
+  syncSource: SyncSource
+): Promise<WriteOffInvestmentResult> {
+  const existing = await env.DB.prepare("SELECT updated_at FROM investment_sales WHERE id = ?1")
+    .bind(payload.id)
+    .first<{ updated_at: string | null }>();
+
+  const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
+  const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
+  if (decision.outcome === "stale") return { status: "stale" };
+
+  const accountType = await getAccountType(env, payload.accountId);
+  if (accountType == null) {
+    return { status: "rejected", reason: "Akun tidak ditemukan." };
+  }
+  if (accountType !== "investment") {
+    return { status: "rejected", reason: "Write-off wajib menunjuk ke akun bertipe 'investment'." };
+  }
+
+  if (existing) {
+    return { status: "rejected", reason: "Write-off ini sudah pernah dicatat." };
+  }
+
+  const remainingUnit = await getRemainingUnit(env, payload.accountId);
+  if (payload.unit > remainingUnit) {
+    return {
+      status: "rejected",
+      reason: new InsufficientInvestmentUnitsError(remainingUnit, payload.unit).message,
+    };
+  }
+
+  const averageCost = await getAverageCostPerUnit(env, payload.accountId);
+  const amount = averageCost * payload.unit;
+  const realizedPl = -amount;
+
+  const now = nowText();
+  const transactionId = uuidv7();
+  await env.DB.prepare(
+    `INSERT INTO transactions
+       (id, type, amount, category_id, account_id, transfer_account_id, note, date, description,
+        created_at, updated_at, sync_source)
+     VALUES (?1, 'expense', ?2, NULL, ?3, NULL, ?4, ?5, NULL, ?6, ?6, ?7)`
+  )
+    .bind(transactionId, amount, payload.accountId, payload.note ?? null, payload.date, now, syncSource)
+    .run();
+
+  await env.DB.prepare(
+    `INSERT INTO investment_sales
+       (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit,
+        average_cost_per_unit, realized_pl, date, status, created_at, updated_at, sync_source)
+     VALUES (?1, ?2, ?3, NULL, ?4, 0, ?5, ?6, ?7, 'settled', ?8, ?8, ?9)`
+  )
+    .bind(payload.id, payload.accountId, transactionId, payload.unit, averageCost, realizedPl, payload.date, now, syncSource)
+    .run();
+
+  return { status: "ok", id: payload.id, transactionId, averageCost };
 }

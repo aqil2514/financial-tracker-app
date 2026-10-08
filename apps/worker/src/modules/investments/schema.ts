@@ -113,3 +113,74 @@ export function isSettleInvestmentSalePayload(value: unknown): value is SettleIn
   const v = value as Record<string, unknown>;
   return typeof v.transferAccountId === "string" && v.transferAccountId.length > 0;
 }
+
+// Payload POST /investments/purchases/direct -- unit bertambah TANPA
+// transfer kas (hibah, bonus saham, right issue/warrant, atau saldo &
+// unit awal sebelum pakai app), pola PERSIS CreateDirectDebtPayload
+// (debts/schema.ts). accountId WAJIB akun bertipe 'investment'. unit/
+// pricePerUnit WAJIB diisi (BEDA dari jalur transfer yg opsional) --
+// lihat docs/concept/konsep-investasi.md "Unit yang berubah TANPA
+// transfer kas": cost basis lot ini TIDAK PERNAH boleh 0, supaya
+// getAverageCostPerUnit() tidak "mengencerkan" average cost unit yang
+// dibeli riil.
+export type CreateDirectInvestmentPurchasePayload = {
+  id: string;
+  accountId: string;
+  amount: number;
+  unit: number;
+  pricePerUnit: number;
+  date: string;
+  note?: string | null;
+  updatedAt?: string;
+};
+
+export function isCreateDirectInvestmentPurchasePayload(
+  value: unknown
+): value is CreateDirectInvestmentPurchasePayload {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "string" &&
+    typeof v.accountId === "string" &&
+    v.accountId.length > 0 &&
+    typeof v.amount === "number" &&
+    v.amount >= 0 &&
+    typeof v.unit === "number" &&
+    v.unit > 0 &&
+    typeof v.pricePerUnit === "number" &&
+    v.pricePerUnit > 0 &&
+    typeof v.date === "string" &&
+    (v.note === undefined || v.note === null || typeof v.note === "string") &&
+    (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
+  );
+}
+
+// Payload POST /investments/write-off -- unit hilang/dilepas TANPA kas
+// yang berpindah (hibah ke orang lain, delisting, biaya admin dipotong
+// dalam bentuk unit). accountId WAJIB akun bertipe 'investment'. TIDAK
+// ada field nominal -- amount DIHITUNG otomatis dari averageCost x unit
+// di service.ts (keputusan 2026-10-08, konsisten dgn nominal yg dipakai
+// jual), bukan diterima dari payload.
+export type WriteOffInvestmentPayload = {
+  id: string;
+  accountId: string;
+  unit: number;
+  date: string;
+  note?: string | null;
+  updatedAt?: string;
+};
+
+export function isWriteOffInvestmentPayload(value: unknown): value is WriteOffInvestmentPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "string" &&
+    typeof v.accountId === "string" &&
+    v.accountId.length > 0 &&
+    typeof v.unit === "number" &&
+    v.unit > 0 &&
+    typeof v.date === "string" &&
+    (v.note === undefined || v.note === null || typeof v.note === "string") &&
+    (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
+  );
+}

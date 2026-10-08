@@ -3,6 +3,7 @@
 import type { UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
   FormFieldCombobox,
@@ -50,6 +51,16 @@ export function SellInvestmentForm({
   const { data: holding } = useInvestmentHoldingSummary(
     investmentAccountId ? String(investmentAccountId) : undefined,
   );
+
+  // "Jual Semua Unit" -- derived dari field unit itu sendiri (BUKAN state
+  // terpisah yang bisa desync), supaya tidak ada bug "checkbox dicentang
+  // tapi unit sudah diubah manual lagi tanpa ke-uncheck otomatis". Dicek
+  // SAMA PERSIS (===), bukan toleransi epsilon -- holding.remainingUnit
+  // di-setValue LANGSUNG sebagai number JS presisi penuh (bukan lewat
+  // CurrencyInput yang decimalsLimit={4}, lihat unit-amount-field.tsx),
+  // jadi perbandingan exact aman selama field tidak diubah manual sesudahnya.
+  const isSellingAll =
+    holding != null && holding.remainingUnit > 0 && Number(unit) === holding.remainingUnit;
 
   const cashAccountOptions =
     accounts
@@ -150,8 +161,31 @@ export function SellInvestmentForm({
           </p>
         </div>
       )}
+      {holding && holding.remainingUnit > 0 && (
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <Checkbox
+            checked={isSellingAll}
+            onCheckedChange={(checked) => {
+              // setValue dengan number ASLI dari query (bukan diketik ulang
+              // lewat CurrencyInput yang decimalsLimit={4}) -- menghindari
+              // sisa unit presisi tinggi (mis. 99.99999999994 akibat
+              // akumulasi pembagian average cost) terpotong jadi 4 desimal
+              // lalu dianggap BEDA dari remainingUnit asli saat validasi
+              // oversell (getRemainingUnit, investment-holding-math.ts).
+              // Uncheck -> kosongkan lagi (bukan dibiarkan terkunci ke
+              // remainingUnit) supaya user bisa ketik manual lagi, field
+              // unit otomatis ikut ENABLED lagi (isSellingAll jadi false).
+              form.setValue("unit", (checked ? holding.remainingUnit : null) as never, {
+                shouldValidate: true,
+                shouldDirty: true,
+              });
+            }}
+          />
+          Jual Semua Unit ({holding.remainingUnit})
+        </label>
+      )}
       <div className="grid grid-cols-2 gap-4">
-        <UnitAmountField form={form} name="unit" optional={false} />
+        <UnitAmountField form={form} name="unit" optional={false} disabled={isSellingAll} />
         <PricePerUnitField
           form={form}
           name="price_per_unit"

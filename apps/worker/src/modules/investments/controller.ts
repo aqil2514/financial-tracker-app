@@ -5,6 +5,8 @@ import {
   isPushInvestmentPurchasePayload,
   isPushInvestmentSalePayload,
   isSettleInvestmentSalePayload,
+  isCreateDirectInvestmentPurchasePayload,
+  isWriteOffInvestmentPayload,
 } from "./schema";
 import {
   pushInvestmentAccountFromPc,
@@ -14,6 +16,8 @@ import {
   deletePushedInvestmentSale,
   settleInvestmentSale,
   deletePendingInvestmentSale,
+  createDirectInvestmentPurchase,
+  writeOffInvestment,
 } from "./service";
 
 // Autentikasi ditangani requireAuth middleware, dipasang di router.ts.
@@ -118,4 +122,48 @@ export async function handleDeleteInvestmentSale(c: Context<AppContext>) {
     return c.json({ error: result.reason }, 422);
   }
   return c.json({ status: "ok", id });
+}
+
+// Unit bertambah TANPA transfer kas (hibah, bonus saham, right issue,
+// saldo & unit awal sebelum pakai app) -- pola PERSIS handlePostDebt
+// (createDirectDebt), BUKAN jalur push: Worker SENDIRI yang insert
+// transaksi income + baris investment_purchases (dipanggil langsung dari
+// MCP, tidak harus lewat desktop). Lihat service.ts.
+export async function handlePostInvestmentPurchaseDirect(c: Context<AppContext>) {
+  const body = await c.req.json().catch(() => null);
+  if (!isCreateDirectInvestmentPurchasePayload(body)) {
+    return c.json({ error: "Invalid payload" }, 400);
+  }
+
+  const result = await createDirectInvestmentPurchase(c.env, body, c.get("syncSource"));
+  if (result.status === "stale") {
+    return c.json({ status: "ignored", id: body.id });
+  }
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
+  return c.json({ status: "ok", id: result.id, transactionId: result.transactionId }, 201);
+}
+
+// Unit hilang/dilepas TANPA kas yang berpindah (hibah ke orang lain,
+// delisting, biaya admin dipotong dalam bentuk unit) -- pola PERSIS
+// handlePostDebtWriteOff (writeOffDebt), BUKAN jalur push. Lihat
+// service.ts (writeOffInvestment).
+export async function handlePostInvestmentWriteOff(c: Context<AppContext>) {
+  const body = await c.req.json().catch(() => null);
+  if (!isWriteOffInvestmentPayload(body)) {
+    return c.json({ error: "Invalid payload" }, 400);
+  }
+
+  const result = await writeOffInvestment(c.env, body, c.get("syncSource"));
+  if (result.status === "stale") {
+    return c.json({ status: "ignored", id: body.id });
+  }
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
+  return c.json(
+    { status: "ok", id: result.id, transactionId: result.transactionId, averageCost: result.averageCost },
+    201
+  );
 }

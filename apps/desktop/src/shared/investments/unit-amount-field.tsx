@@ -12,6 +12,13 @@ type UnitAmountFieldProps<TFieldValues extends FieldValues> = {
   name: FieldPath<TFieldValues>;
   label?: string;
   optional?: boolean;
+  /** true saat field ini dikunci dari input manual -- dipakai
+   * sell-investment-form.tsx saat checkbox "Jual Semua Unit" aktif, supaya
+   * user tidak bisa mengetik ulang nilai yang berpotensi memotong presisi
+   * desimal (decimalsLimit={4} di bawah vs sisa unit riil yang bisa
+   * punya lebih banyak digit akibat akumulasi average cost floating-point
+   * -- lihat komentar "Jual Semua Unit" di sell-investment-form.tsx). */
+  disabled?: boolean;
 };
 
 /**
@@ -29,6 +36,7 @@ export function UnitAmountField<TFieldValues extends FieldValues>({
   name,
   label = "Jumlah Unit",
   optional = true,
+  disabled = false,
 }: UnitAmountFieldProps<TFieldValues>) {
   // Display string LOKAL, terpisah dari field.value (number) -- state
   // mentah yang sedang diketik ("7," sebelum digit desimal berikutnya)
@@ -64,6 +72,7 @@ export function UnitAmountField<TFieldValues extends FieldValues>({
               setDisplay(undefined);
               field.onBlur();
             }}
+            disabled={disabled}
             placeholder="Kosongkan kalau belum tahu"
             decimalsLimit={4}
             groupSeparator="."

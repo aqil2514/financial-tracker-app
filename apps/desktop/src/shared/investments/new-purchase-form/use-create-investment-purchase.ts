@@ -28,11 +28,26 @@ type UseCreateInvestmentPurchaseOptions = {
  * Jalan pintas "Catat Pembelian Investasi" dari header halaman
  * `/investments/detail` — pola PERSIS
  * `shared/debts/new-debt-form/use-create-debt.ts`: form bahasa
- * domain-spesifik yang DI BELAKANG LAYAR cuma insert 1 baris
- * `transactions` tipe transfer + panggil `applyInvestmentTransaction`
- * yang SAMA dengan jalur form transaksi biasa — bukan tabel/logic baru.
- * Scope CUMA beli (cash->investment), lihat
- * docs/todos/plan/account-type-investment.md.
+ * domain-spesifik yang DI BELAKANG LAYAR cuma insert baris
+ * `transactions` + `investment_purchases` — bukan tabel/logic baru. Dua
+ * mode (field `record_mode`, lihat schema.ts):
+ *
+ * - `'transfer'` (jalur lama): insert 1 transaksi transfer kas->investment
+ *   + panggil `applyInvestmentTransaction` (sama dengan jalur form
+ *   transaksi biasa).
+ * - `'direct'`: unit bertambah TANPA transfer kas (hibah, bonus saham,
+ *   right issue/warrant, atau saldo & unit awal sebelum pakai app) --
+ *   TIDAK menyentuh saldo akun kas manapun, TAPI tetap WAJIB transaksi
+ *   `income` langsung pada akun investment itu sendiri (pola identik
+ *   `record_mode: 'direct'` di use-create-debt.ts, arah create bukan
+ *   write-off) supaya saldo akun investment ikut berubah sesuai prinsip
+ *   "accounts.balance hanya berubah lewat transactions". Baris
+ *   `investment_purchases` di-insert LANGSUNG (BUKAN lewat
+ *   `applyInvestmentTransaction`, yang exclusive utk type='transfer' --
+ *   lihat guard di apply-investment-transaction.ts), status selalu
+ *   'settled' (nilainya sudah pasti saat diterima). Lihat
+ *   docs/concept/konsep-investasi.md bagian "Unit yang berubah TANPA
+ *   transfer kas" dan docs/todos/plan/account-type-investment.md.
  */
 export function useCreateInvestmentPurchase(options: UseCreateInvestmentPurchaseOptions = {}) {
   const { investmentAccountId } = options;
@@ -40,6 +55,7 @@ export function useCreateInvestmentPurchase(options: UseCreateInvestmentPurchase
   return useEntityForm({
     schema: newInvestmentPurchaseSchema,
     defaultValues: () => ({
+      record_mode: "transfer" as const,
       cash_account_id: "",
       investment_account_id: investmentAccountId ?? "",
       amount: 0,
@@ -52,6 +68,37 @@ export function useCreateInvestmentPurchase(options: UseCreateInvestmentPurchase
     resetOnOpen: true,
     mutationFn: async (values: NewInvestmentPurchaseFormOutput) => {
       const db = await getDb();
+
+      if (values.record_mode === "direct") {
+        const transactionId = newId();
+        await db.execute(
+          `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date)
+           VALUES ($1, 'income', $2, NULL, $3, NULL, $4, NULL, $5)`,
+          [transactionId, values.amount, values.investment_account_id, values.note, values.date]
+        );
+
+        const investmentPurchaseId = newId();
+        await db.execute(
+          `INSERT INTO investment_purchases (id, account_id, transaction_id, unit, price_per_unit, date, status)
+           VALUES ($1, $2, $3, $4, $5, $6, 'settled')`,
+          [
+            investmentPurchaseId,
+            values.investment_account_id,
+            transactionId,
+            values.unit,
+            values.price_per_unit,
+            values.date,
+          ]
+        );
+
+        await pushOnWrite("transactions", transactionId);
+        void pushOnWrite("investment_purchases", investmentPurchaseId);
+
+        return transactionId;
+      }
+
+      // record_mode === 'transfer' -- jalur lama.
+      const cashAccountId = values.cash_account_id as string;
       const transactionId = newId();
 
       await db.execute(
@@ -60,7 +107,7 @@ export function useCreateInvestmentPurchase(options: UseCreateInvestmentPurchase
         [
           transactionId,
           values.amount,
-          values.cash_account_id,
+          cashAccountId,
           values.investment_account_id,
           values.note,
           values.date,
@@ -71,7 +118,7 @@ export function useCreateInvestmentPurchase(options: UseCreateInvestmentPurchase
         db,
         transactionId,
         type: "transfer",
-        accountId: values.cash_account_id,
+        accountId: cashAccountId,
         transferAccountId: values.investment_account_id,
         date: values.date,
         unit: values.unit,
@@ -88,8 +135,9 @@ export function useCreateInvestmentPurchase(options: UseCreateInvestmentPurchase
 
       return transactionId;
     },
-    // Transaksi transfer ini mempengaruhi saldo akun kas & investasi
-    // (domain "transactions"), bukan cuma riwayat investment_purchases.
+    // Transaksi transfer/income ini mempengaruhi saldo akun kas (transfer)
+    // dan/atau investasi (domain "transactions"), bukan cuma riwayat
+    // investment_purchases.
     invalidateKey: dependentKeysOf("transactions"),
     successMessage: "Pembelian investasi berhasil dicatat",
     errorMessage: "Gagal mencatat pembelian investasi",
