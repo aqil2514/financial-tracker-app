@@ -4,15 +4,19 @@
 
 Penjelasan lengkap kenapa tiap poin ada di sini — lihat bagian "Latar belakang" dan "Keputusan desain" di bawah.
 
-- [ ] Keputusan skema belum final: kolom baru di `transaction_attachments` (lokal) dan tabel sync-nya di D1 (`storage_type`/`r2_key` vs `file_path` lokal).
-- [ ] Tambah binding `[[r2_buckets]]` di `apps/worker/wrangler.toml` + update `Env` di `shared/env.ts`.
-- [ ] Modul baru `apps/worker/src/modules/attachments/` (router/controller/service/schema) — ikuti pola di [docs/rules/module-structure.md](../../rules/module-structure.md).
-- [ ] Endpoint upload (dari HP/MCP langsung ke R2 via Worker) dan endpoint baca/list.
-- [ ] Endpoint delete — harus hapus row D1 (soft-delete, ikut pola LWW yang sudah ada) DAN object R2 (hard delete, R2 tidak punya konsep soft-delete sendiri).
-- [ ] Migrasi desktop: kolom baru di SQLite lokal buat tandai "attachment ini sudah ada salinan di R2" + path lokal vs key R2 dibedakan di UI (thumbnail, detail dialog).
-- [ ] Tool MCP baru untuk baca/attach lampiran dari sisi Asisten AI (upload dari HP → tercatat ke transaksi).
-- [ ] Keputusan: siapa yang BOLEH upload langsung ke R2 — lewat Worker endpoint saja, atau desktop juga push attachment lama yang masih di disk lokal?
-- [ ] Rencana migrasi lampiran LAMA yang sudah ada di disk lokal (opsional naik ke R2, atau tetap lokal selamanya).
+**Keputusan arah besar SUDAH diambil (2026-10-08): R2 = source of truth, desktop TETAP pakai `file_path` lokal apa adanya (skema SQLite lokal TIDAK berubah) — lihat "Keputusan desain" di bawah untuk detail & alasan.**
+
+- [x] Tabel replika `transaction_attachments` baru di D1 (`r2_key`, kolom sync standar) — `apps/worker/schema/0003_transaction_attachments.sql` (2026-10-08/09), TIDAK menyentuh skema SQLite lokal desktop sama sekali. Diterapkan ke D1 **lokal** DAN **production** (`wrangler d1 execute --remote`, 2026-10-09) — terkonfirmasi via `SELECT sql FROM sqlite_master` di kedua sisi.
+- [x] Bucket R2 `financial-app-attachments` dibuat + binding `[[r2_buckets]]` (`ATTACHMENTS_BUCKET`) ditambahkan di `apps/worker/wrangler.toml` + `Env` di `shared/env.ts` (2026-10-08).
+- [x] Modul baru `apps/worker/src/modules/attachments/` (router/controller/service/schema) — ikuti pola di [docs/rules/module-structure.md](../../rules/module-structure.md). Implementasi (2026-10-09): `POST /` (upload multipart), `GET /:id` (download bytes), `GET /` (list `?since=`, metadata saja), `DELETE /:id` (soft-delete D1 + hard-delete R2). Semua di belakang `requireAuth`.
+- [x] Endpoint upload (dari HP/MCP langsung ke R2 via Worker), endpoint download/baca isi file, endpoint list "attachment baru yang belum di-pull PC ini" — SELESAI, lihat poin modul di atas.
+- [x] Endpoint delete — harus hapus row D1 (soft-delete, ikut pola LWW yang sudah ada) DAN object R2 (hard delete, R2 tidak punya konsep soft-delete sendiri) — SELESAI. **Beda dari tabel sync lain**: soft-delete attachment TIDAK bisa "hidup lagi" via LWW win (karena bytes-nya sudah benar-benar hilang dari R2), jadi tidak ada semantik un-delete di sini.
+- [x] **DIVERIFIKASI end-to-end LOKAL** (2026-10-09, `wrangler dev` tanpa `--remote`, D1+R2 simulasi lokal, data uji manual via curl): upload multipart → 201 + `r2_key`/`content_type`/`size_bytes` tersimpan benar di D1; download → 200, bytes identik dgn file asli, `Content-Type` terkirim benar; list tanpa `since` → full snapshot berisi row baru; tanpa token → 401; delete → 200, row TETAP ada di D1 dgn `deleted_at` terisi (soft-delete, bukan hard-delete D1) SEKALIGUS object R2 terhapus (GET sesudahnya → 404); delete ulang (idempotency) → 404, bukan error aneh. Data uji sudah dibersihkan.
+- [x] **Di-deploy ke PRODUCTION + diverifikasi end-to-end dengan data NYATA** (2026-10-09, `wrangler deploy`, Version ID `8690058b-0bbc-4089-a3ed-9c32588fa90e`, URL `https://financial-app-worker.muhamadaqil383.workers.dev`): transaksi uji dibuat via `POST /transactions` resmi (bukan insert manual), lalu upload→download→list→delete attachment SEMUA diulang persis skenario verifikasi lokal di atas, hasil IDENTIK (201/200/200/404 sesuai urutan, bytes cocok, `r2_key` benar). Data uji (1 attachment + 1 transaksi) sudah dibersihkan dari D1 production, terkonfirmasi 0 baris tersisa.
+- [ ] Sisi desktop — PUSH: saat user attach file baru, upload ke R2 via Worker (bukan cuma simpan lokal seperti sekarang) supaya row D1 + object R2 tercipta.
+- [ ] Sisi desktop — PULL: saat sync, untuk row attachment baru dari D1 yang filenya belum ada di disk lokal → download dari R2, simpan ke `default_attachment_dir`, INSERT row lokal dengan `file_path` hasil download.
+- [ ] Tool MCP baru untuk baca/attach lampiran dari sisi Asisten AI (upload dari HP → tercatat ke transaksi, langsung ke R2 via Worker).
+- [ ] Rencana migrasi lampiran LAMA yang sudah ada di disk lokal PC naik ke R2 (opsional, lihat "Yang BELUM diputuskan").
 
 ## Latar belakang
 
@@ -36,26 +40,61 @@ Dibahas sebelumnya (lihat riwayat chat) — nambah R2 doang tidak otomatis seles
 3. **Siapa penulis sumber kebenaran untuk upload baru dari HP?** Kalau foto diambil dari HP lewat Claude/MCP langsung ke R2, row `transaction_attachments` yang mewakilinya harus muncul juga di SQLite lokal PC lewat sync turun — desktop perlu render thumbnail dari R2 (bukan baca disk lokal) untuk row jenis ini.
 4. **Soft-delete dua lapis.** Hapus row via LWW (soft-delete, pola yang sudah ada di semua tabel sync) gampang, tapi object fisik di R2 harus dihapus terpisah — mirip pola `delete_attachment_file` yang sudah ada di desktop untuk disk lokal (`apps/desktop/src-tauri/src/attachments/mod.rs:115`), perlu versi Worker-nya untuk R2.
 
-## Keputusan desain (DRAFT — belum final)
+## Keputusan desain
+
+### Arsitektur: R2 = source of truth, desktop selalu sync-download ke lokal (DIPUTUSKAN 2026-10-08)
+
+Ditimbang dua opsi:
+
+1. **(Draft lama, DITOLAK)** Dua `storage_type` (`local` | `r2`) hidup berdampingan selamanya — file lama tetap lokal, file baru dari HP masuk R2, desktop tahu cara baca keduanya.
+2. **(DIPILIH)** R2 jadi satu-satunya tempat penyimpanan jangka panjang. Desktop TIDAK pernah baca langsung dari R2 — begitu ada attachment baru (baik dibuat di PC sendiri maupun dari HP/MCP), PC **download** objectnya dari R2 ke disk lokal seperti biasa, lalu pakai `file_path` lokal itu apa adanya (baca/preview/delete sama sekali tidak berubah di `apps/desktop/src-tauri/src/attachments/mod.rs`).
+
+**Kenapa opsi 2 dipilih**: menghilangkan kebutuhan kolom `storage_type`/`r2_key` di SQLite lokal desktop sama sekali — skema tabel `transaction_attachments` desktop TIDAK BERUBAH. R2/`r2_key` jadi detail murni sisi sync (D1 + Worker), tidak pernah bocor ke model data atau UI desktop. Ini juga otomatis menjawab salah satu open question draft lama ("file lama tetap lokal atau boleh naik ke R2?") — jawabannya: boleh, dan memang itu jalur normalnya untuk SEMUA attachment yang ingin ikut sync, bukan cuma yang baru dari HP.
+
+**Konsekuensi**: PC WAJIB online untuk attachment baru dari HP/MCP benar-benar muncul filenya di disk lokal — baru ter-download saat sync berjalan (pola pull-saat-buka yang sama dengan [cloud-sync.md](../done/cloud-sync.md)), bukan real-time begitu diupload dari HP.
+
+### Kenapa desain ini juga siap untuk multi-device (ganti laptop, `apps/mobile` nanti)
+
+Dibahas 2026-10-08 — desain di atas TIDAK spesifik ke "1 PC", jadi dua skenario ini otomatis tercover tanpa desain ulang:
+
+- **Ganti laptop / install ulang**: laptop baru mulai dengan SQLite lokal kosong, first-sync (`GET /attachments` tanpa `since` = full snapshot, pola sama dgn `GET /sync?since=` yang sudah ada) balas SEMUA row attachment yang pernah ada di D1, lalu didownload satu-satu dari R2 ke disk lokal baru. Syaratnya: attachment itu HARUS sudah sempat ter-push ke R2 dari laptop lama sebelum pindah — attachment yang dibuat tapi belum sempat sync ikut hilang, risiko yang SAMA (bukan baru) dengan data `transactions` dkk di model LWW yang sudah ada.
+- **`apps/mobile`**: endpoint `POST /attachments` / `GET /attachments/:id` / `GET /attachments?since=` adalah HTTP polos, tidak spesifik Tauri/Rust — mobile (React Native/Flutter/dst) bisa panggil langsung, termasuk upload foto dari kamera HP TANPA lewat MCP sama sekali (jalur baru, selain jalur MCP yang sudah direncanakan). Ini align dengan `multi-device-sync-engine.md` (rencana tersimpan untuk `apps/mobile`, lihat [cloud-sync.md](../done/cloud-sync.md)) — pola attachment ini kemungkinan perlu masuk ke rencana itu saat mobile mulai dibangun.
+  - **Beda penting dari desktop**: desktop boleh asumsi "disk besar, download semua attachment saat sync" (full-pull). Mobile TIDAK — storage & bandwidth seluler terbatas, jadi kemungkinan perlu strategi download on-demand (baru fetch saat user buka detail transaksi tertentu, bukan full-sync semua file di awal). Ini detail implementasi PER-PLATFORM, bukan perubahan ke arsitektur R2/D1 di atas.
 
 ### Skema data
 
-Tabel `transaction_attachments` (baik lokal SQLite maupun replika D1) perlu kolom tambahan:
+Tabel `transaction_attachments` **lokal SQLite desktop TIDAK berubah sama sekali** (tetap `id`, `transaction_id`, `file_path`, `created_at`) — lihat `apps/desktop/src-tauri/migrations/0010_transaction_attachments.sql`. Tidak perlu migrasi baru di desktop untuk fitur ini.
 
-- `storage_type` (`local` | `r2`) — menentukan cara desktop membaca file: disk lokal langsung, atau fetch dari Worker/R2.
-- `r2_key` (nullable) — key object di R2, diisi hanya kalau `storage_type = 'r2'`. `file_path` tetap dipakai untuk `storage_type = 'local'`.
+Replika di D1 (tabel BARU, bukan modifikasi tabel sync yang sudah ada) perlu kolom:
 
-Perlu migrasi baru di `apps/desktop/src-tauri/migrations/` (ingat: WAJIB register manual di `migrations.rs`, lihat memory `feedback_migration_rs_registration`) dan skema setara di `apps/worker/schema/`.
+- `r2_key` — key object di R2 tempat file sesungguhnya tersimpan.
+- Kolom sync standar yang sama dengan tabel lain: `updated_at`, `deleted_at`, `sync_source` (lihat `apps/worker/schema/`, pola [cloud-sync.md](../done/cloud-sync.md)).
+- TIDAK ada kolom `file_path` di D1 — path lokal Windows/PC tidak bermakna direplikasi ke cloud (device-specific).
+
+**Implementasi SELESAI** (2026-10-08/09): `apps/worker/schema/0003_transaction_attachments.sql` — `id`, `transaction_id` (FK `ON DELETE CASCADE` ke `transactions`, CASCADE cuma hapus row D1 bukan object R2), `r2_key` (UNIQUE), `content_type`, `size_bytes`, `created_at`/`updated_at`/`deleted_at`/`sync_source`. `content_type`/`size_bytes` SENGAJA ditambah di luar yang dipikirkan awal — dibutuhkan Worker utk kirim header `Content-Type` benar saat serve file & estimasi kuota, tidak ada padanannya di skema lokal desktop. Format `r2_key`: `{transaction_id}/{id}.{ext}` (ekstensi di-derive dari `Content-Type` yang dikirim client).
 
 ### Modul Worker baru: `attachments`
 
 Ikuti pola router/controller/service/schema (lihat `module-structure.md`). Modul PEMILIK tabel `transaction_attachments` di sisi Worker — endpoint minimal:
 
-- `POST /attachments` — upload binary ke R2 + insert row D1 (dipakai MCP tool upload-dari-HP, dan dipakai desktop kalau nanti mau push lampiran lama ke cloud).
-- `GET /attachments/:id` — stream/redirect ke isi file dari R2 (dipakai desktop utk render thumbnail/preview lampiran yg `storage_type = 'r2'`, dan dipakai MCP/Claude utk "membaca" gambar).
+- `POST /attachments` — upload binary ke R2 + insert row D1 (dipakai MCP tool upload-dari-HP, DAN dipakai desktop untuk push attachment yang dibuat di PC).
+- `GET /attachments/:id` — stream isi file dari R2 (dipakai desktop untuk DOWNLOAD saat pull sync — hasilnya ditulis ke disk lokal via `save_attachment_bytes` yang sudah ada — dan dipakai MCP/Claude untuk "membaca" gambar langsung).
+- `GET /attachments?since=` — daftar row attachment yang berubah sejak checkpoint terakhir, dipakai desktop untuk tahu attachment mana yang perlu di-download (pola mirip `GET /sync?since=` yang sudah ada).
 - `DELETE /attachments/:id` — soft-delete row D1 (pola LWW yang sama dengan tabel lain) SEKALIGUS hard-delete object R2 (R2 tidak punya soft-delete).
 
+**Implementasi SELESAI** (2026-10-09, `apps/worker/src/modules/attachments/`) — keempat endpoint di atas ada persis, plus keputusan kecil yang diambil saat menulis kode (tidak ada di rencana awal):
+- **Body upload pakai `multipart/form-data`**, bukan JSON (field `file` binary + `id`/`transactionId`/`updatedAt` string) — `c.req.parseBody()` bawaan Hono.
+- **Urutan upload: R2 dulu baru D1** — supaya tidak ada row D1 yang menunjuk object R2 yang gagal ter-upload (row orphan tanpa file dianggap lebih buruk drpd object tanpa row, yang masih bisa dibersihkan belakangan).
+- **Soft-delete attachment TIDAK bisa "hidup lagi" via LWW win** — beda dari `contacts`/`accounts` dkk yang bisa di-undo kalau sisi lain UPSERT dgn `updatedAt` lebih baru. Attachment yang sudah di-hard-delete dari R2 betul-betul hilang byte-nya, tidak ada state utk "dihidupkan lagi".
+- **DIVERIFIKASI end-to-end lokal** — lihat checklist di atas.
+
 Autentikasi ikut pola `requireAuth` yang sudah ada di modul lain.
+
+### Sisi desktop: push & pull
+
+- **Push (on-write, sama pemicunya dengan tabel data lain)**: begitu user attach file baru di desktop, SETELAH tersimpan lokal seperti sekarang, upload juga ke `POST /attachments` Worker (async, tidak blocking UI) — supaya row D1 + object R2 tercipta dan bisa dilihat dari HP/MCP.
+- **Pull (saat app dibuka + online, sama pemicunya dengan `GET /sync`)**: panggil `GET /attachments?since=`, untuk tiap row yang `file_path` lokalnya belum ada di disk → `GET /attachments/:id` untuk ambil bytes, simpan via `save_attachment_bytes` (fungsi yang SUDAH ADA), lalu INSERT row ke `transaction_attachments` lokal dengan `file_path` hasil simpan.
+- **Delete**: ikut soft-delete D1 seperti biasa; desktop yang pull row soft-deleted memanggil `delete_attachment_file` (SUDAH ADA) untuk file lokalnya, lalu hapus row lokal.
 
 ### Tool MCP baru
 
@@ -63,6 +102,13 @@ Setidaknya satu tool baru di `apps/mcp-server` untuk "upload foto dari HP sebaga
 
 ### Yang BELUM diputuskan (butuh diskusi lanjutan)
 
-- Apakah lampiran LAMA yang sudah di disk lokal PC perlu migrasi naik ke R2, atau dibiarkan `storage_type = 'local'` selamanya (hanya lampiran baru dari HP yang masuk R2)?
+- Apakah lampiran LAMA yang sudah di disk lokal PC (sebelum fitur ini ada) perlu di-push manual ke R2 (biar ikut sync ke device lain), atau dibiarkan hanya ada di PC ini selamanya kalau user tidak melakukan apa pun?
 - Kuota/limit ukuran upload per foto, dan retensi (apakah ada pembersihan R2 untuk attachment yang row-nya sudah soft-deleted lama)?
-- Biaya: R2 gratis sampai 10GB + operasi tertentu per bulan — perlu dipantau kalau volume lampiran mulai signifikan (relevan dgn [[project_worker_dev_prod_isolation]] soal 1 Worker shared dev/prod).
+- Biaya: R2 gratis sampai 10GB + operasi tertentu per bulan — perlu dipantau kalau volume lampiran mulai signifikan (relevan dgn [[project_worker_dev_prod_isolation]] soal 1 Worker shared dev/prod). **Lihat pengecekan di bawah — untuk skala pemakaian pribadi saat ini TIDAK masalah.**
+- First-sync di device baru (atau setelah lama offline) akan menarik SEMUA attachment yang belum ada lokal sekaligus — belum ada batas/strategi kalau suatu saat volume jadi besar (saat ini tidak relevan, lihat ukuran aktual di bawah).
+
+**Pengecekan 2026-10-08** (lihat [docs/rules/checking-dev-database.md](../../../../desktop/docs/rules/checking-dev-database.md) utk cara verifikasi): untuk pemakaian pribadi, biaya R2 kemungkinan besar TIDAK masalah —
+  - Row aktif di `transaction_attachments` production (`finance.db`) saat ini cuma **1 row** (~113 KB). Dev DB (`finance.dev.db`) 0 row.
+  - Folder lampiran fisik ada DUA lokasi: default `app_data_dir/attachments/` (35 file, 33 MB) dan custom `D:\Penting\Financial Tracker\Images\` (20 file, 23 MB) — 20 file di antaranya duplikat persis (sisa copy saat user pindah lokasi folder custom). Total unik ~21 file, ~33 MB.
+  - **~33 MB dari file fisik itu adalah ORPHAN** — tidak terhubung ke row manapun di DB (production maupun dev). Tidak ada cascade delete file saat row `transaction_attachments`/transaksi dihapus, jadi file lama menumpuk di disk tanpa pernah dibersihkan. Ini bug/gap terpisah dari R2 (retensi lokal), relevan untuk poin retensi di atas — kalau nanti ada cleanup job untuk R2, pertimbangkan juga cleanup lokal yang sama.
+  - Dengan skala riil ini (puluhan KB–MB per lampiran, bukan ratusan), sangat jauh dari limit free tier 10GB R2 — keputusan biaya bisa dianggap selesai untuk skala pemakaian pribadi saat ini.

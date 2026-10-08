@@ -11,6 +11,7 @@ import { accountGroupsRouter } from "./modules/account-groups/router";
 import { categoriesRouter } from "./modules/categories/router";
 import { contactsRouter } from "./modules/contacts/router";
 import { syncRouter } from "./modules/sync/router";
+import { attachmentsRouter } from "./modules/attachments/router";
 
 const app = new Hono<AppContext>();
 
@@ -35,5 +36,6 @@ app.route("/account-groups", accountGroupsRouter);
 app.route("/categories", categoriesRouter);
 app.route("/contacts", contactsRouter);
 app.route("/sync", syncRouter);
+app.route("/attachments", attachmentsRouter);
 
 export default app;

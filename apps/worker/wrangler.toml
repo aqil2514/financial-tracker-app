@@ -6,3 +6,7 @@ compatibility_date = "2025-01-01"
 binding = "DB"
 database_name = "financial-app"
 database_id = "6c6049b2-5969-43d5-a0d5-c9c3557ba308"
+
+[[r2_buckets]]
+binding = "ATTACHMENTS_BUCKET"
+bucket_name = "financial-app-attachments"
