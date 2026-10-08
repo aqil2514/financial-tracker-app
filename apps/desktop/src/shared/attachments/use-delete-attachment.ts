@@ -4,12 +4,18 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { getDb } from "@/lib/db";
 import { useDbMutation } from "@/hooks/use-db-mutation";
+import { pushDeleteAttachmentOnWrite } from "@/shared/cloud-sync/push-on-write";
 import type { TransactionAttachment } from "./use-transaction-attachments";
 import { transactionAttachmentsQueryKey } from "./use-transaction-attachments";
 
 export function useDeleteAttachment(transactionId: string) {
   return useDbMutation({
     mutationFn: async (attachment: TransactionAttachment) => {
+      // Push delete ke cloud DULU (sebelum hapus lokal) -- pola SAMA
+      // dgn pushDeleteOnWrite tabel lain: kalau gagal/offline, delete
+      // lokal TETAP lanjut (offline-first), masuk antrian retry.
+      await pushDeleteAttachmentOnWrite(attachment.id);
+
       const db = await getDb();
       await db.execute("DELETE FROM transaction_attachments WHERE id = $1", [
         attachment.id,

@@ -116,13 +116,18 @@ export type AttachmentListItem = {
   deletedAt: string | null;
 };
 
+export type AttachmentListResponse = { checkpoint: string; attachments: AttachmentListItem[] };
+
 // Pola SAMA dgn modules/sync/service.ts getSyncSnapshot -- `since` null
 // berarti full snapshot (first-sync), terisi berarti cuma baris yg
 // `updated_at > since`. TIDAK mengembalikan bytes file, cuma metadata
 // -- desktop panggil GET /attachments/:id TERPISAH per baris yg filenya
 // belum ada lokal (lihat docs/todos/plan/attachment-r2-sync.md "Sisi
-// desktop: push & pull").
-export async function listAttachmentsSince(env: Env, since: string | null): Promise<AttachmentListItem[]> {
+// desktop: push & pull"). `checkpoint` diambil SEBELUM query jalan (sama
+// alasan dgn modules/sync/service.ts) supaya baris yg berubah PAS SAAT
+// query berjalan tetap tercakup di pull berikutnya.
+export async function listAttachmentsSince(env: Env, since: string | null): Promise<AttachmentListResponse> {
+  const checkpoint = nowText();
   const filter = since !== null ? "WHERE updated_at > ?1" : "";
   const bind = since !== null ? [since] : [];
 
@@ -133,14 +138,17 @@ export async function listAttachmentsSince(env: Env, since: string | null): Prom
     .bind(...bind)
     .all<AttachmentRow>();
 
-  return result.results.map((r) => ({
-    id: r.id,
-    transactionId: r.transaction_id,
-    contentType: r.content_type,
-    sizeBytes: r.size_bytes,
-    updatedAt: r.updated_at,
-    deletedAt: r.deleted_at,
-  }));
+  return {
+    checkpoint,
+    attachments: result.results.map((r) => ({
+      id: r.id,
+      transactionId: r.transaction_id,
+      contentType: r.content_type,
+      sizeBytes: r.size_bytes,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+    })),
+  };
 }
 
 export type DeleteAttachmentResult = { status: "ok" } | { status: "not_found" };

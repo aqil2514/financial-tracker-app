@@ -6,10 +6,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useCloudSyncSettings,
   useSetCloudSyncCheckpoint,
+  useSetAttachmentsCheckpoint,
 } from "./use-cloud-sync-settings";
 import { pullSync } from "./worker-client";
 import { applySyncResponse } from "./pull-sync";
+import { pullAttachments } from "./pull-attachments";
 import { retryPendingPushes } from "./push-on-write";
+import { useAttachmentFolder } from "@/shared/attachments/use-attachment-folder";
 
 /**
  * Pull sekali saat app dibuka (kalau `cloud_sync_enabled` + kredensial
@@ -26,10 +29,20 @@ import { retryPendingPushes } from "./push-on-write";
 export function useAutoPullSync() {
   const { data: settings } = useCloudSyncSettings();
   const setCheckpoint = useSetCloudSyncCheckpoint();
+  const setAttachmentsCheckpoint = useSetAttachmentsCheckpoint();
+  // `isSuccess` (bukan cuma `data`) WAJIB dicek -- `data` query lain yang
+  // kebetulan sama-sama `null` (folder belum di-custom) TIDAK bisa
+  // dibedakan dari "belum selesai fetch" kalau cuma lihat `data`. Bug
+  // nyata (2026-10-09): pull attachment sempat jalan SEBELUM query ini
+  // selesai, `attachmentFolder` masih `undefined` di closure `useEffect`
+  // di bawah (keduanya mulai fetch paralel saat mount, tidak ada jaminan
+  // urutan selesai) -- file hasil pull jatuh ke folder default, bukan
+  // folder custom yang sudah di-set user.
+  const { data: attachmentFolder, isSuccess: attachmentFolderReady } = useAttachmentFolder();
   const queryClient = useQueryClient();
   const hasPulledRef = useRef(false);
 
-  const enabled = !!settings?.enabled && !!settings.workerUrl && !!settings.token;
+  const enabled = !!settings?.enabled && !!settings.workerUrl && !!settings.token && attachmentFolderReady;
 
   useEffect(() => {
     if (!enabled || hasPulledRef.current) return;
@@ -43,12 +56,23 @@ export function useAutoPullSync() {
         // perubahan dari sisi lain yang datang lewat pull berikutnya.
         await retryPendingPushes();
 
-        const response = await pullSync(
-          { workerUrl: settings!.workerUrl!, token: settings!.token! },
-          settings!.lastCheckpoint
-        );
+        const creds = { workerUrl: settings!.workerUrl!, token: settings!.token! };
+
+        const response = await pullSync(creds, settings!.lastCheckpoint);
         await applySyncResponse(response);
         await setCheckpoint.mutateAsync(response.checkpoint);
+
+        // Attachment di-pull SETELAH tabel data biasa (di atas) --
+        // `pullAttachments` butuh transaksi induknya SUDAH ada lokal
+        // (lihat hasLocalTransaction di pull-attachments.ts). Checkpoint
+        // TERPISAH krn endpoint/tabel D1-nya juga terpisah dari /sync.
+        const attachmentsCheckpoint = await pullAttachments(
+          creds,
+          settings!.lastAttachmentsCheckpoint,
+          attachmentFolder ?? null
+        );
+        await setAttachmentsCheckpoint.mutateAsync(attachmentsCheckpoint);
+
         // Semua query data (transactions/accounts/dst) berpotensi stale
         // setelah pull menulis langsung ke SQLite di luar jalur mutation
         // biasa -- invalidate semua query data domain supaya UI refresh.

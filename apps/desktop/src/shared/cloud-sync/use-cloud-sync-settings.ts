@@ -9,6 +9,13 @@ const ENABLED_KEY = "cloud_sync_enabled";
 const WORKER_URL_KEY = "cloud_sync_worker_url";
 const TOKEN_KEY = "cloud_sync_token";
 const LAST_CHECKPOINT_KEY = "cloud_sync_last_checkpoint";
+// Checkpoint TERPISAH dari LAST_CHECKPOINT_KEY -- `GET /attachments?since=`
+// py siklus `updated_at` sendiri (tabel `transaction_attachments` di D1,
+// request terpisah dari `GET /sync`), lihat attachment-r2-sync.md.
+// Menyamakan dgn checkpoint /sync akan salah kalau kedua request tidak
+// selalu sukses bareng (satu gagal, satu berhasil -- checkpoint gabungan
+// akan maju utk yang gagal juga).
+const ATTACHMENTS_CHECKPOINT_KEY = "cloud_sync_attachments_checkpoint";
 
 export const cloudSyncSettingsQueryKey = ["settings", "cloud-sync"];
 
@@ -29,9 +36,12 @@ export type CloudSyncSettings = {
    * berikutnya. `null` berarti belum pernah pull sama sekali
    * (first sync, Worker akan balas full snapshot). */
   lastCheckpoint: string | null;
+  /** Checkpoint TERPISAH utk `GET /attachments?since=` -- lihat
+   * komentar ATTACHMENTS_CHECKPOINT_KEY di atas. */
+  lastAttachmentsCheckpoint: string | null;
 };
 
-const SETTINGS_KEYS = [ENABLED_KEY, WORKER_URL_KEY, TOKEN_KEY, LAST_CHECKPOINT_KEY];
+const SETTINGS_KEYS = [ENABLED_KEY, WORKER_URL_KEY, TOKEN_KEY, LAST_CHECKPOINT_KEY, ATTACHMENTS_CHECKPOINT_KEY];
 
 export function useCloudSyncSettings() {
   return useQuery({
@@ -48,6 +58,7 @@ export function useCloudSyncSettings() {
         workerUrl: get(WORKER_URL_KEY),
         token: get(TOKEN_KEY),
         lastCheckpoint: get(LAST_CHECKPOINT_KEY),
+        lastAttachmentsCheckpoint: get(ATTACHMENTS_CHECKPOINT_KEY),
       };
     },
   });
@@ -95,6 +106,25 @@ export function useSetCloudSyncCheckpoint() {
     invalidateKey: cloudSyncSettingsQueryKey,
     successMessage: "",
     errorMessage: "Gagal menyimpan checkpoint sync",
+    silent: true,
+  });
+}
+
+/** Sama seperti `useSetCloudSyncCheckpoint`, checkpoint TERPISAH utk
+ * `GET /attachments?since=` -- lihat komentar ATTACHMENTS_CHECKPOINT_KEY. */
+export function useSetAttachmentsCheckpoint() {
+  return useDbMutation({
+    mutationFn: async (checkpoint: string) => {
+      const db = await getDb();
+      await db.execute(
+        `INSERT INTO settings (key, value) VALUES ($1, $2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        [ATTACHMENTS_CHECKPOINT_KEY, checkpoint]
+      );
+    },
+    invalidateKey: cloudSyncSettingsQueryKey,
+    successMessage: "",
+    errorMessage: "Gagal menyimpan checkpoint attachment",
     silent: true,
   });
 }

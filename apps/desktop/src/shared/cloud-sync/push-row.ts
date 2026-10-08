@@ -6,6 +6,8 @@
  * (push langsung vs retry) selalu kirim shape payload yang sama.
  */
 
+import { invoke } from "@tauri-apps/api/core";
+
 import { getDb } from "@/lib/db";
 import type { AccountType } from "@/lib/account-types";
 import type { CloudSyncCredentials, PushUpsertResult } from "./worker-client";
@@ -20,8 +22,29 @@ import {
   pushInvestmentAccount,
   pushInvestmentPurchase,
   pushInvestmentSale,
+  pushAttachment,
 } from "./worker-client";
 import type { QueueableTable } from "./push-queue";
+
+// `transaction_attachments` lokal TIDAK py kolom `content_type` (skema
+// SENGAJA tidak berubah, lihat attachment-r2-sync.md) -- infer dari
+// ekstensi file utk dikirim ke Worker (dipakai Worker utk header
+// Content-Type saat serve & cari ekstensi `r2_key`). Daftar minimal
+// format foto struk yang realistis dipakai; selain itu fallback null
+// (Worker treat sbg "bin").
+const EXTENSION_CONTENT_TYPE: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  heic: "image/heic",
+  pdf: "application/pdf",
+};
+
+function inferContentType(filePath: string): string | null {
+  const ext = filePath.split(".").pop()?.toLowerCase();
+  return ext ? (EXTENSION_CONTENT_TYPE[ext] ?? null) : null;
+}
 
 export async function pushRowPayload(
   creds: CloudSyncCredentials,
@@ -300,6 +323,27 @@ export async function pushRowPayload(
         date: row.date,
         status: row.status,
         updatedAt: row.updated_at ?? undefined,
+      });
+    }
+    case "transaction_attachments": {
+      // Skema lokal TIDAK py `updated_at` (`id, transaction_id, file_path,
+      // created_at` saja, lihat attachment-r2-sync.md) -- `updatedAt` TIDAK
+      // dikirim, Worker pakai now() sendiri (SELALU menang, konsisten dgn
+      // field opsional di shared/lww.ts Worker -- attachment TIDAK pernah
+      // di-edit setelah dibuat, cuma dibuat/dihapus, jadi tidak ada risiko
+      // menimpa perubahan lain yang lebih baru).
+      const rows = await db.select<{ id: string; transaction_id: string; file_path: string }[]>(
+        "SELECT id, transaction_id, file_path FROM transaction_attachments WHERE id = $1",
+        [id]
+      );
+      const row = rows[0];
+      if (!row) return null;
+      const bytes = await invoke<number[]>("read_attachment_bytes", { filePath: row.file_path });
+      return pushAttachment(creds, {
+        id: row.id,
+        transactionId: row.transaction_id,
+        bytes: Uint8Array.from(bytes),
+        contentType: inferContentType(row.file_path),
       });
     }
   }

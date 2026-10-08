@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getDb } from "@/lib/db";
 import { newId } from "@/lib/id";
 import { useDbMutation } from "@/hooks/use-db-mutation";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { transactionAttachmentsQueryKey } from "./use-transaction-attachments";
 
 export type AddAttachmentInput =
@@ -38,10 +39,14 @@ export async function saveAttachmentToTransaction(
 ) {
   const filePath = await saveFile(input, targetDir);
   const db = await getDb();
+  const id = newId();
   await db.execute(
     "INSERT INTO transaction_attachments (id, transaction_id, file_path) VALUES ($1, $2, $3)",
-    [newId(), transactionId, filePath]
+    [id, transactionId, filePath]
   );
+  // Non-blocking -- gagal/offline masuk antrian retry, TIDAK menunda
+  // atau menggagalkan penyimpanan lampiran lokal (lihat push-on-write.ts).
+  void pushOnWrite("transaction_attachments", id);
 }
 
 export function useAddAttachment(transactionId: string, targetDir: string | null) {

@@ -95,6 +95,15 @@ export async function pushDeleteTransactionOnWrite(id: string): Promise<Transact
   }
 }
 
+/** Khusus `transaction_attachments` -- `pushDeleteOnWrite` generik juga
+ * cocok (endpoint `DELETE /attachments/:id` TANPA payload action, sama
+ * bentuknya dgn `contacts`/`transactions`), tapi dibungkus fungsi
+ * terpisah supaya caller (`use-delete-attachment.ts`) tidak perlu tahu
+ * payload kosong `{}` yang wajib dikirim utk tipe `DeleteCloudPayload`. */
+export async function pushDeleteAttachmentOnWrite(id: string): Promise<void> {
+  await pushDeleteOnWrite("transaction_attachments", id, {});
+}
+
 /** Jalankan ulang antrian retry -- dipanggil saat app dibuka (bareng
  * pull). Best-effort, diam-diam skip kalau offline/kredensial belum
  * lengkap. */

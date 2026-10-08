@@ -68,8 +68,8 @@ export async function handleListAttachments(c: Context<AppContext>) {
     return c.json({ error: "Invalid 'since' format, expected 'YYYY-MM-DD HH:mm:ss'" }, 400);
   }
 
-  const items = await listAttachmentsSince(c.env, parsed.since);
-  return c.json({ attachments: items }, 200);
+  const result = await listAttachmentsSince(c.env, parsed.since);
+  return c.json(result, 200);
 }
 
 export async function handleDeleteAttachment(c: Context<AppContext>) {

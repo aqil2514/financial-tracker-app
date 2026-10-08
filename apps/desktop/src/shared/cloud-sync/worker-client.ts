@@ -253,6 +253,91 @@ export function pushInvestmentSale(creds: CloudSyncCredentials, payload: PushInv
   return pushUpsert(creds, "/investments/sales/push", payload);
 }
 
+// --- Attachments: upload/download binary via R2, lihat
+// apps/worker/docs/todos/plan/attachment-r2-sync.md + modules/attachments/*
+// (Worker). BEDA dari pushUpsert generik di atas -- body `multipart/
+// form-data` (file binary + field), bukan JSON, jadi TIDAK reuse
+// `request()` yang hardcode Content-Type: application/json.
+
+export type PushAttachmentPayload = {
+  id: string;
+  transactionId: string;
+  bytes: Uint8Array;
+  contentType: string | null;
+  updatedAt?: string;
+};
+
+export async function pushAttachment(
+  creds: CloudSyncCredentials,
+  payload: PushAttachmentPayload
+): Promise<PushUpsertResult> {
+  const form = new FormData();
+  form.set("id", payload.id);
+  form.set("transactionId", payload.transactionId);
+  if (payload.updatedAt) form.set("updatedAt", payload.updatedAt);
+  // `Blob` butuh backing ArrayBuffer murni (bukan ArrayBufferLike) --
+  // `.slice()` normalisasi copy yang tipenya pasti ArrayBuffer.
+  const arrayBuffer = payload.bytes.buffer.slice(
+    payload.bytes.byteOffset,
+    payload.bytes.byteOffset + payload.bytes.byteLength
+  ) as ArrayBuffer;
+  form.set("file", new Blob([arrayBuffer], { type: payload.contentType ?? undefined }));
+
+  const url = `${creds.workerUrl.replace(/\/$/, "")}/attachments`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${creds.token}` },
+    body: form,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const message = (body as { error?: string } | null)?.error ?? `HTTP ${response.status}`;
+    if (response.status === 422) return { status: "rejected", reason: message };
+    throw new WorkerRequestError(response.status, message);
+  }
+  const result = (await response.json()) as { status: "ok" | "ignored" };
+  return result.status === "ignored" ? { status: "ignored" } : { status: "ok" };
+}
+
+export type AttachmentListItem = {
+  id: string;
+  transactionId: string;
+  contentType: string | null;
+  sizeBytes: number | null;
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
+export type AttachmentListResponse = { checkpoint: string; attachments: AttachmentListItem[] };
+
+/** `since` null -> first sync, Worker balas semua baris (termasuk yang
+ * `deletedAt` terisi). Cuma metadata -- bytes diambil terpisah per baris
+ * via `getAttachmentBytes`, lihat pull-attachments.ts. `checkpoint`
+ * dipakai caller sbg `?since=` pull berikutnya (simpan via
+ * `useSetAttachmentsCheckpoint`), SAMA pola dgn `pullSync`. */
+export function listAttachmentsSince(
+  creds: CloudSyncCredentials,
+  since: string | null
+): Promise<AttachmentListResponse> {
+  const query = since ? `?since=${encodeURIComponent(since)}` : "";
+  return request(creds, `/attachments${query}`);
+}
+
+/** Download isi file dari R2 (lewat Worker) -- dipakai pull utk
+ * menyimpan ke disk lokal via `save_attachment_bytes` (Rust). */
+export async function getAttachmentBytes(
+  creds: CloudSyncCredentials,
+  id: string
+): Promise<{ bytes: Uint8Array; contentType: string | null }> {
+  const url = `${creds.workerUrl.replace(/\/$/, "")}/attachments/${encodeURIComponent(id)}`;
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${creds.token}` } });
+  if (!response.ok) {
+    throw new WorkerRequestError(response.status, `HTTP ${response.status}`);
+  }
+  const buffer = await response.arrayBuffer();
+  return { bytes: new Uint8Array(buffer), contentType: response.headers.get("Content-Type") };
+}
+
 // --- Pull: GET /sync?since= ---
 // Bentuk response SAMA PERSIS dgn apps/worker/src/modules/sync/service.ts
 // (SyncResponse) -- camelCase, termasuk baris `deletedAt` terisi.
@@ -369,7 +454,12 @@ export type DeleteCloudPayload =
   // accounts, dihapus hanya lewat DELETE /accounts yg Worker tangani via
   // CASCADE di D1, bukan jalur push desktop).
   | { table: "investment_purchases" }
-  | { table: "investment_sales" };
+  | { table: "investment_sales" }
+  // Hard-delete object R2 + soft-delete row D1 sekaligus di sisi Worker
+  // (lihat apps/worker/src/modules/attachments/service.ts deleteAttachment)
+  // -- TANPA payload action sama sekali, sama bentuknya dgn contacts/
+  // transactions di atas.
+  | { table: "transaction_attachments" };
 
 const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
   account_groups: "/account-groups",
@@ -381,6 +471,7 @@ const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
   transactions: "/transactions",
   debts: "/debts/push",
   debt_payments: "/debts/payments/push",
+  transaction_attachments: "/attachments",
 };
 
 export async function deleteCloudRow(

@@ -212,7 +212,13 @@ export function TransactionForm({
           </div>
 
           <div className="space-y-4">
-            <ScrollArea className="max-h-48">
+            {/* `h-48` (bukan `max-h-48`) WAJIB -- ScrollArea (base-ui)
+              Viewport-nya `size-full`, ikut tumbuh mengikuti Root kalau
+              Root cuma dibatasi `max-height` tanpa `height` pasti. Tanpa
+              ini, grid lampiran yang banyak (>1 baris) overflow KELUAR
+              dan menimpa field Deskripsi di bawahnya alih-alih di-scroll
+              di dalam box-nya sendiri (bug nyata, 2026-10-09). */}
+            <ScrollArea className="h-48">
               {transactionId != null ? (
                 <AttachmentUploader transactionId={transactionId} />
               ) : onPendingAttachmentsChange ? (
