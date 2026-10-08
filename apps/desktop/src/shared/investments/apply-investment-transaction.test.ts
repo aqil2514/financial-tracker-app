@@ -36,6 +36,11 @@ function createFakeDb(
         const account = accounts.find((a) => a.id === id);
         return (account ? [{ account_type: account.account_type }] : []) as T;
       }
+      if (sql.startsWith("SELECT id, unit, price_per_unit FROM investment_purchases WHERE transaction_id")) {
+        const [transactionId] = params as [string];
+        const match = investmentPurchases.find((p) => p.transaction_id === transactionId);
+        return (match ? [{ id: match.id, unit: match.unit, price_per_unit: match.price_per_unit }] : []) as T;
+      }
       if (sql.startsWith("SELECT id FROM investment_purchases WHERE transaction_id")) {
         const [transactionId] = params as [string];
         const match = investmentPurchases.find((p) => p.transaction_id === transactionId);
@@ -69,6 +74,16 @@ function createFakeDb(
         const [id] = params as [string];
         const index = investmentPurchases.findIndex((p) => p.id === id);
         if (index >= 0) investmentPurchases.splice(index, 1);
+        return {};
+      }
+      if (sql.startsWith("UPDATE investment_purchases SET unit")) {
+        const [unit, pricePerUnit, date, id] = params as [number | null, number | null, string, string];
+        const row = investmentPurchases.find((p) => p.id === id);
+        if (row) {
+          row.unit = unit;
+          row.price_per_unit = pricePerUnit;
+          row.date = date;
+        }
         return {};
       }
       throw new Error(`Fake db.execute tidak mengenali query: ${sql}`);
@@ -274,6 +289,91 @@ describe("applyInvestmentTransactionEdit", () => {
     expect(investmentPurchases[0]).toMatchObject({ unit: 20, price_per_unit: 1200, date: "2026-01-02" });
     expect(result.deletedInvestmentPurchaseIds).toEqual(["ip-old"]);
     expect(result.investmentPurchaseIds).toHaveLength(1);
+  });
+
+  // Regresi 2026-10-08 (dogfooding): transaksi 'income' hasil
+  // record_mode:'direct' (createDirectInvestmentPurchase, lihat
+  // konsep-investasi.md "Unit yang berubah TANPA transfer kas") diedit
+  // lewat form transaksi UTAMA tetap type='income' (bukan 'transfer') --
+  // sebelum fix ini, baris lama dihapus lalu applyInvestmentTransaction
+  // dipanggil yang `return none` untuk type!=='transfer', jadi baris
+  // investment_purchases hilang TANPA pengganti sama sekali.
+  it("UPDATE in-place (bukan delete+recreate) kalau type bukan transfer -- transaksi direct yang diedit tetap income/expense", async () => {
+    const existing: InvestmentPurchaseRow = {
+      id: "ip-direct",
+      account_id: "inv-1",
+      transaction_id: "tx-1",
+      unit: 100,
+      price_per_unit: 2000,
+      date: "2026-01-01",
+      status: "settled",
+    };
+    const { db, investmentPurchases } = createFakeDb({
+      accounts: [INVESTMENT_ACCOUNT],
+      investmentPurchases: [existing],
+    });
+
+    const result = await applyInvestmentTransactionEdit({
+      db: db as never,
+      transactionId: "tx-1",
+      type: "income",
+      accountId: "inv-1",
+      transferAccountId: null,
+      date: "2026-01-02",
+      unit: 100,
+      pricePerUnit: 2200,
+    });
+
+    expect(investmentPurchases).toHaveLength(1);
+    expect(investmentPurchases[0]).toMatchObject({
+      id: "ip-direct",
+      unit: 100,
+      price_per_unit: 2200,
+      date: "2026-01-02",
+    });
+    expect(result.investmentPurchaseIds).toEqual(["ip-direct"]);
+    expect(result.deletedInvestmentPurchaseIds).toHaveLength(0);
+  });
+
+  // Regresi KEDUA 2026-10-08 (ditemukan lewat tes manual fix di atas):
+  // unit/pricePerUnit null dari form (field-nya TIDAK PERNAH dirender utk
+  // income/expense, dan defaultValues() use-update-transaction.ts bisa
+  // submit sebelum query investmentPurchase React Query selesai resolve)
+  // TIDAK BOLEH menimpa nilai lama yang sudah benar -- fallback ke nilai
+  // existing kalau input baru null.
+  it("fallback ke unit/price_per_unit LAMA kalau input baru null (race condition form, bukan user sengaja mengosongkan)", async () => {
+    const existing: InvestmentPurchaseRow = {
+      id: "ip-direct",
+      account_id: "inv-1",
+      transaction_id: "tx-1",
+      unit: 1,
+      price_per_unit: 10000,
+      date: "2026-01-01",
+      status: "settled",
+    };
+    const { db, investmentPurchases } = createFakeDb({
+      accounts: [INVESTMENT_ACCOUNT],
+      investmentPurchases: [existing],
+    });
+
+    const result = await applyInvestmentTransactionEdit({
+      db: db as never,
+      transactionId: "tx-1",
+      type: "income",
+      accountId: "inv-1",
+      transferAccountId: null,
+      date: "2026-01-02",
+      unit: null,
+      pricePerUnit: null,
+    });
+
+    expect(investmentPurchases[0]).toMatchObject({
+      id: "ip-direct",
+      unit: 1,
+      price_per_unit: 10000,
+      date: "2026-01-02",
+    });
+    expect(result.investmentPurchaseIds).toEqual(["ip-direct"]);
   });
 });
 

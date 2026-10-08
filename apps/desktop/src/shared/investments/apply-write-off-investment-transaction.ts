@@ -101,3 +101,98 @@ export async function applyWriteOffInvestmentTransaction({
 
   return { transactionId, investmentSaleId, averageCost };
 }
+
+// price_per_unit = 0 adalah ciri KHUSUS write-off (selalu diisi 0, lihat
+// INSERT di applyWriteOffInvestmentTransaction di atas) -- BEDA dari jual
+// biasa yang price_per_unit WAJIB diisi & positive (schema.ts form jual).
+// `adjustment_transaction_id IS NULL` SENDIRIAN tidak cukup: jual biasa
+// yang kebetulan realizedPl == 0 (harga jual == average cost saat itu)
+// JUGA tidak punya leg kedua (lihat createAdjustmentTransaction: cuma
+// insert kalau realizedPl !== 0), jadi harus dikombinasikan dgn
+// price_per_unit = 0 supaya tidak salah kenali jual biasa sbg write-off.
+async function getTransactionWriteOffSale(
+  db: Db,
+  transactionId: string
+): Promise<{ id: string; unit: number } | null> {
+  const rows = await db.select<{ id: string; unit: number }[]>(
+    "SELECT id, unit FROM investment_sales WHERE transaction_id = $1 AND price_per_unit = 0",
+    [transactionId]
+  );
+  return rows[0] ?? null;
+}
+
+export type ApplyWriteOffInvestmentTransactionEditInput = {
+  db: Db;
+  transactionId: string;
+  accountId: string;
+  unit: number;
+};
+
+export type WriteOffInvestmentTransactionEditResult = {
+  /** `amount` baru yang HARUS ditulis ke `transactions.amount` oleh
+   * caller — write-off bukan nominal bebas dari form, selalu
+   * `averageCost × unit` (lihat komentar `applyWriteOffInvestmentTransaction`
+   * di atas), dan `averageCost` bisa sudah bergeser sejak baris ini
+   * pertama dibuat (pembelian baru masuk, dst) — dihitung ULANG di titik
+   * edit ini, bukan dipakai dari nilai lama. */
+  amount: number;
+  averageCost: number;
+};
+
+/**
+ * Versi `applyWriteOffInvestmentTransaction` untuk jalur EDIT transaksi —
+ * dipanggil dari form transaksi UTAMA (`use-update-transaction.ts`) saat
+ * transaksi yang diedit terdeteksi sebagai write-off (baris
+ * `investment_sales` dengan `adjustment_transaction_id IS NULL`, ciri
+ * yang membedakannya dari jual biasa — lihat `getTransactionWriteOffSale`).
+ *
+ * BEDA dari `applySellInvestmentTransactionEdit` (jual, apply-sell-
+ * investment-transaction.ts): write-off TIDAK PERNAH punya leg
+ * penyesuaian P/L di akun kas (`adjustment_transaction_id` selalu NULL —
+ * seluruh P/L negatif sudah tercermin di SATU transaksi `expense` pada
+ * akun investment itu sendiri), jadi tidak ada transaksi kedua yang perlu
+ * dihapus/dibuat ulang. UPDATE in-place pada baris yang sama (bukan
+ * delete+recreate seperti pola `investment_purchases`/jual) karena id
+ * baris ini tidak dipakai di mana pun selain `transaction_id` (tidak ada
+ * baris anak yang bergantung, sama seperti `investment_purchases`).
+ *
+ * Validasi oversell (unit baru > sisa unit) TETAP tanggung jawab CALLER
+ * (pola sama arah jual di `use-update-transaction.ts`: unit LAMA baris ini
+ * harus dikompensasi balik ke `remainingUnit` dulu sebelum dibandingkan,
+ * karena baris ini sendiri sudah ikut mengurangi holding sejak dibuat) —
+ * fungsi ini cuma eksekusi, tidak menolak oversell sendiri.
+ */
+export async function applyWriteOffInvestmentTransactionEdit({
+  db,
+  transactionId,
+  accountId,
+  unit,
+}: ApplyWriteOffInvestmentTransactionEditInput): Promise<WriteOffInvestmentTransactionEditResult> {
+  const existing = await getTransactionWriteOffSale(db, transactionId);
+  if (existing == null) {
+    throw new Error("Baris write-off investasi untuk transaksi ini tidak ditemukan.");
+  }
+
+  const averageCost = await getAverageCostPerUnit(db, accountId);
+  const amount = averageCost * unit;
+  const realizedPl = -amount;
+
+  await db.execute(
+    "UPDATE investment_sales SET unit = $1, average_cost_per_unit = $2, realized_pl = $3 WHERE id = $4",
+    [unit, averageCost, realizedPl, existing.id]
+  );
+
+  return { amount, averageCost };
+}
+
+/** Deteksi "transaksi ini adalah write-off investasi" — dipakai
+ * `use-update-transaction.ts` SEBELUM memutuskan cabang edit mana yang
+ * dipanggil (direct-purchase vs write-off vs transfer biasa). Lihat
+ * komentar `getTransactionWriteOffSale` di atas untuk kriterianya
+ * (`price_per_unit = 0`, bukan `adjustment_transaction_id IS NULL` saja). */
+export async function getTransactionWriteOff(
+  db: Db,
+  transactionId: string
+): Promise<{ id: string; unit: number } | null> {
+  return getTransactionWriteOffSale(db, transactionId);
+}

@@ -3,6 +3,7 @@
 import type { UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DialogFooter } from "@/components/ui/dialog";
 import { FormFieldCombobox, FormFieldDate, FormFieldText } from "@/components/forms/form-fields";
 import { useAccounts } from "@/features/accounts";
@@ -33,6 +34,14 @@ export function WriteOffInvestmentForm({
   const { data: holding } = useInvestmentHoldingSummary(
     investmentAccountId ? String(investmentAccountId) : undefined
   );
+
+  // "Write-off Semua Unit" -- pola PERSIS "Jual Semua Unit" di
+  // sell-investment-form.tsx: derived dari field unit itu sendiri (BUKAN
+  // state terpisah yang bisa desync), dicek SAMA PERSIS (===) karena
+  // holding.remainingUnit di-setValue LANGSUNG sebagai number JS presisi
+  // penuh (bukan lewat CurrencyInput yang decimalsLimit={4}).
+  const isWritingOffAll =
+    holding != null && holding.remainingUnit > 0 && Number(unit) === holding.remainingUnit;
 
   const investmentAccountOptions =
     accounts
@@ -75,7 +84,34 @@ export function WriteOffInvestmentForm({
           </p>
         </div>
       )}
-      <UnitAmountField form={form} name="unit" optional={false} label="Jumlah Unit yang Hilang/Dilepas" />
+      {holding && holding.remainingUnit > 0 && (
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <Checkbox
+            checked={isWritingOffAll}
+            onCheckedChange={(checked) => {
+              // setValue dengan number ASLI dari query (bukan diketik ulang
+              // lewat CurrencyInput yang decimalsLimit={4}) -- menghindari
+              // sisa unit presisi tinggi terpotong jadi 4 desimal lalu
+              // dianggap BEDA dari remainingUnit asli saat validasi oversell
+              // (getRemainingUnit, investment-holding-math.ts). Uncheck ->
+              // kosongkan lagi supaya user bisa ketik manual lagi, field
+              // unit otomatis ikut ENABLED lagi (isWritingOffAll jadi false).
+              form.setValue("unit", (checked ? holding.remainingUnit : null) as never, {
+                shouldValidate: true,
+                shouldDirty: true,
+              });
+            }}
+          />
+          Write-off Semua Unit ({holding.remainingUnit})
+        </label>
+      )}
+      <UnitAmountField
+        form={form}
+        name="unit"
+        optional={false}
+        label="Jumlah Unit yang Hilang/Dilepas"
+        disabled={isWritingOffAll}
+      />
       <p className="text-muted-foreground text-xs">
         Modal yang berkurang dari akun ini: <span className="font-medium">{formatCurrency(previewAmount, "IDR")}</span>{" "}
         (otomatis dari average cost × unit, tidak ada kas yang diterima).

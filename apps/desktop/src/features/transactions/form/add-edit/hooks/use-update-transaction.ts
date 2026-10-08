@@ -14,6 +14,10 @@ import {
   applySellInvestmentTransactionEdit,
   InsufficientInvestmentUnitsError,
 } from "@/shared/investments/apply-sell-investment-transaction";
+import {
+  applyWriteOffInvestmentTransactionEdit,
+  getTransactionWriteOff,
+} from "@/shared/investments/apply-write-off-investment-transaction";
 import { getAverageCostPerUnit, getRemainingUnit } from "@/shared/investments/investment-holding-math";
 import { useTransactionInvestmentPurchase } from "@/shared/investments/use-transaction-investment-purchase";
 import { useTransactionInvestmentSale } from "@/shared/investments/use-transaction-investment-sale";
@@ -139,6 +143,25 @@ export function useUpdateTransaction(
         amount = averageCost * values.unit;
       }
 
+      // Write-off investasi (income/expense LANGSUNG pada akun investment,
+      // tanpa transfer_account_id -- lihat konsep-investasi.md "Unit yang
+      // berubah TANPA transfer kas", arah berkurang) BUKAN jalur
+      // isInvestmentSell di atas (itu khusus transfer investment->cash) --
+      // dideteksi terpisah dari baris investment_sales dengan
+      // price_per_unit = 0 (lihat getTransactionWriteOffSale). amount
+      // SAMA prinsipnya dgn jual: BUKAN values.amount dari form (field itu
+      // bahkan tidak muncul sama sekali di form utama untuk income/expense,
+      // lihat use-transaction-investment-fields.ts), dihitung ulang dari
+      // averageCost x unit SAAT INI. unit sendiri TIDAK bisa diubah lewat
+      // form utama (field unit/harga tersembunyi untuk kasus ini) -- unit
+      // LAMA baris ini dipakai apa adanya, cuma amount yang mungkin
+      // bergeser kalau average cost berubah sejak write-off ini dibuat.
+      const writeOffSale = await getTransactionWriteOff(db, transaction.id);
+      const isWriteOff = writeOffSale != null;
+      if (isWriteOff) {
+        amount = await getAverageCostPerUnit(db, accountId).then((cost) => cost * writeOffSale.unit);
+      }
+
       // Field yang mempengaruhi PERHITUNGAN debt — kalau salah satu
       // berubah dari nilai semula, debt/debt_payment terkait (kalau ada)
       // perlu di-recreate dari nilai baru (atau diblokir, tergantung
@@ -219,6 +242,20 @@ export function useUpdateTransaction(
         adjustmentTransactionId = touched.adjustmentTransactionId;
         investmentSaleId = touched.investmentSaleIds[0] ?? null;
         deletedInvestmentSaleIds = touched.deletedInvestmentSaleIds;
+      } else if (isWriteOff) {
+        // Beda tabel dari isInvestmentSell (investment_sales dgn
+        // price_per_unit=0, bukan hasil transfer) -- lihat
+        // apply-write-off-investment-transaction.ts. UPDATE in-place,
+        // tidak ada leg kedua yang perlu diurus (adjustment_transaction_id
+        // selalu NULL utk write-off).
+        const touched = await applyWriteOffInvestmentTransactionEdit({
+          db,
+          transactionId: transaction.id,
+          accountId,
+          unit: writeOffSale.unit,
+        });
+        investmentSaleId = writeOffSale.id;
+        void touched; // amount sudah dipakai di atas (sebelum UPDATE transactions)
       } else {
         const touched = await applyInvestmentTransactionEdit({
           db,

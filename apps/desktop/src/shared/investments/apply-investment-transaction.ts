@@ -130,29 +130,80 @@ async function getTransactionInvestmentPurchaseId(
   return rows[0]?.id ?? null;
 }
 
+async function getTransactionInvestmentPurchaseRow(
+  db: Db,
+  transactionId: string
+): Promise<{ id: string; unit: number | null; price_per_unit: number | null } | null> {
+  const rows = await db.select<{ id: string; unit: number | null; price_per_unit: number | null }[]>(
+    "SELECT id, unit, price_per_unit FROM investment_purchases WHERE transaction_id = $1",
+    [transactionId]
+  );
+  return rows[0] ?? null;
+}
+
 /**
  * Versi `applyInvestmentTransaction` untuk jalur EDIT transaksi — field
  * unit/harga TIDAK divalidasi terhadap nominal (lihat konsep-investasi.md),
  * jadi tidak ada kasus "diblokir" seperti `DebtEditBlockedError` (tidak
  * ada baris lain yang bergantung pada satu `investment_purchases`, beda
- * dari `debts` yang bisa sudah dicicil). Field berbahaya berubah -> hapus
- * baris lama, buat baris baru dari nilai saat ini — selalu aman.
+ * dari `debts` yang bisa sudah dicicil).
+ *
+ * **Revisi 2026-10-08 (bug ditemukan lewat dogfooding)**: baris lama TIDAK
+ * selalu aman di-delete-lalu-recreate lewat `applyInvestmentTransaction` —
+ * fungsi itu `return none` (no-op) untuk `type !== 'transfer'`, sedangkan
+ * baris `investment_purchases` juga bisa lahir dari jalur `record_mode:
+ * 'direct'` (`createDirectInvestmentPurchase`/`create_investment_purchase_direct`,
+ * transaksi `income` LANGSUNG pada akun investment, bukan transfer — lihat
+ * konsep-investasi.md "Unit yang berubah TANPA transfer kas"). Transaksi
+ * hasil `direct` diedit lewat form transaksi UTAMA tetap `type: 'income'`
+ * (field `type` tidak ikut berubah jadi transfer) — delete-lalu-
+ * `applyInvestmentTransaction` berarti baris lama terhapus TANPA pengganti
+ * sama sekali, karena pemanggilan keduanya cuma jalan untuk transfer.
+ *
+ * Perbaikan: begitu ada baris lama DAN `type` baru BUKAN `'transfer'`,
+ * berarti ini tetap transaksi direct yang sekadar dikoreksi nilainya —
+ * UPDATE baris yang sama in-place (unit/harga/tanggal), TIDAK delete+
+ * recreate. Delete+recreate lewat `applyInvestmentTransaction` cuma masih
+ * valid untuk kasus `type === 'transfer'` (transaksi memang transfer
+ * kas<->investment, pola lama yang sudah terbukti aman).
+ *
+ * **Revisi 2026-10-08 (bug KEDUA ditemukan lewat tes manual fix di atas)**:
+ * `unit`/`pricePerUnit` dari `input` TIDAK selalu bisa dipercaya apa
+ * adanya untuk cabang `type !== 'transfer'` — field unit/harga TIDAK
+ * PERNAH dirender di form transaksi utama untuk income/expense
+ * (`needsInvestmentFields` di use-transaction-investment-fields.ts
+ * exclusive untuk transfer), dan `defaultValues()` form (`use-update-
+ * transaction.ts`) membaca `investmentPurchase` dari query React Query
+ * yang ASYNC — dialog bisa submit SEBELUM query itu resolve (race
+ * condition, form dirender begitu `transaction` siap tanpa menunggu
+ * `investmentPurchase`), mengirim `unit`/`pricePerUnit` berupa `null`
+ * walau baris lama punya nilai asli. Fallback ke nilai LAMA (`existing.unit`/
+ * `existing.price_per_unit`) kalau input baru `null` — user tidak pernah
+ * bisa sengaja mengosongkan field yang bahkan tidak ditampilkan di form.
  */
 export async function applyInvestmentTransactionEdit(
   input: ApplyInvestmentTransactionInput
 ): Promise<TouchedInvestmentRows> {
-  const { db, transactionId } = input;
-  const existingId = await getTransactionInvestmentPurchaseId(db, transactionId);
+  const { db, transactionId, type, unit, pricePerUnit, date } = input;
+  const existing = await getTransactionInvestmentPurchaseRow(db, transactionId);
 
-  if (existingId == null) {
+  if (existing == null) {
     return applyInvestmentTransaction(input);
   }
 
-  await db.execute("DELETE FROM investment_purchases WHERE id = $1", [existingId]);
+  if (type !== "transfer") {
+    await db.execute(
+      "UPDATE investment_purchases SET unit = $1, price_per_unit = $2, date = $3 WHERE id = $4",
+      [unit ?? existing.unit, pricePerUnit ?? existing.price_per_unit, date, existing.id]
+    );
+    return { investmentPurchaseIds: [existing.id], deletedInvestmentPurchaseIds: [] };
+  }
+
+  await db.execute("DELETE FROM investment_purchases WHERE id = $1", [existing.id]);
   const result = await applyInvestmentTransaction(input);
   return {
     investmentPurchaseIds: result.investmentPurchaseIds,
-    deletedInvestmentPurchaseIds: [existingId, ...result.deletedInvestmentPurchaseIds],
+    deletedInvestmentPurchaseIds: [existing.id, ...result.deletedInvestmentPurchaseIds],
   };
 }
 
