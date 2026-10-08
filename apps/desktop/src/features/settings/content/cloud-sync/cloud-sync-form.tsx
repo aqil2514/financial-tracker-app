@@ -118,12 +118,14 @@ export function CloudSyncForm() {
         <p className="text-sm font-medium">Sync Semua Data Sekarang</p>
         <p className="text-muted-foreground text-xs">
           Kirim SEMUA data yang sudah ada di PC (akun, kategori, kontak,
-          transaksi) ke Worker, sekali jalan. Perlu dijalankan MINIMAL
-          SEKALI setelah mengisi URL+token di atas — tanpa ini, transaksi
-          baru yang merujuk akun/kategori LAMA akan ditolak Worker
-          (data lama itu belum pernah dikirim). Aman dijalankan berkali-
-          kali (baris yang sudah ada di Worker cukup diperbarui, tidak
-          dobel).
+          transaksi, lampiran foto) ke Worker, sekali jalan. Perlu
+          dijalankan MINIMAL SEKALI setelah mengisi URL+token di atas —
+          tanpa ini, transaksi baru yang merujuk akun/kategori LAMA akan
+          ditolak Worker (data lama itu belum pernah dikirim). Aman
+          dijalankan berkali-kali (baris yang sudah ada di Worker cukup
+          diperbarui, tidak dobel) — tapi lampiran foto akan di-upload
+          ulang setiap kali tombol ini ditekan (bukan di-skip walau belum
+          berubah), jadi hindari klik berulang kalau lampirannya banyak.
         </p>
         <Button
           type="button"

@@ -20,6 +20,15 @@
  * seperti push-on-write -- tidak ada endpoint POST langsung di Worker,
  * lihat catatan di worker-client.ts).
  *
+ * `transaction_attachments` di-push PALING AKHIR (setelah `transactions`,
+ * referensi FK-nya) -- ini SEKALIGUS jawaban eksekusi utk open question
+ * "migrasi lampiran lama ke R2" di attachment-r2-sync.md: backfill ini
+ * reuse `pushRowPayload` case `transaction_attachments` yang SAMA dgn
+ * push-on-write biasa (baca ulang `file_path` dari disk + upload), jadi
+ * TIDAK perlu jalur terpisah -- cukup tombol yang sama, sekali jalan,
+ * mengirim SEMUA lampiran lokal (baru maupun lama) yang belum pernah
+ * ter-push.
+ *
  * BUG DITEMUKAN SAAT verifikasi production 2026-10-01: `categories`
  * SELF-REFERENCING (`parent_id -> categories.id`) -- `SELECT id FROM
  * categories` TIDAK menjamin induk terkirim sebelum anaknya, jadi
@@ -58,6 +67,7 @@ const BACKFILL_ORDER: QueueableTable[] = [
   "contacts",
   "accounts",
   "transactions",
+  "transaction_attachments",
 ];
 
 async function getAllIds(table: QueueableTable): Promise<string[]> {
