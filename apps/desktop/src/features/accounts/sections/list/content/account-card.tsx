@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/format-currency";
 import { ListItemActionsMenu } from "@/components/list-item-actions-menu";
 import { resolveAccountIcon } from "@/lib/account-icons";
 import { resolveAccountColorText } from "@/lib/account-colors";
+import { ACCOUNT_TYPE_OPTIONS } from "@/lib/account-types";
 
 export function AccountCard({
   account,
@@ -21,6 +22,7 @@ export function AccountCard({
   const { openDialog } = useAccountsList();
   const AccountIcon = resolveAccountIcon(account.icon);
   const colorText = resolveAccountColorText(account.color);
+  const accountTypeOption = ACCOUNT_TYPE_OPTIONS.find((option) => option.value === account.account_type);
 
   return (
     <Card
@@ -61,6 +63,11 @@ export function AccountCard({
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="flex flex-wrap items-center gap-1">
+          {accountTypeOption && (
+            <Badge variant="secondary" className={accountTypeOption.badgeClassName}>
+              {accountTypeOption.label}
+            </Badge>
+          )}
           {account.group_name && <Badge variant="secondary">{account.group_name}</Badge>}
           {!account.is_active && <Badge variant="outline">Nonaktif</Badge>}
           {linkedRetailkuAccounts.length > 0 && (
