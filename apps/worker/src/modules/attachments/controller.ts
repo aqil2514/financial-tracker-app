@@ -41,7 +41,7 @@ export async function handlePostAttachment(c: Context<AppContext>) {
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: fields.id });
   }
-  return c.json({ status: "ok", id: result.id }, 201);
+  return c.json({ status: "ok", id: result.id, checksumSha256: result.checksumSha256 }, 201);
 }
 
 // Serve isi file langsung (bukan JSON) -- dipakai desktop (download saat

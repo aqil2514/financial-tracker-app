@@ -20,11 +20,28 @@ export type UploadAttachmentInput = {
   updatedAt?: string;
 };
 
-export type UploadAttachmentResult = { status: "ok"; id: string } | { status: "stale" };
+export type UploadAttachmentResult =
+  | { status: "ok"; id: string; checksumSha256: string }
+  | { status: "stale" };
 
 function buildR2Key(transactionId: string, id: string, contentType: string | null): string {
   const ext = contentType?.split("/")[1]?.replace(/[^a-z0-9]/gi, "") || "bin";
   return `${transactionId}/${id}.${ext}`;
+}
+
+// SHA-256 hex lowercase dari bytes yang BENAR-BENAR disimpan ke R2 --
+// dibalas ke caller (lihat controller.ts) supaya bisa dibandingkan thdp
+// checksum file asli di sisi caller, menutup kasus corruption yang
+// magic-byte check (upload-attachment.ts, mcp-server) tidak bisa
+// deteksi krn ada di TENGAH file -- lihat
+// docs/dogfooding/2026-10-09-upload-attachment-corrupt-dan-orphan.md.
+// Web Crypto SubtleCrypto tersedia native di Cloudflare Workers runtime,
+// tidak perlu library tambahan.
+async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 // UPSERT dgn LWW, pola SAMA dgn contacts/service.ts upsertContact --
@@ -53,13 +70,18 @@ export async function uploadAttachment(
   await env.ATTACHMENTS_BUCKET.put(r2Key, input.bytes, {
     httpMetadata: input.contentType ? { contentType: input.contentType } : undefined,
   });
+  // Dihitung dari bytes YANG SAMA yang baru di-put ke R2 (bukan dari
+  // input mentah terpisah) -- checksum ini jadi pembanding tepercaya
+  // caller thdp file aslinya, independen dari apa pun yang terjadi di
+  // jalur sebelumnya (decode base64 di mcp-server, dst).
+  const checksumSha256 = await sha256Hex(input.bytes);
 
   if (!existing) {
     const now = nowText();
     await env.DB.prepare(
       `INSERT INTO transaction_attachments
-         (id, transaction_id, r2_key, content_type, size_bytes, created_at, updated_at, sync_source)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
+         (id, transaction_id, r2_key, content_type, size_bytes, checksum_sha256, created_at, updated_at, sync_source)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
     )
       .bind(
         input.id,
@@ -67,6 +89,7 @@ export async function uploadAttachment(
         r2Key,
         input.contentType,
         input.bytes.byteLength,
+        checksumSha256,
         now,
         decision.updatedAt,
         syncSource
@@ -75,14 +98,14 @@ export async function uploadAttachment(
   } else {
     await env.DB.prepare(
       `UPDATE transaction_attachments
-       SET transaction_id = ?1, content_type = ?2, size_bytes = ?3, updated_at = ?4, deleted_at = NULL
-       WHERE id = ?5`
+       SET transaction_id = ?1, content_type = ?2, size_bytes = ?3, checksum_sha256 = ?4, updated_at = ?5, deleted_at = NULL
+       WHERE id = ?6`
     )
-      .bind(input.transactionId, input.contentType, input.bytes.byteLength, decision.updatedAt, input.id)
+      .bind(input.transactionId, input.contentType, input.bytes.byteLength, checksumSha256, decision.updatedAt, input.id)
       .run();
   }
 
-  return { status: "ok", id: input.id };
+  return { status: "ok", id: input.id, checksumSha256 };
 }
 
 export type GetAttachmentResult =
@@ -193,4 +216,22 @@ export async function deleteAttachment(env: Env, id: string): Promise<DeleteAtta
     .run();
 
   return { status: "ok" };
+}
+
+// Dipanggil dari transactions/service.ts deleteTransaction, sejajar
+// detachInvestmentPurchaseForDeletedTransaction/detachInvestmentSaleForDeletedTransaction
+// -- BEDA krn attachment punya object R2 fisik yg juga harus ikut
+// terhapus (bukan cuma soft-delete row D1 spt investment_purchases),
+// jadi reuse deleteAttachment per-row drpd UPDATE massal supaya
+// hard-delete R2-nya ikut jalan juga utk tiap attachment.
+export async function detachAttachmentsForDeletedTransaction(env: Env, transactionId: string): Promise<void> {
+  const rows = await env.DB.prepare(
+    "SELECT id FROM transaction_attachments WHERE transaction_id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(transactionId)
+    .all<{ id: string }>();
+
+  for (const row of rows.results) {
+    await deleteAttachment(env, row.id);
+  }
 }

@@ -27,6 +27,7 @@ import {
   getAverageCostPerUnit,
 } from "../investments/service";
 import { resolveContactId } from "../contacts/service";
+import { detachAttachmentsForDeletedTransaction } from "../attachments/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 
 // contactId eksplisit SELALU menang; contactName (nama natural dari tool
@@ -629,6 +630,10 @@ export async function deleteTransaction(env: Env, id: string): Promise<DeleteTra
   // Sejajar detachInvestmentPurchaseForDeletedTransaction di atas, utk
   // arah jual -- juga TANPA guard syncSource sama alasannya.
   await detachInvestmentSaleForDeletedTransaction(env, id);
+  // Sejajar juga -- lampiran bukan cuma soft-delete row D1 tapi ikut
+  // hard-delete object R2-nya (lihat detachAttachmentsForDeletedTransaction),
+  // mencegah attachment jadi orphan spt temuan dogfooding 2026-10-09.
+  await detachAttachmentsForDeletedTransaction(env, id);
 
   const now = nowText();
   await env.DB.prepare("UPDATE transactions SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")
