@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { X } from "lucide-react";
+import { FileText, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogOverlay, DialogPortal } from "@/components/ui/dialog";
@@ -17,9 +17,15 @@ export function guessMimeType(filePath: string) {
       return "image/webp";
     case "gif":
       return "image/gif";
+    case "pdf":
+      return "application/pdf";
     default:
       return "image/jpeg";
   }
+}
+
+export function isPdfAttachment(filePath: string) {
+  return filePath.toLowerCase().endsWith(".pdf");
 }
 
 // String.fromCharCode(...bytes) langsung akan melebihi batas argumen
@@ -46,11 +52,17 @@ export function AttachmentThumbnail({
   onRemove?: () => void;
   isRemoving?: boolean;
 }) {
+  const isPdf = isPdfAttachment(attachment.file_path);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
+    // PDF tidak pernah dirender sebagai <img> (lihat isPdfAttachment di
+    // bawah) -- tidak perlu baca bytes sama sekali, cukup ikon + klik
+    // buka lewat default PDF viewer OS (openPath).
+    if (isPdf) return;
+
     let cancelled = false;
     setDataUrl(null);
     setError(false);
@@ -66,12 +78,21 @@ export function AttachmentThumbnail({
     return () => {
       cancelled = true;
     };
-  }, [attachment.file_path]);
+  }, [attachment.file_path, isPdf]);
 
   return (
     <>
       <div className="group relative size-20 overflow-hidden rounded-lg border">
-        {error ? (
+        {isPdf ? (
+          <button
+            type="button"
+            className="hover:bg-accent flex size-full flex-col items-center justify-center gap-1 transition-colors"
+            onClick={() => invoke("open_attachment_file", { filePath: attachment.file_path })}
+          >
+            <FileText className="text-muted-foreground size-6" />
+            <span className="text-muted-foreground text-[10px]">PDF</span>
+          </button>
+        ) : error ? (
           <div className="text-muted-foreground flex size-full items-center justify-center text-xs">
             Gagal muat
           </div>

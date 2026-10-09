@@ -1,6 +1,7 @@
 "use client";
 
-import { ImagePlus, X } from "lucide-react";
+import { FileText, ImagePlus, X } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export function PendingAttachmentUploader({
 
   return (
     <div className="space-y-2">
-      <Label>Lampiran Foto</Label>
+      <Label>Lampiran</Label>
       <div
         ref={setDropZoneEl}
         onPaste={handlePaste}
@@ -53,12 +54,27 @@ export function PendingAttachmentUploader({
             key={attachment.id}
             className="group relative size-20 overflow-hidden rounded-lg border"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={attachment.previewUrl}
-              alt="Pratinjau lampiran"
-              className="size-full object-cover"
-            />
+            {attachment.isPdf ? (
+              <button
+                type="button"
+                className="hover:bg-accent flex size-full flex-col items-center justify-center gap-1 transition-colors"
+                onClick={() => {
+                  if (attachment.input.source === "path") {
+                    invoke("open_attachment_file", { filePath: attachment.input.path });
+                  }
+                }}
+              >
+                <FileText className="text-muted-foreground size-6" />
+                <span className="text-muted-foreground text-[10px]">PDF</span>
+              </button>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={attachment.previewUrl}
+                alt="Pratinjau lampiran"
+                className="size-full object-cover"
+              />
+            )}
             <Button
               type="button"
               variant="destructive"
@@ -83,7 +99,7 @@ export function PendingAttachmentUploader({
         </Button>
       </div>
       <p className="text-muted-foreground text-xs">
-        Pilih file, seret foto ke sini, atau tempel (paste) gambar hasil
+        Pilih file, seret foto/PDF ke sini, atau tempel (paste) gambar hasil
         screenshot/copy image. Lampiran baru benar-benar tersimpan setelah
         transaksi disimpan.
       </p>

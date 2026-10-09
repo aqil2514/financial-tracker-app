@@ -119,3 +119,24 @@ pub fn delete_attachment_file(file_path: String) -> Result<(), String> {
     }
     fs::remove_file(&path).map_err(|e| format!("Gagal menghapus file lampiran: {e}"))
 }
+
+/// Membuka file lampiran (mis. PDF) lewat aplikasi default OS. Command
+/// kustom sendiri (BUKAN plugin `opener`'s `open_path`) karena folder
+/// lampiran dipilih bebas oleh user (lihat `use-attachment-folder.ts` —
+/// `open({ directory: true })` tanpa batasan) sehingga tidak ada satu
+/// scope path tetap yang bisa didaftarkan di capabilities/default.json
+/// sebelumnya (glob pattern opener scope dicek literal terhadap path
+/// absolut, "**" saja TIDAK otomatis mencakup semua drive Windows —
+/// lihat tauri-plugin-opener scope.rs/fs.rs). Validasi keamanan di sini
+/// murni "file itu ada", sama levelnya dengan `read_attachment_bytes` —
+/// caller (frontend) hanya pernah memanggil ini dengan `file_path` yang
+/// datang dari kolom `transaction_attachments.file_path` tersimpan,
+/// bukan input bebas dari user.
+#[tauri::command]
+pub fn open_attachment_file(file_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&file_path);
+    if !path.exists() {
+        return Err(format!("File lampiran tidak ditemukan: {file_path}"));
+    }
+    open::that(&path).map_err(|e| format!("Gagal membuka file lampiran: {e}"))
+}

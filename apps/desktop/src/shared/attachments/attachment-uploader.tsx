@@ -29,7 +29,7 @@ export function AttachmentUploader({ transactionId }: { transactionId: string })
 
   return (
     <div className="space-y-2">
-      <Label>Lampiran Foto</Label>
+      <Label>Lampiran</Label>
       <div
         ref={setDropZoneEl}
         onPaste={handlePaste}
@@ -59,7 +59,7 @@ export function AttachmentUploader({ transactionId }: { transactionId: string })
         </Button>
       </div>
       <p className="text-muted-foreground text-xs">
-        Pilih file, seret foto ke sini, atau tempel (paste) gambar hasil
+        Pilih file, seret foto/PDF ke sini, atau tempel (paste) gambar hasil
         screenshot/copy image.
       </p>
     </div>

@@ -44,6 +44,7 @@ const MAGIC_BYTES: Record<string, (bytes: Buffer) => boolean> = {
     b[6] === 0x1a &&
     b[7] === 0x0a,
   "image/webp": (b) => b.length >= 12 && b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP",
+  "application/pdf": (b) => b.length >= 4 && b.toString("ascii", 0, 4) === "%PDF",
 };
 
 // create_* lain (transactions/debts/dst) SEMUA kirim JSON ke workerFetch
@@ -53,19 +54,19 @@ export function registerUploadAttachment(server: McpServer) {
   server.registerTool(
     "upload_attachment",
     {
-      title: "Upload Lampiran Foto Transaksi",
+      title: "Upload Lampiran Transaksi",
       description:
-        "Upload foto (struk/nota/bukti) sebagai lampiran transaksi, mis. dari foto yang dikirim user lewat HP. Gambar harus base64 TANPA prefix 'data:image/...;base64,' (base64 mentah saja). Attachment ikut ter-sync ke semua device (desktop pull otomatis).",
+        "Upload foto atau PDF (struk/nota/invoice) sebagai lampiran transaksi, mis. dari foto yang dikirim user lewat HP atau PDF invoice. File harus base64 TANPA prefix 'data:...;base64,' (base64 mentah saja). Attachment ikut ter-sync ke semua device (desktop pull otomatis).",
       inputSchema: z.object({
         transactionId: z.string().min(1, "transactionId wajib diisi").describe("ID transaksi yang dilampiri"),
         imageBase64: z
           .string()
           .min(1)
-          .max(MAX_BASE64_LENGTH, "Gambar terlalu besar (maks ~5MB)")
-          .describe("Isi gambar sbg base64 mentah, TANPA prefix data URI"),
+          .max(MAX_BASE64_LENGTH, "File terlalu besar (maks ~5MB)")
+          .describe("Isi file sbg base64 mentah, TANPA prefix data URI"),
         mimeType: z
-          .enum(["image/jpeg", "image/png", "image/webp", "image/heic"])
-          .describe("Tipe gambar, dipakai Worker utk Content-Type & ekstensi file di R2"),
+          .enum(["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"])
+          .describe("Tipe file, dipakai Worker utk Content-Type & ekstensi file di R2"),
       }),
     },
     async ({ transactionId, imageBase64, mimeType }, ctx) => {

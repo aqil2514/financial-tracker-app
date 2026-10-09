@@ -1,6 +1,6 @@
 "use client";
 
-import { AlignLeft, ImageIcon } from "lucide-react";
+import { AlignLeft, FileText, ImageIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,10 +34,16 @@ export const ItemInfo = ({ tx }: { tx: TransactionListRow }) => {
           )}
           {(!!tx.has_attachment || tx.description) && (
             <TooltipProvider delay={200}>
-              {!!tx.has_attachment && (
+              {!!tx.has_image_attachment && (
                 <Tooltip>
                   <TooltipTrigger render={<ImageIcon className="text-muted-foreground size-3.5" />} />
                   <TooltipContent>Ada lampiran foto</TooltipContent>
+                </Tooltip>
+              )}
+              {!!tx.has_pdf_attachment && (
+                <Tooltip>
+                  <TooltipTrigger render={<FileText className="text-muted-foreground size-3.5" />} />
+                  <TooltipContent>Ada lampiran PDF</TooltipContent>
                 </Tooltip>
               )}
               {tx.description && (

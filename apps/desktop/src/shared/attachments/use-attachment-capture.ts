@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import type { AddAttachmentInput } from "./use-add-attachment";
 
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif"];
+export const DOCUMENT_EXTENSIONS = ["pdf"];
+export const ATTACHMENT_EXTENSIONS = [...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS];
 
 async function rgbaToPngBytes(
   rgba: Uint8Array,
@@ -80,14 +82,14 @@ export function useAttachmentCapture(onCapture: (inputs: AddAttachmentInput[]) =
         if (event.payload.type !== "drop") return;
         if (!isInside(event.payload.position.x, event.payload.position.y)) return;
 
-        const imagePaths = event.payload.paths.filter((path) =>
-          IMAGE_EXTENSIONS.some((ext) => path.toLowerCase().endsWith(`.${ext}`))
+        const supportedPaths = event.payload.paths.filter((path) =>
+          ATTACHMENT_EXTENSIONS.some((ext) => path.toLowerCase().endsWith(`.${ext}`))
         );
-        if (imagePaths.length === 0) {
-          toast.error("File yang di-drop bukan gambar");
+        if (supportedPaths.length === 0) {
+          toast.error("File yang di-drop bukan gambar atau PDF");
           return;
         }
-        onCapture(imagePaths.map((path) => ({ source: "path", path })));
+        onCapture(supportedPaths.map((path) => ({ source: "path", path })));
       })
       .then((fn) => {
         unlisten = fn;
@@ -100,7 +102,11 @@ export function useAttachmentCapture(onCapture: (inputs: AddAttachmentInput[]) =
   const handlePickFile = useCallback(async () => {
     const selected = await open({
       multiple: true,
-      filters: [{ name: "Gambar", extensions: IMAGE_EXTENSIONS }],
+      filters: [
+        { name: "Gambar & PDF", extensions: ATTACHMENT_EXTENSIONS },
+        { name: "Gambar", extensions: IMAGE_EXTENSIONS },
+        { name: "PDF", extensions: DOCUMENT_EXTENSIONS },
+      ],
     });
     if (!selected) return;
     const paths = Array.isArray(selected) ? selected : [selected];

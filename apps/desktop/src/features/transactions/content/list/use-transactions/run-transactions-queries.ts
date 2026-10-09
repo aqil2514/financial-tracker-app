@@ -1,5 +1,10 @@
 import { getDb } from "@/lib/db";
-import { HAS_ATTACHMENT_SUBQUERY, type TransactionListRow } from "./interface";
+import {
+  HAS_ATTACHMENT_SUBQUERY,
+  HAS_IMAGE_ATTACHMENT_SUBQUERY,
+  HAS_PDF_ATTACHMENT_SUBQUERY,
+  type TransactionListRow,
+} from "./interface";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
@@ -51,7 +56,7 @@ export const runTransactionsQueries = (
   if (clauses.accountId == null) {
     return Promise.all([
       db.select<TransactionListRow[]>(
-        `SELECT transactions.*, ${HAS_ATTACHMENT_SUBQUERY} as has_attachment
+        `SELECT transactions.*, ${HAS_ATTACHMENT_SUBQUERY} as has_attachment, ${HAS_PDF_ATTACHMENT_SUBQUERY} as has_pdf_attachment, ${HAS_IMAGE_ATTACHMENT_SUBQUERY} as has_image_attachment
          FROM transactions ${clauses.whereClause} ${clauses.orderClause} ${clauses.limitOffsetClause}`,
         rowsParams
       ),
@@ -70,6 +75,8 @@ export const runTransactionsQueries = (
          SELECT
            transactions.*,
            ${HAS_ATTACHMENT_SUBQUERY} as has_attachment,
+           ${HAS_PDF_ATTACHMENT_SUBQUERY} as has_pdf_attachment,
+           ${HAS_IMAGE_ATTACHMENT_SUBQUERY} as has_image_attachment,
            (
              (SELECT initial_balance FROM accounts WHERE id = $${accountIdIndex})
              + SUM(
