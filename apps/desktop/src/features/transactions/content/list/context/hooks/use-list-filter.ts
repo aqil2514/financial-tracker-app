@@ -5,12 +5,14 @@ import type { SelectOptionsMap } from "@/components/query/filters/panel/panel.in
 import type { SortConfig } from "@/components/query/sort";
 import type { AccountWithBalance } from "@/features/accounts";
 import type { Category } from "@/lib/db";
+import type { Label } from "@/shared/labels/use-labels";
 import { STATIC_FILTER_SELECT_OPTIONS } from "../constants";
 import type { ListContextFilter } from "../interface";
 
 export function useListFilter(
   categories: Category[] | undefined,
-  accounts: AccountWithBalance[] | undefined
+  accounts: AccountWithBalance[] | undefined,
+  labels: Label[] | undefined
 ): ListContextFilter {
   const [filters, setFilters] = useState<FilterConfig[]>([]);
   const [sorts, setSorts] = useState<SortConfig[]>([]);
@@ -27,8 +29,13 @@ export function useListFilter(
         value: String(account.id),
         label: account.name,
       })),
+      // Value = NAMA label (bukan id) -- subquery efektif (lihat
+      // shared/labels/effective-label-subquery.ts) bandingkan by name,
+      // konsisten dgn LabelField yang juga pakai nama sbg unit identitas
+      // user-facing (resolusi ke id terjadi di titik lain, bukan filter).
+      label: (labels ?? []).map((l) => ({ value: l.name, label: l.name })),
     }),
-    [categories, accounts]
+    [categories, accounts, labels]
   );
 
   return { filters, setFilters, filterSelectOptions, sorts, setSorts, dateRange, setDateRange };

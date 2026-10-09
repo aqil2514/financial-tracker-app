@@ -10,6 +10,7 @@ const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "account_id", label: "Akun", type: "combobox" },
   { key: "amount", label: "Jumlah", type: "number" },
   { key: "has_attachment", label: "Gambar", type: "select" },
+  { key: "label", label: "Label", type: "combobox" },
 ];
 
 export function TransactionListFilter({

@@ -14,8 +14,8 @@
  */
 
 import { getDb } from "@/lib/db";
-import type { CloudSyncCredentials, DeleteCloudPayload, TransactionDebtInfo } from "./worker-client";
-import { deleteCloudRow, deleteTransactionCloud } from "./worker-client";
+import type { CloudSyncCredentials, DeleteCloudPayload, TransactionDebtInfo, LabelEntityScope } from "./worker-client";
+import { deleteCloudRow, deleteTransactionCloud, detachLabelCloud } from "./worker-client";
 import {
   enqueueDeletePush,
   enqueueUpsertPush,
@@ -102,6 +102,26 @@ export async function pushDeleteTransactionOnWrite(id: string): Promise<Transact
  * payload kosong `{}` yang wajib dikirim utk tipe `DeleteCloudPayload`. */
 export async function pushDeleteAttachmentOnWrite(id: string): Promise<void> {
   await pushDeleteOnWrite("transaction_attachments", id, {});
+}
+
+/** Detach label -- TIDAK lewat `pushDeleteOnWrite` generik (bentuk path
+ * Worker-nya 3 segment: scope/entityId/labelId, bukan 1 `:id`) dan TIDAK
+ * py antrian retry sendiri (keputusan: detach gagal krn offline dianggap
+ * acceptable eventual-consistency gap kecil, beda dari upsert yg harus
+ * selalu sampai -- re-detach yg sama idempotent di sisi Worker kalau user
+ * membuka app lagi & retry manual via re-sync nanti). */
+export async function detachLabelOnWrite(
+  scope: LabelEntityScope,
+  entityId: string,
+  labelId: string
+): Promise<void> {
+  const creds = await resolveCredentials();
+  if (!creds) return;
+  try {
+    await detachLabelCloud(creds, scope, entityId, labelId);
+  } catch {
+    // Best-effort, lihat catatan di atas -- tidak masuk antrian retry.
+  }
 }
 
 /** Jalankan ulang antrian retry -- dipanggil saat app dibuka (bareng

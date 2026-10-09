@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { getDb, type Account, type Transaction } from "@/lib/db";
 import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
@@ -23,6 +24,9 @@ import { useTransactionInvestmentPurchase } from "@/shared/investments/use-trans
 import { useTransactionInvestmentSale } from "@/shared/investments/use-transaction-investment-sale";
 import { transactionSchema, type TransactionFormOutput } from "../schema";
 import { pushOnWrite, pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-write";
+import { resolveLabelIds } from "@/shared/labels/resolve-label-ids";
+import { applyTransactionLabels } from "@/shared/labels/apply-transaction-labels";
+import { useTransactionLabels } from "@/shared/labels/use-transaction-labels";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
@@ -58,8 +62,9 @@ export function useUpdateTransaction(
   // pernah dua-duanya -- query sale ini cuma relevan kalau investmentPurchase
   // null (lihat prefill unit/price_per_unit/investment_status di bawah).
   const { data: investmentSale } = useTransactionInvestmentSale(transaction.id);
+  const { data: currentLabelNames } = useTransactionLabels(transaction.id);
 
-  return useEntityForm({
+  const entityForm = useEntityForm({
     schema: transactionSchema,
     defaultValues: () => ({
       type: transaction.type,
@@ -86,6 +91,7 @@ export function useUpdateTransaction(
       unit: investmentPurchase?.unit ?? investmentSale?.unit ?? null,
       price_per_unit: investmentPurchase?.price_per_unit ?? investmentSale?.price_per_unit ?? null,
       investment_status: investmentPurchase?.status ?? investmentSale?.status ?? "pending",
+      label_names: currentLabelNames ?? [],
     }),
     open,
     resetOnOpen: true,
@@ -291,6 +297,11 @@ export function useUpdateTransaction(
         void pushDeleteOnWrite("investment_purchases", purchaseId, {});
       for (const saleId of deletedInvestmentSaleIds)
         void pushDeleteOnWrite("investment_sales", saleId, {});
+
+      // Sama alasan dgn use-create-transaction.ts -- diff attach/detach,
+      // bukan hapus-semua-insert-ulang (lihat applyTransactionLabels).
+      const labelIds = await resolveLabelIds(values.label_names, "transaction_category");
+      await applyTransactionLabels(transaction.id, labelIds);
     },
     invalidateKey: QUERY_DEPENDENCIES.transactions,
     successMessage: "Transaksi berhasil diperbarui",
@@ -299,4 +310,22 @@ export function useUpdateTransaction(
       onClosed?.();
     },
   });
+
+  // `useTransactionLabels` adalah query BARU per-transaksi yang baru
+  // mulai fetch saat dialog edit ini pertama terbuka -- beda dari
+  // `useContacts`/`useTransactionDebtStatus` dkk yang biasanya sudah lama
+  // di-cache sebelum dialog dibuka. `defaultValues()` di useEntityForm
+  // dipanggil SEKALI saat `open` berubah (lihat useEffect-nya), race
+  // kalau dipanggil SEBELUM `currentLabelNames` selesai termuat --
+  // chip Label kosong walau datanya sudah ada di DB (bug nyata,
+  // 2026-10-10). Di-sync ulang manual di sini begitu data datang,
+  // TANPA mengubah useEntityForm generik (dipakai banyak form lain).
+  useEffect(() => {
+    if (open && currentLabelNames !== undefined) {
+      entityForm.form.setValue("label_names", currentLabelNames, { shouldDirty: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentLabelNames]);
+
+  return entityForm;
 }

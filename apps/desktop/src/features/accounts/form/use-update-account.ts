@@ -9,9 +9,13 @@ import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { isAccountInUse } from "./is-account-in-use";
 import { useInvestmentAccount } from "@/shared/investments/use-investment-account";
+import { resolveLabelIds } from "@/shared/labels/resolve-label-ids";
+import { applyAccountLabels } from "@/shared/labels/apply-account-labels";
+import { useAccountLabels } from "@/shared/labels/use-account-labels";
 
 export function useUpdateAccount(account: Account, onSuccess?: () => void) {
   const { data: investmentAccount } = useInvestmentAccount(account.id);
+  const { data: currentLabelNames } = useAccountLabels(account.id);
 
   const entityForm = useEntityForm({
     schema: accountSchema,
@@ -26,6 +30,7 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
       color: account.color,
       unit_label: investmentAccount?.unit_label ?? null,
       current_market_value: investmentAccount?.current_market_value ?? null,
+      label_names: currentLabelNames ?? [],
     }),
     resetOnOpen: true,
     onSuccess,
@@ -91,6 +96,9 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
       if (values.account_type === "investment") {
         void pushOnWrite("investment_accounts", account.id);
       }
+
+      const labelIds = await resolveLabelIds(values.label_names, "account");
+      await applyAccountLabels(account.id, labelIds);
     },
     invalidateKey: QUERY_DEPENDENCIES.accounts,
     successMessage: "Akun berhasil diperbarui",
@@ -109,6 +117,14 @@ export function useUpdateAccount(account: Account, onSuccess?: () => void) {
     entityForm.form.setValue("current_market_value", investmentAccount.current_market_value);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reaksi ke data query saja, form stabil lewat closure
   }, [investmentAccount]);
+
+  // Race condition sama (query terpisah, useAccountLabels) -- lihat
+  // komentar di atas & use-update-transaction.ts/use-update-category.ts.
+  useEffect(() => {
+    if (currentLabelNames === undefined) return;
+    entityForm.form.setValue("label_names", currentLabelNames, { shouldDirty: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLabelNames]);
 
   return entityForm;
 }

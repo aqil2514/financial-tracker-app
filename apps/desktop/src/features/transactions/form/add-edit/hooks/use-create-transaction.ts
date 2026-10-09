@@ -20,6 +20,8 @@ import type { PendingAttachment } from "@/shared/attachments/pending-attachment"
 import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
 import { transactionSchema, type TransactionFormOutput } from "../schema";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
+import { resolveLabelIds } from "@/shared/labels/resolve-label-ids";
+import { applyTransactionLabels } from "@/shared/labels/apply-transaction-labels";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
@@ -87,6 +89,7 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
       unit: null,
       price_per_unit: null,
       investment_status: "pending" as const,
+      label_names: [],
     }),
     open,
     resetOnOpen: true,
@@ -224,6 +227,13 @@ export function useCreateTransaction(options: UseCreateTransactionOptions) {
       if (investmentSaleId != null) void pushOnWrite("investment_sales", investmentSaleId);
       for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
       for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
+
+      // Label di-attach TERAKHIR -- butuh transactionId yang sudah pasti
+      // ada (sudah di-INSERT di atas), tidak ada efek bisnis apa pun yang
+      // bergantung label (query-only, lihat general-label.md), jadi aman
+      // di urutan paling akhir mutationFn ini.
+      const labelIds = await resolveLabelIds(values.label_names, "transaction_category");
+      await applyTransactionLabels(transactionId, labelIds);
 
       return transactionId;
     },

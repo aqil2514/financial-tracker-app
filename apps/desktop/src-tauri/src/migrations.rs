@@ -266,6 +266,18 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0044_cloud_sync_queue_attachments.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 45,
+            description: "labels",
+            sql: include_str!("../migrations/0045_labels.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 46,
+            description: "cloud_sync_queue_labels",
+            sql: include_str!("../migrations/0046_cloud_sync_queue_labels.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

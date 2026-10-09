@@ -5,6 +5,9 @@ export const categorySchema = z.object({
   type: z.enum(["income", "expense"]),
   parent_id: z.string().nullable(),
   is_active: z.enum(["1", "0"]),
+  /** Nama label (scope 'transaction_category', BUKAN id) -- sama prinsip
+   * dgn transaction.schema.ts, lihat shared/labels/label-field.tsx. */
+  label_names: z.array(z.string()),
 });
 
 export type CategoryFormValues = z.input<typeof categorySchema>;

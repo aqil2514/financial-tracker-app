@@ -4,6 +4,7 @@ import { createContext, useContext } from "react";
 
 import { useAccounts } from "@/features/accounts";
 import { useCategories } from "@/features/categories";
+import { useLabels } from "@/shared/labels/use-labels";
 import { useTransactionsPage } from "../../../page/transactions-page-context";
 import { useListData } from "./hooks/use-list-data";
 import { useListFilter } from "./hooks/use-list-filter";
@@ -26,9 +27,10 @@ export function ListProvider({
   const { dateFilter } = useTransactionsPage();
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const { data: labels } = useLabels("transaction_category");
 
   const { page, setPage, limit, setLimit } = useListPageControl();
-  const filter = useListFilter(categories, accounts);
+  const filter = useListFilter(categories, accounts, labels);
   const data = useListData(
     page,
     limit,

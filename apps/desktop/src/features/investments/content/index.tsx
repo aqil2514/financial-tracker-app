@@ -1,29 +1,61 @@
 "use client";
 
+import { useState } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAccounts } from "@/features/accounts";
 import { BalancePie } from "@/features/accounts/sections/balance-pie-chart/balance-pie";
 import { useInvestmentsPage } from "../page/investments-page-context";
 import { InvestmentAccountCard } from "./investment-account-card";
 import { InvestmentSummaryStats } from "./investment-summary-stats";
 import { InvestmentBreakdownList } from "./investment-breakdown-list";
+import { InvestmentLabelBreakdown } from "./investment-label-breakdown";
 import { useAllInvestmentAccounts } from "@/shared/investments/use-all-investment-accounts";
+import { useInvestmentAccountLabels } from "@/shared/investments/use-investment-account-labels";
+import { aggregateInvestmentByLabel } from "@/shared/investments/aggregate-by-label";
+
+type PieMode = "account" | "label";
 
 export function InvestmentsContent() {
   const { activeTab, setActiveTab } = useInvestmentsPage();
+  const [pieMode, setPieMode] = useState<PieMode>("account");
   const { data: accounts, isLoading } = useAccounts();
   const investmentAccounts = (accounts ?? []).filter(
     (account) => account.account_type === "investment"
   );
   const { data: marketValues, isLoading: marketValuesLoading, error: marketValuesError } =
     useAllInvestmentAccounts();
+  const { data: accountLabels } = useInvestmentAccountLabels();
 
   const marketValueByAccountId = new Map((marketValues ?? []).map((row) => [row.account_id, row.current_market_value]));
-  const pieData = investmentAccounts.map((account) => ({
-    name: account.name,
-    balance: marketValueByAccountId.get(account.id) ?? 0,
-  }));
+
+  const labelsByAccountId = new Map<string, string[]>();
+  for (const row of accountLabels ?? []) {
+    const existing = labelsByAccountId.get(row.account_id) ?? [];
+    existing.push(row.name);
+    labelsByAccountId.set(row.account_id, existing);
+  }
+
+  const labelBreakdown = aggregateInvestmentByLabel(
+    investmentAccounts,
+    marketValueByAccountId,
+    accountLabels ?? []
+  );
+
+  // Mode "account": pie per akun individual (perilaku lama, tidak
+  // berubah). Mode "label": pie per jenis instrumen -- akun dgn >1 label
+  // ikut "berkontribusi" nilai penuh ke SETIAP labelnya (overlap sengaja,
+  // lihat aggregate-by-label.ts), jadi total pie mode ini BISA > total
+  // modal sungguhan kalau ada akun multi-label.
+  const pieData =
+    pieMode === "account"
+      ? investmentAccounts.map((account) => ({
+          name: account.name,
+          balance: marketValueByAccountId.get(account.id) ?? 0,
+        }))
+      : labelBreakdown.map((row) => ({ name: row.label, balance: row.totalMarketValue }));
 
   return (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
@@ -49,8 +81,17 @@ export function InvestmentsContent() {
           <>
             <InvestmentSummaryStats investmentAccounts={investmentAccounts} />
             <Card>
-              <CardHeader>
+              <CardHeader className="flex-row items-center justify-between gap-2">
                 <CardTitle>Distribusi Nilai Pasar</CardTitle>
+                <ToggleGroup
+                  value={[pieMode]}
+                  onValueChange={(values: string[]) => {
+                    if (values.length > 0) setPieMode(values[values.length - 1] as PieMode);
+                  }}
+                >
+                  <ToggleGroupItem value="account">Per Akun</ToggleGroupItem>
+                  <ToggleGroupItem value="label">Per Jenis</ToggleGroupItem>
+                </ToggleGroup>
               </CardHeader>
               <CardContent>
                 <BalancePie
@@ -69,6 +110,16 @@ export function InvestmentsContent() {
                 <InvestmentBreakdownList investmentAccounts={investmentAccounts} />
               </CardContent>
             </Card>
+            {labelBreakdown.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Per Jenis Instrumen</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <InvestmentLabelBreakdown rows={labelBreakdown} />
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </TabsContent>
@@ -87,7 +138,11 @@ export function InvestmentsContent() {
             ) : (
               <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {investmentAccounts.map((account) => (
-                  <InvestmentAccountCard account={account} key={account.id} />
+                  <InvestmentAccountCard
+                    account={account}
+                    labels={labelsByAccountId.get(account.id) ?? []}
+                    key={account.id}
+                  />
                 ))}
               </div>
             )}

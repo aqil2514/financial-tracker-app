@@ -10,6 +10,7 @@ import {
   FormFieldToggleGroup,
 } from "@/components/forms/form-fields";
 import { useCategories } from "@/hooks/resources/use-categories";
+import { LabelField } from "@/shared/labels/label-field";
 import type { CategoryFormOutput, CategoryFormValues } from "./category.schema";
 
 type CategoryFormProps = {
@@ -70,6 +71,11 @@ export function CategoryForm({
           { value: "1", label: "Aktif" },
           { value: "0", label: "Nonaktif" },
         ]}
+      />
+      <LabelField
+        control={form.control}
+        scope="transaction_category"
+        label="Label"
       />
       <DialogFooter>
         <Button type="submit" disabled={isPending}>

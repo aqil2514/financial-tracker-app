@@ -23,6 +23,9 @@ import {
   pushInvestmentPurchase,
   pushInvestmentSale,
   pushAttachment,
+  pushLabel,
+  pushAttachLabel,
+  type LabelEntityScope,
 } from "./worker-client";
 import type { QueueableTable } from "./push-queue";
 
@@ -344,6 +347,40 @@ export async function pushRowPayload(
         transactionId: row.transaction_id,
         bytes: Uint8Array.from(bytes),
         contentType: inferContentType(row.file_path),
+      });
+    }
+    case "labels": {
+      const rows = await db.select<
+        { id: string; name: string; scope: "transaction_category" | "account"; updated_at: string | null }[]
+      >("SELECT id, name, scope, updated_at FROM labels WHERE id = $1", [id]);
+      const row = rows[0];
+      if (!row) return null;
+      return pushLabel(creds, { id: row.id, name: row.name, scope: row.scope, updatedAt: row.updated_at ?? undefined });
+    }
+    // 3 junction table attach label -- SAMA bentuk query/push, cuma beda
+    // nama tabel/kolom FK (lihat JUNCTION di
+    // apps/worker/src/modules/labels/service.ts, pola identik di sini).
+    case "transaction_labels":
+    case "category_labels":
+    case "account_labels": {
+      const junction: Record<
+        "transaction_labels" | "category_labels" | "account_labels",
+        { column: string; scope: LabelEntityScope }
+      > = {
+        transaction_labels: { column: "transaction_id", scope: "transactions" },
+        category_labels: { column: "category_id", scope: "categories" },
+        account_labels: { column: "account_id", scope: "accounts" },
+      };
+      const { column, scope } = junction[table];
+      const rows = await db.select<
+        { id: string; entity_id: string; label_id: string; updated_at: string | null }[]
+      >(`SELECT id, ${column} as entity_id, label_id, updated_at FROM ${table} WHERE id = $1`, [id]);
+      const row = rows[0];
+      if (!row) return null;
+      return pushAttachLabel(creds, scope, row.entity_id, {
+        id: row.id,
+        labelId: row.label_id,
+        updatedAt: row.updated_at ?? undefined,
       });
     }
   }

@@ -6,10 +6,12 @@ import type { SortConfig } from "@/components/query/sort/sort.interface";
 import { buildLimitOffset } from "@/components/query/pagination/builders/sql";
 import { buildWhereConditions } from "./build-where-conditions";
 import { extractAttachmentCondition } from "./extract-attachment-condition";
+import { extractLabelCondition } from "./extract-label-condition";
 import { runTransactionsQueries } from "./run-transactions-queries";
 import { toTransactionsPageResult } from "./to-transactions-page-result";
 
 export type { TransactionListRow } from "./interface";
+export { splitEffectiveLabels } from "./interface";
 
 export const transactionsQueryKey = ["transactions"];
 
@@ -36,7 +38,22 @@ export function useTransactions(
 
       // 2. Pisahkan filter `has_attachment` (butuh EXISTS subquery) dari
       // filter kolom biasa.
-      const { remaining, extraConditions } = extractAttachmentCondition(filters);
+      const { remaining: afterAttachment, extraConditions: attachmentConditions } =
+        extractAttachmentCondition(filters);
+
+      // 2b. Sama utk filter `label` -- nilai efektifnya hasil fallback
+      // transaksi->kategori, bukan kolom asli. `startIndex` dihitung dari
+      // JUMLAH PARAM extraCondition attachment yg sudah diproses duluan
+      // di atas (attachment SELALU lebih dulu di pipeline ini, lihat
+      // urutan push extraConditions di buildWhereClause) supaya numbered
+      // placeholder tidak bentrok.
+      const labelStartIndex =
+        1 + attachmentConditions.reduce((sum, c) => sum + (c.params?.length ?? 0), 0);
+      const { remaining, extraConditions: labelConditions } = extractLabelCondition(
+        afterAttachment,
+        labelStartIndex
+      );
+      const extraConditions = [...attachmentConditions, ...labelConditions];
 
       // 3. Bangun klausa WHERE/ORDER BY/LIMIT OFFSET beserta parameternya.
       const { whereClause, params } = buildWhereConditions(

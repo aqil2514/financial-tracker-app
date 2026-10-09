@@ -34,6 +34,11 @@ export const transactionSchema = z
      * luar kasus itu. Lihat docs/concept/konsep-investasi.md bagian
      * "Settlement tertunda". */
     investment_status: z.enum(["pending", "settled"]).nullable(),
+    /** Nama label (scope 'transaction_category', BUKAN id) yang dipilih
+     * dari combobox multi-select -- resolusi ke id (termasuk create label
+     * baru) terjadi di mutationFn lewat resolveLabelIds. Boleh lebih dari
+     * satu label sekaligus (keputusan 2026-10-09), lihat label-field.tsx. */
+    label_names: z.array(z.string()),
   })
   .superRefine((values, ctx) => {
     if (values.type === "transfer") {

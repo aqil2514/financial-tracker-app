@@ -15,6 +15,7 @@ import {
 } from "@/components/forms/form-fields";
 import { useAccountGroups } from "@/features/account-groups";
 import { ACCOUNT_TYPE_OPTIONS } from "@/lib/account-types";
+import { LabelField } from "@/shared/labels/label-field";
 import type { AccountFormOutput, AccountFormValues } from "./account.schema";
 
 type AccountFormProps = {
@@ -96,6 +97,13 @@ export function AccountForm({
                 label="Nilai Pasar Terkini"
               />
             </div>
+          )}
+          {accountType === "investment" && (
+            <LabelField
+              control={form.control}
+              scope="account"
+              label="Jenis Instrumen"
+            />
           )}
         </div>
         <div className="space-y-4">

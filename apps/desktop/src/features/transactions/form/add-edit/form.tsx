@@ -23,6 +23,7 @@ import { useCreateAccount } from "@/features/accounts/form/use-create-account";
 import { CategoryForm } from "@/features/categories/form/category-form";
 import { useCreateCategory } from "@/features/categories/form/use-create-category";
 import { ContactField } from "./fields/contact-field";
+import { LabelField } from "@/shared/labels/label-field";
 import { useTransactionForm } from "./hooks/use-transaction-form";
 import type { TransactionFormOutput, TransactionFormValues } from "./schema";
 import { DebtActionField } from "./fields/debt-action-field";
@@ -201,6 +202,11 @@ export function TransactionForm({
                 debtStatus={debtStatus}
               />
             )}
+            <LabelField
+              control={form.control}
+              scope="transaction_category"
+              label="Label"
+            />
             {needsInvestmentFields && (
               <InvestmentFields
                 form={form}

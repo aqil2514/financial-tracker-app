@@ -6,6 +6,8 @@ import { useEntityForm } from "@/hooks/use-entity-form";
 import { categorySchema, type CategoryFormOutput } from "./category.schema";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
+import { resolveLabelIds } from "@/shared/labels/resolve-label-ids";
+import { applyCategoryLabels } from "@/shared/labels/apply-category-labels";
 
 type UseCreateCategoryOptions = {
   /** Prefill nama (mis. dari query combobox saat "buat baru" dipicu dari
@@ -28,6 +30,7 @@ export function useCreateCategory(options: UseCreateCategoryOptions = {}) {
       type: initialValues?.type ?? ("expense" as const),
       parent_id: null,
       is_active: "1" as const,
+      label_names: [],
     }),
     resetOnOpen: true,
     mutationFn: async (values: CategoryFormOutput) => {
@@ -44,6 +47,10 @@ export function useCreateCategory(options: UseCreateCategoryOptions = {}) {
         ]
       );
       void pushOnWrite("categories", id);
+
+      const labelIds = await resolveLabelIds(values.label_names, "transaction_category");
+      await applyCategoryLabels(id, labelIds);
+
       return id;
     },
     invalidateKey: QUERY_DEPENDENCIES.categories,

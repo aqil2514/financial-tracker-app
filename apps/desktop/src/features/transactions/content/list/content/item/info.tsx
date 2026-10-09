@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 import { typeConfig } from "../../../../shared/constants";
 import { useList } from "../../context";
-import type { TransactionListRow } from "../../use-transactions";
+import { splitEffectiveLabels, type TransactionListRow } from "../../use-transactions";
 
 export const ItemInfo = ({ tx }: { tx: TransactionListRow }) => {
   const { accountNameParts, categoryName } = useList().lookup;
@@ -32,6 +32,15 @@ export const ItemInfo = ({ tx }: { tx: TransactionListRow }) => {
           {categoryName(tx.category_id) && (
             <Badge variant="secondary">{categoryName(tx.category_id)}</Badge>
           )}
+          {/* Label EFEKTIF (hasil fallback transaksi->kategori, lihat
+            EFFECTIVE_LABELS_SUBQUERY) -- beda variant dari badge kategori
+            di atas supaya keduanya tidak ambigu, label bisa >1 sekaligus
+            (keputusan 2026-10-09), ditampilkan semua tanpa batas. */}
+          {splitEffectiveLabels(tx.effective_labels).map((name) => (
+            <Badge key={name} variant="outline">
+              {name}
+            </Badge>
+          ))}
           {(!!tx.has_attachment || tx.description) && (
             <TooltipProvider delay={200}>
               {!!tx.has_image_attachment && (

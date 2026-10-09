@@ -253,6 +253,56 @@ export function pushInvestmentSale(creds: CloudSyncCredentials, payload: PushInv
   return pushUpsert(creds, "/investments/sales/push", payload);
 }
 
+// --- Labels: dictionary + attach/detach, lihat
+// apps/worker/src/modules/labels/* dan docs/todos/plan/general-label.md.
+// BEDA dari pushUpsert generik di atas -- attach/detach butuh `entityId`
+// di PATH (bukan cuma body), jadi fungsi sendiri bukan reuse pushUpsert.
+
+export type PushLabelPayload = {
+  id: string;
+  name: string;
+  scope: "transaction_category" | "account";
+  updatedAt?: string;
+};
+
+export function pushLabel(creds: CloudSyncCredentials, payload: PushLabelPayload) {
+  return pushUpsert(creds, "/labels", payload);
+}
+
+export type LabelEntityScope = "transactions" | "categories" | "accounts";
+
+export type PushAttachLabelPayload = {
+  id: string;
+  labelId: string;
+  updatedAt?: string;
+};
+
+export function pushAttachLabel(
+  creds: CloudSyncCredentials,
+  scope: LabelEntityScope,
+  entityId: string,
+  payload: PushAttachLabelPayload
+) {
+  return pushUpsert(creds, `/labels/${scope}/${encodeURIComponent(entityId)}`, payload);
+}
+
+/** Detach TIDAK py bentuk LWW upsert (tidak ada `updatedAt` yg dikirim) --
+ * endpoint Worker DELETE /labels/:scope/:entityId/:labelId langsung
+ * soft-delete baris junction tanpa pembanding timestamp, pola sama
+ * deleteCloudRow generik tapi path-nya 3 segment (bukan 1 `:id`). */
+export async function detachLabelCloud(
+  creds: CloudSyncCredentials,
+  scope: LabelEntityScope,
+  entityId: string,
+  labelId: string
+): Promise<void> {
+  await request(
+    creds,
+    `/labels/${scope}/${encodeURIComponent(entityId)}/${encodeURIComponent(labelId)}`,
+    { method: "DELETE" }
+  );
+}
+
 // --- Attachments: upload/download binary via R2, lihat
 // apps/worker/docs/todos/plan/attachment-r2-sync.md + modules/attachments/*
 // (Worker). BEDA dari pushUpsert generik di atas -- body `multipart/

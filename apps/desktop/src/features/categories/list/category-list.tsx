@@ -182,22 +182,32 @@ export function CategoryList() {
                   value={parent.id}
                   className="not-last:border-b-0 rounded-lg border bg-muted/30 px-4"
                 >
-                  <AccordionTrigger className="py-3 text-base font-semibold hover:no-underline">
-                    <span className="flex flex-1 items-center gap-2 pr-2">
-                      <CategoryStatusDot category={parent} />
-                      {parent.name}
-                      <Badge variant={parent.type === "income" ? "default" : "secondary"}>
-                        {parent.type === "income" ? "Pemasukan" : "Pengeluaran"}
-                      </Badge>
-                      <span className="text-muted-foreground text-sm font-normal">
-                        {children.length} sub-kategori
+                  {/* Tombol Edit/Delete TIDAK BOLEH jadi children
+                    AccordionTrigger -- trigger-nya sendiri render sbg
+                    <button>, jadi <button> apa pun di dalamnya (dialog
+                    trigger) adalah <button> bersarang di <button>, HTML
+                    invalid (hydration error, bug nyata 2026-10-10). Dipisah
+                    jadi sibling "relative" + tombol "absolute" di kanan,
+                    supaya area klik expand/collapse tetap luas tapi
+                    tombolnya tidak lagi anak elemen trigger. */}
+                  <div className="relative">
+                    <AccordionTrigger className="py-3 pr-20 text-base font-semibold hover:no-underline">
+                      <span className="flex flex-1 items-center gap-2 pr-2">
+                        <CategoryStatusDot category={parent} />
+                        {parent.name}
+                        <Badge variant={parent.type === "income" ? "default" : "secondary"}>
+                          {parent.type === "income" ? "Pemasukan" : "Pengeluaran"}
+                        </Badge>
+                        <span className="text-muted-foreground text-sm font-normal">
+                          {children.length} sub-kategori
+                        </span>
                       </span>
-                    </span>
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    </AccordionTrigger>
+                    <div className="absolute top-1/2 right-6 flex -translate-y-1/2 items-center gap-1">
                       <CategoryEditDialog category={parent} />
                       <DeleteCategoryDialog category={parent} />
                     </div>
-                  </AccordionTrigger>
+                  </div>
                   <AccordionContent>
                     <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {children.map((child) => (

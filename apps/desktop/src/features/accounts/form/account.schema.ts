@@ -22,6 +22,10 @@ export const accountSchema = z
      * snapshot historis per-lot, bukan sumber hitung nilai pasar lagi). */
     unit_label: z.string().nullable(),
     current_market_value: z.coerce.number().nullable(),
+    /** Nama label (scope 'account', BUKAN id) -- cuma relevan saat
+     * `account_type === 'investment'` (jenis instrumen, mis. RDPU/Saham),
+     * lihat shared/labels/label-field.tsx. */
+    label_names: z.array(z.string()),
   })
   .superRefine((values, ctx) => {
     if (values.account_type === "investment") {
