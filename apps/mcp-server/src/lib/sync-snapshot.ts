@@ -384,15 +384,49 @@ export function computeBalanceTrend(
 
 export function listTransactions(
   snapshot: SyncSnapshot,
-  options: { limit?: number; from?: string; to?: string; type?: Transaction["type"]; accountId?: string } = {}
+  options: {
+    limit?: number;
+    from?: string;
+    to?: string;
+    type?: Transaction["type"];
+    accountId?: string;
+    // Hanya berlaku kalau accountId diisi -- tanpa ini accountId cocok di
+    // KEDUA sisi (sumber ATAU tujuan), sama seperti sebelumnya (backward
+    // compatible). "from" -> accountId WAJIB jadi akun sumber (bukan
+    // tujuan transfer), "to" -> WAJIB jadi akun tujuan.
+    transferDirection?: "from" | "to";
+    categoryId?: string;
+    contactId?: string;
+    // Substring, case-insensitive, dicek di note DAN description --
+    // pengguna biasanya tidak tahu suatu kata disimpan di field mana.
+    query?: string;
+    minAmount?: number;
+    maxAmount?: number;
+  } = {}
 ): Transaction[] {
   const limit = options.limit ?? 20;
+  const queryLower = options.query?.toLowerCase();
   return snapshot.transactions
     .filter((t) => isAlive(t))
     .filter((t) => !options.from || datePart(t.date) >= options.from)
     .filter((t) => !options.to || datePart(t.date) <= options.to)
     .filter((t) => !options.type || t.type === options.type)
-    .filter((t) => !options.accountId || t.accountId === options.accountId || t.transferAccountId === options.accountId)
+    .filter((t) => {
+      if (!options.accountId) return true;
+      if (options.transferDirection === "from") return t.accountId === options.accountId;
+      if (options.transferDirection === "to") return t.transferAccountId === options.accountId;
+      return t.accountId === options.accountId || t.transferAccountId === options.accountId;
+    })
+    .filter((t) => !options.categoryId || t.categoryId === options.categoryId)
+    .filter((t) => !options.contactId || t.contactId === options.contactId)
+    .filter(
+      (t) =>
+        !queryLower ||
+        t.note.toLowerCase().includes(queryLower) ||
+        (t.description?.toLowerCase().includes(queryLower) ?? false)
+    )
+    .filter((t) => options.minAmount == null || t.amount >= options.minAmount)
+    .filter((t) => options.maxAmount == null || t.amount <= options.maxAmount)
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, limit);
 }
