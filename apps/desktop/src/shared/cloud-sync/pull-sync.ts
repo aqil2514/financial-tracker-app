@@ -216,6 +216,90 @@ async function upsertDebtPayment(db: Database, row: SyncResponse["debtPayments"]
   );
 }
 
+// `investment_accounts` ber-PK `account_id` (BUKAN `id`) -- tidak bisa
+// lewat `applyRow` yang mengasumsikan kolom `id`, jadi LWW + hard-delete
+// lokalnya ditangani `applyInvestmentAccountRow` di bawah.
+async function upsertInvestmentAccount(db: Database, row: SyncResponse["investmentAccounts"][number]) {
+  await db.execute(
+    `INSERT INTO investment_accounts (account_id, unit_label, current_market_value, updated_at, deleted_at, sync_source)
+     VALUES ($1, $2, $3, $4, NULL, 'mcp')
+     ON CONFLICT(account_id) DO UPDATE SET unit_label = excluded.unit_label,
+       current_market_value = excluded.current_market_value,
+       updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
+    [row.accountId, row.unitLabel, row.currentMarketValue, row.updatedAt]
+  );
+}
+
+/** Versi `applyRow` utk `investment_accounts` -- beda nama kolom PK saja. */
+async function applyInvestmentAccountRow(
+  db: Database,
+  row: SyncResponse["investmentAccounts"][number]
+): Promise<void> {
+  const rows = await db.select<{ updated_at: string | null }[]>(
+    "SELECT updated_at FROM investment_accounts WHERE account_id = $1",
+    [row.accountId]
+  );
+  if (!wins(row.updatedAt, rows[0]?.updated_at ?? null)) return;
+
+  if (row.deletedAt !== null) {
+    await db.execute("DELETE FROM investment_accounts WHERE account_id = $1", [row.accountId]);
+    return;
+  }
+
+  await upsertInvestmentAccount(db, row);
+}
+
+async function upsertInvestmentPurchase(db: Database, row: SyncResponse["investmentPurchases"][number]) {
+  await db.execute(
+    `INSERT INTO investment_purchases (id, account_id, transaction_id, unit, price_per_unit, date, status, updated_at, deleted_at, sync_source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL, 'mcp')
+     ON CONFLICT(id) DO UPDATE SET account_id = excluded.account_id, transaction_id = excluded.transaction_id,
+       unit = excluded.unit, price_per_unit = excluded.price_per_unit, date = excluded.date,
+       status = excluded.status, updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
+    [
+      row.id,
+      row.accountId,
+      row.transactionId,
+      row.unit,
+      row.pricePerUnit,
+      row.date,
+      row.status,
+      row.updatedAt,
+    ]
+  );
+}
+
+// `average_cost_per_unit`/`realized_pl` disalin APA ADANYA dari D1 (sama
+// pola debts/debt_payments -- desktop percaya nilai dari Worker, tidak
+// hitung ulang). Logic jual sendiri (average cost, Realized P/L) BELUM
+// diport ke Worker (lihat investments/service.ts), jadi baris jual di D1
+// saat ini selalu lahir dari push desktop -- nilai turunannya sudah benar
+// sejak awal, pull cuma mengembalikannya.
+async function upsertInvestmentSale(db: Database, row: SyncResponse["investmentSales"][number]) {
+  await db.execute(
+    `INSERT INTO investment_sales (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit, average_cost_per_unit, realized_pl, date, status, updated_at, deleted_at, sync_source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULL, 'mcp')
+     ON CONFLICT(id) DO UPDATE SET account_id = excluded.account_id, transaction_id = excluded.transaction_id,
+       adjustment_transaction_id = excluded.adjustment_transaction_id, unit = excluded.unit,
+       price_per_unit = excluded.price_per_unit, average_cost_per_unit = excluded.average_cost_per_unit,
+       realized_pl = excluded.realized_pl, date = excluded.date, status = excluded.status,
+       updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
+    [
+      row.id,
+      row.accountId,
+      row.transactionId,
+      row.adjustmentTransactionId,
+      row.unit,
+      row.pricePerUnit,
+      row.averageCostPerUnit,
+      row.realizedPl,
+      row.date,
+      row.status,
+      row.updatedAt,
+    ]
+  );
+}
+
 async function upsertLabel(db: Database, row: SyncResponse["labels"][number]) {
   await db.execute(
     `INSERT INTO labels (id, name, scope, updated_at, deleted_at, sync_source)
@@ -296,6 +380,17 @@ export async function applySyncResponse(response: SyncResponse): Promise<void> {
   for (const row of response.transactions) await applyRow(db, "transactions", row, upsertTransaction);
   for (const row of response.debts) await applyRow(db, "debts", row, upsertDebt);
   for (const row of response.debtPayments) await applyRow(db, "debt_payments", row, upsertDebtPayment);
+
+  // Ketiga tabel investment SETELAH accounts + transactions di atas --
+  // FK account_id/transaction_id menunjuk ke sana. investment_accounts
+  // pakai helper sendiri (PK `account_id`, bukan `id`).
+  for (const row of response.investmentAccounts) await applyInvestmentAccountRow(db, row);
+  for (const row of response.investmentPurchases) {
+    await applyRow(db, "investment_purchases", row, upsertInvestmentPurchase);
+  }
+  for (const row of response.investmentSales) {
+    await applyRow(db, "investment_sales", row, upsertInvestmentSale);
+  }
 
   // `labels` (dictionary) WAJIB sebelum ketiga junction-nya -- FK
   // label_id. Junction sendiri setelah transactions/categories/accounts

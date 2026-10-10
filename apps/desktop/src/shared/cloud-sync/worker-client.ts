@@ -464,6 +464,38 @@ export type SyncResponse = {
       sourceRef: string | null;
     }
   >;
+  // `investment_accounts` ber-PK `account_id`, bukan `id` -- jadi BUKAN
+  // SyncRow (yang mewajibkan `id`).
+  investmentAccounts: Array<{
+    accountId: string;
+    unitLabel: string;
+    currentMarketValue: number;
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
+  investmentPurchases: Array<
+    SyncRow & {
+      accountId: string;
+      transactionId: string | null;
+      unit: number | null;
+      pricePerUnit: number | null;
+      date: string;
+      status: "pending" | "settled";
+    }
+  >;
+  investmentSales: Array<
+    SyncRow & {
+      accountId: string;
+      transactionId: string | null;
+      adjustmentTransactionId: string | null;
+      unit: number;
+      pricePerUnit: number;
+      averageCostPerUnit: number | null;
+      realizedPl: number | null;
+      date: string;
+      status: "pending" | "settled";
+    }
+  >;
   labels: Array<SyncRow & { name: string; scope: LabelScope }>;
   transactionLabels: Array<SyncRow & { transactionId: string; labelId: string }>;
   categoryLabels: Array<SyncRow & { categoryId: string; labelId: string }>;

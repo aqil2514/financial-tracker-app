@@ -19,4 +19,9 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/;
 export const dateField = z
   .string()
   .regex(DATE_PATTERN, "Format tanggal harus YYYY-MM-DD atau YYYY-MM-DDTHH:mm, misal 2026-10-05T14:30")
-  .describe("Format YYYY-MM-DD, atau YYYY-MM-DDTHH:mm kalau jam transaksinya diketahui/relevan");
+  .describe(
+    "Format YYYY-MM-DD, atau YYYY-MM-DDTHH:mm kalau jam transaksinya diketahui/relevan. " +
+      "Jam HARUS WIB (UTC+7) -- field ini ditulis APA ADANYA (tanpa konversi timezone apa pun) " +
+      "ke kolom `date` di D1, sama seperti desktop (toISOString() dari local time, lihat " +
+      "use-create-transaction.ts). Jangan isi dari jam UTC/server mentah."
+  );
