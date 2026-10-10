@@ -116,6 +116,34 @@ export type SyncResponse = {
     updatedAt: string | null;
     deletedAt: string | null;
   }>;
+  labels: Array<{
+    id: string;
+    name: string;
+    scope: "transaction_category" | "account";
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
+  transactionLabels: Array<{
+    id: string;
+    transactionId: string;
+    labelId: string;
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
+  categoryLabels: Array<{
+    id: string;
+    categoryId: string;
+    labelId: string;
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
+  accountLabels: Array<{
+    id: string;
+    accountId: string;
+    labelId: string;
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
 };
 
 // `since` null -> first sync, full snapshot SEMUA baris (termasuk yg
@@ -145,6 +173,10 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     investmentAccounts,
     investmentPurchases,
     investmentSales,
+    labels,
+    transactionLabels,
+    categoryLabels,
+    accountLabels,
   ] = await Promise.all([
     env.DB.prepare(`SELECT id, name, updated_at, deleted_at FROM account_groups ${filter}`)
       .bind(...bind)
@@ -291,6 +323,48 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
         updated_at: string | null;
         deleted_at: string | null;
       }>(),
+    env.DB.prepare(`SELECT id, name, scope, updated_at, deleted_at FROM labels ${filter}`)
+      .bind(...bind)
+      .all<{
+        id: string;
+        name: string;
+        scope: "transaction_category" | "account";
+        updated_at: string | null;
+        deleted_at: string | null;
+      }>(),
+    env.DB.prepare(
+      `SELECT id, transaction_id, label_id, updated_at, deleted_at FROM transaction_labels ${filter}`
+    )
+      .bind(...bind)
+      .all<{
+        id: string;
+        transaction_id: string;
+        label_id: string;
+        updated_at: string | null;
+        deleted_at: string | null;
+      }>(),
+    env.DB.prepare(
+      `SELECT id, category_id, label_id, updated_at, deleted_at FROM category_labels ${filter}`
+    )
+      .bind(...bind)
+      .all<{
+        id: string;
+        category_id: string;
+        label_id: string;
+        updated_at: string | null;
+        deleted_at: string | null;
+      }>(),
+    env.DB.prepare(
+      `SELECT id, account_id, label_id, updated_at, deleted_at FROM account_labels ${filter}`
+    )
+      .bind(...bind)
+      .all<{
+        id: string;
+        account_id: string;
+        label_id: string;
+        updated_at: string | null;
+        deleted_at: string | null;
+      }>(),
   ]);
 
   return {
@@ -404,6 +478,34 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
       realizedPl: r.realized_pl,
       date: r.date,
       status: r.status,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+    })),
+    labels: labels.results.map((r) => ({
+      id: r.id,
+      name: r.name,
+      scope: r.scope,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+    })),
+    transactionLabels: transactionLabels.results.map((r) => ({
+      id: r.id,
+      transactionId: r.transaction_id,
+      labelId: r.label_id,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+    })),
+    categoryLabels: categoryLabels.results.map((r) => ({
+      id: r.id,
+      categoryId: r.category_id,
+      labelId: r.label_id,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+    })),
+    accountLabels: accountLabels.results.map((r) => ({
+      id: r.id,
+      accountId: r.account_id,
+      labelId: r.label_id,
       updatedAt: r.updated_at,
       deletedAt: r.deleted_at,
     })),

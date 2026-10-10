@@ -216,6 +216,73 @@ async function upsertDebtPayment(db: Database, row: SyncResponse["debtPayments"]
   );
 }
 
+async function upsertLabel(db: Database, row: SyncResponse["labels"][number]) {
+  await db.execute(
+    `INSERT INTO labels (id, name, scope, updated_at, deleted_at, sync_source)
+     VALUES ($1, $2, $3, $4, NULL, 'mcp')
+     ON CONFLICT(id) DO UPDATE SET name = excluded.name, scope = excluded.scope,
+       updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
+    [row.id, row.name, row.scope, row.updatedAt]
+  );
+}
+
+/** Upsert 1 baris junction label. Dipakai bertiga (transaction_labels/
+ * category_labels/account_labels) -- bentuknya identik, cuma beda nama
+ * tabel + nama kolom entity.
+ *
+ * `ON CONFLICT(entity_id, label_id)`, BUKAN `ON CONFLICT(id)`: baris
+ * junction diidentifikasi oleh PASANGANnya (itu yang UNIQUE), `id` cuma
+ * ikut serta. Device lain bisa saja sudah py pasangan yang sama dgn `id`
+ * berbeda (mis. baris lokal dibuat offline, lalu baris D1 utk pasangan
+ * yang sama datang dari MCP) -- `ON CONFLICT(id)` tidak akan melihat
+ * bentrokan itu dan INSERT-nya pecah UNIQUE constraint 2067, persis bug
+ * yang diperbaiki 2026-10-10 di apply-*-labels.ts. `id` SENGAJA tidak
+ * ikut di-update saat konflik: biarkan `id` lokal yang menang supaya
+ * baris yang sudah terlanjur dirujuk antrian push lokal tidak berubah
+ * identitas di tengah jalan. */
+async function upsertLabelJunction(
+  db: Database,
+  table: "transaction_labels" | "category_labels" | "account_labels",
+  entityColumn: "transaction_id" | "category_id" | "account_id",
+  row: { id: string; entityId: string; labelId: string; updatedAt: string | null }
+) {
+  await db.execute(
+    `INSERT INTO ${table} (id, ${entityColumn}, label_id, updated_at, deleted_at, sync_source)
+     VALUES ($1, $2, $3, $4, NULL, 'mcp')
+     ON CONFLICT(${entityColumn}, label_id) DO UPDATE SET
+       updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
+    [row.id, row.entityId, row.labelId, row.updatedAt]
+  );
+}
+
+/** Varian `applyRow` utk junction label -- LWW-nya dicari lewat PASANGAN
+ * (entity, label), bukan lewat `id`, dgn alasan yang sama spt
+ * `upsertLabelJunction` di atas. Hard-delete saat `deletedAt` terisi
+ * juga menyasar pasangan, bukan `id`, supaya detach dari device lain
+ * tetap kena walau `id` lokalnya kebetulan beda. */
+async function applyLabelJunctionRow(
+  db: Database,
+  table: "transaction_labels" | "category_labels" | "account_labels",
+  entityColumn: "transaction_id" | "category_id" | "account_id",
+  row: { id: string; entityId: string; labelId: string; updatedAt: string | null; deletedAt: string | null }
+): Promise<void> {
+  const rows = await db.select<{ updated_at: string | null }[]>(
+    `SELECT updated_at FROM ${table} WHERE ${entityColumn} = $1 AND label_id = $2`,
+    [row.entityId, row.labelId]
+  );
+  if (!wins(row.updatedAt, rows[0]?.updated_at ?? null)) return;
+
+  if (row.deletedAt !== null) {
+    await db.execute(`DELETE FROM ${table} WHERE ${entityColumn} = $1 AND label_id = $2`, [
+      row.entityId,
+      row.labelId,
+    ]);
+    return;
+  }
+
+  await upsertLabelJunction(db, table, entityColumn, row);
+}
+
 /** Terapkan SEMUA baris dari satu `SyncResponse` ke SQLite lokal, urut
  * sesuai dependency FK. Caller bertanggung jawab update checkpoint
  * (`useSetCloudSyncCheckpoint`) SETELAH ini resolve sukses. */
@@ -229,4 +296,27 @@ export async function applySyncResponse(response: SyncResponse): Promise<void> {
   for (const row of response.transactions) await applyRow(db, "transactions", row, upsertTransaction);
   for (const row of response.debts) await applyRow(db, "debts", row, upsertDebt);
   for (const row of response.debtPayments) await applyRow(db, "debt_payments", row, upsertDebtPayment);
+
+  // `labels` (dictionary) WAJIB sebelum ketiga junction-nya -- FK
+  // label_id. Junction sendiri setelah transactions/categories/accounts
+  // di atas, yang juga direferensikan FK-nya.
+  for (const row of response.labels) await applyRow(db, "labels", row, upsertLabel);
+  for (const row of response.transactionLabels) {
+    await applyLabelJunctionRow(db, "transaction_labels", "transaction_id", {
+      ...row,
+      entityId: row.transactionId,
+    });
+  }
+  for (const row of response.categoryLabels) {
+    await applyLabelJunctionRow(db, "category_labels", "category_id", {
+      ...row,
+      entityId: row.categoryId,
+    });
+  }
+  for (const row of response.accountLabels) {
+    await applyLabelJunctionRow(db, "account_labels", "account_id", {
+      ...row,
+      entityId: row.accountId,
+    });
+  }
 }

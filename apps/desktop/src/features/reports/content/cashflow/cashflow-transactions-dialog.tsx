@@ -26,6 +26,11 @@ const CHART_COLOR: Record<"income" | "expense", string> = {
   expense: "#dc2626",
 };
 
+// `childId` null sudah dipakai sbg "tidak ada anak terpilih" (tampilkan
+// semua), jadi bucket "Tanpa Kategori" di dimensi label butuh sentinel
+// sendiri -- tidak bisa diwakili null.
+const UNCATEGORIZED_CHILD_ID = "__uncategorized__";
+
 export function CashflowTransactionsDialog({
   target,
   from,
@@ -71,6 +76,29 @@ export function CashflowTransactionsDialog({
         .sort((a, b) => b.total - a.total);
     }
 
+    // Dimensi `label` tidak punya "anak" struktural spt grup akun ->
+    // akun atau kategori induk -> kategori anak. Dipakai KATEGORI sbg
+    // pecahannya krn label transaksi umumnya diwarisi dari kategori
+    // (lihat fallback di primary-label-subquery.ts), jadi ini sekaligus
+    // memperlihatkan dari mana label itu datang. Kategori diambil dari
+    // transaksi yang benar-benar masuk grup ini (bukan filter
+    // `parent_id`) -- satu label bisa memuat kategori lintas induk.
+    if (target.groupBy === "label") {
+      const totalByCategoryId = new Map<string | null, number>();
+      for (const tx of allTransactions) {
+        const key = tx.category_id ?? null;
+        totalByCategoryId.set(key, (totalByCategoryId.get(key) ?? 0) + tx.amount);
+      }
+      return Array.from(totalByCategoryId.entries())
+        .map(([categoryId, total]) => ({
+          value: categoryId ?? UNCATEGORIZED_CHILD_ID,
+          label: (categories ?? []).find((c) => c.id === categoryId)?.name ?? "Tanpa Kategori",
+          total,
+        }))
+        .filter((row) => row.total > 0)
+        .sort((a, b) => b.total - a.total);
+    }
+
     const childCategories = (categories ?? []).filter((c) => c.parent_id === target.groupKey);
     return childCategories
       .map((c) => ({
@@ -88,6 +116,9 @@ export function CashflowTransactionsDialog({
     if (!allTransactions || !childId) return allTransactions;
     if (target?.groupBy === "account_group") {
       return allTransactions.filter((t) => t.account_id === childId);
+    }
+    if (target?.groupBy === "label" && childId === UNCATEGORIZED_CHILD_ID) {
+      return allTransactions.filter((t) => t.category_id == null);
     }
     return allTransactions.filter((t) => t.category_id === childId);
   }, [allTransactions, childId, target]);

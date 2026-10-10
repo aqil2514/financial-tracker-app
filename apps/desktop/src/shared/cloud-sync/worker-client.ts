@@ -258,10 +258,14 @@ export function pushInvestmentSale(creds: CloudSyncCredentials, payload: PushInv
 // BEDA dari pushUpsert generik di atas -- attach/detach butuh `entityId`
 // di PATH (bukan cuma body), jadi fungsi sendiri bukan reuse pushUpsert.
 
+/** Scope label itu sendiri (kolom `labels.scope`) -- BEDA dari
+ * `LabelEntityScope` di bawah yang nama segmen PATH endpoint attach. */
+export type LabelScope = "transaction_category" | "account";
+
 export type PushLabelPayload = {
   id: string;
   name: string;
-  scope: "transaction_category" | "account";
+  scope: LabelScope;
   updatedAt?: string;
 };
 
@@ -460,6 +464,10 @@ export type SyncResponse = {
       sourceRef: string | null;
     }
   >;
+  labels: Array<SyncRow & { name: string; scope: LabelScope }>;
+  transactionLabels: Array<SyncRow & { transactionId: string; labelId: string }>;
+  categoryLabels: Array<SyncRow & { categoryId: string; labelId: string }>;
+  accountLabels: Array<SyncRow & { accountId: string; labelId: string }>;
 };
 
 /** `since` null/undefined -> first sync, Worker balas full snapshot.
