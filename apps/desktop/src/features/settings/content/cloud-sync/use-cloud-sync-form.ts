@@ -62,10 +62,8 @@ export function useCloudSyncForm() {
   }
 
   /** "Sync Semua Data Sekarang" -- push SEMUA data lokal existing ke
-   * Worker sekali jalan (lihat backfill-sync.ts utk alasan ini perlu
-   * ada: push-on-write cuma mengirim data BARU, transaksi lama yang
-   * merujuk akun lama akan ditolak Worker dgn FK error kalau akunnya
-   * belum pernah ter-push). Dipicu manual, BUKAN otomatis saat toggle
+   * Worker sekali jalan (lihat shared/cloud-sync/backfill-sync/README.md
+   * utk alasan ini perlu ada). Dipicu manual, BUKAN otomatis saat toggle
    * ON -- keputusan 2026-10-01, supaya user sadar kapan proses (bisa
    * lama utk data banyak) ini berjalan. */
   async function handleBackfill() {

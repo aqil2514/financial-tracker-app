@@ -45,7 +45,8 @@ export async function saveAttachmentToTransaction(
     [id, transactionId, filePath]
   );
   // Non-blocking -- gagal/offline masuk antrian retry, TIDAK menunda
-  // atau menggagalkan penyimpanan lampiran lokal (lihat push-on-write.ts).
+  // atau menggagalkan penyimpanan lampiran lokal (lihat
+  // shared/cloud-sync/push-on-write/README.md).
   void pushOnWrite("transaction_attachments", id);
 }
 

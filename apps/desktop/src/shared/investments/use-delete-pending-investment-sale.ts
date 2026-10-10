@@ -18,7 +18,7 @@ export function useDeletePendingInvestmentSale() {
   return useDbMutation({
     mutationFn: async (saleId: string) => {
       // Push SEBELUM hard-delete lokal -- pola sama tabel lain (lihat
-      // push-on-write.ts).
+      // shared/cloud-sync/push-on-write/README.md).
       await pushDeleteOnWrite("investment_sales", saleId, {});
 
       const db = await getDb();
