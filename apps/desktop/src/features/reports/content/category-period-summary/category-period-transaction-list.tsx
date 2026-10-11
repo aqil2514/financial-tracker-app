@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { QueryState } from "@/components/query-state";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { useAccounts, useCategories } from "@/hooks/resources";
 import { formatDate } from "@/lib/format-date";
 import { CategoryPeriodTransactionRow } from "./category-period-transaction-row";
@@ -40,10 +41,11 @@ export function CategoryPeriodTransactionList({ periodId }: { periodId: string }
 
       {transactionsByDay.length > 0 && (
         <ScrollArea className="h-96">
-          <div className="space-y-4 pr-4">
-            {transactionsByDay.map((group) => (
+          <div className="space-y-5 pr-4">
+            {transactionsByDay.map((group, index) => (
               <div key={group.date}>
-                <p className="text-muted-foreground sticky top-0 bg-popover py-1 text-xs font-medium">
+                {index > 0 && <Separator className="mb-5" />}
+                <p className="sticky top-0 bg-popover py-1 text-sm font-semibold">
                   {group.displayDate}
                 </p>
                 <div className="divide-y">
