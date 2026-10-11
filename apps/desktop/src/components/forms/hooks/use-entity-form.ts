@@ -16,16 +16,8 @@ type UseEntityFormOptions<
   invalidateKey: QueryKey | QueryKey[];
   successMessage: string;
   errorMessage: string;
-  /** Dialog terbuka atau tidak — datang dari LUAR (context), bukan
-   * dikelola sendiri oleh hook ini. Dipakai untuk `resetOnOpen` saja. */
   open: boolean;
-  /** Re-derive defaultValues (e.g. dari data entity terbaru) tiap kali
-   * `open` berubah jadi true. */
   resetOnOpen?: boolean;
-  /** Dipanggil setelah mutation sukses, SEBELUM form direset — `keepOpen`
-   * true kalau ini submit lewat `onSubmitAndContinue` ("Simpan & Lanjut"),
-   * supaya pemanggil tahu kapan boleh menutup dialog (context) dan kapan
-   * harus tetap membiarkannya terbuka untuk entry berikutnya. */
   onSuccess?: (result: TResult, info: { keepOpen: boolean }) => void | Promise<void>;
 };
 

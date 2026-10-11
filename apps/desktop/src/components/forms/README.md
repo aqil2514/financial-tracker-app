@@ -1,0 +1,27 @@
+# components/forms
+
+Lapisan form generic yang dipakai lintas fitur (`react-hook-form` + Zod) — tidak tahu domain apa pun, cuma skema/output generic yang diteruskan tiap fitur. Form spesifik fitur (`TransactionForm`, `CategoryForm`, dst) menyusun `form-fields/*` ini sebagai children, bukan menulis ulang `<Controller>` manual.
+
+## Inti: `EntityForm` + `useEntityForm`
+
+- **`entity-form.tsx`** (`EntityForm`) — pembungkus `<form>`+submit button generic, menyatukan pola yang sebelumnya diulang manual di tiap `*-form.tsx` (`ContactForm`, `AccountForm`, `AccountGroupForm`, dst): `<form onSubmit={form.handleSubmit(onSubmit)}>` + `DialogFooter` + tombol submit berlabel "Menyimpan...". Field spesifik fitur tetap ditulis manual sebagai `children` — field-field itu terima `form` sebagai prop (pola `form-fields/` di bawah), atau untuk sub-komponen yang bersarang dalam, ambil lewat `useFormContext()` (disediakan `FormProvider` di `EntityForm`) supaya tidak perlu meneruskan `form`/`control` manual di tiap level. `extraActions` untuk tombol tambahan di footer sebelum tombol submit (mis. "Lanjut" pada `TransactionForm`).
+- **`hooks/use-entity-form.ts`** (`useEntityForm`) — bungkus `useForm` (react-hook-form) + `useDbMutation` jadi satu hook: resolver Zod, reset form setelah submit sukses, dan `onSubmitAndContinue` ("Simpan & Lanjut") yang me-reset ke `defaultValues()` lagi (bukan form kosong) supaya entry berikutnya bisa langsung diisi. `open` (status dialog, datang dari context LUAR, bukan dikelola hook ini) + `resetOnOpen` dipakai untuk re-derive `defaultValues()` tiap kali dialog baru dibuka (mis. data entity terbaru saat form edit). `onSuccess` dipanggil SEBELUM form direset, dengan `{ keepOpen }` supaya pemanggil tahu kapan dialog boleh ditutup vs harus tetap terbuka untuk entry berikutnya.
+- **`entity-form-dialog.tsx`** (`EntityFormDialog`) — pembungkus `Dialog` generic. `trigger` opsional — kosongkan kalau dialog dipicu dari luar (mis. item menu aksi) lewat `open`/`onOpenChange` saja, tanpa trigger visible sendiri. `scrollBody` membungkus `children` dalam `ScrollArea` terpisah dari header, supaya judul tidak ikut ter-scroll dan dialog tidak resize mengikuti tinggi konten saat bagian dalamnya expand/collapse (mis. baris yang bisa dibuka-tutup) — selalu dipasangkan dengan `contentClassName` yang punya `max-h-*`.
+
+## `form-fields/` — satu komponen per tipe input
+
+Semua mengikuti pola yang sama: terima `form` (`UseFormReturn`) + `name` (`FieldPath`) + `label`, dibungkus `<Controller>`, render error dari `fieldState.error.message`.
+
+- **`form-field-text.tsx`**, **`form-field-textarea.tsx`**, **`form-field-number.tsx`**, **`form-field-date.tsx`** — input dasar HTML (`text`/`email`/`password`, textarea, number, `date`/`datetime-local`). `FormFieldDate` punya `withTime` (default `true`) untuk pilih antara `datetime-local` vs `date` murni.
+- **`form-field-select.tsx`** — dropdown dari daftar opsi tetap (`FormFieldSelectOption[]`). `allowClear` menampilkan item "Tanpa ..." yang mengosongkan field jadi `null`. Opsi yang sedang terpilih boleh punya `description` yang muncul di bawah select.
+- **`form-field-combobox.tsx`** — dropdown dengan search (`@/components/ui/combobox`). `onCreateNew` menampilkan baris "Buat baru: ..." saat ketikan tidak cocok persis opsi manapun, dipanggil dengan teks yang diketik user — dipakai untuk entitas yang butuh form lengkap (akun/kategori punya atribut wajib seperti tipe) sehingga TIDAK bisa di-create on-the-fly cuma dari nama seperti kontak; caller (`AccountComboboxField`/`CategoryComboboxField`) yang membuka dialog create-nya sendiri. `renderOption` kustomisasi isi tiap baris opsi di dropdown (mis. sisipkan icon) — nilai TERPILIH di kotak input tetap teks polos karena `ComboboxInput` adalah text input native, tidak mendukung custom render.
+- **`form-field-rich-text.tsx`** — wrapper `RichTextEditor` (Tiptap, `JSONContent`).
+- **`form-field-toggle-group.tsx`** — grup tombol single-select (`ToggleGroup`), untuk pilihan sedikit yang semuanya ingin selalu terlihat (beda dari select yang menyembunyikan opsi di dropdown).
+- **`form-field-currency.tsx`** — input nominal Rupiah (`react-currency-input-field`, format titik/koma ID). `useCalculator` mengganti plain input dengan popover kalkulator numpad (`numpad-calculator.tsx`) — dipakai saat user lebih sering butuh menjumlahkan beberapa angka sebelum submit (mis. nominal transaksi) daripada mengetik satu angka final.
+- **`form-field-icon-picker.tsx`** — grid pilihan icon dari whitelist `lib/account-icons.ts`, di dalam popover dipicu tombol yang menampilkan icon terpilih saat ini. Bukan dropdown/select biasa karena tiap opsi perlu tampil sebagai ikon visual, bukan teks.
+- **`form-field-color-picker.tsx`** — grid swatch dari palet warna TERBATAS (`lib/account-colors.ts`), BUKAN color picker hex bebas, supaya hasil warna akun tetap konsisten dengan desain sistem aplikasi. Sengaja dipisah dari icon picker: warna dipilih independen dari bentuk icon.
+- **`numpad-calculator.tsx`** — popover kalkulator ekspresi (`+ - * /`) yang dipakai `form-field-currency.tsx`, bukan form field tersendiri (tidak dipasang langsung lewat `Controller`).
+
+## Konvensi
+
+Satu file per komponen, tanpa komentar inline — narasi desain/alasan pola ada di README ini, bukan di kode. Baca README ini sebelum mengubah `form-fields/` atau `EntityForm`/`useEntityForm`, supaya perubahan baru tetap konsisten dengan alasan di balik pola yang sudah ada.

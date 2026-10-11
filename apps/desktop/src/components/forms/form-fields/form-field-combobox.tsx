@@ -30,21 +30,9 @@ type FormFieldComboboxProps<TFieldValues extends FieldValues> = {
   label: string;
   placeholder?: string;
   options: FormFieldComboboxOption[];
-  /** Show a clear button that resets the field back to null. */
   allowClear?: boolean;
   disabled?: boolean;
-  /** Custom isi tiap baris opsi di dropdown (mis. sisipkan icon di
-   * depan label) — nilai TERPILIH di kotak input tetap teks polos
-   * (`ComboboxInput` adalah text input native, tidak mendukung custom
-   * render). Default: `item.label` seperti biasa. */
   renderOption?: (item: FormFieldComboboxOption) => ReactNode;
-  /** Kalau diisi, tampilkan opsi "Buat baru: ..." di baris paling bawah
-   * saat ketikan tidak cocok persis dengan opsi manapun — dipanggil
-   * dengan teks yang sedang diketik user. Dipakai utk entitas yang
-   * butuh form lengkap (akun/kategori punya atribut wajib seperti tipe)
-   * sehingga TIDAK bisa di-create on-the-fly cuma dari nama seperti
-   * kontak — caller yang membuka dialog create-nya sendiri (lihat
-   * `AccountComboboxField`/`CategoryComboboxField`). */
   onCreateNew?: (query: string) => void;
 };
 

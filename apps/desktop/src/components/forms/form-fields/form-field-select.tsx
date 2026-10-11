@@ -17,7 +17,6 @@ import {
 type FormFieldSelectOption = {
   value: string;
   label: string;
-  /** Shown below the select when this option is the current value. */
   description?: string;
 };
 
@@ -27,7 +26,6 @@ type FormFieldSelectProps<TFieldValues extends FieldValues> = {
   label: string;
   placeholder?: string;
   options: FormFieldSelectOption[];
-  /** Show a "Tanpa ..." item that clears the field back to null. */
   allowClear?: boolean;
   clearLabel?: string;
   disabled?: boolean;

@@ -16,10 +16,6 @@ type FormFieldIconPickerProps<TFieldValues extends FieldValues> = {
   label: string;
 };
 
-/** Grid pilihan icon dari whitelist lucide-react (lib/account-icons.ts)
- * di dalam popover — dipicu dari tombol yang menampilkan icon terpilih
- * saat ini. Bukan dropdown/select biasa karena tiap opsi perlu tampil
- * sebagai ikon visual, bukan teks. */
 export function FormFieldIconPicker<TFieldValues extends FieldValues>({
   form,
   name,

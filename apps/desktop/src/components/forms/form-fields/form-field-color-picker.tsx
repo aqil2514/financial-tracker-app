@@ -21,10 +21,6 @@ type FormFieldColorPickerProps<TFieldValues extends FieldValues> = {
   label: string;
 };
 
-/** Grid swatch dari palet warna TERBATAS (lib/account-colors.ts) di
- * dalam popover — BUKAN color picker hex bebas, supaya hasilnya tetap
- * konsisten dengan desain sistem aplikasi. Dipisah dari icon picker:
- * warna dipilih independen dari bentuk icon. */
 export function FormFieldColorPicker<TFieldValues extends FieldValues>({
   form,
   name,

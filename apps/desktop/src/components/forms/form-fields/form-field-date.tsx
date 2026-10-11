@@ -12,7 +12,6 @@ type FormFieldDateProps<TFieldValues extends FieldValues> = {
   form: UseFormReturn<TFieldValues>;
   name: FieldPath<TFieldValues>;
   label: string;
-  /** Include hour/minute in the picker. Defaults to true. */
   withTime?: boolean;
 };
 

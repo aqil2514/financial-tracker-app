@@ -23,7 +23,6 @@ type FormFieldCurrencyProps<TFieldValues extends FieldValues> = {
   name: FieldPath<TFieldValues>;
   label: string;
   placeholder?: string;
-  /** Use the numpad-with-expression popover instead of a plain input. */
   useCalculator?: boolean;
   disabled?: boolean;
 };
