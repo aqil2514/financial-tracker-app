@@ -36,10 +36,15 @@ export type Category = {
 
 export type CategoryPeriod = {
   id: string;
-  category_id: string;
   name: string;
   start_date: string;
   end_date: string;
+};
+
+export type CategoryPeriodCategory = {
+  id: string;
+  period_id: string;
+  category_id: string;
 };
 
 export type AccountGroup = {

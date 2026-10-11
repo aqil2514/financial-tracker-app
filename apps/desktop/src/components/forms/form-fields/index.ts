@@ -3,6 +3,7 @@ export { FormFieldNumber } from "./form-field-number";
 export { FormFieldCurrency } from "./form-field-currency";
 export { FormFieldSelect } from "./form-field-select";
 export { FormFieldCombobox } from "./form-field-combobox";
+export { FormFieldComboboxMulti } from "./form-field-combobox-multi";
 export { FormFieldTextarea } from "./form-field-textarea";
 export { FormFieldRichText } from "./form-field-rich-text";
 export { FormFieldDate } from "./form-field-date";

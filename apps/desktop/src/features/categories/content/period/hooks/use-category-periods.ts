@@ -10,7 +10,12 @@ export function useCategoryPeriods(categoryId: string | undefined) {
     queryFn: async (): Promise<CategoryPeriod[]> => {
       const db = await getDb();
       return db.select<CategoryPeriod[]>(
-        "SELECT * FROM category_periods WHERE category_id = $1 ORDER BY start_date DESC",
+        `SELECT category_periods.*
+         FROM category_periods
+         JOIN category_period_categories
+           ON category_period_categories.period_id = category_periods.id
+         WHERE category_period_categories.category_id = $1
+         ORDER BY category_periods.start_date DESC`,
         [categoryId]
       );
     },

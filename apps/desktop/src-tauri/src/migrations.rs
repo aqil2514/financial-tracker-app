@@ -284,6 +284,12 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0047_category_periods.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 48,
+            description: "category_periods_many_categories",
+            sql: include_str!("../migrations/0048_category_periods_many_categories.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -617,13 +623,14 @@ mod tests {
         assert_ne!(sale_updated_at_after, "2026-01-01 00:00:00", "trigger harus refresh updated_at setelah terisi sekali");
     }
 
-    // Migrasi 0047: category_periods -- jendela waktu custom bernama,
-    // scope satu kategori (ON DELETE CASCADE kalau kategori dihapus).
-    // Kolom LWW (updated_at/deleted_at/sync_source) sudah ada sejak
-    // CREATE TABLE pertama (pola 0045_labels.sql), beda dari investment
-    // yang nambah belakangan di 0042 -- jadi default sync_source='pc'
-    // dan trigger auto-refresh updated_at harus langsung jalan tanpa
-    // perlu migrasi susulan.
+    // Migrasi 0047+0048: category_periods -- jendela waktu custom
+    // bernama, TIDAK LAGI py category_id langsung (direvisi 0048 --
+    // kategori dipisah per tipe income/expense, siklus nyata spt
+    // "panen" butuh mencakup beberapa kategori lintas tipe sekaligus).
+    // Kolom LWW (updated_at/deleted_at/sync_source) tetap ada sejak
+    // CREATE TABLE pertama (pola 0045_labels.sql) -- default
+    // sync_source='pc' dan trigger auto-refresh updated_at harus
+    // langsung jalan tanpa perlu migrasi susulan.
     #[test]
     fn insert_category_period_dan_trigger_updated_at_jalan() {
         let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
@@ -631,9 +638,8 @@ mod tests {
 
         conn.execute_batch(
             "
-            INSERT INTO categories (id, name, type) VALUES ('cat-period-1', 'Sawah', 'income');
-            INSERT INTO category_periods (id, category_id, name, start_date, end_date)
-                VALUES ('period-1', 'cat-period-1', 'Panen 2025', '2025-01-01', '2025-12-31');
+            INSERT INTO category_periods (id, name, start_date, end_date)
+                VALUES ('period-1', 'Panen 2025', '2025-01-01', '2025-12-31');
             ",
         )
         .expect("insert category_periods gagal");
@@ -675,18 +681,62 @@ mod tests {
             updated_at_after, "2026-01-01 00:00:00",
             "trigger harus refresh updated_at setelah UPDATE"
         );
+    }
 
-        // ON DELETE CASCADE -- hapus kategori harus ikut menghapus
-        // periode miliknya, sama prinsip category_labels/account_labels.
-        conn.execute("DELETE FROM categories WHERE id = 'cat-period-1'", [])
-            .expect("delete categories gagal");
-        let remaining: i64 = conn
+    // Migrasi 0048: category_period_categories -- tabel pivot many-to-many
+    // antara category_periods dan categories, supaya satu Periode bisa
+    // mencakup BANYAK kategori lintas tipe income/expense sekaligus
+    // (mis. "Panen 2025" = kategori Pupuk [expense] + Jual Hasil [income]).
+    // UNIQUE(period_id, category_id) cegah kategori yang sama ditambahkan
+    // dobel ke periode yang sama, BUKAN pembatas jumlah kategori per
+    // periode.
+    #[test]
+    fn insert_category_period_categories_lintas_tipe_dan_cascade_jalan() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        conn.execute_batch(
+            "
+            INSERT INTO category_periods (id, name, start_date, end_date)
+                VALUES ('period-2', 'Panen 2025', '2025-01-01', '2025-12-31');
+            INSERT INTO categories (id, name, type) VALUES ('cat-expense-1', 'Pupuk', 'expense');
+            INSERT INTO categories (id, name, type) VALUES ('cat-income-1', 'Jual Hasil', 'income');
+            INSERT INTO category_period_categories (id, period_id, category_id)
+                VALUES ('ppc-1', 'period-2', 'cat-expense-1');
+            INSERT INTO category_period_categories (id, period_id, category_id)
+                VALUES ('ppc-2', 'period-2', 'cat-income-1');
+            ",
+        )
+        .expect("insert category_period_categories lintas tipe gagal");
+
+        let linked_count: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM category_periods WHERE id = 'period-1'",
+                "SELECT COUNT(*) FROM category_period_categories WHERE period_id = 'period-2'",
                 [],
                 |row| row.get(0),
             )
-            .expect("query sisa category_periods gagal");
-        assert_eq!(remaining, 0, "category_periods harus ikut terhapus via ON DELETE CASCADE");
+            .expect("query category_period_categories gagal");
+        assert_eq!(linked_count, 2, "satu periode harus bisa mencakup >1 kategori lintas tipe");
+
+        // UNIQUE(period_id, category_id) -- kategori sama tidak boleh
+        // ditambahkan dobel ke periode yang sama.
+        let duplicate_result = conn.execute(
+            "INSERT INTO category_period_categories (id, period_id, category_id) VALUES ('ppc-3', 'period-2', 'cat-expense-1')",
+            [],
+        );
+        assert!(duplicate_result.is_err(), "duplikat (period_id, category_id) harus ditolak UNIQUE constraint");
+
+        // ON DELETE CASCADE dari periode -- hapus category_periods harus
+        // ikut menghapus baris pivot-nya.
+        conn.execute("DELETE FROM category_periods WHERE id = 'period-2'", [])
+            .expect("delete category_periods gagal");
+        let remaining_after_period_delete: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM category_period_categories WHERE period_id = 'period-2'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("query sisa category_period_categories gagal");
+        assert_eq!(remaining_after_period_delete, 0, "pivot harus ikut terhapus saat category_periods dihapus");
     }
 }

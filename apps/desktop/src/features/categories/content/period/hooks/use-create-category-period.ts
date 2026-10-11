@@ -20,15 +20,22 @@ export function useCreateCategoryPeriod(options: UseCreateCategoryPeriodOptions 
       const db = await getDb();
       const id = newId();
       await db.execute(
-        "INSERT INTO category_periods (id, category_id, name, start_date, end_date) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO category_periods (id, name, start_date, end_date) VALUES ($1, $2, $3, $4)",
         [
           id,
-          values.category_id,
           values.name,
           format(values.date_range.from, "yyyy-MM-dd"),
           format(values.date_range.to, "yyyy-MM-dd"),
         ]
       );
+
+      for (const categoryId of values.category_ids) {
+        await db.execute(
+          "INSERT INTO category_period_categories (id, period_id, category_id) VALUES ($1, $2, $3)",
+          [newId(), id, categoryId]
+        );
+      }
+
       return id;
     },
     invalidateKey: QUERY_DEPENDENCIES.categoryPeriods,

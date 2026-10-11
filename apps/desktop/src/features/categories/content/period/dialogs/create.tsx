@@ -1,31 +1,40 @@
 "use client";
 
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { CategoryContentPeriodForm } from "../form";
 import { useCreateCategoryPeriod } from "../hooks/use-create-category-period";
 import { getCategoryPeriodDefaultValues } from "../form/schema";
+import { useCategoryPeriodDialog } from "./context";
 
 export function CreateCategoryPeriodDialog() {
-  const [open, setOpen] = useState(false);
+  const { dialog, openDialog, closeDialog } = useCategoryPeriodDialog();
   const mutation = useCreateCategoryPeriod({
-    onCreated: () => setOpen(false),
+    onCreated: () => closeDialog(),
   });
 
   return (
-    <EntityFormDialog
-      trigger={<Button size="sm">Tambah Periode</Button>}
-      title="Tambah Periode"
-      open={open}
-      onOpenChange={setOpen}
+    <Dialog
+      open={dialog?.type === "create"}
+      onOpenChange={(open) => (open ? openDialog("create") : closeDialog())}
     >
-      <CategoryContentPeriodForm
-        defaultValues={getCategoryPeriodDefaultValues("")}
-        onSubmit={(values) => mutation.mutate(values)}
-        isPending={mutation.isPending}
-      />
-    </EntityFormDialog>
+      <DialogTrigger render={<Button size="sm">Tambah Periode</Button>} />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Tambah Periode</DialogTitle>
+        </DialogHeader>
+        <CategoryContentPeriodForm
+          defaultValues={getCategoryPeriodDefaultValues()}
+          onSubmit={(values) => mutation.mutate(values)}
+          isPending={mutation.isPending}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

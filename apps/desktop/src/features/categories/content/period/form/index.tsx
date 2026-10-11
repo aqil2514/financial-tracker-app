@@ -7,11 +7,15 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
   FormFieldText,
-  FormFieldCombobox,
+  FormFieldComboboxMulti,
   FormFieldDateRange,
 } from "@/components/forms/form-fields";
 import { useCategories } from "@/hooks/resources/use-categories";
-import { categoryPeriodSchema, type CategoryPeriodFormOutput, type CategoryPeriodFormValues } from "./schema";
+import {
+  categoryPeriodSchema,
+  type CategoryPeriodFormOutput,
+  type CategoryPeriodFormValues,
+} from "./schema";
 
 type CategoryContentPeriodFormProps = {
   defaultValues: CategoryPeriodFormValues;
@@ -28,21 +32,35 @@ export function CategoryContentPeriodForm({
 }: CategoryContentPeriodFormProps) {
   const { data: categories } = useCategories();
 
-  const form = useForm<CategoryPeriodFormValues, unknown, CategoryPeriodFormOutput>({
+  const form = useForm<
+    CategoryPeriodFormValues,
+    unknown,
+    CategoryPeriodFormOutput
+  >({
     resolver: zodResolver(categoryPeriodSchema),
     defaultValues,
   });
 
-  const categoryOptions = (categories ?? []).map((category) => ({
-    value: String(category.id),
-    label: category.name,
-  }));
+  const categoriesById = new Map(
+    (categories ?? []).map((category) => [category.id, category]),
+  );
+  const categoryOptions = (categories ?? []).map((category) => {
+    const parent = category.parent_id
+      ? categoriesById.get(category.parent_id)
+      : null;
+    const name = parent ? `${parent.name} • ${category.name}` : category.name;
+    const direction = category.type === "income" ? "Pemasukan" : "Pengeluaran";
+    return {
+      value: String(category.id),
+      label: `[${direction}] ${name}`,
+    };
+  });
 
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <FormFieldCombobox
+      <FormFieldComboboxMulti
         form={form}
-        name="category_id"
+        name="category_ids"
         label="Kategori"
         placeholder="Cari kategori..."
         options={categoryOptions}
