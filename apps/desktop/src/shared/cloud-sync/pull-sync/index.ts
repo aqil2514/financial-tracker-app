@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 
+import { applyCategoryPeriodRow } from "./apply-category-period-row";
 import { applyInvestmentAccountRow } from "./apply-investment-account-row";
 import { applyLabelJunctionRow } from "./apply-label-junction-row";
 import { applyRow } from "./apply-row";
@@ -53,4 +54,6 @@ export async function applySyncResponse(response: SyncResponse): Promise<void> {
       entityId: row.accountId,
     });
   }
+
+  for (const row of response.categoryPeriods) await applyCategoryPeriodRow(db, row);
 }

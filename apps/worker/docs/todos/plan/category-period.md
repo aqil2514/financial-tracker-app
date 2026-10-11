@@ -13,7 +13,7 @@ pendekatan" di bawah utk detail.
 
 **REVISI (2026-10-11)**: dokumen ini awalnya ditulis SEBELUM revisi
 skema many-to-many di sisi desktop (migrasi `0048` — lihat
-`apps/desktop/docs/todos/plan/category-period.md`). Seluruh isi di
+`apps/desktop/docs/todos/done/category-period.md`). Seluruh isi di
 bawah SUDAH disesuaikan: skema D1 yg awalnya 1 tabel (`category_id`
 tunggal) jadi 2 tabel (`category_periods` + tabel pivot
 `category_period_categories`, pola PERSIS 3 junction table label di
@@ -27,38 +27,47 @@ tunggal) jadi 2 tabel (`category_periods` + tabel pivot
   `SELECT sql FROM sqlite_master WHERE type='table' AND name IN
   (...)` — struktur kedua tabel sesuai persis rencana. **BELUM
   diterapkan ke `--remote`/production** (lihat item deploy di bawah).
-- [ ] Modul `category-periods/` (`schema.ts`/`service.ts`/
-  `controller.ts`/`router.ts`, pola `categories/`) — CRUD upsert-by-id
-  dgn LWW (`shared/lww.ts`) utk `category_periods`, PLUS replace-all
-  baris pivot tiap upsert (pola desktop `useUpdateCategoryPeriod`:
-  DELETE semua baris pivot lama + INSERT ulang, bukan diff) + soft-delete.
-- [ ] Query ringkasan on-the-fly (total masuk/keluar/selisih + daftar
-  transaksi) berdasar `category_id IN (SELECT category_id FROM
+- [x] Modul `category-periods/` (`schema.ts`/`service.ts`/
+  `controller.ts`/`router.ts`, pola `categories/`) (2026-10-11) — CRUD
+  upsert-by-id dgn LWW (`shared/lww.ts`) utk `category_periods`, PLUS
+  replace-all baris pivot tiap upsert (pola desktop
+  `useUpdateCategoryPeriod`: DELETE semua baris pivot lama + INSERT
+  ulang, bukan diff) + soft-delete. Diverifikasi lokal via
+  `wrangler dev` (insert, update dgn replace-all pivot, LWW stale
+  ditolak, soft-delete, delete ganda 404, tanpa token 401).
+- [x] Query ringkasan on-the-fly (2026-10-11) (total masuk/keluar +
+  daftar transaksi) berdasar `category_id IN (SELECT category_id FROM
   category_period_categories WHERE period_id = ?)` + `start_date`/
   `end_date` — SUM/SELECT langsung ke `transactions`, tidak ada tabel
-  agregat.
-- [ ] Endpoint push (`POST /category-periods/push`,
-  `DELETE /category-periods/push/:id`) utk jalur sync PC, pola persis
-  `pushDebtFromPc`/`deletePushedDebt`.
-- [ ] Didaftarkan di `src/index.ts` (`.route("/category-periods", ...)`).
-- [ ] Perluasan `/sync` snapshot (`sync/service.ts`) — tambah
-  `categoryPeriods` (dgn `categoryIds: string[]` sudah di-JOIN, BUKAN
-  baris pivot mentah terpisah) ke `SyncResponse`/`getSyncSnapshot`,
-  pola sama 7 tabel lain yang sudah ada.
-- [ ] Verifikasi lokal via `wrangler dev` (modul/endpoint, migrasi D1
-  sudah diverifikasi lokal duluan — lihat poin migrasi di atas)
-  sebelum deploy.
-- [ ] Deploy ke `--remote`/production — DITUNDA sampai modul ini
-  siap & diverifikasi lokal, dan desktop sudah siap push. Migrasi D1
-  JUGA perlu diterapkan ulang ke `--remote` saat itu (saat ini cuma
-  lokal).
+  agregat. Diverifikasi lokal, match query desktop.
+- [x] Endpoint push (`POST /category-periods/push`,
+  `DELETE /category-periods/push/:id`) (2026-10-11) utk jalur sync PC,
+  pola persis `pushDebtFromPc`/`deletePushedDebt`. Diverifikasi lokal.
+- [x] Didaftarkan di `src/index.ts` (`.route("/category-periods", ...)`)
+  (2026-10-11).
+- [x] Perluasan `/sync` snapshot (`sync/service.ts`) (2026-10-11) —
+  tambah `categoryPeriods` (dgn `categoryIds: string[]` sudah di-JOIN
+  via `LEFT JOIN` + `GROUP_CONCAT`, BUKAN baris pivot mentah terpisah)
+  ke `SyncResponse`/`getSyncSnapshot`, pola sama tabel lain yang sudah
+  ada. `LEFT JOIN` (bukan INNER spt query list desktop) supaya periode
+  TANPA kategori pun tetap muncul (`categoryIds: []`). Filter `since`
+  di kolom induk (`category_periods.updated_at`) saja. Diverifikasi
+  lokal via `wrangler dev`: periode dgn kategori, periode tanpa
+  kategori, dan filter `since`.
+- [x] Verifikasi lokal via `wrangler dev` (2026-10-11) — modul/endpoint
+  SUDAH diverifikasi per-item di atas, migrasi D1 diverifikasi lokal
+  duluan di poin migrasi. Semua bersih sebelum deploy.
+- [ ] Deploy ke `--remote`/production — desktop SUDAH wired push
+  (2026-10-11, lihat `apps/desktop/docs/todos/done/category-period.md`),
+  tidak ada blocker teknis lagi, tinggal dieksekusi. Migrasi D1 JUGA
+  perlu diterapkan ulang ke `--remote` saat itu (saat ini cuma lokal).
 
 ## Rencana pendekatan
 
 ### Revisi: many-to-many kategori (2026-10-11)
 
 Skema desktop direvisi (migrasi `0048`, lihat
-`apps/desktop/docs/todos/plan/category-period.md` bagian "Revisi:
+`apps/desktop/docs/todos/done/category-period.md` bagian "Revisi:
 many-to-many kategori") — satu Periode TIDAK LAGI terikat ke satu
 `category_id`, melainkan ke SEKUMPULAN kategori lewat tabel pivot
 `category_period_categories` (lintas tipe income/expense sekaligus).

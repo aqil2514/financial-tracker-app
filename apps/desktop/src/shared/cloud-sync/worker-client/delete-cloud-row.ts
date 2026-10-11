@@ -17,7 +17,8 @@ export type DeleteCloudPayload =
   | { table: "debt_payments" }
   | { table: "investment_purchases" }
   | { table: "investment_sales" }
-  | { table: "transaction_attachments" };
+  | { table: "transaction_attachments" }
+  | { table: "category_periods" };
 
 const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
   account_groups: "/account-groups",
@@ -30,6 +31,7 @@ const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
   debts: "/debts/push",
   debt_payments: "/debts/payments/push",
   transaction_attachments: "/attachments",
+  category_periods: "/category-periods/push",
 };
 
 export async function deleteCloudRow(

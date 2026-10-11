@@ -11,29 +11,36 @@ app — JANGAN duplikasi isi ke sini, cukup pointer.
 
 ## Status & TODO saat ini (ringkas)
 
-Desktop: skema DB (many-to-many, lihat revisi di bawah) + form create
-UI SELESAI (2026-10-11). Worker & MCP BELUM disentuh sama sekali.
-Lihat dokumen per-app utk detail teknis.
+Desktop: SELESAI PENUH (2026-10-11) — skema DB (many-to-many), CRUD
++ list/filter/sort, ringkasan di Laporan, DAN cloud sync (push+pull)
+ke Worker, semua final & terverifikasi. Dokumen detailnya SUDAH
+dipindah ke `done/`. Worker: modul+endpoint+perluasan `/sync` SELESAI
+lokal, cuma deploy `--remote` yang tertunda. MCP BELUM disentuh sama
+sekali. Lihat dokumen per-app utk detail teknis.
 
-- [x] Desktop — skema `category_periods`+`category_period_categories`
-  (migrasi `0047`+`0048`, REVISI many-to-many di tengah jalan, lihat
-  "Latar belakang" di bawah) + refactor halaman kategori jadi tab
-  (Daftar/Periode) + form create periode (multi-select kategori,
-  rentang tanggal) jalan penuh. List/ringkasan periode, edit/delete,
-  DAN wiring push ke Worker semua MASIH BELUM. Lihat
-  [`apps/desktop/docs/todos/plan/category-period.md`](../../../apps/desktop/docs/todos/plan/category-period.md).
+- [x] Desktop — SELESAI PENUH (2026-10-11): skema
+  `category_periods`+`category_period_categories` (migrasi `0047`+`0048`,
+  REVISI many-to-many di tengah jalan, lihat "Latar belakang" di
+  bawah), refactor halaman kategori jadi tab (Daftar/Periode), CRUD
+  penuh (create/edit/delete) + list/filter/sort, ringkasan di halaman
+  Laporan, DAN cloud sync (push via `pushOnWrite`/`pushDeleteOnWrite`
+  + pull via `applySyncResponse`) — diverifikasi end-to-end lewat
+  `tauri dev` + `wrangler dev` asli. Lihat
+  [`apps/desktop/docs/todos/done/category-period.md`](../../../apps/desktop/docs/todos/done/category-period.md).
 - [ ] Worker — tabel D1 `category_periods`+`category_period_categories`
   + modul `category-periods/` (CRUD + query ringkasan on-the-fly) +
-  endpoint push — BELUM DIMULAI, rencana di dokumen ini masih
-  mengasumsikan skema LAMA (1 kategori per periode), perlu
-  disesuaikan dgn revisi many-to-many sebelum dikerjakan. Lihat
+  endpoint push + perluasan `/sync` SEMUA SELESAI & diverifikasi
+  lokal (2026-10-11). Cuma deploy ke `--remote`/production yang
+  tertunda, lihat
   [`apps/worker/docs/todos/plan/category-period.md`](../../../apps/worker/docs/todos/plan/category-period.md).
 - [ ] MCP server — perluasan `/sync` snapshot + tool baru (list/create/
-  update/delete periode, get ringkasan periode) — BELUM DIMULAI, sama
-  catatan skema basi spt Worker. Lihat
+  update/delete periode, get ringkasan periode) — BELUM DIMULAI (sengaja
+  tahap paling terakhir). Rencana di dokumennya perlu dicek ulang sudah
+  sinkron dgn skema many-to-many final sebelum mulai. Lihat
   [`apps/mcp-server/docs/todos/plan/category-period.md`](../../../apps/mcp-server/docs/todos/plan/category-period.md).
-- [ ] Deploy D1 migrasi ke `--remote`/production — ditunda sampai
-  modul Worker siap & diverifikasi lokal (pola sama `investment-sync.md`).
+- [ ] Deploy D1 migrasi + modul Worker ke `--remote`/production —
+  ditunda sampai desktop siap push (SUDAH) — tinggal dieksekusi kapan
+  saja, tidak ada blocker teknis lagi.
 
 ## Latar belakang
 

@@ -13,6 +13,7 @@ import { pushInvestmentSaleRow } from "./push-investment-sale-row";
 import { pushAttachmentRow } from "./push-attachment-row";
 import { pushLabelRow } from "./push-label-row";
 import { pushLabelJunctionRow } from "./push-label-junction-row";
+import { pushCategoryPeriodRow } from "./push-category-period-row";
 
 export async function pushRowPayload(
   creds: CloudSyncCredentials,
@@ -48,5 +49,7 @@ export async function pushRowPayload(
     case "category_labels":
     case "account_labels":
       return pushLabelJunctionRow(creds, table, id);
+    case "category_periods":
+      return pushCategoryPeriodRow(creds, id);
   }
 }

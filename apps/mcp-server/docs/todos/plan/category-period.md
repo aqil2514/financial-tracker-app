@@ -13,7 +13,7 @@ bagian "Rencana pendekatan" di bawah utk detail.
 
 **REVISI (2026-10-11)**: dokumen ini awalnya ditulis SEBELUM revisi
 skema many-to-many di sisi desktop (migrasi `0048` — lihat
-`apps/desktop/docs/todos/plan/category-period.md`). Seluruh isi di
+`apps/desktop/docs/todos/done/category-period.md`). Seluruh isi di
 bawah SUDAH disesuaikan ke skema baru (`categoryIds: string[]`,
 bukan `categoryId` tunggal) — lihat "Revisi: many-to-many kategori"
 di bawah utk detail apa saja yg berubah. **5 tool (bukan 4) yg
@@ -46,7 +46,7 @@ kurang tool, kemarin cuma skemanya yg basi.
 ### Revisi: many-to-many kategori (2026-10-11)
 
 Skema desktop direvisi (migrasi `0048`, lihat
-`apps/desktop/docs/todos/plan/category-period.md` bagian "Revisi:
+`apps/desktop/docs/todos/done/category-period.md` bagian "Revisi:
 many-to-many kategori") — satu Periode TIDAK LAGI terikat ke satu
 `category_id`, melainkan ke SEKUMPULAN kategori lewat tabel pivot
 `category_period_categories` (lintas tipe income/expense sekaligus,

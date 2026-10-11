@@ -70,6 +70,7 @@ function emptySyncResponse(): SyncResponse {
     transactionLabels: [],
     categoryLabels: [],
     accountLabels: [],
+    categoryPeriods: [],
   };
 }
 
@@ -78,7 +79,7 @@ beforeEach(() => {
 });
 
 describe("applySyncResponse", () => {
-  it("menerapkan SEMUA 15 koleksi SyncResponse ke tabel lokalnya -- regresi investment_* yang dulu terlupa", async () => {
+  it("menerapkan SEMUA 16 koleksi SyncResponse ke tabel lokalnya -- regresi investment_* yang dulu terlupa", async () => {
     const { db, touchedTables } = createTableTrackingDb();
     vi.mocked(getDb).mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDb>>);
 
@@ -186,6 +187,9 @@ describe("applySyncResponse", () => {
       transactionLabels: [{ ...row({ id: "tl1" }), transactionId: "t1", labelId: "l1" }],
       categoryLabels: [{ ...row({ id: "cl1" }), categoryId: "c1", labelId: "l1" }],
       accountLabels: [{ ...row({ id: "al1" }), accountId: "a1", labelId: "l1" }],
+      categoryPeriods: [
+        { ...row({ id: "cp1" }), name: "Periode", startDate: "2026-01-01", endDate: "2026-03-31", categoryIds: ["c1"] },
+      ],
     };
 
     await applySyncResponse(response);
@@ -209,6 +213,8 @@ describe("applySyncResponse", () => {
         "transaction_labels",
         "category_labels",
         "account_labels",
+        "category_periods",
+        "category_period_categories",
       ])
     );
   });

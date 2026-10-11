@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db";
 import { newId } from "@/lib/id";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import type { CategoryPeriodFormOutput } from "../form/schema";
 
 type UseCreateCategoryPeriodOptions = {
@@ -35,6 +36,8 @@ export function useCreateCategoryPeriod(options: UseCreateCategoryPeriodOptions 
           [newId(), id, categoryId]
         );
       }
+
+      void pushOnWrite("category_periods", id);
 
       return id;
     },

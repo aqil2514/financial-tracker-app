@@ -13,6 +13,7 @@ import { contactsRouter } from "./modules/contacts/router";
 import { syncRouter } from "./modules/sync/router";
 import { attachmentsRouter } from "./modules/attachments/router";
 import { labelsRouter } from "./modules/labels/router";
+import { categoryPeriodsRouter } from "./modules/category-periods/router";
 
 const app = new Hono<AppContext>();
 
@@ -39,5 +40,6 @@ app.route("/contacts", contactsRouter);
 app.route("/sync", syncRouter);
 app.route("/attachments", attachmentsRouter);
 app.route("/labels", labelsRouter);
+app.route("/category-periods", categoryPeriodsRouter);
 
 export default app;

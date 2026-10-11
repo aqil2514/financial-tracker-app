@@ -8,13 +8,13 @@
 ## Status & TODO saat ini (ringkas)
 
 Skema DB + CRUD periode (create/edit/delete) + list (filter & sort)
-+ ringkasan di halaman Laporan SEMUA SELESAI (2026-10-11) — lihat
-"Rencana pendekatan" di bawah utk detail teknis & revisi desain yang
-terjadi di tengah jalan (many-to-many kategori). **Satu-satunya yang
-tersisa adalah wiring push ke `apps/worker`, dan itu BLOCKED** (bukan
-belum sempat) — butuh tabel D1 + endpoint Worker dulu yang belum
-dibuat sama sekali, lihat item terakhir checklist utk detail
-prasyaratnya.
++ ringkasan di halaman Laporan + wiring cloud sync (push & pull)
+SEMUA SELESAI (2026-10-11) — lihat "Rencana pendekatan" di bawah
+utk detail teknis & revisi desain yang terjadi di tengah jalan
+(many-to-many kategori). Fitur ini FINAL di sisi desktop, termasuk
+sync-nya; satu-satunya sisa pekerjaan lintas-app adalah deploy
+Worker ke `--remote` (lihat `apps/worker/docs/todos/plan/category-period.md`)
+dan tool MCP (belum dimulai, sengaja tahap terakhir).
 
 **Ringkasan transaksi TIDAK masuk tab Periode (Kategori)** —
 diputuskan (2026-10-11) tab itu murni manajemen periode (CRUD
@@ -47,8 +47,15 @@ SUDAH DIBANGUN (2026-10-11), tapi di tempat yang berbeda: tab baru
   tab baru "Periode Kategori") — BUKAN di tab Periode, lihat catatan
   scope di atas. Detail: lihat "Ringkasan di halaman Laporan" di
   bawah.
-- [ ] **Wiring push ke `apps/worker`** — **BLOCKED**, bukan cuma
-  belum sempat. Lihat "Cloud sync & MCP" di bawah utk prasyaratnya.
+- [x] **Wiring cloud sync ke `apps/worker`** (2026-10-11) — push
+  (`pushOnWrite`/`pushDeleteOnWrite` di `useCreateCategoryPeriod`/
+  `useUpdateCategoryPeriod`/`useDeleteCategoryPeriod`) DAN pull
+  (`categoryPeriods` di `SyncResponse` + `upsertCategoryPeriod`/
+  `applyCategoryPeriodRow`). Diverifikasi end-to-end lewat `tauri dev`
+  + `wrangler dev` asli (bukan cuma test mock): create/edit/delete
+  dari UI sukses ter-push ke D1 lokal, dan baris yg di-insert manual
+  ke D1 (simulasi device/MCP lain) muncul benar di UI desktop lewat
+  pull. Lihat "Cloud sync & MCP" di bawah utk detail teknis.
 
 ## Latar belakang
 
@@ -258,9 +265,8 @@ card; context `CategoryPeriodDialogType` ditambah `"edit"`/
   category_periods` — baris pivot ikut terhapus otomatis via `ON
   DELETE CASCADE` (migrasi `0048`), tidak perlu DELETE manual ke
   `category_period_categories`.
-- Kedua hook MURNI SQLite lokal (tanpa `pushOnWrite`/
-  `pushDeleteOnWrite`), konsisten dgn create — lihat "Cloud sync &
-  MCP" di bawah knp belum bisa.
+- Ketiga hook (create/update/delete) SUDAH wired ke cloud sync
+  (2026-10-11) — lihat "Cloud sync & MCP" di bawah.
 
 **Keputusan desain dialog** (2026-10-11, sempat bolak-balik):
 trigger (tombol "Tambah Periode") dan `<Dialog>` sungguhan SENGAJA
@@ -358,47 +364,40 @@ Cashflow/Per Tipe Akun/Tren Keuangan di `reports/content/index.tsx`)
   di tab Periode) — data tanggal diambil dari `periods` (hasil
   `useCategoryPeriods()`) yg sudah ter-fetch, TANPA query tambahan.
 
-### Cloud sync & MCP — diputuskan PERLU dari awal, BELUM dikerjakan
+### Cloud sync & MCP
 
 Beda dari investasi (yang desktop-only duluan, sync menyusul), utk
 Periode Kategori sync ke `apps/worker` + tool `apps/mcp-server`
 **sudah diputuskan perlu dari awal** (2026-10-11) — supaya
 pertanyaan seperti "panen tahun kemarin berapa?" bisa dijawab
-asisten AI, bukan cuma dibuka manual di desktop. Konsekuensi konkret
-(ikut pola `investment-sync.md` Tahap 0 — replikasi logic penuh,
-BUKAN sekadar tabel mirror):
+asisten AI, bukan cuma dibuka manual di desktop.
 
-- Desktop tetap jadi sumber migrasi SQLite pertama & pemilik
-  logic/UI, tapi `apps/worker` butuh tabel D1 sendiri
-  (`category_periods` + `category_period_categories`, skema sama)
-  supaya device/klien lain (mobile belum dibangun, tool MCP TULIS)
-  bisa bikin/ubah Periode tanpa lewat desktop dulu — prinsip
-  "Worker = satu-satunya penulis D1 production" yang sudah dipegang
-  `debts`/`transactions`/investasi.
-- Query ringkasan on-the-fly perlu versi Worker (query D1) DAN versi
-  MCP (`sync-snapshot.ts`, port rumus yang sama dari snapshot
-  `/sync`), bukan cuma sisi desktop.
-- **BELUM DIMULAI SAMA SEKALI** — `useCreateCategoryPeriod` saat ini
-  murni tulis ke SQLite lokal, TIDAK ADA panggilan `pushOnWrite`.
-  Tabel `category_periods`/`category_period_categories` juga BELUM
-  terdaftar di `QueueableTable` (`shared/cloud-sync/push-queue/types.ts`)
-  — memanggil `pushOnWrite` apa adanya sekarang akan gagal type-check.
-  Detail lintas-app (tahapan, endpoint, tool MCP) ditulis di dokumen
-  masing-masing app, LIHAT index di
-  [`docs/todos/plan/category-period-sync.md`](../../../../../docs/todos/plan/category-period-sync.md)
-  — jangan duplikasi di sini. Dokumen index itu JUGA masih
-  menyebut skema LAMA (`category_id` tunggal) di beberapa tempat —
-  perlu disinkronkan menyusul skema `0048` kalau mau dipakai sbg
-  rujukan detail Worker/MCP.
+**Sisi desktop + Worker SUDAH SELESAI (2026-10-11)**:
+- Worker: modul `category-periods/` (upsert-by-id + LWW + replace-all
+  pivot, soft-delete, query ringkasan on-the-fly) + endpoint push +
+  perluasan `/sync` snapshot. Detail lengkap di
+  `apps/worker/docs/todos/plan/category-period.md`.
+- Desktop: `category_periods` terdaftar di `QueueableTable`/
+  `DeleteCloudPayload`, `pushOnWrite`/`pushDeleteOnWrite` dipasang di
+  `useCreateCategoryPeriod`/`useUpdateCategoryPeriod`/
+  `useDeleteCategoryPeriod`, `categoryPeriods` ditambah ke
+  `SyncResponse` + applier `upsertCategoryPeriod`/
+  `applyCategoryPeriodRow` (replace-all pivot lokal, pola sama
+  `use-update-category-period.ts`) di `shared/cloud-sync/pull-sync/`.
+  Diverifikasi end-to-end via `tauri dev` + `wrangler dev` asli: push
+  create/edit/delete dari UI sukses, dan pull baris yg di-insert
+  manual ke D1 (simulasi device/MCP lain) muncul benar di UI.
+
+**Masih tersisa** (lintas-app, lihat index di
+[`docs/todos/plan/category-period-sync.md`](../../../../../docs/todos/plan/category-period-sync.md)):
+deploy migrasi D1 + Worker ke `--remote`/production, dan tool MCP (5
+tool, sengaja tahap paling terakhir — belum dimulai sama sekali).
 
 ## Catatan
 
 - Proyek ini portofolio-only, tidak ada deadline/urgensi.
 - Sisi desktop SUDAH FINAL (2026-10-11): CRUD periode (create/edit/
-  delete + list/filter/sort) DAN ringkasan di halaman Laporan
-  (summary card + pie chart + list transaksi berlampiran) — bentuk
-  data & UX tidak lagi berubah. Satu-satunya kerja tersisa: wiring
-  Worker/MCP, dimulai dari bikin tabel D1 + endpoint di `apps/worker`
-  (pola sama `investment-sync.md`), baru daftarkan ke
-  `QueueableTable`/`DeletableTable` dan sambungkan `pushOnWrite`/
-  `pushDeleteOnWrite` di hook desktop yang sudah ada.
+  delete + list/filter/sort), ringkasan di halaman Laporan (summary
+  card + pie chart + list transaksi berlampiran), DAN cloud sync
+  (push & pull) — bentuk data & UX tidak lagi berubah. Kerja tersisa
+  murni lintas-app: deploy Worker ke `--remote`, lalu tool MCP.

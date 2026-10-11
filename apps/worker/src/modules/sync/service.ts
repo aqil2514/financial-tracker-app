@@ -144,6 +144,15 @@ export type SyncResponse = {
     updatedAt: string | null;
     deletedAt: string | null;
   }>;
+  categoryPeriods: Array<{
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    categoryIds: string[];
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
 };
 
 // `since` null -> first sync, full snapshot SEMUA baris (termasuk yg
@@ -177,6 +186,7 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     transactionLabels,
     categoryLabels,
     accountLabels,
+    categoryPeriods,
   ] = await Promise.all([
     env.DB.prepare(`SELECT id, name, updated_at, deleted_at FROM account_groups ${filter}`)
       .bind(...bind)
@@ -365,6 +375,36 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
         updated_at: string | null;
         deleted_at: string | null;
       }>(),
+    // `category_ids` BUKAN baris pivot mentah -- sudah di-JOIN+GROUP_CONCAT
+    // (dipisah koma, di-split di JS) spy MCP tidak perlu assemble sendiri
+    // dari category_period_categories, lihat "Perluasan /sync" di
+    // docs/todos/plan/category-period.md. LEFT JOIN (bukan INNER spt query
+    // list desktop) krn periode TANPA kategori sekalipun tetap harus
+    // muncul di snapshot. Filter `since` di kolom `category_periods.updated_at`
+    // SAJA (induk) -- pivot ikut terbawa lewat GROUP_CONCAT apa adanya,
+    // bukan difilter sendiri (konsisten dgn keputusan deleteCategoryPeriod
+    // tidak menyentuh pivot).
+    env.DB.prepare(
+      `SELECT category_periods.id, category_periods.name, category_periods.start_date,
+              category_periods.end_date, category_periods.updated_at, category_periods.deleted_at,
+              GROUP_CONCAT(category_period_categories.category_id) AS category_ids
+       FROM category_periods
+       LEFT JOIN category_period_categories
+         ON category_period_categories.period_id = category_periods.id
+        AND category_period_categories.deleted_at IS NULL
+       ${since !== null ? "WHERE category_periods.updated_at > ?1" : ""}
+       GROUP BY category_periods.id`
+    )
+      .bind(...bind)
+      .all<{
+        id: string;
+        name: string;
+        start_date: string;
+        end_date: string;
+        updated_at: string | null;
+        deleted_at: string | null;
+        category_ids: string | null;
+      }>(),
   ]);
 
   return {
@@ -506,6 +546,15 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
       id: r.id,
       accountId: r.account_id,
       labelId: r.label_id,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+    })),
+    categoryPeriods: categoryPeriods.results.map((r) => ({
+      id: r.id,
+      name: r.name,
+      startDate: r.start_date,
+      endDate: r.end_date,
+      categoryIds: r.category_ids ? r.category_ids.split(",") : [],
       updatedAt: r.updated_at,
       deletedAt: r.deleted_at,
     })),

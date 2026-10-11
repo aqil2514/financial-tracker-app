@@ -106,6 +106,9 @@ export type SyncResponse = {
   transactionLabels: Array<SyncRow & { transactionId: string; labelId: string }>;
   categoryLabels: Array<SyncRow & { categoryId: string; labelId: string }>;
   accountLabels: Array<SyncRow & { accountId: string; labelId: string }>;
+  categoryPeriods: Array<
+    SyncRow & { name: string; startDate: string; endDate: string; categoryIds: string[] }
+  >;
 };
 
 export function pullSync(creds: CloudSyncCredentials, since: string | null): Promise<SyncResponse> {
