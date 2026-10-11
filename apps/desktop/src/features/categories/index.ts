@@ -1,7 +1,8 @@
 export {
   CategoryList,
   useDeleteCategory,
-} from "./list";
+} from "./content/list/list";
+export { CategoryContent } from "./content";
 export {
   CategoryForm,
   CategoryFormDialog,
@@ -11,5 +12,5 @@ export {
   categorySchema,
   type CategoryFormValues,
   type CategoryFormOutput,
-} from "./form";
+} from "./content/list/form";
 export { useCategories, categoriesQueryKey } from "@/hooks/resources/use-categories";

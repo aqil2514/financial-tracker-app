@@ -34,6 +34,14 @@ export type Category = {
   is_active: number;
 };
 
+export type CategoryPeriod = {
+  id: string;
+  category_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+};
+
 export type AccountGroup = {
   id: string;
   name: string;

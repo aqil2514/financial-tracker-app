@@ -278,6 +278,12 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0046_cloud_sync_queue_labels.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 47,
+            description: "category_periods",
+            sql: include_str!("../migrations/0047_category_periods.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -609,5 +615,78 @@ mod tests {
             )
             .expect("query investment_sales kedua gagal");
         assert_ne!(sale_updated_at_after, "2026-01-01 00:00:00", "trigger harus refresh updated_at setelah terisi sekali");
+    }
+
+    // Migrasi 0047: category_periods -- jendela waktu custom bernama,
+    // scope satu kategori (ON DELETE CASCADE kalau kategori dihapus).
+    // Kolom LWW (updated_at/deleted_at/sync_source) sudah ada sejak
+    // CREATE TABLE pertama (pola 0045_labels.sql), beda dari investment
+    // yang nambah belakangan di 0042 -- jadi default sync_source='pc'
+    // dan trigger auto-refresh updated_at harus langsung jalan tanpa
+    // perlu migrasi susulan.
+    #[test]
+    fn insert_category_period_dan_trigger_updated_at_jalan() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        conn.execute_batch(
+            "
+            INSERT INTO categories (id, name, type) VALUES ('cat-period-1', 'Sawah', 'income');
+            INSERT INTO category_periods (id, category_id, name, start_date, end_date)
+                VALUES ('period-1', 'cat-period-1', 'Panen 2025', '2025-01-01', '2025-12-31');
+            ",
+        )
+        .expect("insert category_periods gagal");
+
+        let (sync_source, deleted_at): (String, Option<String>) = conn
+            .query_row(
+                "SELECT sync_source, deleted_at FROM category_periods WHERE id = 'period-1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("query category_periods gagal");
+        assert_eq!(sync_source, "pc");
+        assert_eq!(deleted_at, None);
+
+        // updated_at diset ke nilai tetap dulu (bukan dibandingkan ke
+        // nilai INSERT apa adanya) -- INSERT+UPDATE yang jalan dalam
+        // detik yang sama akan punya updated_at IDENTIK krn resolusi
+        // datetime('now') cuma per detik, false-negative kalau
+        // dibandingkan langsung (lihat catatan trigger di test
+        // migrasi 0042 di atas).
+        conn.execute(
+            "UPDATE category_periods SET updated_at = '2026-01-01 00:00:00' WHERE id = 'period-1'",
+            [],
+        )
+        .expect("set updated_at awal gagal");
+        conn.execute(
+            "UPDATE category_periods SET name = 'Panen 2025 (revisi)' WHERE id = 'period-1'",
+            [],
+        )
+        .expect("update category_periods gagal");
+        let updated_at_after: String = conn
+            .query_row(
+                "SELECT updated_at FROM category_periods WHERE id = 'period-1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("query updated_at kedua gagal");
+        assert_ne!(
+            updated_at_after, "2026-01-01 00:00:00",
+            "trigger harus refresh updated_at setelah UPDATE"
+        );
+
+        // ON DELETE CASCADE -- hapus kategori harus ikut menghapus
+        // periode miliknya, sama prinsip category_labels/account_labels.
+        conn.execute("DELETE FROM categories WHERE id = 'cat-period-1'", [])
+            .expect("delete categories gagal");
+        let remaining: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM category_periods WHERE id = 'period-1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("query sisa category_periods gagal");
+        assert_eq!(remaining, 0, "category_periods harus ikut terhapus via ON DELETE CASCADE");
     }
 }

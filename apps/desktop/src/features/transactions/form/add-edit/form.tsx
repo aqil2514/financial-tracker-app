@@ -20,8 +20,8 @@ import { PendingAttachmentUploader } from "@/shared/attachments/pending-attachme
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import { AccountForm } from "@/features/accounts/form/account-form";
 import { useCreateAccount } from "@/features/accounts/form/use-create-account";
-import { CategoryForm } from "@/features/categories/form/category-form";
-import { useCreateCategory } from "@/features/categories/form/use-create-category";
+import { CategoryForm } from "@/features/categories/content/list/form/category-form";
+import { useCreateCategory } from "@/features/categories/content/list/form/use-create-category";
 import { ContactField } from "./fields/contact-field";
 import { LabelField } from "@/shared/labels/label-field";
 import { useTransactionForm } from "./hooks/use-transaction-form";
