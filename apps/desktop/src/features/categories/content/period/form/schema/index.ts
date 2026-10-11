@@ -3,4 +3,4 @@ export {
   type CategoryPeriodFormValues,
   type CategoryPeriodFormOutput,
 } from "./schema";
-export { getCategoryPeriodDefaultValues } from "./values";
+export { getCategoryPeriodDefaultValues, getCategoryPeriodEditValues } from "./values";

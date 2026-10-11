@@ -2,7 +2,7 @@
 
 import { createDialogContext } from "@/provider/dialog-state";
 
-export type CategoryPeriodDialogType = "create";
+export type CategoryPeriodDialogType = "create" | "edit" | "delete";
 
 const { DialogProvider, useDialog } = createDialogContext<CategoryPeriodDialogType>();
 

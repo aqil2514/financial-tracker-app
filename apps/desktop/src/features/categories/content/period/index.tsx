@@ -1,5 +1,10 @@
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CategoryPeriodDialogProvider, CreateCategoryPeriodDialog } from "./dialogs";
+import {
+  CategoryPeriodDialogProvider,
+  CreateCategoryPeriodDialog,
+  EditPeriodDialog,
+  DeletePeriodDialog,
+} from "./dialogs";
 import { CategoryPeriodList } from "./list";
 
 export function CategoryPeriodSection() {
@@ -16,6 +21,8 @@ export function CategoryPeriodSection() {
           <CategoryPeriodList />
         </CardContent>
       </Card>
+      <EditPeriodDialog />
+      <DeletePeriodDialog />
     </CategoryPeriodDialogProvider>
   );
 }

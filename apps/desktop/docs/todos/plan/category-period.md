@@ -7,10 +7,17 @@
 
 ## Status & TODO saat ini (ringkas)
 
-Skema DB + form create (UI) SELESAI (2026-10-11) — lihat "Rencana
-pendekatan" di bawah utk detail teknis & revisi desain yang terjadi
-di tengah jalan (many-to-many kategori). Sisanya (list/ringkasan
-periode, edit/delete, wiring push) masih tahap rencana.
+Skema DB + form create + list (filter & sort) + edit/delete SELESAI
+(2026-10-11) — lihat "Rencana pendekatan" di bawah utk detail teknis
+& revisi desain yang terjadi di tengah jalan (many-to-many kategori).
+Sisanya (wiring push ke `apps/worker`) BELUM BISA dikerjakan — lihat
+item terakhir checklist, butuh tabel D1 + endpoint Worker dulu yang
+belum dibuat sama sekali.
+
+**Ringkasan transaksi (total masuk/keluar/selisih) TIDAK masuk scope
+tab Periode** — diputuskan (2026-10-11) tab ini murni manajemen
+periode (CRUD metadata: nama, tanggal, kategori terkait), ringkasan
+akan ada di halaman Report terpisah yang memanfaatkan periode ini.
 
 - [x] Migrasi `category_periods` + registrasi di `migrations.rs` —
   `0047_category_periods.sql` (versi 47).
@@ -30,8 +37,9 @@ periode, edit/delete, wiring push) masih tahap rencana.
 - [x] Form create periode (`CategoryContentPeriodForm`) — nama,
   multi-select kategori (`FormFieldComboboxMulti`, baru dibuat),
   rentang tanggal (`FormFieldDateRange`, baru dibuat, bungkus
-  `PeriodPicker`). Dialog (`CreateCategoryPeriodDialog`) trigger+
-  dialog menyatu dalam satu komponen, state dari context lokal
+  `PeriodPicker`, plus teks bantu bahwa tanggal akhir boleh
+  perkiraan). Dialog (`CreateCategoryPeriodDialog`) trigger+dialog
+  menyatu dalam satu komponen, state dari context lokal
   (`CategoryPeriodDialogProvider`, `provider/dialog-state/`).
   Diverifikasi jalan di app (`tauri dev`), termasuk 1 bug runtime
   ditemukan+diperbaiki (lihat catatan di bawah).
@@ -39,15 +47,75 @@ periode, edit/delete, wiring push) masih tahap rencana.
   `useCreateCategoryPeriod` (mutation, insert periode lalu loop
   insert pivot). Query key domain sendiri (`categoryPeriods`) di
   `QUERY_DEPENDENCIES`.
-- [ ] List periode + ringkasan (total masuk/keluar/selisih + daftar
-  transaksi) di tab Periode — section masih placeholder "Segera
-  hadir.", BELUM ada tampilan baca sama sekali (baru jalur tulis/
-  create yang ada).
-- [ ] Edit & delete periode.
-- [ ] Wiring push ke `apps/worker` (`pushOnWrite`/`pushDeleteOnWrite`)
-  utk `category_periods` DAN `category_period_categories` di titik
-  mutasi — belum disentuh sama sekali, `useCreateCategoryPeriod`
-  murni tulis lokal SQLite saat ini.
+- [x] List periode (`CategoryPeriodList`, `list/`) — grid card per
+  periode (nama, rentang tanggal, kategori terkait), badge status
+  "Berlangsung" (amber)/"Selesai" (emerald) dari kolom computed
+  `is_ongoing` (`date('now') BETWEEN start_date AND end_date`, TANPA
+  migrasi — `end_date` tetap `NOT NULL`, dimaknai perkiraan selama
+  periode masih berlangsung).
+- [x] Filter (`CategoryPeriodFilter`, `list/period-filter.tsx`) —
+  pakai sistem generik `components/query/filters/`: nama periode
+  (text), kategori terkait (combobox, opsi HANYA kategori yg
+  benar-benar sudah dipakai di suatu periode — `usePeriodCategoryOptions`,
+  bukan semua kategori master data), status berlangsung/selesai
+  (select, computed). `category_id` & `status` diterjemahkan manual
+  ke `extraConditions` (EXISTS subquery / `date('now') BETWEEN`) krn
+  bukan kolom asli `category_periods` — TIDAK lewat `buildWhereClause`
+  biasa. 2 bug ditemukan+diperbaiki saat verifikasi runtime: (1)
+  `name` ambigu dgn `categories.name` stlh JOIN — fix pakai kolom
+  qualified `category_periods.name` di `FILTERABLE_COLUMNS` DAN
+  `filterKey`; (2) filter combobox/select SELALU `string[]` (bukan
+  string tunggal, salah asumsi awal) — kondisi `typeof === "string"`
+  sebelumnya bikin filter kategori & status diam-diam tidak pernah
+  aktif.
+- [x] Sort (`CategoryPeriodSort`, `list/period-sort.tsx`) — pakai
+  sistem generik `components/query/sort/`: nama, tanggal mulai,
+  tanggal selesai (kolom qualified `category_periods.*`). Default
+  urutan saat TIDAK ada sort aktif tetap `is_ongoing DESC,
+  start_date DESC` (periode berlangsung duluan).
+- [x] Edit & delete periode — pola dialog SAMA dgn create (satu
+  instance di-render per jenis dialog di level section, bukan per
+  card; context `CategoryPeriodDialogType` ditambah `"edit"`/
+  `"delete"`, `PeriodCard` cuma panggil `openDialog(type, period.id)`).
+  - **Edit** (`dialogs/edit.tsx`, `EditPeriodDialog`) — **reuse
+    `CategoryContentPeriodForm` APA ADANYA** (form yg sama persis dgn
+    create, tanpa percabangan mode create/edit di dalamnya). Butuh 2
+    query tambahan sblm render form: `usePeriodById` (data periode by
+    id) + `usePeriodCategoryIds` (array `category_id` milik periode
+    itu, krn list query cuma punya `category_names` string gabungan,
+    bukan array id) — pola sama `TransactionEditDialog` (tunggu kedua
+    query siap, `return null` dulu, baru render komponen anak yg
+    manggil hook mutation, supaya tidak ada percabangan Rules of
+    Hooks). `getCategoryPeriodEditValues` (`form/schema/values.ts`)
+    convert `CategoryPeriod` + `category_ids[]` jadi
+    `CategoryPeriodFormValues` (string tanggal → `Date`).
+    `useUpdateCategoryPeriod`: UPDATE `category_periods`, lalu DELETE
+    semua baris pivot lama + INSERT ulang sesuai pilihan baru (bukan
+    diff) — simpel, tidak ada tracking historis pivot yg perlu
+    dipertahankan.
+  - **Delete** (`dialogs/delete.tsx`, `DeletePeriodDialog`) — pakai
+    `ConfirmDeleteDialog` generic yg sudah ada (`components/`), bukan
+    bikin ulang. `useDeleteCategoryPeriod` cuma `DELETE FROM
+    category_periods` — baris pivot ikut terhapus otomatis via `ON
+    DELETE CASCADE` (migrasi `0048`), tidak perlu DELETE manual ke
+    `category_period_categories`.
+  - Kedua hook MURNI SQLite lokal (tanpa `pushOnWrite`/
+    `pushDeleteOnWrite`), konsisten dgn create — lihat item wiring
+    push di bawah knp belum bisa.
+- [ ] **Wiring push ke `apps/worker`** (`pushOnWrite`/
+  `pushDeleteOnWrite`) utk `category_periods` DAN
+  `category_period_categories` di titik mutasi (create/update/delete)
+  — **BELUM BISA dikerjakan saat ini**, BUKAN cuma belum sempat:
+  `apps/worker` SAMA SEKALI belum punya tabel D1
+  `category_periods`/`category_period_categories` ataupun endpoint utk
+  menerimanya — `pushOnWrite`/`pushDeleteOnWrite` akan GAGAL
+  TYPE-CHECK kalau dipanggil sekarang krn kedua tabel ini belum
+  terdaftar di `QueueableTable`/`DeletableTable`
+  (`shared/cloud-sync/push-queue/types.ts`). Prasyarat sblm hook
+  desktop bisa disentuh: (1) tabel D1 di `apps/worker` (skema sama
+  persis dgn SQLite), (2) endpoint Worker utk terima write periode,
+  (3) daftarkan ke `QueueableTable`/`DeletableTable`. Detail lintas-app
+  lihat bagian "Cloud sync & MCP" di bawah.
 
 ## Latar belakang
 
@@ -140,13 +208,15 @@ CREATE TABLE category_period_categories (
 );
 ```
 
-Masih TANPA tabel ledger/history transaksi terpisah — ringkasan
-(total masuk, total keluar, selisih, daftar transaksi) tetap
-**dihitung on-the-fly**, sekarang dari
+Masih TANPA tabel ledger/history transaksi terpisah. Ringkasan
+transaksi (total masuk/keluar/selisih) TIDAK dibangun di sini —
+diputuskan (2026-10-11) jadi scope halaman Report terpisah, bukan
+tab Periode. Kalau nanti dibangun di Report, query acuannya:
 `transactions WHERE category_id IN (SELECT category_id FROM
 category_period_categories WHERE period_id = ?) AND date BETWEEN
-start_date AND end_date`, sama prinsip dengan `accounts.balance`
-yang derived. Query ini BELUM diimplementasikan (lihat checklist).
+start_date AND end_date` (on-the-fly, sama prinsip dengan
+`accounts.balance` yang derived) — dicatat di sini sbg referensi,
+BUKAN rencana implementasi tab ini.
 
 Belum ada keputusan soal validasi `end_date >= start_date` di level
 DB (CHECK) vs cuma di level UI/form (saat ini validasi ADA tapi
@@ -173,22 +243,35 @@ features/categories/
 │   │   ├── list/               — isi dipindah dari features/categories/list/ lama
 │   │   └── form/                — isi dipindah dari features/categories/form/ lama
 │   └── period/                — tab "Periode"
-│       ├── index.tsx          — CategoryPeriodSection
+│       ├── index.tsx          — CategoryPeriodSection (render 1 instance
+│       │                         per jenis dialog: create/edit/delete)
 │       ├── dialogs/
-│       │   └── create.tsx     — CreateCategoryPeriodDialog (trigger+dialog menyatu)
+│       │   ├── context.tsx    — CategoryPeriodDialogType: "create"|"edit"|"delete"
+│       │   ├── create.tsx     — CreateCategoryPeriodDialog (trigger+dialog menyatu)
+│       │   ├── edit.tsx       — EditPeriodDialog (reuse CategoryContentPeriodForm)
+│       │   └── delete.tsx     — DeletePeriodDialog (ConfirmDeleteDialog generic)
 │       ├── form/
-│       │   ├── index.tsx      — CategoryContentPeriodForm
-│       │   └── schema/        — categoryPeriodSchema, defaultValues
+│       │   ├── index.tsx      — CategoryContentPeriodForm (dipakai create & edit)
+│       │   └── schema/        — categoryPeriodSchema, defaultValues, editValues
+│       ├── list/
+│       │   ├── index.tsx      — CategoryPeriodList (state filters/sorts)
+│       │   ├── period-card.tsx     — PeriodCard (badge status, tombol edit/delete)
+│       │   ├── period-filter.tsx   — CategoryPeriodFilter
+│       │   └── period-sort.tsx     — CategoryPeriodSort
 │       └── hooks/
 │           ├── use-category-periods.ts
-│           └── use-create-category-period.ts
+│           ├── use-create-category-period.ts
+│           ├── use-update-category-period.ts
+│           ├── use-delete-category-period.ts
+│           ├── use-period-by-id.ts
+│           ├── use-period-category-ids.ts
+│           └── use-period-category-options.ts
 └── index.ts                   — barrel (export dari content/list/{list,form})
 ```
 
-Isi tab Periode saat ini: cuma dialog "Tambah Periode" (create) yang
-sudah bisa jalan penuh. List periode + ringkasan SAAT INI masih
-placeholder teks "Segera hadir." — belum ada tampilan baca sama
-sekali.
+Isi tab Periode saat ini: CRUD periode lengkap (create/edit/delete)
++ list dengan filter & sort (lihat checklist atas untuk detail
+teknis). Satu-satunya yg belum bisa adalah sync ke Worker/MCP.
 
 **Keputusan desain dialog** (2026-10-11, sempat bolak-balik):
 trigger (tombol "Tambah Periode") dan `<Dialog>` sungguhan SENGAJA
@@ -273,6 +356,10 @@ BUKAN sekadar tabel mirror):
 ## Catatan
 
 - Proyek ini portofolio-only, tidak ada deadline/urgensi.
-- Urutan kerja yang disarankan: selesaikan dulu list/ringkasan
-  periode + edit/delete di desktop (supaya bentuk data & UX final),
-  baru lanjut wiring Worker/MCP — pola sama `investment-sync.md`.
+- CRUD desktop (create/edit/delete + list/filter/sort) SUDAH FINAL
+  (2026-10-11) — bentuk data & UX sisi desktop tidak lagi berubah.
+  Kerja berikutnya yang tersisa: wiring Worker/MCP, dimulai dari
+  bikin tabel D1 + endpoint di `apps/worker` (pola sama
+  `investment-sync.md`), baru daftarkan ke `QueueableTable`/
+  `DeletableTable` dan sambungkan `pushOnWrite`/`pushDeleteOnWrite`
+  di hook desktop yang sudah ada.
