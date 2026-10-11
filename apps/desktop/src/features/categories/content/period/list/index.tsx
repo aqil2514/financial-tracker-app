@@ -4,17 +4,29 @@ import { useState } from "react";
 
 import { QueryState } from "@/components/query-state";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
+import { SortDropdown } from "@/components/query/sort";
+import type { SortConfig, SortKeyOption } from "@/components/query/sort/sort.interface";
 import { useCategoryPeriods } from "../hooks/use-category-periods";
 import { CategoryPeriodFilter } from "./period-filter";
 import { PeriodCard } from "./period-card";
 
+const SORT_CONFIG: SortKeyOption[] = [
+  { key: "category_periods.name", label: "Nama Periode" },
+  { key: "category_periods.start_date", label: "Tanggal Mulai" },
+  { key: "category_periods.end_date", label: "Tanggal Selesai" },
+];
+
 export function CategoryPeriodList() {
   const [filters, setFilters] = useState<FilterConfig[]>([]);
-  const { data: periods, isLoading, error } = useCategoryPeriods(filters);
+  const [sorts, setSorts] = useState<SortConfig[]>([]);
+  const { data: periods, isLoading, error } = useCategoryPeriods(filters, sorts);
 
   return (
     <div className="space-y-3">
-      <CategoryPeriodFilter filters={filters} onApplyFilter={setFilters} />
+      <div className="flex flex-wrap items-center gap-2">
+        <CategoryPeriodFilter filters={filters} onApplyFilter={setFilters} />
+        <SortDropdown config={SORT_CONFIG} value={sorts} onChange={setSorts} />
+      </div>
 
       <QueryState isLoading={isLoading} error={error} />
 

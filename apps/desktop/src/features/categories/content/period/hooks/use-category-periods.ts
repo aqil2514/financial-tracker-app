@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getDb, type CategoryPeriod } from "@/lib/db";
 import { buildWhereClause } from "@/components/query/filters/builders/sql";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
+import { buildOrderClause } from "@/components/query/sort/builders/sql";
+import type { SortConfig } from "@/components/query/sort/sort.interface";
 
 export const categoryPeriodsQueryKey = ["category_periods"];
 
@@ -11,8 +13,14 @@ export type CategoryPeriodWithCategories = CategoryPeriod & {
 };
 
 const FILTERABLE_COLUMNS = ["category_periods.name"] as const;
+const SORTABLE_COLUMNS = [
+  "category_periods.name",
+  "category_periods.start_date",
+  "category_periods.end_date",
+] as const;
+const DEFAULT_ORDER = "is_ongoing DESC, category_periods.start_date DESC";
 
-export function useCategoryPeriods(filters: FilterConfig[] = []) {
+export function useCategoryPeriods(filters: FilterConfig[] = [], sorts: SortConfig[] = []) {
   const categoryFilter = filters.find((f) => f.filterKey === "category_id");
   const statusFilter = filters.find((f) => f.filterKey === "status");
   const genericFilters = filters.filter(
@@ -58,9 +66,10 @@ export function useCategoryPeriods(filters: FilterConfig[] = []) {
     FILTERABLE_COLUMNS,
     extraConditions
   );
+  const orderClause = buildOrderClause(sorts, SORTABLE_COLUMNS, DEFAULT_ORDER);
 
   return useQuery({
-    queryKey: [...categoryPeriodsQueryKey, filters],
+    queryKey: [...categoryPeriodsQueryKey, filters, sorts],
     queryFn: async (): Promise<CategoryPeriodWithCategories[]> => {
       const db = await getDb();
       return db.select<CategoryPeriodWithCategories[]>(
@@ -74,7 +83,7 @@ export function useCategoryPeriods(filters: FilterConfig[] = []) {
            ON categories.id = category_period_categories.category_id
          ${whereClause}
          GROUP BY category_periods.id
-         ORDER BY is_ongoing DESC, category_periods.start_date DESC`,
+         ${orderClause}`,
         params
       );
     },
