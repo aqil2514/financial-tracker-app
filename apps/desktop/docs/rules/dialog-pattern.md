@@ -17,12 +17,12 @@ Pemisahannya:
    level orkestrator fitur (`index.tsx` / `content/index.tsx`, bukan
    per-item), `open`-nya dikontrol dari context.
 3. **State "dialog mana yang aktif"** — satu context per fitur, isinya
-   pakai `useDialogState<TType>()` dari `hooks/use-dialog-state.ts`.
+   pakai `useDialogState<TType>()` dari `provider/dialog-state.tsx`.
 
 ## `useDialogState`
 
 ```typescript
-import { useDialogState } from "@/hooks/use-dialog-state";
+import { useDialogState } from "@/provider/dialog-state";
 
 type TransactionDialogType = "create" | "edit" | "delete-confirm";
 
@@ -53,7 +53,7 @@ State-nya SATU object gabungan, bukan beberapa `useState` terpisah:
 
 ```tsx
 // features/transactions/dialog/context.tsx
-import { createDialogContext } from "@/hooks/create-dialog-context";
+import { createDialogContext } from "@/provider/dialog-state";
 
 type TransactionDialogType = "create" | "edit" | "delete-confirm";
 

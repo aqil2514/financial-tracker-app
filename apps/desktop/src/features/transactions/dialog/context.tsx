@@ -1,6 +1,6 @@
 "use client";
 
-import { createDialogContext } from "@/hooks/create-dialog-context";
+import { createDialogContext } from "@/provider/dialog-state";
 
 export type TransactionDialogType = "create" | "edit" | "detail" | "delete-confirm";
 
