@@ -33,6 +33,7 @@ type FormFieldDateRangeProps<TFieldValues extends FieldValues> = {
   name: FieldPath<TFieldValues>;
   label: string;
   placeholder?: string;
+  description?: string;
   disabled?: boolean;
 };
 
@@ -41,6 +42,7 @@ export function FormFieldDateRange<TFieldValues extends FieldValues>({
   name,
   label,
   placeholder,
+  description,
   disabled,
 }: FormFieldDateRangeProps<TFieldValues>) {
   return (
@@ -56,6 +58,9 @@ export function FormFieldDateRange<TFieldValues extends FieldValues>({
             placeholder={placeholder}
             disabled={disabled}
           />
+          {description && (
+            <p className="text-muted-foreground text-sm">{description}</p>
+          )}
           {fieldState.error && (
             <p className="text-destructive text-sm">{fieldState.error.message}</p>
           )}

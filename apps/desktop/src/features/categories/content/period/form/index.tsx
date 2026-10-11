@@ -75,6 +75,7 @@ export function CategoryContentPeriodForm({
         form={form}
         name="date_range"
         label="Rentang Tanggal"
+        description="Belum tahu kapan berakhir? Isi tanggal akhir dengan perkiraan dulu, nanti bisa diubah lagi setelah periode ini benar-benar selesai."
       />
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
