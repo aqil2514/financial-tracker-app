@@ -2,7 +2,7 @@
 
 > Detail implementasi sisi desktop utk fitur lintas-app "Periode
 > Kategori". Index navigasi + status lintas-app ada di
-> [`docs/todos/plan/category-period-sync.md`](../../../../../docs/todos/plan/category-period-sync.md)
+> [`docs/todos/done/category-period-sync.md`](../../../../../docs/todos/done/category-period-sync.md)
 > (root repo) — JANGAN duplikasi isi ke sana, cukup pointer status.
 
 ## Status & TODO saat ini (ringkas)
@@ -13,7 +13,7 @@ SEMUA SELESAI (2026-10-11) — lihat "Rencana pendekatan" di bawah
 utk detail teknis & revisi desain yang terjadi di tengah jalan
 (many-to-many kategori). Fitur ini FINAL di sisi desktop, termasuk
 sync-nya; satu-satunya sisa pekerjaan lintas-app adalah deploy
-Worker ke `--remote` (lihat `apps/worker/docs/todos/plan/category-period.md`)
+Worker ke `--remote` (lihat `apps/worker/docs/todos/done/category-period.md`)
 dan tool MCP (belum dimulai, sengaja tahap terakhir).
 
 **Ringkasan transaksi TIDAK masuk tab Periode (Kategori)** —
@@ -376,7 +376,7 @@ asisten AI, bukan cuma dibuka manual di desktop.
 - Worker: modul `category-periods/` (upsert-by-id + LWW + replace-all
   pivot, soft-delete, query ringkasan on-the-fly) + endpoint push +
   perluasan `/sync` snapshot. Detail lengkap di
-  `apps/worker/docs/todos/plan/category-period.md`.
+  `apps/worker/docs/todos/done/category-period.md`.
 - Desktop: `category_periods` terdaftar di `QueueableTable`/
   `DeleteCloudPayload`, `pushOnWrite`/`pushDeleteOnWrite` dipasang di
   `useCreateCategoryPeriod`/`useUpdateCategoryPeriod`/
@@ -389,7 +389,7 @@ asisten AI, bukan cuma dibuka manual di desktop.
   manual ke D1 (simulasi device/MCP lain) muncul benar di UI.
 
 **Masih tersisa** (lintas-app, lihat index di
-[`docs/todos/plan/category-period-sync.md`](../../../../../docs/todos/plan/category-period-sync.md)):
+[`docs/todos/done/category-period-sync.md`](../../../../../docs/todos/done/category-period-sync.md)):
 deploy migrasi D1 + Worker ke `--remote`/production, dan tool MCP (5
 tool, sengaja tahap paling terakhir — belum dimulai sama sekali).
 

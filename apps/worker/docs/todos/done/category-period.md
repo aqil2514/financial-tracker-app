@@ -2,14 +2,14 @@
 
 > Detail implementasi sisi `apps/worker` utk fitur lintas-app
 > "Periode Kategori". Index navigasi + status lintas-app ada di
-> [`docs/todos/plan/category-period-sync.md`](../../../../../docs/todos/plan/category-period-sync.md)
+> [`docs/todos/done/category-period-sync.md`](../../../../../docs/todos/done/category-period-sync.md)
 > (root repo) — JANGAN duplikasi isi ke sana, cukup pointer status.
 
 ## Status & TODO saat ini (ringkas)
 
-Migrasi D1 SUDAH diterapkan ke lokal (2026-10-11). Modul/endpoint/
-sync BELUM — scope sesi berikutnya. Lihat bagian "Rencana
-pendekatan" di bawah utk detail.
+SELESAI PENUH (2026-10-11) — migrasi D1, modul/endpoint, perluasan
+`/sync`, DAN deploy ke `--remote`/production semua sudah jalan &
+diverifikasi. Lihat bagian "Rencana pendekatan" di bawah utk detail.
 
 **REVISI (2026-10-11)**: dokumen ini awalnya ditulis SEBELUM revisi
 skema many-to-many di sisi desktop (migrasi `0048` — lihat
@@ -22,11 +22,11 @@ tunggal) jadi 2 tabel (`category_periods` + tabel pivot
 - [x] Migrasi D1 `schema/0006_category_periods.sql` (2026-10-11) — 2
   `CREATE TABLE` murni (tabel baru, tidak direferensikan FK tabel lain
   → tidak perlu pola copy-and-rename seperti migrasi `accounts`).
-  Diterapkan ke D1 **lokal** (`wrangler d1 execute financial-app
-  --local --file=schema/0006_category_periods.sql`), diverifikasi via
-  `SELECT sql FROM sqlite_master WHERE type='table' AND name IN
-  (...)` — struktur kedua tabel sesuai persis rencana. **BELUM
-  diterapkan ke `--remote`/production** (lihat item deploy di bawah).
+  Diterapkan ke D1 lokal DAN `--remote`/production (`wrangler d1
+  execute financial-app --remote --file=schema/0006_category_periods.sql`,
+  2026-10-11: 4 queries, 9 rows written), diverifikasi via `SELECT sql
+  FROM sqlite_master WHERE type='table' AND name IN (...)` di kedua
+  sisi — struktur kedua tabel sesuai persis rencana.
 - [x] Modul `category-periods/` (`schema.ts`/`service.ts`/
   `controller.ts`/`router.ts`, pola `categories/`) (2026-10-11) — CRUD
   upsert-by-id dgn LWW (`shared/lww.ts`) utk `category_periods`, PLUS
@@ -57,10 +57,12 @@ tunggal) jadi 2 tabel (`category_periods` + tabel pivot
 - [x] Verifikasi lokal via `wrangler dev` (2026-10-11) — modul/endpoint
   SUDAH diverifikasi per-item di atas, migrasi D1 diverifikasi lokal
   duluan di poin migrasi. Semua bersih sebelum deploy.
-- [ ] Deploy ke `--remote`/production — desktop SUDAH wired push
-  (2026-10-11, lihat `apps/desktop/docs/todos/done/category-period.md`),
-  tidak ada blocker teknis lagi, tinggal dieksekusi. Migrasi D1 JUGA
-  perlu diterapkan ulang ke `--remote` saat itu (saat ini cuma lokal).
+- [x] Deploy ke `--remote`/production (2026-10-11) — `wrangler deploy`
+  sukses (Version ID `c0c7c159-5ec3-4bee-aa15-8acd6e6c1c4b`). Smoke
+  test production: `/health` 200, `POST /category-periods/push` tanpa
+  token 401 (endpoint hidup & ter-proteksi). Tidak ada write test
+  tertulis terhadap data production (token produksi di luar `.dev.vars`
+  lokal, lihat `[[feedback_worker_secret_not_in_dev_vars]]`).
 
 ## Rencana pendekatan
 

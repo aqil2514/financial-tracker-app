@@ -2,14 +2,18 @@
 
 > Detail implementasi sisi `apps/mcp-server` utk fitur lintas-app
 > "Periode Kategori". Index navigasi + status lintas-app ada di
-> [`docs/todos/plan/category-period-sync.md`](../../../../../docs/todos/plan/category-period-sync.md)
+> [`docs/todos/done/category-period-sync.md`](../../../../../docs/todos/done/category-period-sync.md)
 > (root repo) — JANGAN duplikasi isi ke sana, cukup pointer status.
 
 ## Status & TODO saat ini (ringkas)
 
-Baru tahap rencana — belum ada kode ditulis sama sekali (dikonfirmasi
-2026-10-11: tidak ada folder `mcp-tools/category-periods/`). Lihat
-bagian "Rencana pendekatan" di bawah utk detail.
+SELESAI PENUH (2026-10-11) — semua 5 tool + perluasan snapshot
+ditulis & diverifikasi end-to-end lewat `wrangler dev` + `next dev` +
+curl JSON-RPC asli (create, list, get summary dgn transaksi riil,
+update replace-all kategori, delete dgn validasi `confirm:true`,
+semua lolos). Worker production SUDAH deploy (migrasi `0006` +
+endpoint, lihat `apps/worker/docs/todos/done/category-period.md`) —
+fitur ini SIAP dipakai asisten AI di production.
 
 **REVISI (2026-10-11)**: dokumen ini awalnya ditulis SEBELUM revisi
 skema many-to-many di sisi desktop (migrasi `0048` — lihat
@@ -21,25 +25,31 @@ direncanakan SUDAH mewakili semua kemampuan CRUD + ringkasan yg ada
 di desktop** (create/edit/delete/list+filter+sort/ringkasan) — bukan
 kurang tool, kemarin cuma skemanya yg basi.
 
-- [ ] `sync-snapshot.ts` — tipe `CategoryPeriod` ditambah ke
+- [x] `sync-snapshot.ts` — tipe `CategoryPeriod` ditambah ke
   `SyncSnapshot` (field: `id`, `categoryIds` (array, BUKAN
-  `categoryId` tunggal), `name`, `startDate`, `endDate`).
-- [ ] `sync-snapshot.ts` — fungsi baru `getCategoryPeriodSummary`
-  (satu periode: total masuk/keluar/selisih + daftar transaksi,
-  dihitung dari `transactions` yg SUDAH ada di snapshot yg sama,
-  filter `categoryId IN categoryIds` + `date BETWEEN startDate AND
-  endDate`) dan `listCategoryPeriods` (opsional filter by nama DAN/
-  ATAU `categoryId` tunggal — match kalau `categoryId` ada di
+  `categoryId` tunggal), `name`, `startDate`, `endDate`,
+  `updatedAt`/`deletedAt`).
+- [x] `sync-snapshot.ts` — fungsi baru `getCategoryPeriodSummary`
+  (satu periode: total masuk/expense + daftar transaksi, dihitung
+  dari `transactions` yg SUDAH ada di snapshot yg sama, filter
+  `categoryId ∈ categoryIds` + `date BETWEEN startDate AND endDate`)
+  dan `listCategoryPeriods` (opsional filter by nama DAN/ATAU
+  `categoryId` tunggal — match kalau `categoryId` ada di
   `categoryIds` periode itu, pola sama filter kategori di desktop).
-- [ ] 4 tool CRUD baru di `mcp-tools/category-periods/`:
+- [x] 4 tool CRUD baru di `mcp-tools/category-periods/`:
   `list_category_periods`, `create_category_period`,
   `update_category_period`, `delete_category_period` — pola
-  `mcp-tools/categories/`.
-- [ ] 1 tool baca ringkasan: `get_category_period_summary` (input
+  `mcp-tools/categories/`. Catatan kecil beda dari rencana awal:
+  parameter id dinamai `periodId` (bukan `id` generik), konsisten dgn
+  `accountGroupId`/`categoryId` di modul lain.
+- [x] 1 tool baca ringkasan: `get_category_period_summary` (input
   `periodId`).
-- [ ] Didaftarkan di `mcp-tools/index.ts`.
-- [ ] Verifikasi via `wrangler dev` (Worker lokal) + `next dev` (MCP
-  lokal) + `curl` JSON-RPC, pola `investment-sync.md` Tahap 5 Grup B.
+- [x] Didaftarkan di `mcp-tools/index.ts`.
+- [x] Verifikasi via `wrangler dev` (Worker lokal) + `next dev` (MCP
+  lokal, `.env.local` baru override `WORKER_URL` ke lokal) + `curl`
+  JSON-RPC (2026-10-11) — create/list/get_summary/update/delete
+  semua lolos, termasuk replace-all kategori saat update dan
+  validasi `confirm:true` wajib saat delete.
 
 ## Rencana pendekatan
 
@@ -70,7 +80,7 @@ SELURUH isinya sudah disesuaikan menyusul:
 ### Baca vs tulis
 
 Beda dari `/category-periods/:id/summary` endpoint Worker (lihat
-`apps/worker/docs/todos/plan/category-period.md`) yang disediakan
+`apps/worker/docs/todos/done/category-period.md`) yang disediakan
 tapi TIDAK dipakai jalur ini — MCP membaca dari snapshot `/sync`
 (`fetchFullSnapshot`, satu kali fetch berisi SEMUA tabel termasuk
 `transactions` & `categoryPeriods`), lalu hitung ringkasan sendiri di

@@ -115,6 +115,16 @@ export type InvestmentSale = {
   deletedAt: string | null;
 };
 
+export type CategoryPeriod = {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  categoryIds: string[];
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
 export type SyncSnapshot = {
   checkpoint: string;
   accountGroups: AccountGroup[];
@@ -127,6 +137,7 @@ export type SyncSnapshot = {
   investmentAccounts: InvestmentAccount[];
   investmentPurchases: InvestmentPurchase[];
   investmentSales: InvestmentSale[];
+  categoryPeriods: CategoryPeriod[];
 };
 
 export async function fetchFullSnapshot(
@@ -633,5 +644,62 @@ export function listInvestmentDetail(
   return {
     purchases: snapshot.investmentPurchases.filter((p) => isAlive(p) && p.accountId === accountId),
     sales: snapshot.investmentSales.filter((s) => isAlive(s) && s.accountId === accountId),
+  };
+}
+
+export function listCategoryPeriods(
+  snapshot: SyncSnapshot,
+  options: { name?: string; categoryId?: string } = {}
+): CategoryPeriod[] {
+  const nameLower = options.name?.toLowerCase();
+  return snapshot.categoryPeriods
+    .filter(isAlive)
+    .filter((p) => !nameLower || p.name.toLowerCase().includes(nameLower))
+    .filter((p) => !options.categoryId || p.categoryIds.includes(options.categoryId));
+}
+
+// Match persis getCategoryPeriodSummary di apps/worker/src/modules/category-periods/service.ts
+// dan useCategoryPeriodSummary (desktop) -- dihitung dari transactions yg
+// SUDAH ada di snapshot yg sama, bukan request HTTP terpisah per periode
+// (lihat "Baca vs tulis" di docs/todos/plan/category-period.md).
+export function getCategoryPeriodSummary(
+  snapshot: SyncSnapshot,
+  periodId: string
+): {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  totalIncome: number;
+  totalExpense: number;
+  transactions: Transaction[];
+} | null {
+  const period = snapshot.categoryPeriods.find((p) => p.id === periodId && isAlive(p));
+  if (!period) return null;
+
+  const transactions = snapshot.transactions.filter(
+    (t) =>
+      isAlive(t) &&
+      t.categoryId !== null &&
+      period.categoryIds.includes(t.categoryId) &&
+      datePart(t.date) >= period.startDate &&
+      datePart(t.date) <= period.endDate
+  );
+
+  let totalIncome = 0;
+  let totalExpense = 0;
+  for (const t of transactions) {
+    if (t.type === "income") totalIncome += t.amount;
+    else if (t.type === "expense") totalExpense += t.amount;
+  }
+
+  return {
+    id: period.id,
+    name: period.name,
+    startDate: period.startDate,
+    endDate: period.endDate,
+    totalIncome,
+    totalExpense,
+    transactions,
   };
 }

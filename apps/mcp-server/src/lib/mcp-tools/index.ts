@@ -8,6 +8,7 @@ import { registerAccountGroupsMcpTools } from "./account-groups";
 import { registerInvestmentsMcpTools } from "./investments";
 import { registerAttachmentsMcpTools } from "./attachments";
 import { registerLabelsMcpTools } from "./labels";
+import { registerCategoryPeriodsMcpTools } from "./category-periods";
 
 export function registerAllMcpTools(server: McpServer) {
   registerAccountsMcpTools(server);
@@ -19,4 +20,5 @@ export function registerAllMcpTools(server: McpServer) {
   registerInvestmentsMcpTools(server);
   registerAttachmentsMcpTools(server);
   registerLabelsMcpTools(server);
+  registerCategoryPeriodsMcpTools(server);
 }

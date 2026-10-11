@@ -47,7 +47,7 @@ Hard-delete saat `deletedAt` terisi juga menyasar pasangan, bukan `id`, supaya d
 
 ## `upsertCategoryPeriod` / `applyCategoryPeriodRow`
 
-`row.categoryIds` dari snapshot `/sync` sudah di-JOIN+GROUP_CONCAT jadi `string[]` category_id polos di Worker (bukan baris pivot `{id, categoryId}` — lihat "Perluasan `/sync`" di `apps/worker/docs/todos/plan/category-period.md`), jadi `id` pivot lokal di-generate baru di sini. Replace-all (DELETE semua pivot lama + INSERT ulang), pola persis `use-update-category-period.ts` di sisi desktop — pivot id sendiri cuma row identifier teknis (cloud_sync_queue/D1 PK), tidak ada makna yang perlu dipertahankan lintas device.
+`row.categoryIds` dari snapshot `/sync` sudah di-JOIN+GROUP_CONCAT jadi `string[]` category_id polos di Worker (bukan baris pivot `{id, categoryId}` — lihat "Perluasan `/sync`" di `apps/worker/docs/todos/done/category-period.md`), jadi `id` pivot lokal di-generate baru di sini. Replace-all (DELETE semua pivot lama + INSERT ulang), pola persis `use-update-category-period.ts` di sisi desktop — pivot id sendiri cuma row identifier teknis (cloud_sync_queue/D1 PK), tidak ada makna yang perlu dipertahankan lintas device.
 
 Hard-delete periode ikut menghapus pivotnya lewat `ON DELETE CASCADE` (`0048_category_periods_many_categories.sql`) — beda dari Worker yang sengaja biarkan pivot menggantung saat soft-delete (lihat catatan `deleteCategoryPeriod` di `apps/worker/src/modules/category-periods/service.ts`).
 

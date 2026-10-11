@@ -11,12 +11,10 @@ app — JANGAN duplikasi isi ke sini, cukup pointer.
 
 ## Status & TODO saat ini (ringkas)
 
-Desktop: SELESAI PENUH (2026-10-11) — skema DB (many-to-many), CRUD
-+ list/filter/sort, ringkasan di Laporan, DAN cloud sync (push+pull)
-ke Worker, semua final & terverifikasi. Dokumen detailnya SUDAH
-dipindah ke `done/`. Worker: modul+endpoint+perluasan `/sync` SELESAI
-lokal, cuma deploy `--remote` yang tertunda. MCP BELUM disentuh sama
-sekali. Lihat dokumen per-app utk detail teknis.
+SELESAI PENUH lintas-app (2026-10-11) — desktop, Worker (termasuk
+deploy `--remote`/production), DAN MCP server semua final &
+terverifikasi end-to-end. Fitur ini siap dipakai asisten AI lewat
+tool MCP di production. Lihat dokumen per-app utk detail teknis.
 
 - [x] Desktop — SELESAI PENUH (2026-10-11): skema
   `category_periods`+`category_period_categories` (migrasi `0047`+`0048`,
@@ -27,20 +25,20 @@ sekali. Lihat dokumen per-app utk detail teknis.
   + pull via `applySyncResponse`) — diverifikasi end-to-end lewat
   `tauri dev` + `wrangler dev` asli. Lihat
   [`apps/desktop/docs/todos/done/category-period.md`](../../../apps/desktop/docs/todos/done/category-period.md).
-- [ ] Worker — tabel D1 `category_periods`+`category_period_categories`
-  + modul `category-periods/` (CRUD + query ringkasan on-the-fly) +
-  endpoint push + perluasan `/sync` SEMUA SELESAI & diverifikasi
-  lokal (2026-10-11). Cuma deploy ke `--remote`/production yang
-  tertunda, lihat
-  [`apps/worker/docs/todos/plan/category-period.md`](../../../apps/worker/docs/todos/plan/category-period.md).
-- [ ] MCP server — perluasan `/sync` snapshot + tool baru (list/create/
-  update/delete periode, get ringkasan periode) — BELUM DIMULAI (sengaja
-  tahap paling terakhir). Rencana di dokumennya perlu dicek ulang sudah
-  sinkron dgn skema many-to-many final sebelum mulai. Lihat
-  [`apps/mcp-server/docs/todos/plan/category-period.md`](../../../apps/mcp-server/docs/todos/plan/category-period.md).
-- [ ] Deploy D1 migrasi + modul Worker ke `--remote`/production —
-  ditunda sampai desktop siap push (SUDAH) — tinggal dieksekusi kapan
-  saja, tidak ada blocker teknis lagi.
+- [x] Worker — SELESAI PENUH (2026-10-11): tabel D1
+  `category_periods`+`category_period_categories`, modul
+  `category-periods/` (CRUD + query ringkasan on-the-fly), endpoint
+  push, perluasan `/sync`, DAN deploy ke `--remote`/production
+  (migrasi `0006` diterapkan remote, `wrangler deploy` sukses, smoke
+  test `/health` + auth lolos). Lihat
+  [`apps/worker/docs/todos/done/category-period.md`](../../../apps/worker/docs/todos/done/category-period.md).
+- [x] MCP server — SELESAI PENUH (2026-10-11): tipe `CategoryPeriod`
+  di `SyncSnapshot`, `listCategoryPeriods`/`getCategoryPeriodSummary`,
+  5 tool CRUD (`list_category_periods`, `get_category_period_summary`,
+  `create_category_period`, `update_category_period`,
+  `delete_category_period`) — diverifikasi end-to-end lewat
+  `next dev` + `wrangler dev` + curl JSON-RPC asli. Lihat
+  [`apps/mcp-server/docs/todos/done/category-period.md`](../../../apps/mcp-server/docs/todos/done/category-period.md).
 
 ## Latar belakang
 
