@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot, listTransactions, buildNameLookups } from "@/lib/sync-snapshot/entities";
+import { fetchFullSnapshot, listTransactions, buildNameLookups, buildLabelNameLookup } from "@/lib/sync-snapshot/entities";
 
 export function registerListTransactions(server: McpServer) {
   server.registerTool(
@@ -47,6 +47,11 @@ export function registerListTransactions(server: McpServer) {
         maxAmount,
       });
       const lookup = buildNameLookups(snapshot);
+      const labelNamesByTransactionId = buildLabelNameLookup(
+        snapshot.transactionLabels,
+        snapshot.labels,
+        (row) => row.transactionId
+      );
 
       const result = transactions.map((t) => ({
         ...t,
@@ -54,6 +59,7 @@ export function registerListTransactions(server: McpServer) {
         accountName: t.accountId ? (lookup.accountName.get(t.accountId) ?? null) : null,
         transferAccountName: t.transferAccountId ? (lookup.accountName.get(t.transferAccountId) ?? null) : null,
         contactName: t.contactId ? (lookup.contactName.get(t.contactId) ?? null) : null,
+        labelNames: labelNamesByTransactionId.get(t.id) ?? [],
       }));
 
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

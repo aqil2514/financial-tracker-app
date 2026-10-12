@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot, listAliveCategories } from "@/lib/sync-snapshot/entities";
+import { fetchFullSnapshot, listAliveCategories, buildLabelNameLookup } from "@/lib/sync-snapshot/entities";
 
 export function registerListCategories(server: McpServer) {
   server.registerTool(
@@ -19,6 +19,11 @@ export function registerListCategories(server: McpServer) {
       const snapshot = await fetchFullSnapshot((path) => workerFetch(token, path));
 
       const categories = listAliveCategories(snapshot).filter((c) => !type || c.type === type);
+      const labelNamesByCategoryId = buildLabelNameLookup(
+        snapshot.categoryLabels,
+        snapshot.labels,
+        (row) => row.categoryId
+      );
 
       const result = categories.map((c) => ({
         id: c.id,
@@ -28,6 +33,7 @@ export function registerListCategories(server: McpServer) {
         parentId: c.parentId,
         isActive: c.isActive,
         updatedAt: c.updatedAt,
+        labelNames: labelNamesByCategoryId.get(c.id) ?? [],
       }));
 
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

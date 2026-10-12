@@ -121,6 +121,38 @@ export type CategoryPeriod = {
   deletedAt: string | null;
 };
 
+export type Label = {
+  id: string;
+  name: string;
+  scope: "transaction_category" | "account";
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
+export type TransactionLabel = {
+  id: string;
+  transactionId: string;
+  labelId: string;
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
+export type CategoryLabel = {
+  id: string;
+  categoryId: string;
+  labelId: string;
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
+export type AccountLabel = {
+  id: string;
+  accountId: string;
+  labelId: string;
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
 export type SyncSnapshot = {
   checkpoint: string;
   accountGroups: AccountGroup[];
@@ -134,6 +166,10 @@ export type SyncSnapshot = {
   investmentPurchases: InvestmentPurchase[];
   investmentSales: InvestmentSale[];
   categoryPeriods: CategoryPeriod[];
+  labels: Label[];
+  transactionLabels: TransactionLabel[];
+  categoryLabels: CategoryLabel[];
+  accountLabels: AccountLabel[];
 };
 
 export async function fetchFullSnapshot(

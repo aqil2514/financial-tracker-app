@@ -1,7 +1,9 @@
 export type {
   Account,
   AccountGroup,
+  AccountLabel,
   Category,
+  CategoryLabel,
   CategoryPeriod,
   Contact,
   Debt,
@@ -9,12 +11,14 @@ export type {
   InvestmentAccount,
   InvestmentPurchase,
   InvestmentSale,
+  Label,
   SyncSnapshot,
   Transaction,
+  TransactionLabel,
 } from "../types";
 export { fetchFullSnapshot } from "../types";
 
-export { buildNameLookups } from "../shared";
+export { buildLabelNameLookup, buildNameLookups } from "../shared";
 
 export { computeAccountBalance } from "./accounts/compute-account-balance";
 export { listAliveAccounts } from "./accounts/list-alive-accounts";

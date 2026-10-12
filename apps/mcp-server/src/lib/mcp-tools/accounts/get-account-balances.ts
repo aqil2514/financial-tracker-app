@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot, computeAccountBalance, listAliveAccounts } from "@/lib/sync-snapshot/entities";
+import { fetchFullSnapshot, computeAccountBalance, listAliveAccounts, buildLabelNameLookup } from "@/lib/sync-snapshot/entities";
 
 export function registerGetAccountBalances(server: McpServer) {
   server.registerTool(
@@ -25,6 +25,7 @@ export function registerGetAccountBalances(server: McpServer) {
       const groupNameById = new Map(
         snapshot.accountGroups.filter((g) => g.deletedAt === null).map((g) => [g.id, g.name])
       );
+      const labelNamesByAccountId = buildLabelNameLookup(snapshot.accountLabels, snapshot.labels, (row) => row.accountId);
 
       const result = accounts.map((a) => ({
         id: a.id,
@@ -35,6 +36,7 @@ export function registerGetAccountBalances(server: McpServer) {
         description: a.description,
         balance: computeAccountBalance(snapshot, a.id),
         updatedAt: a.updatedAt,
+        labelNames: labelNamesByAccountId.get(a.id) ?? [],
       }));
 
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
