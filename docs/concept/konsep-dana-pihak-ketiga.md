@@ -1,6 +1,6 @@
 # Konsep Dana Pihak Ketiga di Aplikasi Ini
 
-> Status: BARU konsep, belum ada implementasi kode apa pun. Diskusi lengkap ada di percakapan 2026-10-09 (lihat `apps/desktop/docs/todos/plan/account-type-third-party.md` untuk checklist teknisnya). Dokumen ini murni model data & aturan — belum migrasi, belum form, belum UI.
+> Status: Model data & aturan sudah matang (diskusi 2026-10-09), 3 pertanyaan terbuka sudah diputuskan (2026-10-13, lihat "Keputusan final" di bawah), migrasi skema sudah ditulis (`apps/desktop/src-tauri/migrations/0049_account_type_third_party.sql`). BELUM: `classifyAccountPair`, `applyThirdPartyTransaction`, form, pengecualian cashflow, UI. Lihat `apps/desktop/docs/todos/plan/account-type-third-party.md` untuk checklist teknis lengkap.
 
 ## Kenapa fitur ini ada
 
@@ -78,15 +78,20 @@ HAVING sisa_titipan != 0
 
 Satu query/sumber kebenaran yang sama bisa menjawab baik "total per orang" (tanpa `GROUP BY` akun) maupun "breakdown per orang × per tempat" (dengan) — tidak perlu dua struktur data berbeda.
 
+## Keputusan final (2026-10-13)
+
+Menjawab 3 pertanyaan yang sebelumnya terbuka — lihat migrasi `apps/desktop/src-tauri/migrations/0049_account_type_third_party.sql`:
+
+- **Bentuk tabel detail** — TIDAK reuse pola `debts` apa adanya. Tabel `third_party_funds`: `id`, `account_id`, `contact_id` (NOT NULL, `ON DELETE RESTRICT` — beda dari `debts.contact_id` yang nullable/`SET NULL`, karena kontak WAJIB diisi di sini), `transaction_id`, `direction` (`in`/`out`), `amount`, `date`, `note`, plus kolom sync standar (`created_at`/`updated_at`/`deleted_at`/`sync_source`). Tidak ada kolom `type` seperti `debts.type` (`receivable`/`payable`) — arah sudah jelas dari jenis transaksi (`income`=nitip, `expense`=ambil), TAPI kolom `direction` tetap ada di tabel detail sendiri (bukan sekadar baca dari `transactions.type`) karena transfer `third_party → third_party` menghasilkan DUA baris per transaksi (satu `out` di kontak+akun asal, satu `in` di kontak+akun tujuan) — satu `transactions.type = 'transfer'` saja tidak cukup merepresentasikan dua kontak independen itu.
+- **Status "lunas"** — TIDAK perlu kolom `status`. Sisa titipan dihitung ulang: `SUM(amount WHERE direction='in') - SUM(amount WHERE direction='out')` per `(account_id, contact_id)`. Konsisten dengan sifat "rekening berjalan" tanpa titik "selesai" alami.
+- **Validasi "ambil melebihi titipan"** — YA, perlu. Sebelum insert baris `direction='out'`, hitung sisa titipan via query SUM di atas, tolak kalau nominal yang diambil melebihi sisa. Pola serupa `getRemainingUnit()`/`InsufficientInvestmentUnitsError` di investasi — belum diimplementasikan di kode, logic-nya menyusul di `applyThirdPartyTransaction`.
+
 ## Belum diputuskan
 
-- **Bentuk tabel detail** — apakah reuse pola `debts` APA ADANYA (tabel `third_party_funds` dengan kolom mirip `debts`: `contact_id`, `amount`, `account_id`, `transaction_id`, `status`), atau butuh penyesuaian karena arah pergerakannya cuma SATU arti per jenis transaksi (beda dari `debt-cash` yang AMBIGU butuh `debtAction` eksplisit — di sini `income`=nitip dan `expense`=ambil sudah jelas tanpa perlu tanya user "maksudnya apa").
-- **Status "lunas"** — apakah titipan butuh konsep status eksplisit seperti `debt` (berjalan/lunas/dihapuskan), atau cukup dihitung ulang dari SUM transaksi (titipan "lunas" = saldo kontak itu di akun itu sudah 0, tidak perlu kolom status tersimpan)? Condong ke yang kedua mengingat sifatnya "rekening berjalan" tanpa titik "selesai" yang natural (beda dari piutang yang memang menuju pelunasan).
-- **Validasi "ambil melebihi titipan"** — perlu validasi oversell seperti investasi (`InsufficientInvestmentUnitsError`) untuk mencegah `expense third_party` melebihi sisa titipan kontak itu di akun itu? Kemungkinan ya, pola serupa `getRemainingUnit()`.
 - **Form transfer `third_party → third_party`** — detail UI untuk dua field kontak independen (asal/tujuan), termasuk bagaimana menyajikan "ini pindah tempat" vs "ini pindah kepemilikan" vs kombinasi keduanya secara jelas ke user (satu form yang sama, atau dibedakan bahasanya secara kondisional).
 - **Penempatan laporan/UI** — halaman terpisah (seperti `/investments`, `/debts`) atau bagian dari halaman Akun yang sudah ada? Juga breakdown di card akun halaman Akun (lihat screenshot diskusi: perlu baris tambahan "termasuk Rp X titipan" atau cukup card akun `third_party` berdiri sendiri karena sudah akun terpisah sepenuhnya — kemungkinan BESAR opsi kedua yang relevan sekarang, karena saldo sudah terpisah bersih sejak dari struktur akunnya, bukan tercampur di satu card seperti dugaan awal diskusi).
 - **Sinkronisasi ke `apps/worker`/`apps/mcp-server`** — belum dibahas sama sekali, lihat pola investasi yang sempat desktop-only dulu sebelum menyusul (`docs/todos/plan/investment-sync.md`).
-- **Nama resmi tipe akun** — `third_party` dipakai konsisten sepanjang dokumen ini (sudah disebut di `konsep-tipe-akun.md`), tapi nama tabel/kolom teknis final belum diputuskan.
+- ~~**Nama resmi tipe akun**~~ — SUDAH final (2026-10-13): `account_type = 'third_party'`, tabel detail `third_party_funds`, kolom `direction` (`in`/`out`). Lihat "Keputusan final" di atas.
 
 ## Relevansi dengan Retailku
 

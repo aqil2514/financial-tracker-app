@@ -5,10 +5,10 @@
 Penjelasan lengkap kenapa tiap poin ada di sini — lihat model data & aturan lengkap di [docs/concept/konsep-dana-pihak-ketiga.md](../../../../../docs/concept/konsep-dana-pihak-ketiga.md), BACA DULU sebelum menulis kode apa pun di sini — dokumen ini cuma checklist teknis, bukan pengganti konsepnya.
 
 - [x] Diskusi konsep selesai (2026-10-09) — model data, arah pergerakan yang valid/tidak valid, pengecualian cashflow, semua sudah diuji dari berbagai skenario nyata. Lihat dokumen konsep.
-- [ ] Keputusan belum diambil: bentuk tabel detail (reuse pola `debts` apa adanya, atau disesuaikan — lihat "Belum diputuskan" di dokumen konsep).
-- [ ] Keputusan belum diambil: perlu kolom `status` (lunas/berjalan) atau cukup dihitung ulang dari SUM transaksi.
-- [ ] Keputusan belum diambil: validasi "ambil melebihi sisa titipan" — perlu atau tidak, pola seperti apa.
-- [ ] Migrasi skema (`account_type` tambah `'third_party'`, tabel detail) belum ditulis.
+- [x] Keputusan diambil (2026-10-13): bentuk tabel detail — TIDAK 1:1 copy dari `debts`. Tabel baru `third_party_funds` (`account_id`, `contact_id` NOT NULL, `transaction_id`, `direction` IN ('in','out'), `amount`, `date`, `note`). `contact_id` NOT NULL + `ON DELETE RESTRICT` (beda dari `debts.contact_id` yang nullable/`SET NULL`) karena konsep mewajibkan kontak terisi. Kolom `direction` (bukan `type` seperti `debts.type`) karena transfer `third_party→third_party` butuh DUA baris independen per transaksi (satu `out` di kontak+akun asal, satu `in` di kontak+akun tujuan) — tidak bisa hanya mengandalkan `transactions.type`.
+- [x] Keputusan diambil (2026-10-13): TIDAK perlu kolom `status`. Sisa titipan dihitung ulang dari `SUM(amount WHERE direction='in') - SUM(amount WHERE direction='out')` per `(account_id, contact_id)`.
+- [x] Keputusan diambil (2026-10-13): validasi oversell tetap diperlukan — sebelum insert baris `direction='out'`, hitung sisa titipan via query SUM di atas, tolak kalau `amount` yang diambil > sisa. Pola serupa `getRemainingUnit()` di investasi. Belum diimplementasikan di kode (baru keputusan desain), logic-nya menyusul di `applyThirdPartyTransaction`.
+- [x] Migrasi skema ditulis (2026-10-13): [0049_account_type_third_party.sql](../../../src-tauri/migrations/0049_account_type_third_party.sql) — `accounts.account_type` tambah `'third_party'` (copy-and-rename, ikut rebuild 8 tabel yang FK ke `accounts` baik langsung maupun transitif lewat `transactions`: `transactions`, `transaction_attachments`, `transaction_labels`, `debts`, `debt_payments`, `retailku_sync_field_mapping`, `investment_accounts`, `investment_purchases`, `investment_sales`, `account_labels`) + tabel baru `third_party_funds`. Sudah diverifikasi eksekusi penuh (seed data + jalankan migrasi + cek row count & `foreign_key_check`), bukan cuma dibaca. Terdaftar di [migrations.rs](../../../src-tauri/src/migrations.rs).
 - [ ] `classifyAccountPair` belum ditambah kombinasi `third_party-*` — PENTING: `third_party-third_party` BUKAN reuse dari `debt-debt` yang sudah ada (itu ternyata no-op, lihat dokumen konsep bagian "Pindah tempat dan/atau pindah kepemilikan") — perlu logic baru sungguhan.
 - [ ] Logic `applyThirdPartyTransaction` (atau nama serupa) belum ditulis — PERHATIAN: pola utamanya `income`/`expense` SATU SISI (seperti investasi `record_mode: direct`), BUKAN trigger dari `transfer` seperti `applyDebtTransaction`. Transfer cuma relevan untuk `third_party → third_party`.
 - [ ] Form titip/ambil (income/expense pada akun third_party) belum didesain.
@@ -46,12 +46,12 @@ Lalu diuji arah pergerakan mana yang valid sebagai `transfer` vs harus `income`/
 | Masuk cashflow? | Ya (transfer tidak masuk cashflow dari awal, tapi debt TIDAK py pengecualian khusus income/expense) | TIDAK — pengecualian baru berdasar `account_type`, preseden pertama di app ini |
 | Satu akun per kontak? | Tidak — kontak dibedakan di `debts.contact_id` | Tidak — sama, kontak dibedakan di level data, bukan akun |
 
-## Pekerjaan yang MASIH KOSONG (belum ada draf sama sekali)
+## Pekerjaan yang MASIH KOSONG
 
-Beda dari `account-type-investment.md` yang saat ditulis sudah py rencana pendekatan konkret dari awal, dokumen ini baru sampai tahap KONSEP matang — belum ada satu baris desain skema SQL, belum ada draf kode. Urutan kerja yang disarankan SEBELUM mulai coding:
+Urutan kerja yang disarankan:
 
-1. Putuskan 3 pertanyaan terbuka di dokumen konsep (bentuk tabel detail, perlu status atau tidak, validasi oversell atau tidak) — ini akan menentukan bentuk migrasi.
-2. Baru setelah itu: migrasi skema (`account_type` + tabel detail), `classifyAccountPair`, `applyThirdPartyTransaction`.
+1. ~~Putuskan 3 pertanyaan terbuka di dokumen konsep~~ — SELESAI (2026-10-13).
+2. ~~Migrasi skema (`account_type` + tabel detail)~~ — SELESAI (2026-10-13), lihat `0049_account_type_third_party.sql`. SISA: `classifyAccountPair` (tambah kombinasi `third_party-*`) dan `applyThirdPartyTransaction` belum ditulis.
 3. Form titip/ambil dan form transfer third_party→third_party.
 4. Pengecualian cashflow — audit SEMUA tempat yang query cashflow (bukan cuma satu file) sebelum menganggap selesai.
 5. Fitur turunan breakdown per kontak × akun.

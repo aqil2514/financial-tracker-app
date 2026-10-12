@@ -290,6 +290,12 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0048_category_periods_many_categories.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 49,
+            description: "account_type_third_party",
+            sql: include_str!("../migrations/0049_account_type_third_party.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
