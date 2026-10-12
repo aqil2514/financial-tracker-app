@@ -3,7 +3,6 @@ import type { AppContext } from "../../shared/auth";
 import { parseSinceParam } from "./schema";
 import { getSyncSnapshot } from "./service";
 
-// Autentikasi ditangani requireAuth middleware, dipasang di router.ts.
 export async function handleGetSync(c: Context<AppContext>) {
   const sinceParam = c.req.query("since");
   const parsed = parseSinceParam(sinceParam);
