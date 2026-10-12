@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot, listInvestmentDetail, getInvestmentHolding } from "@/lib/sync-snapshot";
+import { fetchFullSnapshot, listInvestmentDetail, getInvestmentHolding } from "@/lib/sync-snapshot/entities";
 
 // Pola sama get_debt_detail -- riwayat lot (pembelian + penjualan) SATU
 // akun investment, termasuk transactionId tiap baris (dipakai

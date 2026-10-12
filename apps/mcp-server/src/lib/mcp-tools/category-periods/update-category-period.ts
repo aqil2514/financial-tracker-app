@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken, newId } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot } from "@/lib/sync-snapshot";
+import { fetchFullSnapshot } from "@/lib/sync-snapshot/entities";
 
 export function registerUpdateCategoryPeriod(server: McpServer) {
   server.registerTool(

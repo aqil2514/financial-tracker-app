@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot, summarizeInvestments } from "@/lib/sync-snapshot";
+import { fetchFullSnapshot, summarizeInvestments } from "@/lib/sync-snapshot/entities";
 
 // Menutup gap docs/todos/plan/investment-sync.md Tahap 4 -- pola sama
 // get_debt_summary. Ringkasan LINTAS semua akun investment (Unrealized

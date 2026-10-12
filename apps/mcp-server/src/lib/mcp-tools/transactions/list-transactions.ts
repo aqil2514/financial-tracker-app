@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot, listTransactions, buildNameLookups } from "@/lib/sync-snapshot";
+import { fetchFullSnapshot, listTransactions, buildNameLookups } from "@/lib/sync-snapshot/entities";
 
 export function registerListTransactions(server: McpServer) {
   server.registerTool(

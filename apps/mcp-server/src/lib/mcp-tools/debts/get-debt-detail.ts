@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { getToken } from "@/lib/mcp-context";
 import { workerFetch } from "@/lib/worker-client";
-import { fetchFullSnapshot, listDebtDetails, buildNameLookups } from "@/lib/sync-snapshot";
+import { fetchFullSnapshot, listDebtDetails, buildNameLookups } from "@/lib/sync-snapshot/entities";
 
 // Menutup gap cloud-sync.md Tahap 8: tanpa ini, Claude tidak punya cara
 // menemukan transactionId satu baris cicilan (debt_payments) tertentu --
