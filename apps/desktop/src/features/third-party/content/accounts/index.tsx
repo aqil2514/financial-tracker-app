@@ -8,21 +8,11 @@ import {
   useThirdPartyAccountDialog,
 } from "./dialog";
 
-function TambahAkunButton() {
-  const { openDialog } = useThirdPartyAccountDialog();
-
-  return (
-    <Button variant="outline" onClick={() => openDialog("create")}>
-      Tambah Akun
-    </Button>
-  );
-}
-
 export function ThirdPartyAccountsSection() {
   return (
     <ThirdPartyAccountDialogProvider>
       <div className="space-y-4">
-        <TambahAkunButton />
+        <InnerButton />
         <Card>
           <CardHeader>
             <CardTitle>Segera Hadir</CardTitle>
@@ -30,8 +20,10 @@ export function ThirdPartyAccountsSection() {
           <CardContent>
             <p className="text-muted-foreground text-sm">
               Daftar akun Dana Pihak Ketiga akan tampil di sini. Lihat{" "}
-              <code className="text-xs">docs/todos/plan/account-type-third-party.md</code> untuk
-              status pengerjaannya.
+              <code className="text-xs">
+                docs/todos/plan/account-type-third-party.md
+              </code>{" "}
+              untuk status pengerjaannya.
             </p>
           </CardContent>
         </Card>
@@ -41,3 +33,13 @@ export function ThirdPartyAccountsSection() {
     </ThirdPartyAccountDialogProvider>
   );
 }
+
+const InnerButton = () => {
+  const { openDialog } = useThirdPartyAccountDialog();
+
+  return (
+    <Button variant="outline" onClick={() => openDialog("create")}>
+      Tambah Akun
+    </Button>
+  );
+};

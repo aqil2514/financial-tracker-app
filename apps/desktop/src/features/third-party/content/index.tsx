@@ -1,4 +1,5 @@
-import { BaseTabItems, BaseTabs } from "@/components/pattern/base-tabs";
+import { BaseTabItems } from "@/components/pattern/base-tabs";
+import { BaseTabsUrl } from "@/components/pattern/base-tabs-url";
 import { ThirdPartySummarySection } from "./summary";
 import { ThirdPartyAccountsSection } from "./accounts";
 import { ThirdPartyDataSection } from "./data";
@@ -22,5 +23,5 @@ const thirdPartyTabs: BaseTabItems[] = [
 ];
 
 export function ThirdPartyContent() {
-  return <BaseTabs items={thirdPartyTabs} />;
+  return <BaseTabsUrl items={thirdPartyTabs} urlParam="tab" />;
 }
