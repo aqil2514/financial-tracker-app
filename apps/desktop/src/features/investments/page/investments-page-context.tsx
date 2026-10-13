@@ -14,7 +14,7 @@ type InvestmentsPageContextType = {
 const InvestmentsPageContext = createContext<InvestmentsPageContextType | undefined>(undefined);
 
 /** Tab aktif (Ringkasan/Detail) tersimpan di URL (nuqs) — pola sama
- * AccountsProvider (features/accounts/sections/list/context), supaya
+ * AccountsContent (features/accounts/contents/index.tsx), supaya
  * tidak hilang saat refresh. */
 export function InvestmentsPageProvider({ children }: { children: React.ReactNode }) {
   const [activeTab, setActiveTab] = useQueryState(

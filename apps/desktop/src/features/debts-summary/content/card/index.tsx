@@ -11,9 +11,9 @@ import { ContactDetailDialog } from "./detail/detail-dialog";
 
 /** Card satu kontak — orkestrator murni komposisi (lihat "Pola pemecahan
  * orchestrator + sub-view" di docs/rules/state-lifting-vs-context.md,
- * dan pola `AccountList` di features/accounts/sections/list/index.tsx):
- * bungkus Provider, susun Header + Body + dialog, tidak ada logic/akses
- * data langsung di sini. */
+ * dan pola `AccountsDetailSection` di
+ * features/accounts/contents/detail/index.tsx): bungkus Provider, susun
+ * Header + Body + dialog, tidak ada logic/akses data langsung di sini. */
 export function ContactCard({
   contact,
   oldestReceivable,

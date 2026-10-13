@@ -1,9 +1,7 @@
-export {
-  AccountList,
-  useAccounts,
-  accountsQueryKey,
-} from "./sections/list";
-export type { AccountWithBalance } from "./calculate-balance";
+export { AccountsHeader } from "./header";
+export { AccountsContent } from "./contents";
+export { AccountsSummarySection } from "./contents/summary";
+export { useAccounts, accountsQueryKey, type AccountWithBalance } from "@/hooks/resources/use-accounts";
 export {
   AccountForm,
   useCreateAccount,
@@ -11,5 +9,4 @@ export {
   type AccountFormValues,
   type AccountFormOutput,
 } from "./form";
-export { AccountFormDialog, AccountEditDialog } from "./dialogs";
-export { AccountBalancePieChart } from "./sections/balance-pie-chart";
+export { AccountEditDialog } from "./dialogs";

@@ -9,11 +9,11 @@ export interface BaseTabItems {
 
 interface Props {
   items: Array<BaseTabItems>;
-  defaultValue?:string
+  defaultValue?: string;
 }
 
 export function BaseTabs({ items, defaultValue }: Props) {
-    return (
+  return (
     <Tabs defaultValue={defaultValue ?? items[0]?.value}>
       <TabsList>
         {items.map((tab, i) => (

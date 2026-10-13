@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAccounts } from "@/features/accounts";
-import { BalancePie } from "@/features/accounts/sections/balance-pie-chart/balance-pie";
+import { BalancePie } from "@/features/accounts/contents/summary/balance-pie";
 import { useInvestmentsPage } from "../page/investments-page-context";
 import { InvestmentAccountCard } from "./investment-account-card";
 import { InvestmentSummaryStats } from "./investment-summary-stats";

@@ -16,7 +16,7 @@ import { cashflowBreakdownQueryKey } from "@/features/reports/content/cashflow/u
 import { cashflowSummaryQueryKey } from "@/features/reports/content/cashflow/use-cashflow-summary";
 import { balancesByAccountTypeQueryKey } from "@/features/reports/content/account-type/use-balances-by-account-type";
 import { balanceTrendQueryKey } from "@/features/reports/content/balance-trend/use-balance-trend";
-import { accountGroupBalancesQueryKey } from "@/features/accounts/sections/balance-pie-chart/use-account-group-balances";
+import { accountGroupBalancesQueryKey } from "@/features/accounts/contents/summary/use-account-group-balances";
 import { categoryPeriodsQueryKey } from "@/features/categories/content/period/hooks/use-category-periods";
 import { transactionDaysQueryKey } from "@/features/transactions/shared/hooks/use-transaction-days";
 import { monthSummaryQueryKey } from "@/features/transactions/shared/hooks/use-month-summary";
