@@ -8,7 +8,7 @@ import {
   revokePendingAttachment,
   type PendingAttachment,
 } from "@/shared/attachments/pending-attachment";
-import { TransactionForm } from "../form/add-edit/form";
+import { TransactionForm } from "../form/add-edit/components";
 import { useCreateTransaction } from "../form/add-edit/hooks/use-create-transaction";
 import { useTransactionsDialog } from "./context";
 
@@ -36,7 +36,7 @@ export function TransactionCreateDialog({
     setPendingAttachments([]);
   }
 
-  const { form, onSubmit, onSubmitAndContinue, isPending } = useCreateTransaction({
+  const { form, onSubmit, isPending } = useCreateTransaction({
     open,
     getPendingAttachments: () => pendingAttachmentsRef.current,
     attachmentFolder: attachmentFolder ?? null,
@@ -62,7 +62,6 @@ export function TransactionCreateDialog({
       <TransactionForm
         form={form}
         onSubmit={onSubmit}
-        onSubmitAndContinue={onSubmitAndContinue}
         isPending={isPending}
         pendingAttachments={pendingAttachments}
         onPendingAttachmentsChange={setPendingAttachments}

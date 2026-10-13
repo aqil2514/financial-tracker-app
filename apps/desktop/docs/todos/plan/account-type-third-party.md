@@ -28,7 +28,7 @@ Penjelasan tiap poin ada di bagian "Detail & rasional keputusan" paling bawah �
 ### Tab Akun (CRUD akun `third_party`)
 
 - [x] Create — trigger + dialog create akun jalan (reuse `AccountForm`/`useCreateAccount`)
-- [ ] Read — daftar akun `third_party` beserta saldo — masih placeholder
+- [x] Read — daftar akun `third_party` beserta saldo (2026-10-13) — `content/accounts/list.tsx`, grid card simple, tanpa filter/sort/pagination
 - [ ] Update — edit akun `third_party` (reuse `AccountForm`/`useUpdateAccount`, belum disambung di tab ini)
 - [ ] Delete — belum didesain untuk tab ini
 
@@ -114,7 +114,7 @@ Penjelasan lengkap tiap poin checklist di atas, urut sesuai urutan checklist.
 
 **Tab "Data" — daftar/riwayat** — belum ada (masih placeholder "Segera Hadir" di `content/data/index.tsx`) — tabel/list baris `third_party_funds`, kemungkinan per kontak atau per akun.
 
-**Tab "Akun" — daftar akun** — belum ada (masih placeholder "Segera Hadir" di `content/accounts/index.tsx`) — list akun bertipe `third_party` beserta saldo masing-masing (mirip `AccountsSummarySection`/`AccountsDetailSection` di `features/accounts`).
+**Tab "Akun" — daftar akun (Read)** — SELESAI (2026-10-13), `content/accounts/list.tsx` (`ThirdPartyAccountList`). Sengaja TIDAK meniru pola penuh `AccountsDetailSection` (filter+sort+pagination+accordion grouping+Retailku mapping) — akun `third_party` biasanya sedikit (satu per lokasi fisik: "Kas Orang Lain [Tunai]", "[Bank Jago]", dst, bukan satu per kontak), jadi cukup `useAccounts()` (cache react-query shared) difilter client-side `account_type === 'third_party'`, lalu grid card ringkas (ikon, nama, saldo, deskripsi). Belum ada aksi edit/hapus per card (itu Update/Delete, item terpisah).
 
 **Tab "Ringkasan"** — masih placeholder penuh (`content/summary/index.tsx`) — belum ada breakdown "siapa titip berapa di mana" per kontak × akun. Bergantung pada data `third_party_funds` nyata (tunggu mutation jalan dulu).
 

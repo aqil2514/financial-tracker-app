@@ -3,35 +3,30 @@
 import { useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
-import {
-  FormFieldCombobox,
-  FormFieldCurrency,
-  FormFieldDate,
-  FormFieldRichText,
-  FormFieldText,
-  FormFieldToggleGroup,
-} from "@/components/forms/form-fields";
+import { FormFieldCombobox, FormFieldCurrency, FormFieldToggleGroup } from "@/components/forms/form-fields";
 import { AttachmentUploader } from "@/shared/attachments/attachment-uploader";
 import { PendingAttachmentUploader } from "@/shared/attachments/pending-attachment-uploader";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import { AccountForm, defaultAccountValues, useCreateAccount } from "@/features/accounts";
 import { CategoryForm } from "@/features/categories/content/list/form/category-form";
 import { useCreateCategory } from "@/features/categories/content/list/form/use-create-category";
-import { ContactField } from "./fields/contact-field";
+import { ContactField } from "../fields/contact-field";
 import { LabelField } from "@/shared/labels/label-field";
-import { useTransactionForm } from "./hooks/use-transaction-form";
-import type { TransactionFormOutput, TransactionFormValues } from "./schema";
-import { DebtActionField } from "./fields/debt-action-field";
-import { InvestmentFields } from "./fields/investment-fields";
+import { useTransactionForm } from "../hooks/use-transaction-form";
+import type { TransactionFormOutput, TransactionFormValues } from "../schema";
+import { DebtActionField } from "../fields/debt-action-field";
+import { InvestmentFields } from "../fields/investment-fields";
+import { FieldNote } from "./fields/field-note";
+import { FieldDate } from "./fields/field-date";
+import { FieldDescription } from "./fields/field-description";
+import { TransactionBaseForm } from "./transaction-base-form";
 
 type TransactionFormProps = {
   form: UseFormReturn<TransactionFormValues, unknown, TransactionFormOutput>;
   onSubmit: (values: TransactionFormOutput) => void;
-  onSubmitAndContinue?: (values: TransactionFormOutput) => void;
   isPending: boolean;
   submitLabel?: string;
   /** Transaksi sudah tersimpan (mode edit) — lampiran langsung disimpan ke DB. */
@@ -50,7 +45,6 @@ const typeOptions = [
 export function TransactionForm({
   form,
   onSubmit,
-  onSubmitAndContinue,
   isPending,
   submitLabel = "Simpan",
   transactionId,
@@ -70,19 +64,12 @@ export function TransactionForm({
     categoryOptions,
     renderAccountOption,
     handleSubmit,
-    handleSubmitAndContinue,
   } = useTransactionForm({
     form,
     onSubmit,
-    onSubmitAndContinue,
     transactionId,
   });
 
-  // Field mana ("account_id" / "transfer_account_id" / "category_id")
-  // yang sedang menunggu hasil dialog "buat baru" — null berarti tidak
-  // ada dialog yang perlu terbuka. Satu dialog Akun & satu dialog
-  // Kategori dipakai bersama oleh kedua combobox akun (sumber/tujuan)
-  // supaya tidak perlu 3 instance dialog terpisah.
   const [createAccountFor, setCreateAccountFor] = useState<
     "account_id" | "transfer_account_id" | null
   >(null);
@@ -123,15 +110,10 @@ export function TransactionForm({
 
   return (
     <>
-      <form onSubmit={form.handleSubmit(handleSubmit)}>
+      <TransactionBaseForm form={form} onSubmit={handleSubmit} isPending={isPending} submitLabel={submitLabel}>
         <div className="grid max-h-[70vh] gap-6 overflow-y-auto pr-1 sm:grid-cols-2">
           <div className="space-y-4">
-            <FormFieldText
-              form={form}
-              name="note"
-              label="Catatan"
-              placeholder="Judul singkat transaksi"
-            />
+            <FieldNote />
             <FormFieldToggleGroup
               form={form}
               name="type"
@@ -214,16 +196,10 @@ export function TransactionForm({
                 investmentAccountId={needsInvestmentSellFields ? accountId : undefined}
               />
             )}
-            <FormFieldDate form={form} name="date" label="Tanggal" />
+            <FieldDate />
           </div>
 
           <div className="space-y-4">
-            {/* `h-48` (bukan `max-h-48`) WAJIB -- ScrollArea (base-ui)
-              Viewport-nya `size-full`, ikut tumbuh mengikuti Root kalau
-              Root cuma dibatasi `max-height` tanpa `height` pasti. Tanpa
-              ini, grid lampiran yang banyak (>1 baris) overflow KELUAR
-              dan menimpa field Deskripsi di bawahnya alih-alih di-scroll
-              di dalam box-nya sendiri (bug nyata, 2026-10-09). */}
             <ScrollArea className="h-48">
               {transactionId != null ? (
                 <AttachmentUploader transactionId={transactionId} />
@@ -235,35 +211,10 @@ export function TransactionForm({
                 />
               ) : null}
             </ScrollArea>
-            <FormFieldRichText
-              form={form}
-              name="description"
-              label="Deskripsi"
-            />
+            <FieldDescription />
           </div>
         </div>
-        <DialogFooter className="mt-6">
-          {onSubmitAndContinue && (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={form.handleSubmit(handleSubmitAndContinue)}
-            >
-              Lanjut
-            </Button>
-          )}
-          <Button type="submit" disabled={isPending}>
-            {isPending ? "Menyimpan..." : submitLabel}
-          </Button>
-        </DialogFooter>
-      </form>
-      {/* Dialog "buat baru" dipicu dari combobox Akun/Kategori di atas —
-        HARUS di luar elemen <form> transaksi (bukan cuma lewat portal
-        base-ui Dialog): <CategoryForm>/<AccountForm> masing-masing
-        punya elemen <form> sendiri, dan nested <form> di DOM membuat
-        submit-nya ikut mentrigger submit form transaksi walau
-        popup-nya dirender ke luar lewat portal. */}
+      </TransactionBaseForm>
       <Dialog open={createAccountOpen} onOpenChange={setCreateAccountOpen}>
         <DialogContent>
           <DialogHeader>

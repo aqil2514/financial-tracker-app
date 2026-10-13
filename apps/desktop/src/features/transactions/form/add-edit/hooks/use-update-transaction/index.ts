@@ -22,7 +22,7 @@ import {
 import { getAverageCostPerUnit, getRemainingUnit } from "@/shared/investments/investment-holding-math";
 import { useTransactionInvestmentPurchase } from "@/shared/investments/use-transaction-investment-purchase";
 import { useTransactionInvestmentSale } from "@/shared/investments/use-transaction-investment-sale";
-import { transactionSchema, type TransactionFormOutput } from "../schema";
+import { transactionSchema, type TransactionFormOutput } from "../../schema";
 import { pushOnWrite, pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { resolveLabelIds } from "@/shared/labels/resolve-label-ids";
 import { applyTransactionLabels } from "@/shared/labels/apply-transaction-labels";

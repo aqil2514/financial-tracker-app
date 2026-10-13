@@ -1,4 +1,4 @@
-export { TransactionForm } from "./add-edit/form";
+export { TransactionForm } from "./add-edit/components";
 export {
   transactionSchema,
   type TransactionFormValues,

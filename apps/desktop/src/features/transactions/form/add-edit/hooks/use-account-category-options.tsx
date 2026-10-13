@@ -14,13 +14,6 @@ type UseAccountCategoryOptionsParams = {
   categoryId: string | null;
 };
 
-/**
- * Opsi dropdown akun & kategori untuk form transaksi, plus render
- * icon+warna untuk opsi akun terpilih — dikumpulkan di sini karena
- * sama-sama bergantung pada `accounts`/`categories` mentah dan aturan
- * "tetap tampil kalau sedang dipakai transaksi yang diedit, walau sudah
- * nonaktif" yang sama untuk keduanya.
- */
 export function useAccountCategoryOptions({
   accounts,
   categories,
@@ -29,11 +22,6 @@ export function useAccountCategoryOptions({
   transferAccountId,
   categoryId,
 }: UseAccountCategoryOptionsParams) {
-  // Akun/kategori nonaktif disembunyikan dari opsi baru, tapi tetap
-  // ditampilkan kalau sedang dipakai transaksi yang diedit — supaya form
-  // edit tidak kehilangan nilai yang sudah tersimpan.
-  // Label menyertakan induk (grup akun / kategori induk) karena beberapa
-  // akun/kategori berbeda memakai nama yang sama persis.
   const accountOptions =
     accounts
       ?.filter(
@@ -49,11 +37,6 @@ export function useAccountCategoryOptions({
           : account.name,
       })) ?? [];
 
-  // Icon+warna cuma bisa dirender di DALAM dropdown (ComboboxItem) —
-  // ComboboxInput adalah text input native, tidak mendukung custom
-  // render untuk nilai yang sudah terpilih. Lookup balik ke `accounts`
-  // dari option.value karena FormFieldComboboxOption generic cuma bawa
-  // {value, label}, tidak bawa data akun mentah.
   function renderAccountOption(option: { value: string; label: string }) {
     const account = accounts?.find((a) => String(a.id) === option.value);
     const AccountIcon = resolveAccountIcon(account?.icon ?? null);

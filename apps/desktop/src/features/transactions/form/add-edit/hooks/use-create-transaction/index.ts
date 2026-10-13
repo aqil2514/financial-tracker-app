@@ -18,7 +18,7 @@ import {
 import { getAverageCostPerUnit, getRemainingUnit } from "@/shared/investments/investment-holding-math";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
-import { transactionSchema, type TransactionFormOutput } from "../schema";
+import { transactionSchema, type TransactionFormOutput } from "../../schema";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { resolveLabelIds } from "@/shared/labels/resolve-label-ids";
 import { applyTransactionLabels } from "@/shared/labels/apply-transaction-labels";
