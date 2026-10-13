@@ -10,6 +10,7 @@ import {
   Settings,
   Wallet,
   HandCoins,
+  HandHelping,
   Database,
   Building2,
   ChevronRight,
@@ -48,6 +49,7 @@ const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Transaksi", url: "/transactions", icon: ArrowLeftRight },
   { title: "Investasi", url: "/investments", icon: TrendingUp },
+  { title: "Dana Pihak Ketiga", url: "/third-party", icon: HandHelping },
   { title: "Laporan", url: "/reports", icon: PieChart },
 ];
 

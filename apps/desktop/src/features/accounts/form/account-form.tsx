@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,16 @@ export function AccountForm({
   const { data: groups } = useAccountGroups();
   const accountType = useWatch({ control: form.control, name: "account_type" });
 
+  // Akun third_party tidak boleh punya saldo awal (lihat superRefine di
+  // account.schema.ts) -- dikunci 0 otomatis begitu tipe ini dipilih,
+  // bukan dibiarkan user ubah lalu gagal submit.
+  useEffect(() => {
+    if (accountType === "third_party") {
+      form.setValue("initial_balance", 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountType]);
+
   return (
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -52,7 +63,12 @@ export function AccountForm({
             label="Nama Akun"
             placeholder="Contoh: Kartu Kredit"
           />
-          <FormFieldCurrency form={form} name="initial_balance" label="Saldo Awal" />
+          <FormFieldCurrency
+            form={form}
+            name="initial_balance"
+            label="Saldo Awal"
+            disabled={accountType === "third_party"}
+          />
           <div className="grid grid-cols-2 gap-4">
             <FormFieldIconPicker form={form} name="icon" label="Icon" />
             <FormFieldColorPicker form={form} name="color" label="Warna" />

@@ -40,6 +40,18 @@ export const accountSchema = z
         });
       }
     }
+    // Akun third_party baru TIDAK BOLEH punya saldo awal -- setiap rupiah
+    // di akun ini harus bisa ditelusuri ke kontak tertentu lewat baris
+    // third_party_funds (income/expense), bukan "uang misterius" tanpa
+    // pemilik yang lahir dari initial_balance. Lihat
+    // docs/concept/konsep-dana-pihak-ketiga.md.
+    if (values.account_type === "third_party" && values.initial_balance !== 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["initial_balance"],
+        message: "Akun Dana Pihak Ketiga tidak boleh punya saldo awal",
+      });
+    }
   });
 
 export type AccountFormValues = z.input<typeof accountSchema>;
