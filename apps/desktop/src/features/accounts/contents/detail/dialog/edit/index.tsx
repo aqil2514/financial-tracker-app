@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useInvestmentAccount } from "@/shared/investments/use-investment-account";
 import { useAccountLabels } from "@/shared/labels/use-account-labels";
-import { useAccountIsUsed } from "../../../../form/use-account-is-used";
+import { useAccountIsUsed } from "../../form/add-edit/helpers";
 import { AccountForm, accountValuesFromEntity, useUpdateAccount } from "../../form";
 import { useAccountsDialog } from "../context";
 

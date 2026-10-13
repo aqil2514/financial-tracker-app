@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
+
 import { Button } from "@/components/ui/button";
-import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
-import { AccountForm, useCreateAccount } from "@/features/accounts";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AccountForm, defaultAccountValues, useCreateAccount } from "@/features/accounts";
 
 /** "Tambah Akun Investasi" dari header /investments — reuse penuh
  * `AccountForm`/`useCreateAccount` (sama dengan "Tambah Akun" di halaman
@@ -11,19 +13,25 @@ import { AccountForm, useCreateAccount } from "@/features/accounts";
  * pilih tipe akun secara manual. BUKAN form transaksi — form pembelian
  * ("Catat Pembelian") ada di header halaman detail per akun. */
 export function NewInvestmentAccountDialog() {
-  const { open, setOpen, form, onSubmit, isPending } = useCreateAccount({
-    initialValues: { account_type: "investment" },
+  const [open, setOpen] = useState(false);
+
+  const { onSubmit, isPending } = useCreateAccount({
+    onCreated: () => setOpen(false),
   });
 
   return (
-    <EntityFormDialog
-      trigger={<Button variant="outline">Tambah Akun Investasi</Button>}
-      title="Tambah Akun Investasi"
-      open={open}
-      onOpenChange={setOpen}
-      contentClassName="sm:!max-w-2xl"
-    >
-      <AccountForm form={form} onSubmit={onSubmit} isPending={isPending} />
-    </EntityFormDialog>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="outline">Tambah Akun Investasi</Button>} />
+      <DialogContent className="sm:max-w-2xl!">
+        <DialogHeader>
+          <DialogTitle>Tambah Akun Investasi</DialogTitle>
+        </DialogHeader>
+        <AccountForm
+          defaultValues={{ ...defaultAccountValues(), account_type: "investment" }}
+          onSubmit={onSubmit}
+          isPending={isPending}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

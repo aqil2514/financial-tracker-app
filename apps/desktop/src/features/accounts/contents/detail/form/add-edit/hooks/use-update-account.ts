@@ -4,7 +4,7 @@ import { getDb, type Account } from "@/lib/db";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
-import { isAccountInUse } from "../../../../../form/is-account-in-use";
+import { isAccountInUse } from "../helpers/is-account-in-use";
 import { resolveLabelIds } from "@/shared/labels/resolve-label-ids";
 import { applyAccountLabels } from "@/shared/labels/apply-account-labels";
 import type { AccountFormOutput } from "../schema";

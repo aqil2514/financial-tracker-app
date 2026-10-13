@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatCurrency } from "@/lib/format-currency";
-import { AccountEditDialog } from "@/features/accounts";
 import { NewInvestmentPurchaseDialog } from "@/shared/investments/new-purchase-form/new-investment-purchase-dialog";
 import { SellInvestmentDialog } from "@/shared/investments/sell-investment-form/sell-investment-dialog";
 import { WriteOffInvestmentDialog } from "@/shared/investments/write-off-investment-form/write-off-investment-dialog";
 import { useInvestmentDetailPage } from "../page/investment-detail-page-context";
 import { InvestmentPlStats } from "./investment-pl-stats";
+import { AccountEditDialog } from "./account-edit-dialog";
 
 export function InvestmentDetailHeader() {
   const router = useRouter();

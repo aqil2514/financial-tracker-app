@@ -12,6 +12,6 @@ Dialog row-level di sini perlu bisa dibuka lewat link langsung (mis. tombol "Edi
 
 - `create` — form "Tambah Akun" (reuse `AccountFormDialog`, sebelumnya trigger di `PageHeader actions`, sekarang pindah ke sini).
 - `detail` — ringkasan read-only akun (`AccountDetailDialog`).
-- `edit` — form edit (reuse `AccountEditDialog` dari `features/accounts/dialogs/edit-dialog/`, TIDAK dipindah fisik karena dipakai lintas fitur juga oleh `features/investment-detail/header`).
+- `edit` — form edit, implementasi SENDIRI (native `Dialog` + `AccountForm`/`useUpdateAccount` dari `contents/detail/form`) — BUKAN reuse `AccountEditDialog` lama di `features/accounts/dialogs/edit-dialog/` (itu tetap ada terpisah, dipakai lintas fitur oleh `features/investment-detail/header`, lihat `../../../dialogs/README.md`).
 - `balance-correction` — koreksi saldo (`AccountBalanceCorrectionDialog`).
 - `delete` — konfirmasi hapus (`DeleteAccountDialog`).

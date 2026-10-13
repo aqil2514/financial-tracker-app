@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import {
@@ -18,8 +18,7 @@ import {
 import { AttachmentUploader } from "@/shared/attachments/attachment-uploader";
 import { PendingAttachmentUploader } from "@/shared/attachments/pending-attachment-uploader";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
-import { AccountForm } from "@/features/accounts/form/account-form";
-import { useCreateAccount } from "@/features/accounts/form/use-create-account";
+import { AccountForm, defaultAccountValues, useCreateAccount } from "@/features/accounts";
 import { CategoryForm } from "@/features/categories/content/list/form/category-form";
 import { useCreateCategory } from "@/features/categories/content/list/form/use-create-category";
 import { ContactField } from "./fields/contact-field";
@@ -88,11 +87,12 @@ export function TransactionForm({
     "account_id" | "transfer_account_id" | null
   >(null);
   const [createAccountQuery, setCreateAccountQuery] = useState("");
+  const [createAccountOpen, setCreateAccountOpen] = useState(false);
   const [createCategoryQuery, setCreateCategoryQuery] = useState("");
 
   const createAccount = useCreateAccount({
-    initialValues: { name: createAccountQuery },
     onCreated: (id) => {
+      setCreateAccountOpen(false);
       if (createAccountFor)
         form.setValue(createAccountFor, id, { shouldValidate: true });
     },
@@ -113,7 +113,7 @@ export function TransactionForm({
   ) {
     setCreateAccountFor(field);
     setCreateAccountQuery(query);
-    createAccount.setOpen(true);
+    setCreateAccountOpen(true);
   }
 
   function openCreateCategory(query: string) {
@@ -264,17 +264,18 @@ export function TransactionForm({
         punya elemen <form> sendiri, dan nested <form> di DOM membuat
         submit-nya ikut mentrigger submit form transaksi walau
         popup-nya dirender ke luar lewat portal. */}
-      <EntityFormDialog
-        title="Tambah Akun Baru"
-        open={createAccount.open}
-        onOpenChange={createAccount.setOpen}
-      >
-        <AccountForm
-          form={createAccount.form}
-          onSubmit={createAccount.onSubmit}
-          isPending={createAccount.isPending}
-        />
-      </EntityFormDialog>
+      <Dialog open={createAccountOpen} onOpenChange={setCreateAccountOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tambah Akun Baru</DialogTitle>
+          </DialogHeader>
+          <AccountForm
+            defaultValues={{ ...defaultAccountValues(), name: createAccountQuery }}
+            onSubmit={createAccount.onSubmit}
+            isPending={createAccount.isPending}
+          />
+        </DialogContent>
+      </Dialog>
       <EntityFormDialog
         title="Tambah Kategori Baru"
         open={createCategory.open}

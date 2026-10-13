@@ -1,44 +1,29 @@
 "use client";
 
-import { useEffect } from "react";
-
-import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
-import { AccountForm, useCreateAccount } from "@/features/accounts";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AccountForm, defaultAccountValues, useCreateAccount } from "@/features/accounts";
 import { useThirdPartyAccountDialog } from "./context";
 
-/** `useCreateAccount` mengelola `open`/`setOpen` SENDIRI (internal ke
- * `useEntityForm`) -- tidak menerima `open` dari context luar. Jadi
- * context dialog fitur ini (`useThirdPartyAccountDialog`) cuma menentukan
- * apakah komponen ini DI-MOUNT (gate render), bukan `open` sungguhan
- * yang dipakai `<Dialog>` -- begitu mounted, `open` sungguhan ikut
- * `useCreateAccount`: auto-buka saat mount, dan saat dia balik ke
- * `false` (submit sukses/batal), `closeDialog()` context dipanggil
- * balik supaya komponen ini unmount. Satu sumber kebenaran untuk
- * "apakah dialog ini TERBUKA" tetap `useCreateAccount`. */
 export function ThirdPartyCreateAccountDialog() {
-  const { closeDialog } = useThirdPartyAccountDialog();
-  const { open, setOpen, form, onSubmit, isPending } = useCreateAccount({
-    initialValues: { account_type: "third_party" },
+  const { dialog, closeDialog } = useThirdPartyAccountDialog();
+  const open = dialog?.type === "create";
+
+  const { onSubmit, isPending } = useCreateAccount({
+    onCreated: closeDialog,
   });
 
-  useEffect(() => {
-    setOpen(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!open) closeDialog();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
   return (
-    <EntityFormDialog
-      title="Tambah Akun Dana Pihak Ketiga"
-      open={open}
-      onOpenChange={setOpen}
-      contentClassName="sm:!max-w-2xl"
-    >
-      <AccountForm form={form} onSubmit={onSubmit} isPending={isPending} />
-    </EntityFormDialog>
+    <Dialog open={open} onOpenChange={(next) => !next && closeDialog()}>
+      <DialogContent className="sm:max-w-2xl!">
+        <DialogHeader>
+          <DialogTitle>Tambah Akun Dana Pihak Ketiga</DialogTitle>
+        </DialogHeader>
+        <AccountForm
+          defaultValues={{ ...defaultAccountValues(), account_type: "third_party" }}
+          onSubmit={onSubmit}
+          isPending={isPending}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

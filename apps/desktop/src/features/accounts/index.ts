@@ -5,8 +5,10 @@ export { useAccounts, accountsQueryKey, type AccountWithBalance } from "@/hooks/
 export {
   AccountForm,
   useCreateAccount,
+  useUpdateAccount,
   accountSchema,
+  defaultAccountValues,
+  accountValuesFromEntity,
   type AccountFormValues,
   type AccountFormOutput,
-} from "./form";
-export { AccountEditDialog } from "./dialogs";
+} from "./contents/detail/form";
