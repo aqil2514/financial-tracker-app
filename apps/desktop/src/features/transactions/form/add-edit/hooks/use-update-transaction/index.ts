@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { getDb, type Account, type Transaction } from "@/lib/db";
+import { getDb, type Transaction } from "@/lib/db";
+import { getAccountType } from "@/lib/db/helper";
 import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
 import { isEmptyDoc } from "@/components/rich-text";
@@ -27,26 +28,7 @@ import { pushOnWrite, pushDeleteOnWrite } from "@/shared/cloud-sync/push-on-writ
 import { resolveLabelIds } from "@/shared/labels/resolve-label-ids";
 import { applyTransactionLabels } from "@/shared/labels/apply-transaction-labels";
 import { useTransactionLabels } from "@/shared/labels/use-transaction-labels";
-
-type Db = Awaited<ReturnType<typeof getDb>>;
-
-async function getAccountType(db: Db, accountId: string): Promise<Account["account_type"] | null> {
-  const rows = await db.select<Pick<Account, "account_type">[]>(
-    "SELECT account_type FROM accounts WHERE id = $1",
-    [accountId]
-  );
-  return rows[0]?.account_type ?? null;
-}
-
-type UseUpdateTransactionOptions = {
-  /** Dialog terbuka atau tidak — datang dari context, dipakai untuk
-   * resetOnOpen. */
-  open: boolean;
-  /** Dipanggil setelah transaksi berhasil diperbarui — dipakai pemanggil
-   * untuk menutup dialog dari context. Edit tidak punya "Simpan & Lanjut",
-   * jadi ini selalu dipanggil setelah submit sukses. */
-  onClosed?: () => void;
-};
+import type { UseUpdateTransactionOptions } from "./type";
 
 export function useUpdateTransaction(
   transaction: Transaction,
