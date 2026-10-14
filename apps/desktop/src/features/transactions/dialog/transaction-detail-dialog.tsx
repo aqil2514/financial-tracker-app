@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
 import type { Transaction } from "@/lib/db";
-import { RichTextViewer } from "@/components/rich-text";
+import { parseDescription, RichTextViewer } from "@/components/rich-text";
 import { AttachmentThumbnail } from "@/shared/attachments/attachment-thumbnail";
 import { useTransactionAttachments } from "@/shared/attachments/use-transaction-attachments";
 import { useContacts } from "@/features/contacts";
@@ -64,9 +64,7 @@ function TransactionDetailDialogContent({
   const { data: attachments } = useTransactionAttachments(transaction.id);
   const { data: relatedDebt } = useRelatedDebt(transaction.id);
 
-  const description = transaction.description
-    ? JSON.parse(transaction.description)
-    : null;
+  const description = parseDescription(transaction.description);
 
   const contact = contacts?.find((contact) => contact.id === transaction.contact_id);
 

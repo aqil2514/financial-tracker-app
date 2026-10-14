@@ -1,4 +1,5 @@
 import { isValidUpdatedAt } from "../../shared/lww";
+import { isValidTiptapDocString } from "../../shared/tiptap-doc";
 
 // Payload dari PC/MCP utk push satu baris transaksi. `updatedAt`
 // opsional -- lihat shared/lww.ts utk kontrak LWW lengkap.
@@ -72,6 +73,15 @@ function isValidAccountFields(v: Record<string, unknown>): boolean {
   return true;
 }
 
+// `description` SELALU TipTap doc JSON (lihat tiptap-doc.ts) -- kosong
+// (undefined/null) tetap boleh, cuma kalau diisi harus bentuk yg benar.
+// Pernah ada MCP call kirim plain text ("Ketoprak") krn tool-nya cuma
+// Zod `z.string()` tanpa constraint, lolos sampai D1 lalu crash
+// RichTextViewer (JSON.parse gagal) saat dibuka di desktop.
+function isValidDescriptionField(v: Record<string, unknown>): boolean {
+  return v.description === undefined || v.description === null || isValidTiptapDocString(v.description);
+}
+
 // Dipakai isPushTransactionPayload & isPatchTransactionPayload -- bentuk
 // field investment sama persis di keduanya (unit/pricePerUnit nullable,
 // investmentStatus opsional), lihat komentar PushTransactionPayload.
@@ -107,6 +117,7 @@ export function isPushTransactionPayload(value: unknown): value is PushTransacti
     contactNameValid &&
     isValidInvestmentFields(v) &&
     isValidSourceFields(v) &&
+    isValidDescriptionField(v) &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
 }
@@ -138,6 +149,7 @@ export function isPatchTransactionPayload(value: unknown): value is PatchTransac
     contactNameValid &&
     isValidInvestmentFields(v) &&
     isValidSourceFields(v) &&
+    isValidDescriptionField(v) &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
 }

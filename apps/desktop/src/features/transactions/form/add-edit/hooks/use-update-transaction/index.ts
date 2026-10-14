@@ -5,7 +5,7 @@ import { getDb, type Transaction } from "@/lib/db";
 import { getAccountType } from "@/lib/db/helper";
 import { useEntityForm } from "@/components/forms/hooks/use-entity-form";
 import { QUERY_DEPENDENCIES } from "@/lib/query-dependencies";
-import { isEmptyDoc } from "@/components/rich-text";
+import { isEmptyDoc, parseDescription } from "@/components/rich-text";
 import { useContacts } from "@/shared/contacts/use-contacts";
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
 import { useTransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
@@ -59,7 +59,7 @@ export function useUpdateTransaction(
           ? String(transaction.transfer_account_id)
           : null,
       note: transaction.note ?? "",
-      description: transaction.description ? JSON.parse(transaction.description) : null,
+      description: parseDescription(transaction.description),
       date: transaction.date,
       contact_name: contactName,
       // Reset ke kosong (bukan direkonstruksi dari debt_payments lama) —

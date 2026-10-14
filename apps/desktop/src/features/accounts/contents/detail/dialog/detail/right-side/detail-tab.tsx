@@ -11,7 +11,7 @@ import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
 import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useCategories } from "@/features/categories";
-import { RichTextViewer } from "@/components/rich-text";
+import { parseDescription, RichTextViewer } from "@/components/rich-text";
 import { AttachmentThumbnail } from "@/shared/attachments/attachment-thumbnail";
 import { useTransactionAttachments } from "@/shared/attachments/use-transaction-attachments";
 import { useDeleteTransaction } from "@/features/transactions";
@@ -67,7 +67,7 @@ export function DetailTab() {
     );
   }
 
-  const description = transaction.description ? JSON.parse(transaction.description) : null;
+  const description = parseDescription(transaction.description);
   const config = typeConfig[transaction.type];
   const Icon = config.icon;
 
