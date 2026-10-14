@@ -2,12 +2,7 @@
 
 import { createDialogContext } from "@/provider/dialog-state";
 
-export type TransactionDialogType =
-  | "create"
-  | "create-base-form"
-  | "edit"
-  | "detail"
-  | "delete-confirm";
+export type TransactionDialogType = "create" | "edit" | "detail" | "delete-confirm";
 
 const { DialogProvider, useDialog } = createDialogContext<TransactionDialogType>();
 

@@ -12,7 +12,7 @@ import {
   FormFieldToggleGroup,
 } from "@/components/forms/form-fields";
 import { useAccounts } from "@/features/accounts";
-import { ContactField } from "@/features/transactions/form/add-edit/fields/contact-field";
+import { ContactField } from "@/shared/contacts/contact-field";
 import type { ThirdPartyFundFormOutput, ThirdPartyFundFormValues } from "./schemas";
 
 type ThirdPartyFundFormProps = {

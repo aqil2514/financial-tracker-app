@@ -15,6 +15,15 @@ Penjelasan tiap poin ada di bagian "Detail & rasional keputusan" paling bawah �
 - [ ] Kasus Normal — belum direview ulang untuk pola baru ini.
 - [ ] Kasus Utang Piutang — belum ada, edit income/expense yang sudah direct ke akun `debt`.
 - [ ] Kasus Investasi — belum ada, edit income/expense yang sudah direct ke akun `investment` (sudah ada fix bug 2026-10-08 di jalur lama, jangan diregresi).
+- [ ] **Bug ditemukan 2026-10-14, BELUM diperbaiki** — edit transfer ganti
+      pasangan akun lintas domain (investment↔debt) menyisakan baris
+      turunan lama jadi yatim. Detail: [docs/dogfooding/2026-10-14-transfer-ganti-pasangan-akun-silang-investment-debt-sisakan-baris-yatim.md](../../../../../docs/dogfooding/2026-10-14-transfer-ganti-pasangan-akun-silang-investment-debt-sisakan-baris-yatim.md).
+- [x] **BaseForm Update kini TERUJI runtime (2026-10-14)** — dialog Edit
+      (BaseForm) dibuat + diverifikasi: kontrak `isLoading` jalan, field
+      debt yang sudah dicicil terkunci di UI, edit field aman tidak
+      merusak `debt_payments`, transfer cash→debt dan cash→investment via
+      edit benar (lihat catatan di bawah). Debt→cash (settlement FIFO) dan
+      transfer cash↔cash via Update BELUM dicoba.
 
 ### Jalur Delete
 
@@ -39,7 +48,7 @@ Penjelasan tiap poin ada di bagian "Detail & rasional keputusan" paling bawah �
 
 - [ ] `applyDebtTransaction` — saat ini `return none` kalau `type !== 'transfer'`, perlu dibuka untuk income/expense direct & write-off.
 - [ ] `applyInvestmentTransaction` — saat ini `return none` kalau `type !== 'transfer'`, perlu dibuka untuk income/expense direct & write-off.
-- [x] Form transaksi utama pindah ke `BaseForm` generik — SELESAI untuk sisi Create (lihat catatan di bawah), sisi Update sudah di-wire tapi BELUM diuji runtime. Belum "naik pangkat" menggantikan `TransactionBaseForm`/dialog aktif — masih di `base-form-migration/`, diuji lewat dialog terpisah.
+- [x] Form transaksi utama pindah ke `BaseForm` generik — SELESAI untuk sisi Create DAN Update, keduanya sudah teruji runtime (lihat catatan di bawah). **"Naik pangkat" SELESAI (2026-10-14)**: `TransactionCreateDialog`/`TransactionEditDialog` sekarang langsung memakai `BaseForm`, dialog uji coba terpisah dan folder `base-form-migration/` sudah tidak ada lagi — isinya dipindah jadi struktur permanen `form/add-edit/{components,context,hooks,schema}/`. Form lama (`useEntityForm`, `TransactionBaseForm` wrapper) dihapus total.
 
 ## Kenapa ini dianggap gap, bukan desain final
 
@@ -76,5 +85,11 @@ Setelah Create/Update/Delete/Form solid untuk kedua domain (checklist selesai, t
 - BELUM di-wire menggantikan dialog aktif (`TransactionCreateDialog`/`TransactionEditDialog`) — masih diuji lewat dialog terpisah (`TransactionCreateDialogBaseForm`, trigger tombol "Tambah (BaseForm)" sementara). Ini artinya kesimpulan paragraf sebelumnya ("menambah percabangan jenis akun ke income.ts/expense.ts lebih mudah SETELAH form ini pindah ke BaseForm") SEKARANG sudah bisa dieksekusi — prasyaratnya sudah selesai, tinggal keputusan domain mana duluan (lihat "Pekerjaan yang MASIH KOSONG").
 
 **Verifikasi "Kasus Normal" Jalur Create (2026-10-14)** — struktur baru `use-create-transaction/create-transaction/` (`income.ts`, `expense.ts`, `transfer/index.ts` + `transfer/{cash,debt,investment}.ts`) diuji satu per satu lewat `tauri dev` + Worker lokal (`wrangler dev`), masing-masing dicek lewat salinan `finance.dev.db` (+ `-wal`/`-shm`) ke scratchpad sesuai `docs/rules/checking-dev-database.md`, dan dibandingkan dengan D1 lokal Worker (`apps/worker/.wrangler/state/v3/d1/...sqlite`): (1) income & expense biasa — INSERT benar, label ter-attach, push ke D1 sesuai; (2) transfer cash↔cash — tidak ada efek ke `debts`/`investment_*`; (3) transfer cash→debt — baris `debts` baru (`receivable`, `ongoing`); (4) transfer debt→cash (settlement) — baris `debt_payments` baru, FIFO melunasi piutang TERLAMA; (5) transfer cash→investment — baris `investment_purchases` baru (`status: pending`); (6) transfer investment→cash (jual) — `amount` dihitung ulang dari `average_cost × unit` (bukan nominal form), baris `investment_sales` baru dengan `realized_pl` benar, transaksi adjustment "Realized P/L penjualan investasi" otomatis dibuat dan ter-link via `adjustment_transaction_id`. Sempat ditemukan dan diperbaiki bug urutan push (baris turunan sempat ter-push SEBELUM leg utama `transactions` di `debt.ts`/`investment.ts`, berisiko FOREIGN KEY constraint gagal di Worker kalau race) — sudah diperbaiki, `applyLabelsAndPush` (yang push leg utama) sekarang selalu dipanggil duluan.
+
+**Update 2026-10-14 (lanjutan) — dialog Edit (BaseForm) dibuat & diverifikasi, lampiran Create di-wire, validasi-gagal terbukti tertangkap.** Tiga pekerjaan menutup gap terbesar yang tersisa dari update sebelumnya:
+- `TransactionEditDialogBaseForm` dibuat (mirror `TransactionCreateDialogBaseForm`, trigger menu "Edit (BaseForm)" di action menu list transaksi) — mematuhi kontrak `isLoading` dari `useUpdateTransactionBaseForm` (`if (isLoading) return null` sebelum mount). Diverifikasi runtime: prefill lengkap saat dialog dibuka; edit field aman (catatan/tanggal/deskripsi) pada piutang yang SUDAH dicicil tersimpan benar TANPA mengganggu `debt_payments` yang ada, sementara field berbahaya (nominal/akun/kontak) terkunci di UI dengan pesan penjelasan; transfer cash→debt dan cash→investment via edit keduanya benar di database (`debts`/`investment_purchases` + `cloud_sync_queue`). Debt→cash (settlement FIFO) dan transfer cash↔cash via Update belum dicoba.
+- Dalam proses ini ditemukan bug lama (bukan regresi BaseForm, dibuktikan identik lewat `diff` dengan versi lama) — edit transfer ganti pasangan akun lintas domain investment↔debt menyisakan baris turunan yatim. Dicatat, BELUM diperbaiki — lihat checklist Jalur Update di atas.
+- Lampiran di `TransactionCreateDialogBaseForm` di-wire (`pendingAttachments`/`getPendingAttachments`/`attachmentFolder` — ternyata `useCreateTransactionBaseForm` SUDAH punya opsi ini sejak awal lewat `handle-create-success.ts`, cuma belum pernah dipakai dari sisi dialog). Diverifikasi runtime: upload sebelum `transactionId` ada, submit, baris `transaction_attachments` lahir ter-link benar + masuk `cloud_sync_queue`.
+- Kasus validasi-gagal dibuktikan tertangkap (gap lama "baru terbukti kasus yang lolos, belum terbukti kasus yang gagal"): `validateInvestmentFields` (status Settled tanpa unit/harga) menolak SEBELUM submit; `InsufficientInvestmentUnitsError` (oversell unit) menolak di level mutation TANPA meninggalkan baris `transactions` yatim (beda dari dialog "Jual Investasi" lama yang punya risiko itu, lihat README `create-transaction/`).
 
 **Kenapa dipecah "Jalur Create/Update/Delete/Form" bukan per domain (debt/investment)** — perubahan ini akan menyentuh keempat jalur itu untuk KEDUA domain sekaligus (pola yang sama berulang) — memecah per jalur operasi membuat progres per operasi CRUD lebih mudah dilacak, karena satu jalur (mis. Create) kemungkinan selesai lebih dulu untuk kedua domain sebelum jalur lain (mis. Delete) disentuh sama sekali.

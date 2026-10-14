@@ -13,16 +13,16 @@ import {
   ComboboxList,
   useComboboxAnchor,
 } from "@/components/ui/combobox";
-import { useContacts } from "@/shared/contacts/use-contacts";
-import { findSimilarContacts } from "@/shared/contacts/find-similar-contacts";
+import { useContacts } from "./use-contacts";
+import { findSimilarContacts } from "./find-similar-contacts";
 
 type ContactOption = { value: string; label: string };
 
 const CREATE_PREFIX = "__create__:";
 
 /** Bentuk minimal form yang dibutuhkan field ini — dipakai bareng oleh
- * form transaksi (`transaction.schema.ts`) dan form-form lain yang juga
- * punya field kontak (mis. `new-debt-form`). */
+ * form transaksi dan form-form lain yang juga punya field kontak (mis.
+ * `new-debt-form`, `third-party`). */
 type ContactFormValues = { contact_name: string | null };
 
 type ContactFieldProps<TFieldValues extends ContactFormValues> = {

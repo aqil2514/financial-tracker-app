@@ -14,17 +14,10 @@ export function TransactionsHeader() {
       title="Transaksi"
       description="Kelola seluruh transaksi keuangan Anda"
       actions={
-        <>
-          <Button onClick={() => openDialog("create")}>
-            Tambah Transaksi
-            <KeyboardShortcutBadge shortcut="N" />
-          </Button>
-          {/* Sementara -- uji coba patokan BaseForm, lihat
-          base-form-migration/README.md. Hapus begitu pengujian selesai. */}
-          <Button variant="outline" onClick={() => openDialog("create-base-form")}>
-            Tambah (BaseForm)
-          </Button>
-        </>
+        <Button onClick={() => openDialog("create")}>
+          Tambah Transaksi
+          <KeyboardShortcutBadge shortcut="N" />
+        </Button>
       }
     />
   );

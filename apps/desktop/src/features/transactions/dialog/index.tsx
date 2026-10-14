@@ -1,4 +1,4 @@
-import { TransactionCreateDialog, TransactionCreateDialogBaseForm } from "./transaction-create-dialog";
+import { TransactionCreateDialog } from "./transaction-create-dialog";
 import { TransactionEditDialog } from "./transaction-edit-dialog";
 import { TransactionDetailDialog } from "./transaction-detail-dialog";
 import { TransactionDeleteConfirmDialog } from "./transaction-delete-confirm-dialog";
@@ -6,13 +6,12 @@ import { TransactionDeleteConfirmDialog } from "./transaction-delete-confirm-dia
 export function TransactionsDialogs({
   defaultAccountId,
 }: {
-  /** Diteruskan ke `TransactionCreateDialog` — lihat `useCreateTransaction`. */
+  /** Diteruskan ke `TransactionCreateDialog`. */
   defaultAccountId?: string;
 } = {}) {
   return (
     <>
       <TransactionCreateDialog defaultAccountId={defaultAccountId} />
-      <TransactionCreateDialogBaseForm />
       <TransactionEditDialog />
       <TransactionDetailDialog />
       <TransactionDeleteConfirmDialog />
