@@ -13,6 +13,12 @@ di tiap file kasus.
   ulang dari `average_cost * unit` untuk jalur jual investasi,
   `transferAccountId` selalu `null` untuk income/expense walau
   `values.transfer_account_id` form mungkin masih menyimpan nilai lama.
+- `update-to-db.ts` — `updateTransactionToDb({ db, transactionId,
+  contactId, amount, transferAccountId, values })`, mirror `insert-to-db.ts`
+  tapi `UPDATE transactions ... WHERE id = $10` (perlu `transactionId`
+  tambahan karena baris sudah ada, bukan di-generate lewat `newId()`).
+  Alasan `amount`/`transferAccountId` terpisah dari `values` SAMA
+  dengan `insert-to-db.ts`.
 - `apply-labels-and-push.ts` — `applyLabelsAndPush({ transactionId,
   labelNames })`, langkah PENUTUP yang WAJIB dipanggil setelah insert
   berhasil, untuk SEMUA jenis transaksi (income/expense/transfer) tanpa

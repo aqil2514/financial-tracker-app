@@ -10,6 +10,9 @@ import {
 } from "@/shared/attachments/pending-attachment";
 import { TransactionForm } from "../form/add-edit/components";
 import { useCreateTransaction } from "../form/add-edit/hooks/use-create-transaction";
+import { TransactionFormWithBaseForm } from "../form/add-edit/base-form-migration/components/transaction-form-with-base-form";
+import { useCreateTransactionBaseForm } from "../form/add-edit/base-form-migration/hooks/use-create-transaction/index-base-form";
+import { defaultTransactionValues } from "../form/add-edit/schema";
 import { useTransactionsDialog } from "./context";
 
 export function TransactionCreateDialog({
@@ -65,6 +68,36 @@ export function TransactionCreateDialog({
         isPending={isPending}
         pendingAttachments={pendingAttachments}
         onPendingAttachmentsChange={setPendingAttachments}
+      />
+    </EntityFormDialog>
+  );
+}
+
+// Dialog uji coba terisolasi untuk patokan BaseForm (lihat
+// base-form-migration/README.md) -- TIDAK menggantikan TransactionCreateDialog
+// di atas, cuma pembanding, dipicu lewat dialog.type "create-base-form"
+// terpisah. Belum ada handling pendingAttachments (lampiran sebelum
+// transactionId ada) seperti versi lama -- field Lampiran di form ini
+// akan nonaktif sampai itu diisi.
+export function TransactionCreateDialogBaseForm() {
+  const { dialog, closeDialog } = useTransactionsDialog();
+  const open = dialog?.type === "create-base-form";
+
+  const { onSubmit, isPending } = useCreateTransactionBaseForm({
+    onClosed: closeDialog,
+  });
+
+  return (
+    <EntityFormDialog
+      title="Tambah Transaksi (BaseForm)"
+      open={open}
+      onOpenChange={(next) => !next && closeDialog()}
+      contentClassName="sm:!max-w-6xl"
+    >
+      <TransactionFormWithBaseForm
+        defaultValues={defaultTransactionValues()}
+        onSubmit={onSubmit}
+        isPending={isPending}
       />
     </EntityFormDialog>
   );

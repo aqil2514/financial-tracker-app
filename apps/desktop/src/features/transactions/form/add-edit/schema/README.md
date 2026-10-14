@@ -27,10 +27,26 @@
 
 ## `values.ts`
 
-`defaultTransactionValues(overrides?)` — nilai default untuk dialog
-create. Hanya untuk CREATE — mode edit (`use-update-transaction.ts`) tetap
-membangun `defaultValues()`-nya sendiri di dalam hook karena bergantung
-pada entity `transaction` yang sedang diedit + `contactName` yang
-di-resolve terpisah + sinkronisasi label lewat `useEffect` tambahan
-(race condition dengan query label, lihat komentar di hook itu) — terlalu
-spesifik untuk dipindah ke sini.
+- `defaultTransactionValues(overrides?)` — nilai default untuk dialog
+  CREATE, semua field kosong/netral.
+- `transactionValuesFromRow(transaction, extras)` — versi untuk prefill
+  dialog EDIT (dipakai `base-form-migration/hooks/use-update-transaction/`).
+  Fungsi MURNI — field yang tersedia sinkron dari `transaction`
+  (`amount`/`account_id`/`note`/dst) dibaca langsung, tapi field yang
+  butuh query async (`contactName` dari `useContacts`, `unit`/
+  `pricePerUnit`/`investmentStatus` dari `useTransactionInvestmentPurchase`/
+  `Sale`, `labelNames` dari `useTransactionLabels`) WAJIB sudah
+  di-resolve oleh CALLER dan dioper lewat `extras` — fungsi ini sendiri
+  tidak boleh memanggil hook apa pun (pola sama dengan mutationFn murni
+  di `update-transaction/`).
+
+  `debt_action`/`settle_debt_ids` selalu direset kosong (BUKAN
+  direkonstruksi dari `debt_payments` lama) — lihat "Edit transaksi
+  yang sudah py debts terkait" di `debt-receivable-tracking.md`.
+
+  `use-update-transaction/index.ts` (versi LAMA, `useEntityForm`, masih
+  aktif dipakai form) TIDAK memakai fungsi ini — `defaultValues()`-nya
+  masih inline di dalam hook, termasuk sinkronisasi `label_names` lewat
+  `useEffect` tambahan (race condition dengan query label, bug nyata
+  2026-10-10, lihat komentar di hook itu) yang belum direplikasi di
+  jalur `BaseForm` baru.

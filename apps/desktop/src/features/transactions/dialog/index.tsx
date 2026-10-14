@@ -1,4 +1,4 @@
-import { TransactionCreateDialog } from "./transaction-create-dialog";
+import { TransactionCreateDialog, TransactionCreateDialogBaseForm } from "./transaction-create-dialog";
 import { TransactionEditDialog } from "./transaction-edit-dialog";
 import { TransactionDetailDialog } from "./transaction-detail-dialog";
 import { TransactionDeleteConfirmDialog } from "./transaction-delete-confirm-dialog";
@@ -12,6 +12,7 @@ export function TransactionsDialogs({
   return (
     <>
       <TransactionCreateDialog defaultAccountId={defaultAccountId} />
+      <TransactionCreateDialogBaseForm />
       <TransactionEditDialog />
       <TransactionDetailDialog />
       <TransactionDeleteConfirmDialog />
