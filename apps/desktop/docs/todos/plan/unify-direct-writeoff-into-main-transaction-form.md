@@ -59,7 +59,7 @@ Jalur Create:
 
 Jalur Update:
 
-- [ ] Transfer cash → cash — BELUM dicoba.
+- [x] Transfer cash → cash — TERUJI runtime (2026-10-16), lihat catatan di bawah.
 - [x] Transfer cash → debt — TERUJI runtime (2026-10-14).
 - [ ] Transfer debt → cash (settlement FIFO) — BELUM dicoba.
 - [x] Transfer debt → debt — TERUJI runtime (2026-10-16), lihat catatan di bawah.
