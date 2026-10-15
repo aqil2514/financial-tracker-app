@@ -4,14 +4,8 @@ import {
   applyInvestmentTransaction,
   applyInvestmentTransactionEdit,
   detachInvestmentPurchaseForDeletedTransaction,
-} from "./apply-investment-transaction";
+} from "./index";
 
-/**
- * Fake DB in-memory meniru HANYA pola SQL yang dipakai
- * apply-investment-transaction.ts — pola sama fake db di
- * apply-debt-transaction.test.ts (lihat komentar di sana untuk alasan
- * memilih fake ini alih-alih SQLite asli).
- */
 type AccountRow = { id: string; account_type: "cash" | "debt" | "investment" };
 type InvestmentPurchaseRow = {
   id: string;
@@ -291,13 +285,6 @@ describe("applyInvestmentTransactionEdit", () => {
     expect(result.investmentPurchaseIds).toHaveLength(1);
   });
 
-  // Regresi 2026-10-08 (dogfooding): transaksi 'income' hasil
-  // record_mode:'direct' (createDirectInvestmentPurchase, lihat
-  // konsep-investasi.md "Unit yang berubah TANPA transfer kas") diedit
-  // lewat form transaksi UTAMA tetap type='income' (bukan 'transfer') --
-  // sebelum fix ini, baris lama dihapus lalu applyInvestmentTransaction
-  // dipanggil yang `return none` untuk type!=='transfer', jadi baris
-  // investment_purchases hilang TANPA pengganti sama sekali.
   it("UPDATE in-place (bukan delete+recreate) kalau type bukan transfer -- transaksi direct yang diedit tetap income/expense", async () => {
     const existing: InvestmentPurchaseRow = {
       id: "ip-direct",
@@ -335,12 +322,6 @@ describe("applyInvestmentTransactionEdit", () => {
     expect(result.deletedInvestmentPurchaseIds).toHaveLength(0);
   });
 
-  // Regresi KEDUA 2026-10-08 (ditemukan lewat tes manual fix di atas):
-  // unit/pricePerUnit null dari form (field-nya TIDAK PERNAH dirender utk
-  // income/expense, dan defaultValues() use-update-transaction.ts bisa
-  // submit sebelum query investmentPurchase React Query selesai resolve)
-  // TIDAK BOLEH menimpa nilai lama yang sudah benar -- fallback ke nilai
-  // existing kalau input baru null.
   it("fallback ke unit/price_per_unit LAMA kalau input baru null (race condition form, bukan user sengaja mengosongkan)", async () => {
     const existing: InvestmentPurchaseRow = {
       id: "ip-direct",
