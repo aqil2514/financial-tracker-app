@@ -5,23 +5,9 @@ import {
   applyDebtTransactionEdit,
   detachDebtForDeletedTransaction,
   DebtEditBlockedError,
-} from "./apply-debt-transaction";
-import type { TransactionDebtStatus } from "./use-transaction-debt-status";
+} from "./index";
+import type { TransactionDebtStatus } from "../use-transaction-debt-status";
 
-/**
- * Fake DB in-memory yang meniru HANYA pola SQL spesifik yang benar-benar
- * dipakai apply-debt-transaction.ts — bukan SQL parser umum. Dipakai
- * (bukan mock modul @/lib/db) karena `db` diteruskan sebagai parameter
- * fungsi, bukan diimpor di dalamnya, dan menambah dependency SQLite asli
- * (mis. better-sqlite3) untuk sekadar unit test dianggap berlebihan untuk
- * cakupan logic yang diuji di sini (murni branching, bukan SQL itu sendiri
- * — SQL-nya sudah diverifikasi manual lewat simulasi di salinan
- * finance.dev.db, lihat debt-receivable-tracking.md).
- *
- * ID sekarang UUID (TEXT PRIMARY KEY, lihat migrasi 0027_uuid_primary_keys.sql)
- * — INSERT menyertakan `id` eksplisit sebagai parameter pertama (BUKAN lagi
- * `lastInsertId` dari auto-increment), fake db meniru pola itu persis.
- */
 type AccountRow = { id: string; account_type: "cash" | "debt" };
 type DebtRow = {
   id: string;
@@ -119,7 +105,6 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
         const [id] = params as [string];
         const index = debts.findIndex((d) => d.id === id);
         if (index >= 0) debts.splice(index, 1);
-        // Simulasikan ON DELETE CASCADE debt_payments -> debts.
         for (let i = debtPayments.length - 1; i >= 0; i--) {
           if (debtPayments[i].debt_id === id) debtPayments.splice(i, 1);
         }
@@ -229,13 +214,6 @@ describe("applyDebtTransaction", () => {
   });
 
   it("melempar UnsupportedAccountPairError untuk kombinasi tipe akun di luar cash/debt/cash-investment", async () => {
-    // Tipe fiktif "forex" -- simulasi tipe akun keempat yang belum
-    // ditambahkan ke union account_type sungguhan (lihat
-    // classify-account-pair.ts dan audit-kepatuhan-konsep-tipe-akun.md
-    // pertanyaan #4: kombinasi tak dikenal harus fail loud, bukan
-    // diam-diam dianggap no-op/cash). "investment" TIDAK dipakai lagi di
-    // sini sejak tipe itu benar-benar ditambahkan (sekarang varian valid
-    // cash-investment, ditangani apply-investment-transaction.ts).
     const forexAccount = { id: "forex-1", account_type: "forex" } as unknown as AccountRow;
     const { db } = createFakeDb({ accounts: [CASH_ACCOUNT, forexAccount] });
 
@@ -256,9 +234,6 @@ describe("applyDebtTransaction", () => {
   });
 
   it("tidak melakukan apa pun (no-op) untuk transfer cash -> investment", async () => {
-    // cash-investment adalah urusan apply-investment-transaction.ts, BUKAN
-    // apply-debt-transaction.ts -- lihat komentar pairKind di
-    // apply-debt-transaction.ts.
     const investmentAccount = { id: "inv-1", account_type: "investment" } as unknown as AccountRow;
     const { db } = createFakeDb({ accounts: [CASH_ACCOUNT, investmentAccount] });
 
@@ -399,8 +374,6 @@ describe("applyDebtTransaction", () => {
       settleDebtIds: ["debt-row-1", "debt-row-2"],
     });
 
-    // debt-row-1 (30000, TERLAMA) lunas penuh duluan, sisa 30000 dari
-    // 60000 mengalir ke debt-row-2 (40000) -> sisa 10000, masih ongoing.
     expect(debtPayments).toEqual([
       { id: expect.any(String), debt_id: "debt-row-1", amount: 30000, account_id: "debt-1", transaction_id: "tx-200", date: "2026-02-01" },
       { id: expect.any(String), debt_id: "debt-row-2", amount: 30000, account_id: "debt-1", transaction_id: "tx-200", date: "2026-02-01" },
@@ -483,7 +456,7 @@ describe("applyDebtTransactionEdit", () => {
 
     expect(debts).toHaveLength(1);
     expect(debts[0].date).toBe("2026-03-15");
-    expect(debts[0].amount).toBe(50000); // tidak berubah
+    expect(debts[0].amount).toBe(50000);
   });
 
   it("role='principal', field berbahaya berubah, BELUM ada cicilan: recreate dari nilai baru", async () => {
@@ -505,13 +478,13 @@ describe("applyDebtTransactionEdit", () => {
     await applyDebtTransactionEdit({
       db: db as never,
       ...baseInput,
-      amount: 75000, // nominal berubah
+      amount: 75000,
       status,
       dangerousFieldsChanged: true,
     });
 
     expect(debts).toHaveLength(1);
-    expect(debts[0].id).not.toBe("debt-row-5"); // baris lama sudah dihapus, ini baris baru
+    expect(debts[0].id).not.toBe("debt-row-5");
     expect(debts[0].amount).toBe(75000);
     expect(debts[0].transaction_id).toBe("tx-42");
   });
@@ -549,7 +522,6 @@ describe("applyDebtTransactionEdit", () => {
       })
     ).rejects.toThrow(DebtEditBlockedError);
 
-    // Tidak ada apa pun yang berubah — blokir terjadi SEBELUM mutasi apa pun.
     expect(debts).toHaveLength(1);
     expect(debts[0].amount).toBe(50000);
     expect(debtPayments).toHaveLength(1);
@@ -588,7 +560,7 @@ describe("applyDebtTransactionEdit", () => {
 
     expect(debtPayments).toHaveLength(1);
     expect(debtPayments[0].date).toBe("2026-02-20");
-    expect(debtPayments[0].amount).toBe(20000); // tidak berubah
+    expect(debtPayments[0].amount).toBe(20000);
   });
 
   it("role='payment', field berbahaya berubah: recreate aman, debt induk tetap ongoing kalau masih ada sisa", async () => {
@@ -619,7 +591,7 @@ describe("applyDebtTransactionEdit", () => {
       ...baseInput,
       accountId: "debt-1",
       transferAccountId: "cash-1",
-      amount: 25000, // nominal cicilan berubah
+      amount: 25000,
       debtAction: "settlement",
       settleDebtIds: ["debt-row-5"],
       status,
@@ -627,9 +599,9 @@ describe("applyDebtTransactionEdit", () => {
     });
 
     expect(debtPayments).toHaveLength(1);
-    expect(debtPayments[0].id).not.toBe("payment-8"); // baris lama sudah dihapus
+    expect(debtPayments[0].id).not.toBe("payment-8");
     expect(debtPayments[0].amount).toBe(25000);
-    expect(debts.find((d) => d.id === "debt-row-5")?.status).toBe("ongoing"); // sisa 25000, belum lunas
+    expect(debts.find((d) => d.id === "debt-row-5")?.status).toBe("ongoing");
   });
 
   it("role='payment', field berbahaya berubah, pembayaran BARU melunasi penuh: debt induk jadi paid", async () => {
@@ -660,7 +632,7 @@ describe("applyDebtTransactionEdit", () => {
       ...baseInput,
       accountId: "debt-1",
       transferAccountId: "cash-1",
-      amount: 50000, // melunasi seluruh sisa
+      amount: 50000,
       debtAction: "settlement",
       settleDebtIds: ["debt-row-5"],
       status,
@@ -702,7 +674,7 @@ describe("detachDebtForDeletedTransaction", () => {
     expect(result).toEqual({ role: "principal", debtId: "debt-row-5", hadPayments: false });
     expect(debts).toHaveLength(1);
     expect(debts[0].transaction_id).toBeNull();
-    expect(debts[0].amount).toBe(50000); // nominal tidak berubah
+    expect(debts[0].amount).toBe(50000);
     expect(debts[0].status).toBe("ongoing");
   });
 
@@ -733,7 +705,6 @@ describe("detachDebtForDeletedTransaction", () => {
     expect(result).toEqual({ role: "principal", debtId: "debt-row-5", hadPayments: true });
     expect(debts[0].transaction_id).toBeNull();
     expect(debts[0].amount).toBe(50000);
-    // Cicilan dari transaksi LAIN tetap utuh -- bukan CASCADE/dihapus.
     expect(debtPayments).toHaveLength(1);
     expect(debtPayments[0].id).toBe("payment-1");
     expect(debtPayments[0].transaction_id).toBe("tx-999");
@@ -766,7 +737,7 @@ describe("detachDebtForDeletedTransaction", () => {
     expect(result).toEqual({ role: "payment", debtId: "debt-row-5" });
     expect(debtPayments).toHaveLength(0);
     expect(debts[0].status).toBe("ongoing");
-    expect(debts[0].amount).toBe(50000); // pokok piutang tidak tersentuh
+    expect(debts[0].amount).toBe(50000);
   });
 
   it("role='payment', menghapus cicilan yang MELUNASI penuh: debt direvert dari 'paid' ke 'ongoing'", async () => {
@@ -795,6 +766,6 @@ describe("detachDebtForDeletedTransaction", () => {
 
     expect(result).toEqual({ role: "payment", debtId: "debt-row-5" });
     expect(debtPayments).toHaveLength(0);
-    expect(debts[0].status).toBe("ongoing"); // direvert, sisa penuh lagi
+    expect(debts[0].status).toBe("ongoing");
   });
 });
