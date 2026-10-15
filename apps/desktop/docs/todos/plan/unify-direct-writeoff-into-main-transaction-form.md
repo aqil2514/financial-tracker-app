@@ -20,9 +20,9 @@ Penjelasan tiap poin ada di bagian "Detail & rasional keputusan" paling bawah �
 
 ### Jalur Delete
 
-- [ ] Kasus Normal — belum direview ulang untuk pola baru ini.
-- [ ] Kasus Utang Piutang — belum ada, lihat catatan di bawah.
-- [ ] Kasus Investasi — belum ada, lihat catatan di bawah.
+- [x] Kasus Normal — TERUJI runtime (2026-10-15), lihat catatan di bawah.
+- [x] Kasus Utang Piutang — TERUJI runtime (2026-10-15), TANPA kode baru. Lihat catatan di bawah.
+- [x] Kasus Investasi (pembelian direct + write-off) — TERUJI runtime (2026-10-15), TANPA kode baru. Lihat catatan di bawah.
 
 ### Form
 
@@ -119,3 +119,21 @@ Setelah Create/Update/Delete/Form solid untuk kedua domain (checklist selesai, t
 - **Masih kosong**: edit field berbahaya (recreate/blokir) utk debt & investment direct belum dicoba manual; Jalur Delete utk kedua domain.
 
 **Update 2026-10-15 (lanjutan) — Kasus Normal Jalur Update TERUJI runtime.** "Test Case Normal" (income/expense biasa, akun cash) diedit via dialog Edit BaseForm: `type` diubah dari `expense` → `income` SEKALIGUS `note` diubah. Diverifikasi: `transactions` ter-UPDATE benar (baik `type` maupun `note`), masuk `cloud_sync_queue`, berhasil push ke D1 lokal Worker — nilai identik lokal vs D1. Ini menutup gap "belum direview ulang untuk pola baru" — jalur income/expense cash paling dasar sekarang teruji lewat BaseForm, bukan cuma diasumsikan jalan karena tidak diubah logikanya. Transfer cash↔cash dan debt→cash (settlement FIFO) via Update MASIH belum dicoba (lihat catatan 2026-10-14 di atas).
+
+**Update 2026-10-15 (lanjutan) — Jalur Delete dianalisis: TIDAK perlu kode baru sama sekali, TERUJI runtime untuk Kasus Utang Piutang.** Berbeda dari Create/Update yang butuh percabangan baru di `income.ts`/`expense.ts`, `use-delete-transaction.ts` (hook delete tunggal, sudah ada SEBELUM dokumen ini dibuat) sejak awal didesain generic by `transactionId` — tidak pernah bercabang berdasarkan `type` transaksi atau tipe akun sama sekali:
+
+- `detachDebtForDeletedTransaction` → lewat `getTransactionDebtStatus` → query `WHERE transaction_id = $1` murni, tidak peduli transaksi itu `transfer` atau `income`/`expense` direct — begitu `role: 'principal'` ketemu, `debts.transaction_id` SET NULL (piutang/utang tetap utuh nominal).
+- `detachInvestmentPurchaseForDeletedTransaction` → sama pola, query by `transaction_id`, hard-delete baris `investment_purchases` (tidak ada makna tanpa transaksi asalnya, beda dari `debts`).
+- `detachInvestmentSaleForDeletedTransaction` → QUERY INI JUGA tidak membedakan jual biasa vs write-off (`WHERE transaction_id = $1` tanpa filter `price_per_unit`/`adjustment_transaction_id`) — jadi baris write-off (`adjustment_transaction_id` selalu `NULL`) otomatis ikut terdeteksi. `deleteInvestmentSaleAndAdjustment` sudah ber-guard `if (adjustmentId != null)` sebelum mencoba hapus transaksi adjustment, jadi TIDAK ada percobaan delete yang salah untuk write-off.
+
+Kesimpulan: delete generic ini sudah "siap" untuk kasus direct SEJAK DITULIS, bukan karena disengaja untuk dokumen ini — cuma belum pernah diverifikasi lawan kasus direct secara eksplisit sebelum sekarang.
+
+**Diverifikasi TERUJI runtime** (`tauri dev` + Worker lokal): "Test Piutang (Editted)" (income direct ke debt) dihapus — `transactions` lokal hilang total (hard-delete), `debts` row TETAP ADA dengan `amount`/`status` utuh, cuma `transaction_id` jadi `NULL`. Push ke Worker: `transactions` di D1 soft-delete via `deleted_at` (bukan hard-delete, sesuai desain cloud-sync), `debts` di D1 ikut ter-update `transaction_id` kosong — identik dengan lokal, queue kosong (tidak ada yang tertahan).
+
+**Diverifikasi TERUJI runtime (lanjutan) — Kasus Investasi (pembelian direct)**: "Test Income Investasi (Editted)" dihapus — `transactions` DAN `investment_purchases` KEDUANYA hilang total (hard-delete, beda dari debt yang disisakan) — sesuai desain, `investment_purchases` tidak punya makna tanpa transaksi asalnya. Push ke Worker: `transactions` DAN `investment_purchases` di D1 SAMA-SAMA soft-delete via `deleted_at`, nilai `deleted_at` identik di kedua baris.
+
+**Temuan infrastruktur (BUKAN bug Jalur Delete, dicatat untuk transparansi)**: baris `investment_purchases` sempat tertinggal di `cloud_sync_queue` lokal (`op: delete`, `attempts: 0`, tanpa `last_error`) padahal D1 SUDAH konsisten (`deleted_at` terisi). Diselidiki: `created_at` entri queue itu PERSIS sama detik dengan `deleted_at` di D1 — pola khas request HTTP yang SUKSES diproses Worker tapi response-nya tidak sempat diterima balik oleh `fetch()` di client (dianggap gagal/timeout, masuk `catch` di `pushDeleteOnWrite`, ter-`enqueueDeletePush` walau sebenarnya sudah berhasil). `use-delete-transaction.ts` TIDAK disentuh sesi ini, logikanya sudah benar (`await`, bukan `void`) — ini race murni di level network/timing `wrangler dev` lokal saat testing manual berurutan cepat, bukan bug logic dari pekerjaan unifikasi form.
+
+**Diverifikasi TERUJI runtime (lanjutan) — Kasus Investasi (write-off)**: "Test Expense Investasi (Editted)" dihapus — `transactions` DAN `investment_sales` KEDUANYA hard-delete total di lokal (sama pola dengan pembelian direct, beda dari debt). Push ke Worker: KEDUANYA soft-delete identik di D1 (`deleted_at` sama persis), `cloud_sync_queue` BERSIH TOTAL kali ini (tidak ada entri tertinggal sama sekali) — menguatkan bahwa gap queue pada kasus pembelian direct sebelumnya memang race timing network sesaat, bukan masalah sistemik yang berulang. `deleteInvestmentSaleAndAdjustment` terbukti benar menangani write-off: guard `if (adjustmentId != null)` mencegah percobaan delete transaksi adjustment yang memang tidak ada (write-off tidak punya leg kedua), tidak ada error.
+
+**Diverifikasi TERUJI runtime (lanjutan) — Kasus Normal**: "Test Case Normal (Editted)" (income biasa, akun cash) dihapus — `transactions` hard-delete di lokal, soft-delete `deleted_at` identik di D1, `cloud_sync_queue` bersih tanpa entri tertahan. Menutup checklist Jalur Delete sepenuhnya untuk ketiga kasus (Normal, Utang Piutang, Investasi).
