@@ -4,6 +4,7 @@ import {
   applyInvestmentTransaction,
   applyInvestmentTransactionEdit,
   detachInvestmentPurchaseForDeletedTransaction,
+  InvestmentPurchaseEditBlockedError,
 } from "./index";
 
 type AccountRow = { id: string; account_type: "cash" | "debt" | "investment" };
@@ -16,12 +17,18 @@ type InvestmentPurchaseRow = {
   date: string;
   status: "pending" | "settled";
 };
+type InvestmentSaleRow = { account_id: string; unit: number; status: "pending" | "settled" };
 
 function createFakeDb(
-  seed: { accounts?: AccountRow[]; investmentPurchases?: InvestmentPurchaseRow[] } = {}
+  seed: {
+    accounts?: AccountRow[];
+    investmentPurchases?: InvestmentPurchaseRow[];
+    investmentSales?: InvestmentSaleRow[];
+  } = {}
 ) {
   const accounts = seed.accounts ?? [];
   const investmentPurchases: InvestmentPurchaseRow[] = seed.investmentPurchases ?? [];
+  const investmentSales: InvestmentSaleRow[] = seed.investmentSales ?? [];
 
   const db = {
     async select<T>(sql: string, params: unknown[] = []): Promise<T> {
@@ -30,15 +37,43 @@ function createFakeDb(
         const account = accounts.find((a) => a.id === id);
         return (account ? [{ account_type: account.account_type }] : []) as T;
       }
-      if (sql.startsWith("SELECT id, unit, price_per_unit FROM investment_purchases WHERE transaction_id")) {
+      if (
+        sql.startsWith("SELECT id, account_id, unit, price_per_unit, status FROM investment_purchases WHERE transaction_id")
+      ) {
         const [transactionId] = params as [string];
         const match = investmentPurchases.find((p) => p.transaction_id === transactionId);
-        return (match ? [{ id: match.id, unit: match.unit, price_per_unit: match.price_per_unit }] : []) as T;
+        return (
+          match
+            ? [
+                {
+                  id: match.id,
+                  account_id: match.account_id,
+                  unit: match.unit,
+                  price_per_unit: match.price_per_unit,
+                  status: match.status,
+                },
+              ]
+            : []
+        ) as T;
       }
       if (sql.startsWith("SELECT id FROM investment_purchases WHERE transaction_id")) {
         const [transactionId] = params as [string];
         const match = investmentPurchases.find((p) => p.transaction_id === transactionId);
         return (match ? [{ id: match.id }] : []) as T;
+      }
+      if (sql.includes("SUM(unit) AS total_unit FROM investment_purchases WHERE account_id")) {
+        const [accountId] = params as [string];
+        const total = investmentPurchases
+          .filter((p) => p.account_id === accountId && p.status === "settled")
+          .reduce((sum, p) => sum + (p.unit ?? 0), 0);
+        return [{ total_unit: total }] as T;
+      }
+      if (sql.includes("SUM(unit) AS total_unit FROM investment_sales WHERE account_id")) {
+        const [accountId] = params as [string];
+        const total = investmentSales
+          .filter((s) => s.account_id === accountId)
+          .reduce((sum, s) => sum + s.unit, 0);
+        return [{ total_unit: total }] as T;
       }
       throw new Error(`Fake db.select tidak mengenali query: ${sql}`);
     },
@@ -355,6 +390,73 @@ describe("applyInvestmentTransactionEdit", () => {
       date: "2026-01-02",
     });
     expect(result.investmentPurchaseIds).toEqual(["ip-direct"]);
+  });
+
+  it("melempar InvestmentPurchaseEditBlockedError kalau mengurangi unit purchase settled membuat sisa unit akun negatif", async () => {
+    const existing: InvestmentPurchaseRow = {
+      id: "ip-1",
+      account_id: "inv-1",
+      transaction_id: "tx-1",
+      unit: 10,
+      price_per_unit: 1000,
+      date: "2026-01-01",
+      status: "settled",
+    };
+    const { db, investmentPurchases } = createFakeDb({
+      accounts: [CASH_ACCOUNT, INVESTMENT_ACCOUNT],
+      investmentPurchases: [existing],
+      investmentSales: [{ account_id: "inv-1", unit: 8, status: "settled" }],
+    });
+
+    await expect(
+      applyInvestmentTransactionEdit({
+        db: db as never,
+        transactionId: "tx-1",
+        type: "transfer",
+        accountId: "cash-1",
+        transferAccountId: "inv-1",
+        date: "2026-01-02",
+        unit: 2,
+        pricePerUnit: 1000,
+        status: "settled",
+      })
+    ).rejects.toThrow(InvestmentPurchaseEditBlockedError);
+
+    expect(investmentPurchases).toHaveLength(1);
+    expect(investmentPurchases[0]).toMatchObject({ id: "ip-1", unit: 10 });
+  });
+
+  it("mengizinkan edit unit purchase settled kalau sisa unit akun TETAP non-negatif", async () => {
+    const existing: InvestmentPurchaseRow = {
+      id: "ip-1",
+      account_id: "inv-1",
+      transaction_id: "tx-1",
+      unit: 10,
+      price_per_unit: 1000,
+      date: "2026-01-01",
+      status: "settled",
+    };
+    const { db, investmentPurchases } = createFakeDb({
+      accounts: [CASH_ACCOUNT, INVESTMENT_ACCOUNT],
+      investmentPurchases: [existing],
+      investmentSales: [{ account_id: "inv-1", unit: 8, status: "settled" }],
+    });
+
+    const result = await applyInvestmentTransactionEdit({
+      db: db as never,
+      transactionId: "tx-1",
+      type: "transfer",
+      accountId: "cash-1",
+      transferAccountId: "inv-1",
+      date: "2026-01-02",
+      unit: 9,
+      pricePerUnit: 1000,
+      status: "settled",
+    });
+
+    expect(result.deletedInvestmentPurchaseIds).toEqual(["ip-1"]);
+    expect(investmentPurchases).toHaveLength(1);
+    expect(investmentPurchases[0]).toMatchObject({ unit: 9 });
   });
 });
 

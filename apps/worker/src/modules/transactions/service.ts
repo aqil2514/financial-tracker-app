@@ -23,6 +23,7 @@ import {
   getTransactionWriteOff,
   detachInvestmentSaleForDeletedTransaction,
   validateInvestmentSaleUnits,
+  validateInvestmentPurchaseEdit,
   getTransactionInvestmentSaleUnit,
   resolveInvestmentSellAmount,
   getAverageCostPerUnit,
@@ -448,6 +449,21 @@ async function updateTransactionRow(
     });
     if (precheck.status === "rejected") return precheck;
   }
+
+  // Precheck edit pembelian investasi -- sama alasannya dgn precheck
+  // oversell penjualan di atas, tapi arah SEBALIKNYA: mengurangi unit
+  // pembelian SETTLED yang sudah "dipakai" penjualan setelahnya bisa
+  // membuat sisa unit akun negatif (lihat validateInvestmentPurchaseEdit
+  // di investments/service.ts, port PERSIS InvestmentPurchaseEditBlockedError
+  // desktop). Aman dipanggil unconditional -- no-op kalau baris lama
+  // belum 'settled' atau tidak ada.
+  const purchaseEditPrecheck = await validateInvestmentPurchaseEdit(env, {
+    transactionId: id,
+    type: payload.type,
+    unit: payload.unit ?? null,
+    status: payload.investmentStatus,
+  });
+  if (purchaseEditPrecheck.status === "rejected") return purchaseEditPrecheck;
 
   // Logic #2 pre-check: resolve status SEBELUM update baris transaksi
   // -- kalau nanti DebtEditBlockedError dilempar, UPDATE transactions

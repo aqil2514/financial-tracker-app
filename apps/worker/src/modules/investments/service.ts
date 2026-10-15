@@ -214,16 +214,58 @@ export async function applyInvestmentTransaction(
   return { investmentPurchaseIds: [id], deletedInvestmentPurchaseIds: [] };
 }
 
+type ExistingPurchaseRow = {
+  id: string;
+  account_id: string;
+  unit: number | null;
+  price_per_unit: number | null;
+  status: "pending" | "settled";
+};
+
 async function getTransactionInvestmentPurchaseRow(
   env: Env,
   transactionId: string
-): Promise<{ id: string; unit: number | null; price_per_unit: number | null } | null> {
+): Promise<ExistingPurchaseRow | null> {
   const row = await env.DB.prepare(
-    "SELECT id, unit, price_per_unit FROM investment_purchases WHERE transaction_id = ?1 AND deleted_at IS NULL"
+    "SELECT id, account_id, unit, price_per_unit, status FROM investment_purchases WHERE transaction_id = ?1 AND deleted_at IS NULL"
   )
     .bind(transactionId)
-    .first<{ id: string; unit: number | null; price_per_unit: number | null }>();
+    .first<ExistingPurchaseRow>();
   return row ?? null;
+}
+
+// Port PERSIS dari InvestmentPurchaseEditBlockedError (desktop,
+// apply-investment-transaction/edit.ts) -- lihat README desktop utk
+// rasional lengkap: mengurangi/menghapus unit sebuah pembelian SETTLED
+// yang unitnya sudah "dipakai" penjualan berikutnya (snapshot permanen
+// di investment_sales) membuat sisa unit akun jadi negatif secara
+// retroaktif. Pre-check REJECT SEBELUM SIMPAN, pola PERSIS
+// validateInvestmentSaleUnits di atas -- dipanggil dari
+// transactions/service.ts SEBELUM UPDATE baris transactions, BUKAN
+// throw di tengah applyInvestmentTransactionEdit (beda dari desktop
+// yang throw langsung, krn Worker butuh reject SEBELUM tulisan apa pun
+// konsisten dgn precheck lain di sini).
+export async function validateInvestmentPurchaseEdit(
+  env: Env,
+  { transactionId, type, unit, status }: { transactionId: string; type: string; unit: number | null; status?: "pending" | "settled" }
+): Promise<ValidateInvestmentSaleResult> {
+  const existing = await getTransactionInvestmentPurchaseRow(env, transactionId);
+  if (existing == null || existing.status !== "settled") return { status: "ok" };
+
+  const unitAfterEdit = type === "transfer" ? unit : (unit ?? existing.unit);
+  const statusAfterEdit = type === "transfer" ? (status ?? "pending") : "settled";
+  const unitContributionAfterEdit = statusAfterEdit === "settled" ? (unitAfterEdit ?? 0) : 0;
+  const remainingUnitExcludingThis = (await getRemainingUnit(env, existing.account_id)) - (existing.unit ?? 0);
+  const remainingUnitAfterEdit = remainingUnitExcludingThis + unitContributionAfterEdit;
+  if (remainingUnitAfterEdit < 0) {
+    return {
+      status: "rejected",
+      reason:
+        `Mengubah pembelian ini akan membuat sisa unit akun jadi tidak valid (${remainingUnitAfterEdit}) — ` +
+        `sebagian unit sudah terjual lewat transaksi lain. Kurangi jumlah pengurangan unit, atau batalkan perubahan ini.`,
+    };
+  }
+  return { status: "ok" };
 }
 
 // Port PERSIS dari applyInvestmentTransactionEdit (desktop) -- field

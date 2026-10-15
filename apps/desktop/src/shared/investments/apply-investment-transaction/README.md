@@ -68,11 +68,45 @@ diisi kalau status `'settled'`).
 ## edit.ts
 
 `applyInvestmentTransactionEdit` — versi `applyInvestmentTransaction`
-untuk jalur EDIT transaksi. Field unit/harga TIDAK divalidasi terhadap
-nominal (lihat `konsep-investasi.md`), jadi tidak ada kasus "diblokir"
-seperti `DebtEditBlockedError` (tidak ada baris lain yang bergantung
-pada satu `investment_purchases`, beda dari `debts` yang bisa sudah
-dicicil).
+untuk jalur EDIT transaksi. Field unit/harga vs NOMINAL TRANSFER (satu
+baris yang sama) TIDAK divalidasi (lihat `konsep-investasi.md` "Unit
+dan harga per unit") — tapi sejak 2026-10-16 ADA kasus "diblokir" untuk
+situasi berbeda, lihat `InvestmentPurchaseEditBlockedError` di bawah.
+
+### `InvestmentPurchaseEditBlockedError` (2026-10-16, bug ditemukan
+lewat dogfooding)
+
+Ditemukan saat menguji checklist "edit field berbahaya" domain
+investasi (lihat
+[docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md](../../../../../docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md)):
+mengedit `unit` sebuah pembelian `settled` yang unitnya SUDAH ikut
+terjual lewat penjualan berikutnya bisa membuat `getRemainingUnit`
+(`investment-holding-math.ts`) jadi NEGATIF — dibuktikan konkret di
+`tauri dev` (beli 10 unit → jual 22 unit dari total holding 33 unit →
+edit pembelian pertama jadi 2 unit → sisa unit jadi -1).
+
+Kenapa ini BEDA dari filosofi "tidak menghakimi data" (validasi
+unit×harga vs nominal transfer di atas, yang sengaja longgar): kasus
+itu soal konsistensi SATU baris saat input (user boleh salah input,
+perbaiki sendiri lewat edit). Kasus ini soal integritas LINTAS
+baris/waktu — penjualan yang SUDAH terjadi menyimpan
+`average_cost_per_unit`/`realized_pl` sebagai SNAPSHOT PERMANEN (tidak
+pernah dihitung ulang, lihat `apply-sell-investment-transaction.ts`),
+jadi mengurangi/menghapus unit pembelian yang sudah "dipakai" snapshot
+itu membuat representasi sisa unit tidak masuk akal secara retroaktif
+— pola yang sama alasannya dengan `DebtEditBlockedError` (mencegah
+perubahan yang merusak jejak transaksi LAIN yang sudah bergantung
+padanya), bukan soal menghakimi input.
+
+Validasi di `applyInvestmentTransactionEdit`: HANYA berlaku kalau baris
+lama berstatus `settled` (baris `pending` tidak pernah ikut
+`getRemainingUnit`, jadi tidak ada resiko). Hitung
+`remainingUnitExcludingThis` (sisa unit akun TANPA kontribusi baris
+ini), lalu tambahkan kontribusi baris SETELAH diedit (0 kalau status
+baru jadi `pending`/bukan transfer dengan unit null, atau unit baru
+kalau tetap `settled`) — tolak kalau hasilnya negatif.
+`docs/concept/konsep-investasi.md` diupdate untuk mencatat keputusan
+desain ini (bagian "Validasi: cegah oversell").
 
 **Revisi 2026-10-08 (bug ditemukan lewat dogfooding)**: baris lama
 TIDAK selalu aman di-delete-lalu-recreate lewat
