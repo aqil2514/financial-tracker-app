@@ -1,9 +1,13 @@
 import { getDb, type Transaction } from "@/lib/db";
 import { getAccountType } from "@/lib/db/helper";
 import { classifyAccountPair } from "@/shared/debts/classify-account-pair";
-import { applyInvestmentTransactionEdit } from "@/shared/investments/apply-investment-transaction";
+import {
+  applyInvestmentTransactionEdit,
+  detachInvestmentPurchaseForDeletedTransaction,
+} from "@/shared/investments/apply-investment-transaction";
 import {
   applySellInvestmentTransactionEdit,
+  detachInvestmentSaleForDeletedTransaction,
   InsufficientInvestmentUnitsError,
 } from "@/shared/investments/apply-sell-investment-transaction";
 import { getAverageCostPerUnit, getRemainingUnit } from "@/shared/investments/investment-holding-math";
@@ -65,6 +69,22 @@ export async function updateInvestmentTransfer({
   let deletedInvestmentPurchaseIds: string[] = [];
   let investmentSaleId: string | null = null;
   let deletedInvestmentSaleIds: string[] = [];
+
+  if (isInvestmentSell) {
+    const stalePurchase = await detachInvestmentPurchaseForDeletedTransaction(db, transaction.id);
+    if (stalePurchase.role === "purchase") {
+      deletedInvestmentPurchaseIds = [stalePurchase.investmentPurchaseId];
+    }
+  } else {
+    const staleSale = await detachInvestmentSaleForDeletedTransaction(db, transaction.id);
+    if (staleSale.role === "sale") {
+      deletedInvestmentSaleIds = [staleSale.investmentSaleId];
+      if (staleSale.adjustmentTransactionId != null) {
+        void pushDeleteOnWrite("transactions", staleSale.adjustmentTransactionId, {});
+      }
+    }
+  }
+
   if (isInvestmentSell) {
     const touched = await applySellInvestmentTransactionEdit(transaction.id, {
       db,
