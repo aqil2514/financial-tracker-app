@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 
 import { useAccounts } from "@/features/accounts";
@@ -44,26 +43,6 @@ export function useTransactionForm({
   const destinationAccount = accounts?.find(
     (account) => String(account.id) === transferAccountId
   );
-  const sourceIsDebt = sourceAccount?.account_type === "debt";
-
-  const previousTypeRef = useRef(type);
-
-  useEffect(() => {
-    if (sourceIsDebt && type !== "transfer") {
-      form.setValue("type", "transfer", { shouldValidate: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceIsDebt]);
-
-  useEffect(() => {
-    const typeChanged = previousTypeRef.current !== type;
-    previousTypeRef.current = type;
-    if (typeChanged && type !== "transfer" && sourceIsDebt) {
-      form.setValue("account_id", "", { shouldValidate: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type]);
-
   const { debtStatus, involvesDebtAccount, debtFieldsLocked, needsDebtAction, validateDebtFields } =
     useTransactionDebtFields({
       transactionId,
@@ -73,12 +52,17 @@ export function useTransactionForm({
       destinationAccountType: destinationAccount?.account_type,
     });
 
-  const { needsInvestmentFields, needsInvestmentSellFields, validateInvestmentFields } =
-    useTransactionInvestmentFields({
-      type,
-      sourceAccountType: sourceAccount?.account_type,
-      destinationAccountType: destinationAccount?.account_type,
-    });
+  const {
+    needsInvestmentFields,
+    needsInvestmentSellFields,
+    needsInvestmentDirectBuyFields,
+    needsInvestmentWriteOffFields,
+    validateInvestmentFields,
+  } = useTransactionInvestmentFields({
+    type,
+    sourceAccountType: sourceAccount?.account_type,
+    destinationAccountType: destinationAccount?.account_type,
+  });
 
   const { accountOptions, categoryOptions, renderAccountOption } = useAccountCategoryOptions({
     accounts,
@@ -117,6 +101,8 @@ export function useTransactionForm({
     needsDebtAction,
     needsInvestmentFields,
     needsInvestmentSellFields,
+    needsInvestmentDirectBuyFields,
+    needsInvestmentWriteOffFields,
     accountOptions,
     categoryOptions,
     renderAccountOption,

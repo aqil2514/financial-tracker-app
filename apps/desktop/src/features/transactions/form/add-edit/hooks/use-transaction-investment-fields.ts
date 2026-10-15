@@ -24,9 +24,16 @@ export function useTransactionInvestmentFields({
     }
   }
 
+  const sourceIsInvestment = sourceAccountType === "investment";
   const needsInvestmentBuyFields = pairKind === "cash-investment";
   const needsInvestmentSellFields = pairKind === "investment-cash";
-  const needsInvestmentFields = needsInvestmentBuyFields || needsInvestmentSellFields;
+  const needsInvestmentDirectBuyFields = type === "income" && sourceIsInvestment;
+  const needsInvestmentWriteOffFields = type === "expense" && sourceIsInvestment;
+  const needsInvestmentFields =
+    needsInvestmentBuyFields ||
+    needsInvestmentSellFields ||
+    needsInvestmentDirectBuyFields ||
+    needsInvestmentWriteOffFields;
 
   function validateInvestmentFields(values: {
     unit: number | null;
@@ -42,6 +49,21 @@ export function useTransactionInvestmentFields({
       }
       return null;
     }
+    if (needsInvestmentWriteOffFields) {
+      if (values.unit == null || values.unit <= 0) {
+        return "Jumlah unit wajib diisi untuk write-off investasi";
+      }
+      return null;
+    }
+    if (needsInvestmentDirectBuyFields) {
+      if (values.unit == null || values.unit <= 0) {
+        return "Jumlah unit wajib diisi";
+      }
+      if (values.price_per_unit == null || values.price_per_unit <= 0) {
+        return "Harga per unit wajib diisi";
+      }
+      return null;
+    }
     if (!needsInvestmentBuyFields || values.investment_status !== "settled") return null;
     if (values.unit == null || values.unit <= 0) {
       return "Jumlah unit wajib diisi untuk status Settled";
@@ -52,5 +74,12 @@ export function useTransactionInvestmentFields({
     return null;
   }
 
-  return { needsInvestmentFields, needsInvestmentBuyFields, needsInvestmentSellFields, validateInvestmentFields };
+  return {
+    needsInvestmentFields,
+    needsInvestmentBuyFields,
+    needsInvestmentSellFields,
+    needsInvestmentDirectBuyFields,
+    needsInvestmentWriteOffFields,
+    validateInvestmentFields,
+  };
 }

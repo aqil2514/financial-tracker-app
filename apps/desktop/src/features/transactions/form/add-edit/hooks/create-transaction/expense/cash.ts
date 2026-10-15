@@ -1,20 +1,20 @@
 import { getDb } from "@/lib/db";
-import { insertTransactionToDb, applyLabelsAndPush } from "../helper";
-import type { TransactionFormOutput } from "../../schema";
+import { insertTransactionToDb, applyLabelsAndPush } from "../../helper";
+import type { TransactionFormOutput } from "../../../schema";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
-type CreateExpenseTransactionInput = {
+type CreateCashExpenseInput = {
   db: Db;
   contactId: string | null;
   values: TransactionFormOutput;
 };
 
-export async function createExpenseTransaction({
+export async function createCashExpense({
   db,
   contactId,
   values,
-}: CreateExpenseTransactionInput): Promise<string> {
+}: CreateCashExpenseInput): Promise<string> {
   const transactionId = await insertTransactionToDb({
     db,
     contactId,
