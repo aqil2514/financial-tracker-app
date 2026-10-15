@@ -552,6 +552,20 @@ async function updateTransactionRow(
     });
     if (result.status === "rejected") return result;
 
+    // Transaksi yang sama bisa berpindah arah beli<->jual saat diedit (akun
+    // ditukar) -- applyInvestmentTransactionEdit/applySellInvestmentTransactionEdit
+    // di bawah masing-masing CUMA melihat tabelnya sendiri (port PERSIS
+    // desktop/.../transfer/investment.ts), jadi baris lama di tabel LAWAN
+    // arah baru harus dibersihkan dulu di sini atau jadi yatim. Write-off
+    // TIDAK termasuk (bukan transisi purchase<->sale, lihat getTransactionWriteOff).
+    if (writeOffSale == null) {
+      if (resolvedSellAmount != null) {
+        await detachInvestmentPurchaseForDeletedTransaction(env, id);
+      } else {
+        await detachInvestmentSaleForDeletedTransaction(env, id);
+      }
+    }
+
     if (writeOffSale != null) {
       // Write-off -- UPDATE in-place baris investment_sales yang sama,
       // BEDA dari applyInvestmentTransactionEdit/applySellInvestmentTransactionEdit
