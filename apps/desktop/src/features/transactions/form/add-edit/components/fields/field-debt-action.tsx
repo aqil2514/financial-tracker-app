@@ -24,6 +24,7 @@ export function FieldDebtAction() {
   const { data: ongoingDebts } = useOngoingDebts(contactId, {
     excludeDebtId: debtStatus?.role === "payment" ? debtStatus.debtId : undefined,
     excludeTransactionId: debtStatus?.role === "payment" ? transactionId : undefined,
+    excludePrincipalDebtId: debtStatus?.role === "principal" ? debtStatus.debtId : undefined,
   });
 
   if (!needsDebtAction) return null;

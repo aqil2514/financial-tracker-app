@@ -7,6 +7,7 @@ import {
   checkDebtEditAllowed,
   getTransactionDebtStatus,
   validateDebtSettlementAmount,
+  validateDebtSelfSettlement,
   validateAccountPairSupported,
   detachDebtForDeletedTransaction,
   DebtEditBlockedError,
@@ -463,6 +464,15 @@ async function updateTransactionRow(
       return { status: "rejected", reason: err.message };
     }
     throw err;
+  }
+
+  // Logic #2 pre-check tambahan: settleDebtIds tidak boleh menyertakan
+  // piutang MILIK transaksi ini sendiri (role 'principal') -- baris itu
+  // akan dihapus duluan oleh applyDebtEditAction sebelum settleDebtsFifo
+  // sempat membacanya, gagal senyap kalau lolos sampai situ.
+  if (payload.type === "transfer" && payload.debtAction === "settlement") {
+    const selfSettlementPrecheck = validateDebtSelfSettlement(debtStatus, payload.settleDebtIds ?? []);
+    if (selfSettlementPrecheck.status === "rejected") return selfSettlementPrecheck;
   }
 
   if (await hasSourceRefConflict(env, id, payload)) {

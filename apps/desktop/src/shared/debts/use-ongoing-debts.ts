@@ -26,15 +26,24 @@ export type OngoingDebt = Debt & { remaining: number };
  * secara logic piutang itu justru yang SEHARUSNYA bisa dipilih ulang
  * (lihat "Edit transaksi yang sudah py debts terkait" di
  * debt-receivable-tracking.md).
+ *
+ * `excludePrincipalDebtId` beda arah dari `excludeDebtId` di atas (yang
+ * MEMASUKKAN kembali piutang `paid`) — ini BENAR-BENAR mengeluarkan satu
+ * id dari daftar. Dipakai saat transaksi yang sedang diedit sendiri
+ * berperan `role: 'principal'` (dia SUMBER piutang itu, bukan pelunasan)
+ * — piutang miliknya sendiri tidak boleh muncul sebagai pilihan
+ * "Pelunasan", karena baris itu akan DIHAPUS oleh proses edit yang sama
+ * sebelum alokasi FIFO sempat jalan (gagal senyap kalau tetap dipilih,
+ * lihat applyDebtTransactionEdit).
  */
 export function useOngoingDebts(
   contactId: string | null,
-  options: { excludeDebtId?: string; excludeTransactionId?: string } = {}
+  options: { excludeDebtId?: string; excludeTransactionId?: string; excludePrincipalDebtId?: string } = {}
 ) {
-  const { excludeDebtId, excludeTransactionId } = options;
+  const { excludeDebtId, excludeTransactionId, excludePrincipalDebtId } = options;
 
   return useQuery({
-    queryKey: [...ongoingDebtsQueryKey, contactId, excludeDebtId, excludeTransactionId],
+    queryKey: [...ongoingDebtsQueryKey, contactId, excludeDebtId, excludeTransactionId, excludePrincipalDebtId],
     queryFn: async (): Promise<OngoingDebt[]> => {
       const db = await getDb();
       return db.select<OngoingDebt[]>(
@@ -46,8 +55,9 @@ export function useOngoingDebts(
            AND debts.type = 'receivable'
            AND debts.deleted_at IS NULL
            AND (debts.status = 'ongoing' OR debts.id = $2)
+           AND ($4 IS NULL OR debts.id IS NOT $4)
          ORDER BY debts.date ASC, debts.id ASC`,
-        [contactId, excludeDebtId ?? null, excludeTransactionId ?? null]
+        [contactId, excludeDebtId ?? null, excludeTransactionId ?? null, excludePrincipalDebtId ?? null]
       );
     },
     enabled: contactId != null,

@@ -58,6 +58,18 @@ export class DebtEditBlockedError extends Error {
   }
 }
 
+// Port PERSIS DebtSelfSettlementError (desktop, apply-debt-transaction/edit.ts)
+// -- settleDebtIds yang menyertakan piutang MILIK transaksi ini sendiri
+// (role 'principal') akan gagal senyap: baris debts-nya dihapus DULU di
+// applyDebtEditAction di bawah, sebelum settleDebtsFifo sempat membacanya.
+export class DebtSelfSettlementError extends Error {
+  constructor() {
+    super(
+      "Tidak bisa melunasi piutang yang berasal dari transaksi ini sendiri — pilih piutang lain, atau batalkan perubahan akun/nominal pada transaksi ini."
+    );
+  }
+}
+
 // Logic bisnis #7 (bagian status resolve) dari
 // mcp-server-business-logic-audit.md, port dari
 // use-transaction-debt-status.ts (useTransactionDebtStatus) -- versi
@@ -99,6 +111,24 @@ export async function validateDebtSettlementAmount(
       status: "rejected",
       reason: "Nominal pelunasan melebihi total sisa piutang/utang yang dipilih.",
     };
+  }
+  return { status: "ok" };
+}
+
+// Pre-check REJECT SEBELUM SIMPAN, sama pola dgn validateDebtSettlementAmount
+// di atas -- dipanggil dari transactions/service.ts SEBELUM UPDATE baris
+// `transactions`, HANYA relevan utk edit (status.role === 'principal').
+// settleDebtIds yang menyertakan piutang MILIK transaksi ini sendiri akan
+// gagal senyap kalau lolos sampai applyDebtEditAction (baris debts-nya
+// dihapus DULU di situ sebelum settleDebtsFifo sempat membacanya) --
+// DebtSelfSettlementError tetap jadi defense-in-depth di situ, tapi
+// precheck ini yang membuat reject terjadi SEBELUM ada tulisan apa pun.
+export function validateDebtSelfSettlement(
+  status: TransactionDebtStatus,
+  settleDebtIds: string[]
+): ApplyDebtTransactionResult {
+  if (status.role === "principal" && settleDebtIds.includes(status.debtId)) {
+    return { status: "rejected", reason: new DebtSelfSettlementError().message };
   }
   return { status: "ok" };
 }
@@ -397,6 +427,9 @@ export async function applyDebtEditAction(
     if (!dangerousFieldsChanged) {
       await env.DB.prepare("UPDATE debts SET date = ?1 WHERE id = ?2").bind(date, status.debtId).run();
       return { status: "ok" };
+    }
+    if (rest.settleDebtIds.includes(status.debtId)) {
+      throw new DebtSelfSettlementError();
     }
     await env.DB.prepare("DELETE FROM debts WHERE id = ?1").bind(status.debtId).run();
     return applyDebtTransaction(env, rest);

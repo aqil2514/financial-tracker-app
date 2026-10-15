@@ -16,6 +16,25 @@ export class DebtEditBlockedError extends Error {
   }
 }
 
+/**
+ * Dilempar kalau `settleDebtIds` menyertakan piutang MILIK transaksi ini
+ * sendiri (`role: 'principal'`) — baris itu akan DIHAPUS lebih dulu di
+ * fungsi ini sebelum `applyDebtTransaction`/`settleDebtsFifo` sempat
+ * membacanya, jadi kalau diizinkan lolos, settlement-nya gagal SENYAP
+ * (query FIFO kosong, tidak ada `debt_payments` yang lahir, tanpa error).
+ * UI (`field-debt-action.tsx`, `useOngoingDebts` dgn `excludePrincipalDebtId`)
+ * seharusnya sudah mencegah pilihan ini muncul sama sekali — guard ini
+ * jaring pengaman kalau ada jalur lain (mis. payload tidak lewat UI).
+ */
+export class DebtSelfSettlementError extends Error {
+  constructor() {
+    super(
+      "Tidak bisa melunasi piutang yang berasal dari transaksi ini sendiri — pilih piutang lain, atau batalkan perubahan akun/nominal pada transaksi ini."
+    );
+    this.name = "DebtSelfSettlementError";
+  }
+}
+
 export async function applyDebtTransactionEdit({
   status,
   dangerousFieldsChanged,
@@ -34,6 +53,9 @@ export async function applyDebtTransactionEdit({
     }
     if (status.hasPayments) {
       throw new DebtEditBlockedError();
+    }
+    if (input.settleDebtIds.includes(status.debtId)) {
+      throw new DebtSelfSettlementError();
     }
     await db.execute("DELETE FROM debts WHERE id = $1", [status.debtId]);
     return mergeTouchedDebtRows(
