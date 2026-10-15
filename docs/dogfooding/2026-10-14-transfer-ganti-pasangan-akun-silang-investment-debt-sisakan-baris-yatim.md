@@ -85,11 +85,23 @@ yang sudah ada.
 
 ## Status
 
-**BELUM diperbaiki** — dicatat dulu sesuai keputusan user saat ditemukan,
-supaya tidak memotong alur uji coba dialog Edit (BaseForm) yang sedang
-berjalan. Perlu fix di KEDUA tempat (versi lama `hooks/use-update-transaction/`
-yang masih dipakai form aktif harian, dan `base-form-migration/` yang
-identik) karena terbukti sama-sama kena.
+**DIPERBAIKI (2026-10-15) DAN TERUJI PENUH runtime (2026-10-16)** — lihat
+[docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md](../../apps/desktop/docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md)
+bagian "Update 2026-10-15 (lanjutan) — Bug ganti pasangan akun lintas
+domain" dan "Update 2026-10-16" untuk detail lengkap fix + verifikasi.
+Ringkasnya:
+
+- Fix: `cleanupStaleDomainOnAccountChange` (desktop & Worker, dipanggil
+  SEBELUM percabangan `type`/pairKind) — bersihkan baris turunan
+  (`debts`/`investment_purchases`/`investment_sales`) dari domain LAMA
+  begitu keterlibatan domain itu BENAR-BENAR hilang setelah akun diganti.
+- Diuji ulang 2026-10-16 persis skenario asli dokumen ini (cash→investment
+  diedit jadi cash→debt) — `investment_purchases` lama terbukti hilang
+  total (hard-delete di desktop), baris `debts` baru lahir benar.
+- **Bug KEDUA ditemukan terpisah saat uji ulang**: gap simetris DI DALAM
+  domain investment sendiri (purchase↔sale, bukan lintas investment↔debt)
+  — dicatat & diperbaiki di dokumen plan yang sama, TIDAK ditulis ulang di
+  sini karena bukan domain investment↔debt yang jadi judul dokumen ini.
 
 ## Catatan untuk ke depan
 
