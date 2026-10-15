@@ -86,7 +86,7 @@ yang sudah ada.
 ## Status
 
 **DIPERBAIKI (2026-10-15) DAN TERUJI PENUH runtime (2026-10-16)** — lihat
-[docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md](../../apps/desktop/docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md)
+[docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md](../../apps/desktop/docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md)
 bagian "Update 2026-10-15 (lanjutan) — Bug ganti pasangan akun lintas
 domain" dan "Update 2026-10-16" untuk detail lengkap fix + verifikasi.
 Ringkasnya:

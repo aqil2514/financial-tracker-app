@@ -63,7 +63,7 @@ mengikuti aturan arah di "Deteksi otomatis debts dari transfer"
 **Guard `type !== "transfer"` (baris pertama fungsi)** — saat ini
 HANYA dipanggil dari jalur transfer; `return none` untuk
 `income`/`expense`. Ini TODO terbuka: lihat
-[docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md](../../../../../docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md)
+[docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md](../../../../../docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md)
 — guard ini perlu dibuka supaya income/expense yang direct ke akun
 `debt` juga tertangani oleh fungsi ini (bukan insert manual terpisah
 seperti pola lama `use-create-debt.ts`), opsi mana yang dipilih BELUM

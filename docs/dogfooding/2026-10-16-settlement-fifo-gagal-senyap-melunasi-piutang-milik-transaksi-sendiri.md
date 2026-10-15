@@ -2,7 +2,7 @@
 
 Ditemukan saat menguji checklist "Transfer debt → cash (settlement FIFO)
 via Update" di
-[docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md](../../apps/desktop/docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md)
+[docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md](../../apps/desktop/docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md)
 — sebelumnya belum pernah dicoba sama sekali sejak form transaksi utama
 ini dibuat.
 

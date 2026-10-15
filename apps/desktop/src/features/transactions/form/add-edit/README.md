@@ -5,7 +5,7 @@ Form Tambah/Edit Transaksi aktif, dipakai `TransactionCreateDialog`/
 atas `BaseForm` generik (`@/components/forms/base-form.tsx`) — hasil
 migrasi dari pola lama (`useEntityForm` + `TransactionBaseForm` wrapper
 manual) yang selesai 2026-10-14. Rencana migrasi & verifikasi lengkap
-ada di `docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md`
+ada di `docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md`
 bagian "Refactor".
 
 ## Struktur

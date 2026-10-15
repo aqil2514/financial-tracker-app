@@ -2,7 +2,7 @@
 
 Ditemukan saat menguji checklist "edit field berbahaya untuk transaksi
 direct debt/investment" di
-[docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md](../../apps/desktop/docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md).
+[docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md](../../apps/desktop/docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md).
 Debt sudah punya proteksi `DebtEditBlockedError` (`hasPayments`), tapi
 investment belum punya proteksi serupa sama sekali — pertanyaan "apakah
 investment punya field berbahaya?" memicu pengecekan kode, yang

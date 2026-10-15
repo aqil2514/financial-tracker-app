@@ -78,7 +78,7 @@ lewat dogfooding)
 
 Ditemukan saat menguji checklist "edit field berbahaya" domain
 investasi (lihat
-[docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md](../../../../../docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md)):
+[docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md](../../../../../docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md)):
 mengedit `unit` sebuah pembelian `settled` yang unitnya SUDAH ikut
 terjual lewat penjualan berikutnya bisa membuat `getRemainingUnit`
 (`investment-holding-math.ts`) jadi NEGATIF — dibuktikan konkret di
@@ -145,7 +145,7 @@ kalau input baru `null` — user tidak pernah bisa sengaja mengosongkan
 field yang bahkan tidak ditampilkan di form.
 
 **Relevansi untuk income/expense direct ke `debt`** (lihat
-[docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md](../../../../../docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md)):
+[docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md](../../../../../docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md)):
 kedua bug di atas membuktikan jalur `direct` untuk investment SUDAH
 ADA sebelumnya (`new-purchase-form`) dan SUDAH pernah menyebabkan bug
 nyata saat diedit lewat form transaksi utama. Begitu domain Utang-
