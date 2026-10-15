@@ -6,14 +6,6 @@ export const newDebtSchema = z
      * 'payable' = saya berutang (kas masuk dari akun debt). Menentukan
      * arah transfer yang dibuat di baliknya — lihat use-create-debt.ts. */
     debt_type: z.enum(["receivable", "payable"]),
-    /** 'transfer' = jalur lama, piutang/utang lahir dari 1 transaksi
-     * transfer kas<->debt (menyentuh saldo akun). 'direct' = piutang/utang
-     * murni informasional (uang sudah berpindah DI LUAR app — pinjam
-     * tunai, barter, piutang lama) — tidak ada transaksi/saldo KAS yang
-     * tersentuh, TAPI debt_account_id tetap wajib (akun bertipe 'debt'
-     * sebagai tumpuan, lihat docs/concept/konsep-tipe-akun.md). Lihat
-     * docs/todos/plan/debts-sync-and-non-transfer-debts.md. */
-    record_mode: z.enum(["transfer", "direct"]),
     contact_name: z.string().min(1, "Nama kontak wajib diisi").nullable(),
     amount: z.coerce.number().positive("Nominal harus lebih dari 0"),
     cash_account_id: z.string().nullable(),
@@ -22,7 +14,7 @@ export const newDebtSchema = z
     note: z.string().min(1, "Catatan wajib diisi"),
   })
   .refine(
-    (values) => values.record_mode !== "transfer" || values.cash_account_id,
+    (values) => values.cash_account_id,
     { message: "Akun kas wajib dipilih", path: ["cash_account_id"] }
   )
   .refine(
@@ -30,9 +22,7 @@ export const newDebtSchema = z
     { message: "Akun utang piutang wajib dipilih", path: ["debt_account_id"] }
   )
   .refine(
-    (values) =>
-      values.record_mode !== "transfer" ||
-      values.cash_account_id !== values.debt_account_id,
+    (values) => values.cash_account_id !== values.debt_account_id,
     { message: "Akun kas dan akun utang piutang harus berbeda", path: ["debt_account_id"] }
   );
 

@@ -76,6 +76,14 @@ export function FieldInvestment() {
           Nominal dihitung otomatis dari cost basis unit yang dilepas.
         </p>
       )}
+      {isDirectBuy && (
+        <p className="text-muted-foreground text-xs">
+          Unit yang bertambah tanpa transfer kas (hibah, bonus saham, right issue/warrant, atau saldo & unit awal
+          sebelum pakai app). Nominal (field di atas) boleh 0 kalau tidak ada modal yang mau diakui — tapi Harga per
+          Unit di bawah TETAP wajib diisi nilai pasar riil saat diterima (meski didapat gratis, unit ini tetap punya
+          nilai), supaya perhitungan untung/rugi nanti akurat.
+        </p>
+      )}
       {needsHoldingSummary && holding && (
         <div className="grid grid-cols-2 gap-4 rounded-lg border p-3 text-sm">
           <p>

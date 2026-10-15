@@ -43,8 +43,14 @@ export function useTransactionForm({
   const destinationAccount = accounts?.find(
     (account) => String(account.id) === transferAccountId
   );
-  const { debtStatus, involvesDebtAccount, debtFieldsLocked, needsDebtAction, validateDebtFields } =
-    useTransactionDebtFields({
+  const {
+    debtStatus,
+    involvesDebtAccount,
+    debtFieldsLocked,
+    needsDebtAction,
+    isDebtDebtTransfer,
+    validateDebtFields,
+  } = useTransactionDebtFields({
       transactionId,
       contactId,
       type,
@@ -74,10 +80,14 @@ export function useTransactionForm({
   });
 
   function validateAllFields(values: TransactionFormOutput): string | null {
+    if (values.amount <= 0 && !needsInvestmentDirectBuyFields) {
+      return "Nominal harus lebih dari 0";
+    }
     return validateDebtFields(values) ?? validateInvestmentFields(values);
   }
 
-  function errorFieldFor(values: TransactionFormOutput): "settle_debt_ids" | "contact_name" | "unit" {
+  function errorFieldFor(values: TransactionFormOutput): "amount" | "settle_debt_ids" | "contact_name" | "unit" {
+    if (values.amount <= 0 && !needsInvestmentDirectBuyFields) return "amount";
     if (needsDebtAction && values.debt_action) return "settle_debt_ids";
     if (needsInvestmentFields) return "unit";
     return "contact_name";
@@ -99,6 +109,7 @@ export function useTransactionForm({
     involvesDebtAccount,
     debtFieldsLocked,
     needsDebtAction,
+    isDebtDebtTransfer,
     needsInvestmentFields,
     needsInvestmentSellFields,
     needsInvestmentDirectBuyFields,

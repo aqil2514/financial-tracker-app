@@ -29,6 +29,7 @@ import {
 import { resolveContactId } from "../contacts/service";
 import { detachAttachmentsForDeletedTransaction } from "../attachments/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
+import { cleanupStaleDomainOnAccountChange } from "./cleanup-stale-domain";
 
 // contactId eksplisit SELALU menang; contactName (nama natural dari tool
 // MCP) cuma dipakai kalau contactId kosong -- lihat keputusan desain di
@@ -528,6 +529,13 @@ async function updateTransactionRow(
   // di atas yg SELALU jalan) khusus utk transaksi tanpa padanan lokal
   // (MCP). Lihat docs/todos/plan/fix-debts-duplikasi-sync.md.
   if (syncSource !== "pc") {
+    await cleanupStaleDomainOnAccountChange(
+      env,
+      id,
+      { account_id: existing.account_id, transfer_account_id: existing.transfer_account_id },
+      { accountId: payload.accountId ?? "", transferAccountId: payload.transferAccountId ?? null }
+    );
+
     const result = await applyDebtEditAction(env, {
       transactionId: id,
       type: payload.type,

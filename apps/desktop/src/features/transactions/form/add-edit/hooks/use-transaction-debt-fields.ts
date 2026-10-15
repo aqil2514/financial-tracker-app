@@ -47,7 +47,8 @@ export function useTransactionDebtFields({
 
   const sourceIsDebt = sourceAccountType === "debt";
   const destinationIsDebt = destinationAccountType === "debt";
-  const involvesDebtAccount = sourceIsDebt || destinationIsDebt;
+  const isDebtDebtTransfer = pairKind === "debt-debt";
+  const involvesDebtAccount = (sourceIsDebt || destinationIsDebt) && !isDebtDebtTransfer;
 
   const debtFieldsLocked = debtStatus?.role === "principal" && debtStatus.hasPayments;
 
@@ -83,6 +84,7 @@ export function useTransactionDebtFields({
     involvesDebtAccount,
     debtFieldsLocked,
     needsDebtAction,
+    isDebtDebtTransfer,
     validateDebtFields,
   };
 }

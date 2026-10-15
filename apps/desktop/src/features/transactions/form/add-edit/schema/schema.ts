@@ -4,7 +4,7 @@ import type { JSONContent } from "@tiptap/react";
 export const transactionSchema = z
   .object({
     type: z.enum(["income", "expense", "transfer"]),
-    amount: z.coerce.number().positive("Nominal harus lebih dari 0"),
+    amount: z.coerce.number().nonnegative("Nominal tidak boleh negatif"),
     account_id: z.string().min(1, "Akun wajib dipilih"),
     category_id: z.string().nullable(),
     transfer_account_id: z.string().nullable(),

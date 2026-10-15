@@ -168,7 +168,7 @@ export async function getTransactionDebtStatus(
   return { role: "none" };
 }
 
-async function getAccountType(env: Env, accountId: string): Promise<string | null> {
+export async function getAccountType(env: Env, accountId: string): Promise<string | null> {
   const row = await env.DB.prepare(
     "SELECT account_type FROM accounts WHERE id = ?1 AND deleted_at IS NULL"
   )

@@ -59,8 +59,11 @@ export function useTransactionInvestmentFields({
       if (values.unit == null || values.unit <= 0) {
         return "Jumlah unit wajib diisi";
       }
-      if (values.price_per_unit == null || values.price_per_unit <= 0) {
+      if (values.price_per_unit == null) {
         return "Harga per unit wajib diisi";
+      }
+      if (values.price_per_unit <= 0) {
+        return "Harga per unit harus lebih dari 0 — unit yang diterima tetap punya nilai pasar walau didapat gratis";
       }
       return null;
     }

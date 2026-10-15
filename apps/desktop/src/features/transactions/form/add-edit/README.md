@@ -105,6 +105,31 @@ menjawab gratis "ganti transaksi yang diedit tanpa unmount dialog"
 (begitu `transaction` prop berganti, `defaultValues` baru dihasilkan,
 `BaseForm` reset otomatis ke transaksi yang baru).
 
+## Transfer `debt-debt` sengaja tanpa efek ke `debts`/`debt_payments`
+
+`applyDebtTransaction` (`shared/debts/apply-debt-transaction/create.ts`)
+explicit `return none` untuk `pairKind === "debt-debt"` — bukan gap,
+keputusan desain. Piutang/utang melekat ke KONTAK (`debts.contact_id`),
+bukan ke akun — satu baris `debts` cuma punya satu `contact_id`.
+Transfer antar 2 akun bertipe `debt` tidak punya cara sahih menentukan
+kontak mana yang terlibat di tiap sisi (transaksinya sendiri cuma bawa
+SATU `contact_id`), jadi daripada menebak/menyamaratakan salah, tidak
+ada baris `debts`/`debt_payments` yang dibuat sama sekali — murni
+relokasi saldo akun (via `transactions`), sama seperti transfer
+cash↔cash. `isDebtDebtTransfer` (`use-transaction-debt-fields.ts`)
+DIKECUALIKAN dari `involvesDebtAccount` (kontak jadi tidak wajib) DAN
+dipakai `FieldContactName` untuk men-disable combobox-nya sepenuhnya
+(pola sama `debtFieldsLocked`) — field tidak relevan untuk `debt-debt`,
+jadi dinonaktifkan daripada dibiarkan aktif tapi menyimpan nilai yang
+tidak mempengaruhi `debts`/`debt_payments` sama sekali. Catatan: nilai
+`contact_name` TETAP ikut tersimpan ke `transactions.contact_id` kalau
+sempat terisi SEBELUM akun diganti jadi kombinasi `debt-debt` (field
+di-disable, bukan di-reset — konsisten pola `debtFieldsLocked`) — efeknya
+cuma nongol di `TransactionDetailDialog` (satu-satunya tempat yang baca
+`transactions.contact_id` langsung, lihat `transaction-detail-dialog.tsx`),
+sama sekali tidak mempengaruhi riwayat kontak (`use-contact-debts.ts`
+baca dari tabel `debts`, bukan `transactions`).
+
 ## Bug yang pernah ditemukan & diperbaiki
 
 - **Validasi tambahan terlewat di jalur submit** (2026-10-14) — versi

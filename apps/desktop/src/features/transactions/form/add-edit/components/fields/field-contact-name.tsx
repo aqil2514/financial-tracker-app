@@ -22,7 +22,7 @@ type ContactOption = { value: string; label: string };
 const CREATE_PREFIX = "__create__:";
 
 export function FieldContactName() {
-  const { form, involvesDebtAccount, debtFieldsLocked } = useTransactionFormFields();
+  const { form, involvesDebtAccount, debtFieldsLocked, isDebtDebtTransfer } = useTransactionFormFields();
   const label = involvesDebtAccount ? "Nama Kontak (wajib)" : "Nama Kontak (opsional)";
 
   const { data: contacts } = useContacts();
@@ -74,7 +74,7 @@ export function FieldContactName() {
                   id="contact_name"
                   placeholder="Cari atau ketik nama baru..."
                   showClear
-                  disabled={debtFieldsLocked}
+                  disabled={debtFieldsLocked || isDebtDebtTransfer}
                 />
                 <ComboboxContent anchor={anchor}>
                   <ComboboxEmpty>Tidak ditemukan</ComboboxEmpty>
@@ -101,6 +101,14 @@ export function FieldContactName() {
                 Piutang ini sudah menerima cicilan dari transaksi lain — kontak,
                 nominal, dan akun tidak bisa diubah dari sini supaya riwayat
                 cicilannya tidak hilang.
+              </p>
+            )}
+            {isDebtDebtTransfer && (
+              <p className="text-muted-foreground text-sm">
+                Transfer antar dua akun utang piutang tidak menghasilkan catatan
+                piutang/utang apa pun — murni relokasi saldo antar akun, sama
+                seperti transfer kas↔kas. Kontak dinonaktifkan karena tidak
+                relevan untuk transaksi ini.
               </p>
             )}
             {fieldState.error && (

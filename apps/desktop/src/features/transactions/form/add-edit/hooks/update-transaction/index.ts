@@ -5,6 +5,7 @@ import type { TransactionFormOutput } from "../../schema";
 import { updateIncomeTransaction } from "./income";
 import { updateExpenseTransaction } from "./expense";
 import { updateTransferTransaction } from "./transfer";
+import { cleanupStaleDomainOnAccountChange } from "./cleanup-stale-domain";
 
 export async function updateTransaction(
   transaction: Transaction,
@@ -21,6 +22,8 @@ export async function updateTransaction(
     transferAccountId !== transaction.transfer_account_id ||
     values.amount !== transaction.amount ||
     contactId !== transaction.contact_id;
+
+  await cleanupStaleDomainOnAccountChange(db, transaction, values);
 
   if (values.type === "income") {
     return updateIncomeTransaction({ db, contactId, transaction, values, status, dangerousFieldsChanged });

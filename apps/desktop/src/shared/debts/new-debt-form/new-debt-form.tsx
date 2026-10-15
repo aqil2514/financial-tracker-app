@@ -27,16 +27,10 @@ const debtTypeOptions = [
   { value: "payable", label: "Utang (saya berutang)" },
 ];
 
-const recordModeOptions = [
-  { value: "transfer", label: "Dengan Transaksi Kas" },
-  { value: "direct", label: "Langsung (tanpa transaksi)" },
-];
-
 export function NewDebtForm({ form, onSubmit, isPending }: NewDebtFormProps) {
   const { data: accounts } = useAccounts();
 
   const debtType = useWatch({ control: form.control, name: "debt_type" });
-  const recordMode = useWatch({ control: form.control, name: "record_mode" });
 
   const cashAccountOptions =
     accounts
@@ -75,28 +69,15 @@ export function NewDebtForm({ form, onSubmit, isPending }: NewDebtFormProps) {
         label="Jenis"
         options={debtTypeOptions}
       />
-      <FormFieldToggleGroup
-        form={form}
-        name="record_mode"
-        label="Cara Mencatat"
-        description={
-          recordMode === "direct"
-            ? "Uang sudah berpindah di luar app (pinjam tunai, barter, dll) — tidak menyentuh saldo akun kas, tapi saldo akun utang piutang tetap bertambah/berkurang."
-            : "Mencatat lewat transaksi transfer kas <-> akun utang piutang, saldo akun kas ikut berubah."
-        }
-        options={recordModeOptions}
-      />
       <ContactField control={form.control} label="Nama Kontak (wajib)" />
       <FormFieldCurrency form={form} name="amount" label="Nominal" useCalculator />
-      {recordMode === "transfer" && (
-        <FormFieldCombobox
-          form={form}
-          name="cash_account_id"
-          label="Akun Kas"
-          placeholder="Cari akun kas..."
-          options={cashAccountOptions}
-        />
-      )}
+      <FormFieldCombobox
+        form={form}
+        name="cash_account_id"
+        label="Akun Kas"
+        placeholder="Cari akun kas..."
+        options={cashAccountOptions}
+      />
       <FormFieldCombobox
         form={form}
         name="debt_account_id"

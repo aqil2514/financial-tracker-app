@@ -17,38 +17,22 @@ function now() {
 
 /**
  * Jalan pintas untuk mencatat piutang/utang baru langsung dari halaman
- * `/debts`, tanpa lewat form transaksi lengkap. Dua mode (field
- * `record_mode`, lihat schema.ts):
+ * `/debts`, tanpa lewat form transaksi lengkap. Membuat 1 transaksi
+ * transfer biasa (kas<->debt) lalu memicu `applyDebtTransaction` yang
+ * sama persis dengan jalur form transaksi (lihat "Tambah Utang/Piutang
+ * Baru dari halaman /debts" di debt-receivable-tracking.md). Arah
+ * transfer ditentukan dari `debt_type`, jadi TIDAK ambigu — tidak butuh
+ * `DebtActionField`.
  *
- * - `'transfer'` (jalur lama): membuat 1 transaksi transfer biasa
- *   (kas<->debt) lalu memicu `applyDebtTransaction` yang sama persis
- *   dengan jalur form transaksi (lihat "Tambah Utang/Piutang Baru dari
- *   halaman /debts" di debt-receivable-tracking.md). Arah transfer
- *   ditentukan dari `debt_type`, jadi TIDAK ambigu — tidak butuh
- *   `DebtActionField`.
- * - `'direct'`: TIDAK menyentuh saldo akun KAS (uang sudah berpindah DI
- *   LUAR app — pinjam tunai, barter, piutang lama), TAPI tetap WAJIB
- *   membuat 1 transaksi penutup `income`/`expense` langsung pada akun
- *   `debt_account_id` itu sendiri — pola identik `useWriteOffDebt`
- *   (lihat use-write-off-debt.ts). Sesuai
- *   docs/concept/konsep-transaksi.md: saldo akun HANYA bisa berubah
- *   lewat `transactions`, jadi "piutang/utang baru" = nilai baru yang
- *   "dipegang" akun debt itu, WAJIB transaksi — regresi awal (insert
- *   `debts` dengan `transaction_id` NULL tanpa transaksi apa pun,
- *   ditemukan 2026-10-04) sudah diperbaiki di sini, lihat
- *   migrations/0033_backfill_direct_debt_transactions.sql untuk
- *   backfill baris lama yang terlanjur dibuat sebelum fix ini.
- *   Arah tanda (lihat konsep-utang-piutang.md "kas->debt = makin
- *   positif"): `receivable` butuh +amount pada akun debt -> `income`.
- *   `payable` butuh -amount -> `expense`. Lihat
- *   docs/todos/plan/debts-sync-and-non-transfer-debts.md.
+ * Piutang/utang direct (tanpa transaksi kas) sekarang dicatat lewat
+ * form transaksi utama (income/expense langsung ke akun debt) — lihat
+ * docs/todos/plan/unify-direct-writeoff-into-main-transaction-form.md.
  */
 export function useCreateDebt() {
   return useEntityForm({
     schema: newDebtSchema,
     defaultValues: () => ({
       debt_type: "receivable" as const,
-      record_mode: "transfer" as const,
       contact_name: null,
       amount: 0,
       cash_account_id: null,
@@ -61,45 +45,6 @@ export function useCreateDebt() {
       const contactId = await resolveContactId(values.contact_name);
       const db = await getDb();
 
-      if (values.record_mode === "direct") {
-        // Sudah divalidasi wajib terisi oleh schema.ts (refine kedua,
-        // berlaku utk semua record_mode).
-        const debtAccountId = values.debt_account_id as string;
-
-        // Transaksi penutup pada akun debt itu sendiri — TIDAK menyentuh
-        // akun kas manapun (uangnya memang berpindah di luar app), tapi
-        // saldo akun debt WAJIB ikut berubah (lihat komentar fungsi ini
-        // di atas). Pola identik useWriteOffDebt, arah tanda dibalik
-        // (write-off membawa ke NOL, ini MENCIPTAKAN piutang/utang baru).
-        const transactionId = newId();
-        const transactionType = values.debt_type === "receivable" ? "income" : "expense";
-        await db.execute(
-          `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
-           VALUES ($1, $2, $3, NULL, $4, NULL, $5, NULL, $6, $7)`,
-          [transactionId, transactionType, values.amount, debtAccountId, values.note, values.date, contactId]
-        );
-
-        const debtId = newId();
-        await db.execute(
-          `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date, note)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [
-            debtId,
-            values.debt_type,
-            contactId,
-            values.amount,
-            debtAccountId,
-            transactionId,
-            values.date,
-            values.note,
-          ]
-        );
-        void pushOnWrite("transactions", transactionId);
-        void pushOnWrite("debts", debtId);
-        return debtId;
-      }
-
-      // Sudah divalidasi wajib terisi oleh schema.ts untuk record_mode === 'transfer'.
       const cashAccountId = values.cash_account_id as string;
       const debtAccountId = values.debt_account_id as string;
 
@@ -139,10 +84,8 @@ export function useCreateDebt() {
 
       return transactionId;
     },
-    // Kedua mode SELALU bikin 1 baris `transactions` (direct: transaksi
-    // penutup pada akun debt; transfer: transaksi transfer kas<->debt)
-    // -- invalidate domain "transactions" juga supaya saldo akun/laporan
-    // turunannya ikut ter-refresh, bukan cuma domain "debts" murni.
+    // Transaksi transfer kas<->debt ini mempengaruhi saldo akun kas &
+    // debt (domain "transactions"), bukan cuma riwayat debts murni.
     invalidateKey: dependentKeysOf("transactions", "debts"),
     successMessage: "Utang/piutang baru berhasil dicatat",
     errorMessage: "Gagal mencatat utang/piutang baru",

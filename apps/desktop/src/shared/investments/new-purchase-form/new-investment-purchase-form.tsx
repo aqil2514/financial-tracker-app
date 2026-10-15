@@ -26,11 +26,6 @@ type NewInvestmentPurchaseFormProps = {
   investmentAccountLocked?: boolean;
 };
 
-const recordModeOptions = [
-  { value: "transfer", label: "Dengan Transfer Kas" },
-  { value: "direct", label: "Langsung (hibah/bonus/saldo awal)" },
-];
-
 export function NewInvestmentPurchaseForm({
   form,
   onSubmit,
@@ -38,10 +33,8 @@ export function NewInvestmentPurchaseForm({
   investmentAccountLocked = false,
 }: NewInvestmentPurchaseFormProps) {
   const { data: accounts } = useAccounts();
-  const recordMode = form.watch("record_mode");
   const status = form.watch("status");
-  const isDirect = recordMode === "direct";
-  const isSettled = isDirect || status === "settled";
+  const isSettled = status === "settled";
 
   const cashAccountOptions =
     accounts
@@ -67,41 +60,26 @@ export function NewInvestmentPurchaseForm({
       </div>
       <FormFieldToggleGroup
         form={form}
-        name="record_mode"
-        label="Cara Mencatat"
+        name="status"
+        label="Status"
         description={
-          isDirect
-            ? "Unit bertambah tanpa transfer kas (hibah, bonus saham, right issue, atau saldo & unit awal sebelum pakai app) — tidak menyentuh saldo akun kas manapun."
-            : "Mencatat lewat transaksi transfer kas -> akun investasi, saldo akun kas ikut berkurang."
+          isSettled
+            ? "Nilainya sudah pasti saat ini — jumlah unit & harga per unit wajib diisi."
+            : "Order masih diproses, unit & harga final belum diketahui — boleh dikosongkan dulu, isi belakangan lewat edit baris di riwayat pembelian."
         }
-        options={recordModeOptions}
+        options={[
+          { value: "pending", label: "Pending" },
+          { value: "settled", label: "Settled" },
+        ]}
       />
-      {!isDirect && (
-        <FormFieldToggleGroup
+      <div className={!investmentAccountLocked ? "grid grid-cols-2 gap-4" : ""}>
+        <FormFieldCombobox
           form={form}
-          name="status"
-          label="Status"
-          description={
-            isSettled
-              ? "Nilainya sudah pasti saat ini — jumlah unit & harga per unit wajib diisi."
-              : "Order masih diproses, unit & harga final belum diketahui — boleh dikosongkan dulu, isi belakangan lewat edit baris di riwayat pembelian."
-          }
-          options={[
-            { value: "pending", label: "Pending" },
-            { value: "settled", label: "Settled" },
-          ]}
+          name="cash_account_id"
+          label="Akun Kas"
+          placeholder="Cari akun kas..."
+          options={cashAccountOptions}
         />
-      )}
-      <div className={!isDirect && !investmentAccountLocked ? "grid grid-cols-2 gap-4" : ""}>
-        {!isDirect && (
-          <FormFieldCombobox
-            form={form}
-            name="cash_account_id"
-            label="Akun Kas"
-            placeholder="Cari akun kas..."
-            options={cashAccountOptions}
-          />
-        )}
         {!investmentAccountLocked && (
           <FormFieldCombobox
             form={form}
@@ -114,11 +92,7 @@ export function NewInvestmentPurchaseForm({
       </div>
       <div className="space-y-1">
         <FormFieldCurrency form={form} name="amount" label="Nominal" useCalculator />
-        <p className="text-muted-foreground text-xs">
-          {isDirect
-            ? "Nilai yang diakui sebagai modal (boleh 0 untuk hibah murni tanpa nilai yang mau diakui) — tidak ada kas yang keluar."
-            : "Uang yang keluar dari akun kas saat ini."}
-        </p>
+        <p className="text-muted-foreground text-xs">Uang yang keluar dari akun kas saat ini.</p>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <UnitAmountField form={form} name="unit" optional={!isSettled} />
