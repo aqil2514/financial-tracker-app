@@ -14,13 +14,6 @@ export async function updateTransaction(
   const contactId = await resolveContactId(values.contact_name);
   const db = await getDb();
 
-  if (values.type === "income") {
-    return updateIncomeTransaction({ db, contactId, transaction, values });
-  }
-  if (values.type === "expense") {
-    return updateExpenseTransaction({ db, contactId, transaction, values });
-  }
-
   const transferAccountId = values.type === "transfer" ? values.transfer_account_id : null;
   const dangerousFieldsChanged =
     values.type !== transaction.type ||
@@ -28,6 +21,13 @@ export async function updateTransaction(
     transferAccountId !== transaction.transfer_account_id ||
     values.amount !== transaction.amount ||
     contactId !== transaction.contact_id;
+
+  if (values.type === "income") {
+    return updateIncomeTransaction({ db, contactId, transaction, values, status, dangerousFieldsChanged });
+  }
+  if (values.type === "expense") {
+    return updateExpenseTransaction({ db, contactId, transaction, values, status, dangerousFieldsChanged });
+  }
 
   return updateTransferTransaction({
     db,
