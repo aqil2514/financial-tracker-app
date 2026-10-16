@@ -8,6 +8,7 @@ import { CardContent } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useCalendar } from "../context";
 import { CalendarSummaryHeader } from "./calendar-summary-header";
+import { CalendarDaysSummary } from "./calendar-days-summary";
 import { DayButtonWithSummary } from "./calendar-day-button";
 
 export function CalendarCardContent() {
@@ -43,6 +44,8 @@ export function CalendarCardContent() {
           }}
         />
       </TooltipProvider>
+
+      <CalendarDaysSummary />
     </CardContent>
   );
 }

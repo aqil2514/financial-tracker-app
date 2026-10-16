@@ -15,6 +15,8 @@ interface CalendarContextType {
   transactionDays: Map<string, DaySummary> | undefined;
   monthSummary: MonthSummary | undefined;
   net: number;
+  surplusDays: number;
+  deficitDays: number;
 }
 
 const CalendarContext = createContext<CalendarContextType | undefined>(undefined);
@@ -32,6 +34,17 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     [monthSummary]
   );
 
+  const { surplusDays, deficitDays } = useMemo(() => {
+    let surplus = 0;
+    let deficit = 0;
+    for (const day of transactionDays?.values() ?? []) {
+      const dayNet = day.income - day.expense;
+      if (dayNet > 0) surplus += 1;
+      else if (dayNet < 0) deficit += 1;
+    }
+    return { surplusDays: surplus, deficitDays: deficit };
+  }, [transactionDays]);
+
   return (
     <CalendarContext.Provider
       value={{
@@ -42,6 +55,8 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         transactionDays,
         monthSummary,
         net,
+        surplusDays,
+        deficitDays,
       }}
     >
       {children}
