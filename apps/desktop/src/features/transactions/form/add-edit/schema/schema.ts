@@ -12,7 +12,6 @@ export const transactionSchema = z
     description: z.custom<JSONContent>().nullable(),
     date: z.string().min(1, "Tanggal wajib diisi"),
     contact_name: z.string().nullable(),
-    debt_action: z.enum(["settlement", "payable"]).nullable(),
     settle_debt_ids: z.array(z.string()),
     unit: z.coerce.number().nullable(),
     price_per_unit: z.coerce.number().nullable(),

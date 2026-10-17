@@ -26,7 +26,7 @@ async function getDebtAccountDirection(
   return rows[0] ?? null;
 }
 
-async function requireDebtAccountDirection(
+export async function requireDebtAccountDirection(
   db: Db,
   accountId: string
 ): Promise<"receivable" | "payable"> {
@@ -56,7 +56,7 @@ async function getAccountType(db: Db, accountId: string): Promise<Account["accou
   return rows[0]?.account_type ?? null;
 }
 
-async function createDebt({
+export async function createDebt({
   db,
   type,
   contactId,

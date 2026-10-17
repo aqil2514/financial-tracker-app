@@ -13,7 +13,7 @@ export const accountSchema = z
     color: z.string().nullable(),
     unit_label: z.string().nullable(),
     current_market_value: z.coerce.number().nullable(),
-    debt_direction: z.enum(["receivable", "payable", "both"]).nullable(),
+    debt_direction: z.enum(["receivable", "payable"]).nullable(),
     label_names: z.array(z.string()),
   })
   .superRefine((values, ctx) => {

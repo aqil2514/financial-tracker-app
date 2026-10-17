@@ -45,16 +45,9 @@ export function NewDebtForm({ form, onSubmit, isPending }: NewDebtFormProps) {
         label: account.group_name ? `${account.name} — ${account.group_name}` : account.name,
       })) ?? [];
 
-  // Hanya akun debt yang `direction`-nya cocok `debt_type` yang sedang
-  // dipilih (atau 'both') -- bukan SEMUA akun account_type='debt' seperti
-  // sebelumnya. Mencegah entri Utang tersimpan ke akun "Piutang" (dan
-  // sebaliknya), lihat docs/dogfooding/2026-10-16-....md untuk bug nyata
-  // yang ditemukan dari gap ini.
   const debtAccounts = accounts?.filter(
     (account) =>
-      account.account_type === "debt" &&
-      account.is_active &&
-      (account.debt_direction === debtType || account.debt_direction === "both")
+      account.account_type === "debt" && account.is_active && account.debt_direction === debtType
   );
   const debtAccountOptions =
     debtAccounts?.map((account) => ({

@@ -48,6 +48,8 @@ export function useTransactionForm({
     involvesDebtAccount,
     debtFieldsLocked,
     needsDebtAction,
+    settlementDirection,
+    ongoingDebts,
     isDebtDebtTransfer,
     validateDebtFields,
   } = useTransactionDebtFields({
@@ -56,6 +58,8 @@ export function useTransactionForm({
       type,
       sourceAccountType: sourceAccount?.account_type,
       destinationAccountType: destinationAccount?.account_type,
+      sourceDebtDirection: sourceAccount?.debt_direction,
+      destinationDebtDirection: destinationAccount?.debt_direction,
     });
 
   const {
@@ -88,7 +92,7 @@ export function useTransactionForm({
 
   function errorFieldFor(values: TransactionFormOutput): "amount" | "settle_debt_ids" | "contact_name" | "unit" {
     if (values.amount <= 0 && !needsInvestmentDirectBuyFields) return "amount";
-    if (needsDebtAction && values.debt_action) return "settle_debt_ids";
+    if (needsDebtAction) return "settle_debt_ids";
     if (needsInvestmentFields) return "unit";
     return "contact_name";
   }
@@ -109,6 +113,8 @@ export function useTransactionForm({
     involvesDebtAccount,
     debtFieldsLocked,
     needsDebtAction,
+    settlementDirection,
+    ongoingDebts,
     isDebtDebtTransfer,
     needsInvestmentFields,
     needsInvestmentSellFields,

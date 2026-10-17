@@ -75,12 +75,47 @@ belum sempat backfill, atau data uji coba). Tidak ada fallback diam-
 diam — tanpa `direction` tidak ada cara menentukan arah piutang/utang
 sama sekali.
 
-**Guard `type !== "transfer"` (baris pertama fungsi)** — saat ini
-HANYA dipanggil dari jalur transfer (Jalur 1); `return none` untuk
-`income`/`expense`. Jalur 2 (income/expense langsung ke akun debt,
-lihat konsep-utang-piutang.md) BELUM diimplementasikan di fungsi ini —
-`createDirectDebtIncome`/`Expense` (di luar folder ini) masih logic
-lama yang perlu direvisi terpisah.
+**Guard `type !== "transfer"` (baris pertama fungsi)** — fungsi ini
+HANYA menangani jalur transfer (Jalur 1); `return none` untuk
+`income`/`expense`. Jalur 2 (income/expense langsung ke akun debt)
+ditangani fungsi TERPISAH, `applyDirectDebtTransaction` — lihat
+`apply-direct-debt-transaction.ts` di bawah. `requireDebtAccountDirection`
+dan `createDebt` diekspor dari file ini supaya dipakai ulang di sana
+tanpa duplikasi logic.
+
+## apply-direct-debt-transaction.ts
+
+`applyDirectDebtTransaction` — Jalur 2: income/expense LANGSUNG di akun
+debt (tanpa akun kas perantara, mis. "beli barang bayar belakangan").
+Dipanggil dari `createDirectDebtIncome`/`Expense`
+(`features/transactions/.../create-transaction/income|expense/debt.ts`),
+BUKAN dari `create.ts`. **Revisi 2026-10-17**: sebelumnya caller-caller
+itu hardcode `'receivable'`/`'payable'` langsung di SQL tanpa pernah
+mengecek `direction` akun — bug asli yang memulai seluruh investigasi
+arah utang/piutang sesi ini (income di akun `payable` salah melahirkan
+`receivable` baru, alih-alih mengurangi utang). Tabel lengkap di
+[konsep-utang-piutang.md](../../../../../docs/concept/konsep-utang-piutang.md)
+bagian "Jalur 2":
+
+- `direction='payable'` + `type='expense'`: lahir utang baru.
+- `direction='payable'` + `type='income'`: pelunasan utang (FIFO via
+  `settleDebtIds`) — BARU, sebelumnya selalu salah hardcode jadi
+  piutang baru.
+- `direction='receivable'` + `type='income'`: lahir piutang baru.
+- `direction='receivable'` + `type='expense'`: pelunasan piutang
+  (FIFO) — BARU, sebelumnya selalu salah hardcode jadi utang baru.
+
+`DebtAccountDirectionMissingError` sama seperti `create.ts` — akun
+debt wajib sudah punya `direction` ter-set.
+
+**Scope saat ini: CREATE saja.** `update-transaction/income|expense/debt.ts`
+(edit transaksi existing) BELUM direvisi — masih hardcode `'receivable'`/
+`'payable'` seperti create yang lama. Diputuskan sengaja dipisah
+(keputusan user 2026-10-17): scope edit lebih kompleks, perlu redesign
+alur ganti "debt baru" <-> "pelunasan" saat field berbahaya transaksi
+diedit (tipe/akun/nominal berubah pada transaksi yang sudah py
+`debts`/`debt_payments` terkait) — didaftarkan sebagai TODO terpisah di
+[docs/todos/plan/debt-account-direction.md](../../../../../docs/todos/plan/debt-account-direction.md).
 
 **`sourceType == null || destinationType == null` → throw** — null
 berarti akun sudah terhapus di antara submit form dan titik ini (race),

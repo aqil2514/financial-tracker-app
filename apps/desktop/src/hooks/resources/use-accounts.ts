@@ -46,7 +46,7 @@ const SELECT_ACCOUNTS_WITH_BALANCE = `
 type AccountRow = Account & {
   balance: number;
   group_name: string | null;
-  debt_direction: "receivable" | "payable" | "both" | null;
+  debt_direction: "receivable" | "payable" | null;
 };
 
 export function useAccounts() {

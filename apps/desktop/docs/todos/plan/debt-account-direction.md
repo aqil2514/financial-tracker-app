@@ -2,17 +2,80 @@
 
 ## Status & TODO saat ini (ringkas)
 
-Penjelasan lengkap kenapa tiap poin ada di sini — lihat bagian "Latar belakang" dan "Rencana pendekatan" di bawah.
+Penjelasan lengkap kenapa tiap poin ada di sini — lihat bagian "Latar belakang", "Bug kedua yang ditemukan", dan "Rencana pendekatan" di bawah.
 
-- [ ] Migrasi skema: tabel detail `debt_accounts` (1:1 dengan `accounts`, pola sama `investment_accounts`), kolom `direction` (`'receivable' | 'payable' | 'both'`).
-- [ ] Backfill data existing: tentukan `direction` tiap akun `account_type='debt'` yang sudah ada dari histori pemakaian riil di `debts` (lihat perhitungan di "Latar belakang").
-- [ ] Form "Tambah Akun" (`features/accounts/`): field "Arah" muncul kondisional saat `account_type === 'debt'`, pola sama field `unit_label` untuk `account_type === 'investment'`.
-- [ ] `new-debt-form.tsx`: dropdown "Akun Utang Piutang" difilter berdasar `direction` yang cocok `debt_type` form (bukan heuristik/histori runtime) — ganti total pendekatan "warning non-blocking" yang sempat dicoba lebih dulu dan terbukti rapuh (lihat "Percobaan pertama yang dibuang" di bawah).
-- [ ] `applyDebtTransaction` (`apply-debt-transaction/create.ts`): validasi keras — tolak kombinasi `debt_type` vs `direction` akun yang bertentangan (defense-in-depth backend, bukan cuma UI). **WAJIB, bukan opsional** — lihat "Worker + MCP juga kena gap yang sama" di bawah, jalur MCP tidak punya UI sama sekali untuk mencegah salah pilih akun.
-- [ ] **Port skema + validasi ke `apps/worker`**: `accounts` Worker (`apps/worker/src/modules/accounts/service.ts`) perlu tabel/kolom `direction` yang sama (D1, migrasi Worker terpisah dari migrasi SQLite desktop — cek konvensi migrasi Worker sebelum mulai), dan `createDirectDebt` (`apps/worker/src/modules/debts/service.ts:543`) wajib validasi `direction` vs `type` payload SEBELUM insert — saat ini cuma validasi `accountType === 'debt'` (baris 556-565), sama rentan seperti desktop.
-- [ ] **Verifikasi tool MCP `create_debt_direct`** (`apps/mcp-server/src/lib/mcp-tools/debts/create-debt-direct.ts`) — tool ini `workerFetch` tipis ke endpoint Worker yang sama, jadi validasi di atas otomatis ikut berlaku; TAPI deskripsi tool (baris 19, 23) perlu diperbarui supaya LLM yang memanggilnya tahu `accountId` harus cocok arah `type`, bukan cuma "akun bertipe debt" — risiko salah pilih akun LEBIH TINGGI di jalur ini karena yang memilih adalah model yang menebak dari daftar, bukan manusia melihat UI.
-- [ ] Cleanup 2 baris `debts` lama yang sudah salah kategori (`01a13e62-cf6d...` data riil kontak Kak Ipit, `01a14492-eb7f...` data uji coba) — dilakukan user manual lewat UI setelah fix selesai, BUKAN lewat SQL langsung.
-- [ ] Smoke test manual di `tauri dev` DAN endpoint Worker (`wrangler dev` lokal) — lihat checklist di bagian "Rencana pendekatan".
+- [x] Migrasi skema: tabel detail `debt_accounts` (1:1 dengan `accounts`, pola sama `investment_accounts`), kolom `direction` — migrasi `0050_debt_accounts.sql` (awalnya `'receivable' | 'payable' | 'both'`), lalu `0051_debt_accounts_direction_required.sql` **menghapus opsi `'both'`** (lihat "Perubahan besar dari rencana awal" di bawah).
+- [x] Backfill data existing — dilakukan di migrasi 0050 untuk 3 akun debt produksi (semua sudah benar arahnya, tidak ada yang perlu direklasifikasi saat migrasi 0051 mengetatkan constraint).
+- [x] Form "Tambah Akun" (`features/accounts/`): field "Arah" (`field-debt.tsx`) muncul kondisional saat `account_type === 'debt'`, hanya 2 opsi (Piutang/Utang, tanpa "Keduanya").
+- [x] `new-debt-form.tsx`: dropdown "Akun Utang Piutang" difilter berdasar `direction` yang cocok `debt_type` form — auto-select kalau cuma 1 opsi cocok, pesan eksplisit kalau tidak ada akun yang cocok.
+- [x] `applyDebtTransaction` (`apply-debt-transaction/create.ts`): **ditulis ulang total**, bukan cuma "validasi keras ditambahkan" seperti rencana awal — `direction` akun debt sekarang jadi SATU-SATUNYA sumber kebenaran untuk `debts.type` di Jalur 1 (transfer), parameter `debtAction` yang dulu dikirim dari UI dihapus total (lihat "Perubahan besar dari rencana awal"). Error baru `DebtAccountDirectionMissingError` kalau akun debt belum punya `direction` ter-set.
+- [x] UI jalur transfer (`field-debt-action.tsx`, `use-transaction-debt-fields.ts`, `use-transaction-form.ts`, `use-ongoing-debts.ts`): toggle "Pelunasan vs Utang baru" **dihapus** — arah ditentukan otomatis dari `direction` akun, bukan pilihan manual user. *(Belum dikomit saat dokumen ini ditulis — lihat "Riwayat implementasi".)*
+- [x] **Jalur 2 CREATE** (`create-transaction/income/debt.ts`, `.../expense/debt.ts`): ditulis ulang — fungsi baru `applyDirectDebtTransaction` (`apply-debt-transaction/apply-direct-debt-transaction.ts`) menentukan lahir-baru vs pelunasan FIFO dari `debt_accounts.direction`, menggantikan hardcode lama (income selalu → `receivable`, expense selalu → `payable`) yang sudah terbukti SALAH — ini persis bug original yang memulai investigasi ini. UI (`use-transaction-debt-fields.ts`) ikut direvisi supaya checklist pelunasan muncul untuk income/expense juga, bukan cuma transfer. Test baru `apply-direct-debt-transaction.test.ts`. *(Belum dikomit.)*
+- [ ] **Jalur 2 UPDATE — sengaja BELUM disentuh** (keputusan user 2026-10-17, scope dibatasi create dulu). `update-transaction/income/debt.ts` dan `.../expense/debt.ts` masih hardcode `'receivable'`/`'payable'` seperti versi create yang lama — mengedit transaksi income/expense existing di akun debt (ganti tipe/akun/nominal) masih bisa menghasilkan `debts.type` yang salah. Perlu redesign alur ganti "debt baru" <-> "pelunasan" saat field berbahaya berubah, mirip kompleksitas `applyDebtTransactionEdit` (`edit.ts`) untuk Jalur 1.
+- [ ] **Port skema + validasi ke `apps/worker`**: `apps/worker/src/modules/accounts/service.ts` perlu kolom `direction` yang sama (migrasi D1 terpisah), dan `createDirectDebt` (`apps/worker/src/modules/debts/service.ts:543`) wajib validasi `direction` vs `type` SEBELUM insert — saat ini cuma validasi `accountType === 'debt'`. Belum dimulai.
+- [ ] **Verifikasi tool MCP `create_debt_direct`** (`apps/mcp-server/src/lib/mcp-tools/debts/create-debt-direct.ts`) — deskripsi tool perlu diperbarui menyebut constraint arah akun begitu Worker selesai. Belum dimulai.
+- [ ] Cleanup baris `debts` lama yang salah kategori (`01a13e62-cf6d...` kontak Kak Ipit, `01a14492-eb7f...` data uji coba) — dilakukan user manual lewat UI, BUKAN lewat SQL langsung. Belum dilakukan.
+- [ ] Smoke test manual Worker (`wrangler dev` lokal) — belum dimulai, menunggu Jalur 2 + port Worker selesai.
+- [x] Smoke test manual desktop untuk Jalur 1 — diverifikasi langsung ke `finance.dev.db` (bukan cuma toast UI) tanggal 2026-10-17, lihat "Riwayat implementasi".
+
+## Perubahan besar dari rencana awal
+
+Dua hal berubah signifikan dari rencana yang ditulis pertama kali di bawah ("Rencana pendekatan") — dokumen itu ditulis SEBELUM bug kedua ditemukan via dogfooding lanjutan. Bagian "Rencana pendekatan" di bawah dipertahankan apa adanya sebagai catatan sejarah/alasan desain awal, tapi detail berikut sudah menggantikannya:
+
+### 1. `direction = 'both'` dihapus total, bukan dipertahankan untuk akun netral
+
+Rencana awal mempertahankan `'both'` untuk akun generik seperti "Keluarga"/"Orang Lain"/"Bisnis" yang secara histori dipakai dua arah. Setelah didiskusikan ulang, diputuskan: **setiap akun debt WAJIB `receivable` ATAU `payable`, tidak ada netral.** Kalau kebutuhannya mencatat dua arah ke pihak yang sama, itu harus dua akun terpisah (mis. "Piutang Keluarga"/"Utang Keluarga"), bukan satu akun ambigu — karena `direction` sekarang bukan cuma dipakai filter dropdown UI, tapi jadi SATU-SATUNYA input untuk menentukan `debts.type` secara otomatis di `applyDebtTransaction`. Akun `'both'` akan membuat logika itu tidak mungkin ditentukan tanpa input tambahan dari user, yang justru kembali ke masalah "bisa salah pilih" yang ingin dihindari.
+
+Migrasi `0051_debt_accounts_direction_required.sql` mengetatkan `CHECK` constraint ini. Dicek langsung: produksi tidak punya satu pun akun `'both'` yang perlu direklasifikasi (semua 3 akun debt produksi sudah `receivable`/`payable` sejak backfill 0050).
+
+### 2. Ditemukan bug KEDUA via dogfooding lanjutan: arah Jalur 1 (transfer) sendiri awalnya salah logic, dan ada Jalur 2 yang sama sekali belum tercakup rencana awal
+
+Setelah rencana awal ("Rencana pendekatan" di bawah) diimplementasikan parsial, user menemukan transaksi **income** langsung di akun debt `payable` ("Test Utang Baru") melahirkan `debts.type='receivable'` — bukan mengurangi utang seperti seharusnya. Investigasi mengungkap bahwa aturan arah yang benar TIDAK bisa diturunkan dari "uang masuk = bertambah" secara naif (itu kontradiktif untuk Jalur 1 transfer: bayar utang dengan kas MENGURANGI utang, padahal kas "masuk" ke akun debt). Setelah dikoreksi berkali-kali oleh user, aturan final yang disepakati dan sudah diverifikasi konsisten secara logika — didokumentasikan penuh di [docs/concept/konsep-utang-piutang.md](../../../../../docs/concept/konsep-utang-piutang.md):
+
+**Jalur 1 — transfer kas ↔ akun debt:**
+
+| `direction` akun | Arah transfer | Efek |
+|---|---|---|
+| `payable` | Kas → akun (masuk) | Utang **berkurang** (pelunasan FIFO) |
+| `payable` | Akun → kas (keluar) | Utang **bertambah** (debt baru) |
+| `receivable` | Kas → akun (masuk) | Piutang **bertambah** (debt baru) |
+| `receivable` | Akun → kas (keluar) | Piutang **berkurang** (pelunasan FIFO) |
+
+**Jalur 2 — income/expense langsung di akun debt (belum diimplementasikan di kode):**
+
+| `direction` akun | `type` transaksi | Efek |
+|---|---|---|
+| `payable` | income | Utang **berkurang** |
+| `payable` | expense | Utang **bertambah** (debt baru) |
+| `receivable` | income | Piutang **bertambah** (debt baru) |
+| `receivable` | expense | Piutang **berkurang** |
+
+Jalur 1 sudah diimplementasikan dan diverifikasi sesuai tabel ini (lihat "Riwayat implementasi"). Jalur 2 masih memakai logika lama yang SALAH untuk kombinasi `payable`+income dan `receivable`+expense — ini adalah pekerjaan utama yang tersisa.
+
+## Riwayat implementasi (Jalur 1)
+
+Dikerjakan dan dikomit `c8280a4` ("Fix konsep utang piutang & penerapan jalur create & unitest"), 2026-10-17:
+
+- `apply-debt-transaction/create.ts` ditulis ulang: parameter `debtAction` (dulu dikirim UI, menentukan "settlement" vs "payable" secara manual) dihapus total. Fungsi sekarang membaca `debt_accounts.direction` lewat `requireDebtAccountDirection()`, throw `DebtAccountDirectionMissingError` kalau akun debt belum punya baris `debt_accounts` sama sekali.
+- Comment panjang di kode dipindah ke [apply-debt-transaction/README.md](../../../../src/shared/debts/apply-debt-transaction/README.md) (instruksi eksplisit user: kode minim komentar).
+- Test baru `apply-debt-transaction/create.test.ts` (file terpisah, bukan digabung ke test combined lama) — cakupan: income/expense no-op di jalur ini (ditangani Jalur 2 terpisah), semua `AccountPairKind` (`cash-cash`, `debt-debt`, `cash-investment` no-op; `UnsupportedAccountPairError`), `cash-debt`+`receivable` → debt baru, `cash-debt`+`payable` → FIFO settlement, `debt-cash`+`payable` → debt baru, `debt-cash`+`receivable` → FIFO settlement, `DebtAccountDirectionMissingError` untuk kedua arah transfer.
+- Bug tambahan ditemukan & diperbaiki saat memperbaiki caller: `pay-debt-form/use-pay-debt.ts` (tombol "Bayar" cepat) selalu mengasumsikan arah transfer `debt → kas`, salah untuk debt `payable` di bawah aturan baru — diperbaiki jadi branch berdasar `debt.type`.
+- Diverifikasi ke `finance.dev.db` langsung (bukan cuma toast UI, sesuai [checking-dev-database.md](../checking-dev-database.md)) tanggal 2026-10-17: 4 transaksi uji manual (expense di akun payable, income di akun receivable, transfer masuk/keluar keduanya) — semua `debts.type` dan `debt_payments` yang lahir cocok 100% dengan tabel Jalur 1 di atas.
+
+**Belum dikomit** (status working tree saat dokumen ini ditulis): perbaikan UI lanjutan supaya field checklist pelunasan muncul untuk kombinasi `pairKind`+`direction` yang benar (sebelumnya field itu cuma muncul untuk `debt-cash`, sehingga kombinasi `cash-debt`+`payable` — yang butuh pelunasan FIFO juga — silent no-op karena `settleDebtIds` kosong tidak pernah terisi UI). Perubahan: `use-ongoing-debts.ts` (parameter `type` eksplisit, bukan hardcode `receivable`), `use-transaction-debt-fields.ts` (computed `settlementDirection` dari `pairKind`+`direction`), `use-transaction-form.ts`, `field-debt-action.tsx` (toggle lama dihapus, label checklist dinamis), `transactionSchema`/`values.ts` (field `debt_action` dihapus). Juga ikut dibersihkan 6 file sisa referensi tipe `'both'` yang luput saat migrasi 0051. Diverifikasi `tsc --noEmit` bersih + `vitest run` 251/251 lulus.
+
+Ditemukan saat verifikasi manual Jalur 1 di atas: user sempat menguji income/expense langsung di akun debt juga (bukan cuma transfer) dan hasilnya tampak benar — tapi itu KEBETULAN, bukan bukti Jalur 2 sudah benar (lihat "Bug kedua" di atas). 2 dari 4 kombinasi (`payable`+expense, `receivable`+income) kebetulan cocok dengan hardcode lama; 2 kombinasi lain (`payable`+income, `receivable`+expense) akan tetap salah kalau dicoba.
+
+## Riwayat implementasi (Jalur 2 — CREATE)
+
+Dikerjakan 2026-10-17, sesi lanjutan setelah Jalur 1:
+
+- Fungsi baru `applyDirectDebtTransaction` (`apply-debt-transaction/apply-direct-debt-transaction.ts`) — reuse `requireDebtAccountDirection`/`createDebt` (diekspor dari `create.ts`) dan `settleDebtsFifo` (`settle-fifo.ts`, generik, tidak terikat tipe transaksi). Logic: `direction='payable'`+`expense` atau `direction='receivable'`+`income` → `createDebt`; kombinasi sebaliknya → `settleDebtsFifo`.
+- `create-transaction/income/debt.ts` dan `.../expense/debt.ts` ditulis ulang: `INSERT INTO debts` hardcode langsung dihapus, diganti panggilan `applyDirectDebtTransaction` dengan `settleDebtIds: values.settle_debt_ids` (field form yang sama dipakai Jalur 1).
+- `use-transaction-debt-fields.ts`: `settlementDirection`/`involvesDebtAccount` diperluas mencakup `type === "income"`/`"expense"` (sebelumnya cuma `type === "transfer"`) — supaya checklist pelunasan muncul di form untuk kombinasi `payable`+income dan `receivable`+expense juga.
+- Test baru `apply-direct-debt-transaction.test.ts` (file terpisah, pola sama `create.test.ts`) — 6 test: `payable`+expense → debt baru, `receivable`+income → debt baru, `payable`+income → FIFO settlement, `receivable`+expense → FIFO settlement, `settleDebtIds` kosong → no-op, `DebtAccountDirectionMissingError`.
+- Diverifikasi `tsc --noEmit` bersih + `vitest run` 257/257 lulus (33 file). **Belum diverifikasi manual di `finance.dev.db`** — menunggu user uji di `tauri dev` (skenario pembukti: income di akun "Test Utang Baru" yang sudah punya utang `payable` berjalan, harus MENGURANGI utang itu, bukan melahirkan piutang baru ke kontak yang sama).
+- **Scope sengaja dibatasi CREATE saja** (keputusan user) — `update-transaction/income|expense/debt.ts` TIDAK disentuh, masih hardcode lama. Lihat TODO di atas.
 
 ## Latar belakang
 
@@ -24,9 +87,9 @@ Ringkas: form "Tambah Utang/Piutang" (`new-debt-form.tsx`) menampilkan SEMUA aku
 
 ### Kenapa bukan sekadar bug kode form
 
-Root cause sebenarnya: skema `accounts` tidak punya cara eksplisit membedakan akun debt untuk piutang vs utang vs netral — pembedaan murni dari nama akun yang dibaca manusia ("Piutang", "Utang Dagang"). `classifyAccountPair` (`shared/debts/classify-account-pair.ts`) juga murni berbasis `account_type` mentah, tidak pernah melihat identitas akun debt — arah `receivable`/`payable` ditentukan semata dari arah transfer (`account_id` vs `transfer_account_id`), bukan dari akun debt mana yang dipakai. Jadi akun debt di `applyDebtTransaction` hanya berfungsi sebagai "tempat parkir" `account_id` di baris `debts`, bukan pembeda jenis.
+Root cause sebenarnya: skema `accounts` tidak punya cara eksplisit membedakan akun debt untuk piutang vs utang — pembedaan murni dari nama akun yang dibaca manusia ("Piutang", "Utang Dagang"). `classifyAccountPair` (`shared/debts/classify-account-pair.ts`) juga murni berbasis `account_type` mentah, tidak pernah melihat identitas akun debt — arah `receivable`/`payable` ditentukan semata dari arah transfer (`account_id` vs `transfer_account_id`), bukan dari akun debt mana yang dipakai. Jadi akun debt di `applyDebtTransaction` hanya berfungsi sebagai "tempat parkir" `account_id` di baris `debts`, bukan pembeda jenis.
 
-Desain "satu akun debt boleh dipakai 2 arah" memang SENGAJA (lihat `docs/concept/konsep-tipe-akun.md` — pembedaan arah ada di kolom `debts.type`, bukan di `accounts`), dan ini valid untuk akun generik seperti "Keluarga"/"Orang Lain"/"Bisnis". Tapi untuk akun yang namanya SPESIFIK ("Piutang", "Utang Dagang"), tidak ada apa pun yang mencegah dipakai untuk arah yang berlawanan dari namanya.
+(Desain "satu akun debt boleh dipakai 2 arah" yang disebut di `docs/concept/konsep-tipe-akun.md` versi lama — sudah DIBATALKAN, lihat "Perubahan besar dari rencana awal" poin 1.)
 
 ### Percobaan pertama yang dibuang
 
@@ -34,13 +97,15 @@ Sempat dicoba pendekatan "warning UI non-blocking" (tanpa ubah skema) — dropdo
 
 ### Worker + MCP juga kena gap yang sama
 
-Dicek eksplisit (bukan diasumsikan) — `apps/worker` punya replika PENUH modul debts (`apps/worker/src/modules/debts/`, termasuk `classify-account-pair.ts` sendiri, pola port yang sama persis dengan investasi, lihat `account-type-investment.md` bagian "Port ke Worker + MCP"). Fungsi `createDirectDebt` (`apps/worker/src/modules/debts/service.ts:543-565`) — dipanggil LANGSUNG dari tool MCP `create_debt_direct` (`apps/mcp-server/src/lib/mcp-tools/debts/create-debt-direct.ts`), BUKAN lewat desktop sama sekali — cuma memvalidasi `accountType === 'debt'`, sama rentan seperti bug yang ditemukan di desktop.
+Dicek eksplisit (bukan diasumsikan) — `apps/worker` punya replika PENUH modul debts (`apps/worker/src/modules/debts/`, termasuk `classify-account-pair.ts` sendiri, pola port yang sama persis dengan investasi, lihat `account-type-investment.md` bagian "Port ke Worker + MCP"). Fungsi `createDirectDebt` (`apps/worker/src/modules/debts/service.ts:543-565`) — dipanggil LANGSUNG dari tool MCP `create_debt_direct` (`apps/mcp-server/src/lib/mcp-tools/debts/create-debt-direct.ts`), BUKAN lewat desktop sama sekali — cuma memvalidasi `accountType === 'debt'`, sama rentan seperti bug yang ditemukan di desktop. **Status: masih belum diperbaiki (lihat TODO).**
 
 **Risikonya lebih tinggi di jalur ini**: yang memilih `accountId` untuk `create_debt_direct` adalah model LLM yang menebak dari daftar akun berdasarkan deskripsi tool (`"Akun bertipe 'debt'"`, tidak menyebut arah sama sekali) — bukan manusia yang melihat UI dengan dropdown terfilter. Tanpa validasi backend, kombinasi `type: 'payable'` + `accountId` akun "Piutang" bisa lolos tanpa penolakan apa pun lewat MCP, bahkan setelah desktop diperbaiki — karena desktop dan Worker adalah dua implementasi terpisah yang harus diperbaiki MASING-MASING (tidak ada kode bersama antara keduanya, cuma pola yang sama).
 
 Konsekuensinya: validasi `direction` vs `type` WAJIB ditambahkan di `createDirectDebt` (Worker), bukan cuma di `applyDebtTransaction` (desktop) — ini bukan "nice to have", karena jalur MCP sama sekali tidak terlindungi oleh perbaikan UI desktop manapun.
 
-## Rencana pendekatan
+## Rencana pendekatan (versi awal — dipertahankan sebagai catatan sejarah)
+
+> Catatan: bagian ini ditulis SEBELUM bug kedua ditemukan dan sebelum keputusan menghapus `'both'`. Beberapa detail di bawah (skema `direction` dengan `'both'`, validasi digambarkan "opsional") sudah DIGANTIKAN oleh "Perubahan besar dari rencana awal" di atas — dipertahankan di sini hanya untuk konteks kenapa pendekatan tabel detail (bukan kolom langsung) dipilih sejak awal.
 
 Pola identik `investment_accounts` (migrasi `0036_investment_accounts_and_purchases.sql`) — tabel detail 1:1, BUKAN kolom baru langsung di `accounts` (yang tetap generik lintas tipe).
 
@@ -53,7 +118,7 @@ CREATE TABLE debt_accounts (
 
 - `receivable` — akun ini HANYA untuk piutang (mis. "Piutang", "Piutang Dagang").
 - `payable` — akun ini HANYA untuk utang (mis. "Utang Dagang").
-- `both` — akun netral, boleh dua arah (mis. "Keluarga", "Orang Lain", "Bisnis" — sesuai histori pemakaian riil mereka saat ini, lihat query di bawah).
+- `both` — akun netral, boleh dua arah (mis. "Keluarga", "Orang Lain", "Bisnis" — sesuai histori pemakaian riil mereka saat ini, lihat query di bawah). **(Dihapus di migrasi 0051 — lihat "Perubahan besar dari rencana awal".)**
 
 Tabel baru, tidak direferensikan FK tabel lain — `ALTER TABLE`/`CREATE TABLE` biasa, TIDAK perlu teknik copy-and-rename (`docs/rules/sqlite-copy-and-rename-migration.md`).
 

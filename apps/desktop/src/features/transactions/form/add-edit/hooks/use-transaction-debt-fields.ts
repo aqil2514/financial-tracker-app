@@ -16,6 +16,8 @@ type UseTransactionDebtFieldsParams = {
   type: "income" | "expense" | "transfer";
   sourceAccountType: Account["account_type"] | undefined;
   destinationAccountType: Account["account_type"] | undefined;
+  sourceDebtDirection: "receivable" | "payable" | null | undefined;
+  destinationDebtDirection: "receivable" | "payable" | null | undefined;
 };
 
 export function useTransactionDebtFields({
@@ -24,12 +26,10 @@ export function useTransactionDebtFields({
   type,
   sourceAccountType,
   destinationAccountType,
+  sourceDebtDirection,
+  destinationDebtDirection,
 }: UseTransactionDebtFieldsParams) {
   const { data: debtStatus } = useTransactionDebtStatus(transactionId);
-  const { data: ongoingDebts } = useOngoingDebts(contactId, {
-    excludeDebtId: debtStatus?.role === "payment" ? debtStatus.debtId : undefined,
-    excludeTransactionId: debtStatus?.role === "payment" ? transactionId : undefined,
-  });
 
   let pairKind: AccountPairKind | null = null;
   let unsupportedPairMessage: string | null = null;
@@ -48,11 +48,31 @@ export function useTransactionDebtFields({
   const sourceIsDebt = sourceAccountType === "debt";
   const destinationIsDebt = destinationAccountType === "debt";
   const isDebtDebtTransfer = pairKind === "debt-debt";
-  const involvesDebtAccount = (sourceIsDebt || destinationIsDebt) && !isDebtDebtTransfer;
+  const involvesDebtAccount =
+    type === "transfer" ? (sourceIsDebt || destinationIsDebt) && !isDebtDebtTransfer : sourceIsDebt;
 
   const debtFieldsLocked = debtStatus?.role === "principal" && debtStatus.hasPayments;
 
-  const needsDebtAction = !debtFieldsLocked && pairKind === "debt-cash";
+  const settlementDirection: "receivable" | "payable" | null =
+    type === "transfer"
+      ? pairKind === "cash-debt" && destinationDebtDirection === "payable"
+        ? "payable"
+        : pairKind === "debt-cash" && sourceDebtDirection === "receivable"
+          ? "receivable"
+          : null
+      : type === "income" && sourceDebtDirection === "payable"
+        ? "payable"
+        : type === "expense" && sourceDebtDirection === "receivable"
+          ? "receivable"
+          : null;
+
+  const needsDebtAction = !debtFieldsLocked && settlementDirection != null;
+
+  const { data: ongoingDebts } = useOngoingDebts(contactId, settlementDirection ?? "receivable", {
+    excludeDebtId: debtStatus?.role === "payment" ? debtStatus.debtId : undefined,
+    excludeTransactionId: debtStatus?.role === "payment" ? transactionId : undefined,
+    excludePrincipalDebtId: debtStatus?.role === "principal" ? debtStatus.debtId : undefined,
+  });
 
   function validateDebtFields(values: TransactionFormOutput): string | null {
     if (debtFieldsLocked) return null;
@@ -61,19 +81,14 @@ export function useTransactionDebtFields({
       return "Nama kontak wajib diisi untuk transaksi yang melibatkan akun utang piutang";
     }
     if (needsDebtAction) {
-      if (!values.debt_action) {
-        return "Pilih dulu apakah ini pelunasan piutang atau utang baru";
+      if (values.settle_debt_ids.length === 0) {
+        return "Pilih minimal satu piutang/utang yang dilunasi";
       }
-      if (values.debt_action === "settlement") {
-        if (values.settle_debt_ids.length === 0) {
-          return "Pilih minimal satu piutang yang dilunasi";
-        }
-        const totalRemaining = (ongoingDebts ?? [])
-          .filter((debt) => values.settle_debt_ids.includes(String(debt.id)))
-          .reduce((sum, debt) => sum + debt.remaining, 0);
-        if (values.amount > totalRemaining) {
-          return "Nominal melebihi total sisa piutang yang dipilih — catat kelebihannya sebagai transaksi terpisah";
-        }
+      const totalRemaining = (ongoingDebts ?? [])
+        .filter((debt) => values.settle_debt_ids.includes(String(debt.id)))
+        .reduce((sum, debt) => sum + debt.remaining, 0);
+      if (values.amount > totalRemaining) {
+        return "Nominal melebihi total sisa yang dipilih — catat kelebihannya sebagai transaksi terpisah";
       }
     }
     return null;
@@ -84,6 +99,8 @@ export function useTransactionDebtFields({
     involvesDebtAccount,
     debtFieldsLocked,
     needsDebtAction,
+    settlementDirection,
+    ongoingDebts,
     isDebtDebtTransfer,
     validateDebtFields,
   };

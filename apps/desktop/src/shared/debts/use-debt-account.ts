@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getDb } from "@/lib/db";
 
 export type DebtAccountDetail = {
-  direction: "receivable" | "payable" | "both";
+  direction: "receivable" | "payable";
 } | null;
 
 // Base key (tanpa accountId) -- didaftarkan di QUERY_DEPENDENCIES
@@ -19,7 +19,7 @@ export function useDebtAccount(accountId: string | undefined) {
     queryKey: [...debtAccountQueryKey, accountId],
     queryFn: async (): Promise<DebtAccountDetail> => {
       const db = await getDb();
-      const rows = await db.select<{ direction: "receivable" | "payable" | "both" }[]>(
+      const rows = await db.select<{ direction: "receivable" | "payable" }[]>(
         "SELECT direction FROM debt_accounts WHERE account_id = $1",
         [accountId]
       );

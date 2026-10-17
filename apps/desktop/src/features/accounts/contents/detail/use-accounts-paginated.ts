@@ -39,7 +39,7 @@ const BALANCE_EXPRESSION = `(
 type AccountRow = Account & {
   balance: number;
   group_name: string | null;
-  debt_direction: "receivable" | "payable" | "both" | null;
+  debt_direction: "receivable" | "payable" | null;
 };
 
 // Kolom accounts yang boleh muncul sebagai filterKey — harus

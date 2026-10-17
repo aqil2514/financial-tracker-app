@@ -24,7 +24,7 @@ export function accountValuesFromEntity(
   extra?: {
     unit_label?: string | null;
     current_market_value?: number | null;
-    debt_direction?: "receivable" | "payable" | "both" | null;
+    debt_direction?: "receivable" | "payable" | null;
     label_names?: string[];
   }
 ): AccountFormValues {

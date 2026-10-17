@@ -4,6 +4,9 @@ export { mergeTouchedDebtRows } from "./types";
 export type { ApplyDebtTransactionInput } from "./create";
 export { applyDebtTransaction, DebtAccountDirectionMissingError } from "./create";
 
+export type { ApplyDirectDebtTransactionInput } from "./apply-direct-debt-transaction";
+export { applyDirectDebtTransaction } from "./apply-direct-debt-transaction";
+
 export type { ApplyDebtTransactionEditInput } from "./edit";
 export { applyDebtTransactionEdit, DebtEditBlockedError, DebtSelfSettlementError } from "./edit";
 

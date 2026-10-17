@@ -4,9 +4,8 @@ import { FormFieldToggleGroup } from "@/components/forms/form-fields";
 import type { AccountFormOutput, AccountFormValues } from "../../schema";
 
 const debtDirectionOptions = [
-  { value: "receivable", label: "Piutang saja" },
-  { value: "payable", label: "Utang saja" },
-  { value: "both", label: "Keduanya" },
+  { value: "receivable", label: "Piutang" },
+  { value: "payable", label: "Utang" },
 ];
 
 export function FieldDebt() {

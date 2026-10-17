@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db";
-import { newId } from "@/lib/id";
 import { insertTransactionToDb, applyLabelsAndPush } from "../../helper";
 import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
+import { applyDirectDebtTransaction } from "@/shared/debts/apply-debt-transaction";
 import type { TransactionFormOutput } from "../../../schema";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
@@ -25,15 +25,20 @@ export async function createDirectDebtIncome({
     values,
   });
 
-  const debtId = newId();
-  await db.execute(
-    `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date, note)
-     VALUES ($1, 'receivable', $2, $3, $4, $5, $6, $7)`,
-    [debtId, contactId, values.amount, values.account_id, transactionId, values.date, values.note]
-  );
+  const touchedDebtRows = await applyDirectDebtTransaction({
+    db,
+    transactionId,
+    type: "income",
+    accountId: values.account_id,
+    contactId,
+    amount: values.amount,
+    date: values.date,
+    settleDebtIds: values.settle_debt_ids,
+  });
 
   await applyLabelsAndPush({ transactionId, labelNames: values.label_names });
-  void pushOnWrite("debts", debtId);
+  for (const debtId of touchedDebtRows.debtIds) void pushOnWrite("debts", debtId);
+  for (const debtPaymentId of touchedDebtRows.debtPaymentIds) void pushOnWrite("debt_payments", debtPaymentId);
 
   return transactionId;
 }
