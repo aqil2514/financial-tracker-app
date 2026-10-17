@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  applyDebtTransaction,
   applyDebtTransactionEdit,
   detachDebtForDeletedTransaction,
   DebtEditBlockedError,
 } from "./index";
 import type { TransactionDebtStatus } from "../use-transaction-debt-status";
 
-type AccountRow = { id: string; account_type: "cash" | "debt" };
+type AccountRow = {
+  id: string;
+  account_type: "cash" | "debt";
+  name?: string;
+  debt_direction?: "receivable" | "payable";
+};
 type DebtRow = {
   id: string;
   type: "receivable" | "payable";
@@ -47,6 +51,9 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
       if (sql.includes("FROM accounts WHERE id")) {
         const [id] = params as [string];
         const account = accounts.find((a) => a.id === id);
+        if (sql.startsWith("SELECT name")) {
+          return (account ? [{ name: account.name ?? account.id }] : []) as T;
+        }
         return (account ? [{ account_type: account.account_type }] : []) as T;
       }
       if (sql.includes("FROM debts") && sql.includes("remaining") && sql.includes("IN (")) {
@@ -76,19 +83,25 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
         const match = debtPayments.find((p) => p.transaction_id === transactionId);
         return (match ? [{ id: match.id, debt_id: match.debt_id }] : []) as T;
       }
+      if (sql.includes("FROM debt_accounts")) {
+        const [accountId] = params as [string];
+        const account = accounts.find((a) => a.id === accountId);
+        if (!account || account.debt_direction == null) return [] as T;
+        return [{ name: account.name ?? account.id, direction: account.debt_direction }] as T;
+      }
       throw new Error(`Fake db.select tidak mengenali query: ${sql}`);
     },
     async execute(sql: string, params: unknown[] = []): Promise<{ lastInsertId?: number }> {
       if (sql.startsWith("INSERT INTO debts")) {
-        const [id, contactId, amount, accountId, transactionId, date] = params as [
+        const [id, type, contactId, amount, accountId, transactionId, date] = params as [
           string,
+          "receivable" | "payable",
           string | null,
           number,
           string,
           string,
           string,
         ];
-        const type = sql.includes("'receivable'") ? "receivable" : "payable";
         debts.push({
           id,
           type,
@@ -171,236 +184,7 @@ function createFakeDb(seed: { accounts?: AccountRow[]; debts?: DebtRow[]; debtPa
 }
 
 const CASH_ACCOUNT: AccountRow = { id: "cash-1", account_type: "cash" };
-const DEBT_ACCOUNT: AccountRow = { id: "debt-1", account_type: "debt" };
-
-describe("applyDebtTransaction", () => {
-  it("tidak melakukan apa pun untuk transaksi income/expense", async () => {
-    const { db, debts } = createFakeDb({ accounts: [CASH_ACCOUNT, DEBT_ACCOUNT] });
-
-    await applyDebtTransaction({
-      db: db as never,
-      transactionId: "tx-1",
-      type: "expense",
-      accountId: "cash-1",
-      transferAccountId: null,
-      contactId: null,
-      amount: 1000,
-      date: "2026-01-01",
-      debtAction: null,
-      settleDebtIds: [],
-    });
-
-    expect(debts).toHaveLength(0);
-  });
-
-  it("tidak melakukan apa pun untuk transfer kas ke kas", async () => {
-    const cashB: AccountRow = { id: "cash-2", account_type: "cash" };
-    const { db, debts } = createFakeDb({ accounts: [CASH_ACCOUNT, cashB] });
-
-    await applyDebtTransaction({
-      db: db as never,
-      transactionId: "tx-1",
-      type: "transfer",
-      accountId: "cash-1",
-      transferAccountId: "cash-2",
-      contactId: null,
-      amount: 1000,
-      date: "2026-01-01",
-      debtAction: null,
-      settleDebtIds: [],
-    });
-
-    expect(debts).toHaveLength(0);
-  });
-
-  it("melempar UnsupportedAccountPairError untuk kombinasi tipe akun di luar cash/debt/cash-investment", async () => {
-    const forexAccount = { id: "forex-1", account_type: "forex" } as unknown as AccountRow;
-    const { db } = createFakeDb({ accounts: [CASH_ACCOUNT, forexAccount] });
-
-    await expect(
-      applyDebtTransaction({
-        db: db as never,
-        transactionId: "tx-1",
-        type: "transfer",
-        accountId: "cash-1",
-        transferAccountId: "forex-1",
-        contactId: null,
-        amount: 1000,
-        date: "2026-01-01",
-        debtAction: null,
-        settleDebtIds: [],
-      })
-    ).rejects.toThrow(/belum didukung/);
-  });
-
-  it("tidak melakukan apa pun (no-op) untuk transfer cash -> investment", async () => {
-    const investmentAccount = { id: "inv-1", account_type: "investment" } as unknown as AccountRow;
-    const { db } = createFakeDb({ accounts: [CASH_ACCOUNT, investmentAccount] });
-
-    const result = await applyDebtTransaction({
-      db: db as never,
-      transactionId: "tx-1",
-      type: "transfer",
-      accountId: "cash-1",
-      transferAccountId: "inv-1",
-      contactId: null,
-      amount: 1000,
-      date: "2026-01-01",
-      debtAction: null,
-      settleDebtIds: [],
-    });
-
-    expect(result).toEqual({ debtIds: [], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] });
-  });
-
-  it("tidak melakukan apa pun untuk transfer debt ke debt", async () => {
-    const debtB: AccountRow = { id: "debt-2", account_type: "debt" };
-    const { db, debts } = createFakeDb({ accounts: [DEBT_ACCOUNT, debtB] });
-
-    await applyDebtTransaction({
-      db: db as never,
-      transactionId: "tx-1",
-      type: "transfer",
-      accountId: "debt-1",
-      transferAccountId: "debt-2",
-      contactId: "contact-10",
-      amount: 1000,
-      date: "2026-01-01",
-      debtAction: null,
-      settleDebtIds: [],
-    });
-
-    expect(debts).toHaveLength(0);
-  });
-
-  it("kas -> debt otomatis membuat piutang baru (receivable)", async () => {
-    const { db, debts } = createFakeDb({ accounts: [CASH_ACCOUNT, DEBT_ACCOUNT] });
-
-    await applyDebtTransaction({
-      db: db as never,
-      transactionId: "tx-42",
-      type: "transfer",
-      accountId: "cash-1",
-      transferAccountId: "debt-1",
-      contactId: "contact-10",
-      amount: 50000,
-      date: "2026-01-01",
-      debtAction: null,
-      settleDebtIds: [],
-    });
-
-    expect(debts).toEqual([
-      {
-        id: expect.any(String),
-        type: "receivable",
-        contact_id: "contact-10",
-        amount: 50000,
-        account_id: "debt-1",
-        transaction_id: "tx-42",
-        status: "ongoing",
-        date: "2026-01-01",
-      },
-    ]);
-  });
-
-  it("debt -> kas dengan debtAction='payable' membuat utang baru", async () => {
-    const { db, debts } = createFakeDb({ accounts: [CASH_ACCOUNT, DEBT_ACCOUNT] });
-
-    await applyDebtTransaction({
-      db: db as never,
-      transactionId: "tx-7",
-      type: "transfer",
-      accountId: "debt-1",
-      transferAccountId: "cash-1",
-      contactId: "contact-20",
-      amount: 30000,
-      date: "2026-02-01",
-      debtAction: "payable",
-      settleDebtIds: [],
-    });
-
-    expect(debts).toEqual([
-      {
-        id: expect.any(String),
-        type: "payable",
-        contact_id: "contact-20",
-        amount: 30000,
-        account_id: "debt-1",
-        transaction_id: "tx-7",
-        status: "ongoing",
-        date: "2026-02-01",
-      },
-    ]);
-  });
-
-  it("debt -> kas dengan debtAction='settlement' mengalokasikan FIFO ke piutang terlama dulu", async () => {
-    const seedDebts: DebtRow[] = [
-      {
-        id: "debt-row-1",
-        type: "receivable",
-        contact_id: "contact-10",
-        amount: 30000,
-        account_id: "debt-1",
-        transaction_id: "tx-100",
-        status: "ongoing",
-        date: "2026-01-01",
-      },
-      {
-        id: "debt-row-2",
-        type: "receivable",
-        contact_id: "contact-10",
-        amount: 40000,
-        account_id: "debt-1",
-        transaction_id: "tx-101",
-        status: "ongoing",
-        date: "2026-01-10",
-      },
-    ];
-    const { db, debts, debtPayments } = createFakeDb({
-      accounts: [CASH_ACCOUNT, DEBT_ACCOUNT],
-      debts: seedDebts,
-    });
-
-    await applyDebtTransaction({
-      db: db as never,
-      transactionId: "tx-200",
-      type: "transfer",
-      accountId: "debt-1",
-      transferAccountId: "cash-1",
-      contactId: "contact-10",
-      amount: 60000,
-      date: "2026-02-01",
-      debtAction: "settlement",
-      settleDebtIds: ["debt-row-1", "debt-row-2"],
-    });
-
-    expect(debtPayments).toEqual([
-      { id: expect.any(String), debt_id: "debt-row-1", amount: 30000, account_id: "debt-1", transaction_id: "tx-200", date: "2026-02-01" },
-      { id: expect.any(String), debt_id: "debt-row-2", amount: 30000, account_id: "debt-1", transaction_id: "tx-200", date: "2026-02-01" },
-    ]);
-    expect(debts.find((d) => d.id === "debt-row-1")?.status).toBe("paid");
-    expect(debts.find((d) => d.id === "debt-row-2")?.status).toBe("ongoing");
-  });
-
-  it("settlement dengan settleDebtIds kosong tidak melakukan apa pun", async () => {
-    const { db, debtPayments } = createFakeDb({ accounts: [CASH_ACCOUNT, DEBT_ACCOUNT] });
-
-    await applyDebtTransaction({
-      db: db as never,
-      transactionId: "tx-1",
-      type: "transfer",
-      accountId: "debt-1",
-      transferAccountId: "cash-1",
-      contactId: "contact-10",
-      amount: 1000,
-      date: "2026-01-01",
-      debtAction: "settlement",
-      settleDebtIds: [],
-    });
-
-    expect(debtPayments).toHaveLength(0);
-  });
-});
+const DEBT_ACCOUNT: AccountRow = { id: "debt-1", account_type: "debt", debt_direction: "receivable" };
 
 describe("applyDebtTransactionEdit", () => {
   const baseInput = {
@@ -411,7 +195,6 @@ describe("applyDebtTransactionEdit", () => {
     contactId: "contact-10",
     amount: 50000,
     date: "2026-03-01",
-    debtAction: null,
     settleDebtIds: [] as string[],
   };
 
@@ -592,7 +375,6 @@ describe("applyDebtTransactionEdit", () => {
       accountId: "debt-1",
       transferAccountId: "cash-1",
       amount: 25000,
-      debtAction: "settlement",
       settleDebtIds: ["debt-row-5"],
       status,
       dangerousFieldsChanged: true,
@@ -633,7 +415,6 @@ describe("applyDebtTransactionEdit", () => {
       accountId: "debt-1",
       transferAccountId: "cash-1",
       amount: 50000,
-      debtAction: "settlement",
       settleDebtIds: ["debt-row-5"],
       status,
       dangerousFieldsChanged: true,

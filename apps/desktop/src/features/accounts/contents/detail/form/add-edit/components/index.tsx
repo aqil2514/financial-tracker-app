@@ -14,6 +14,7 @@ import { FieldIconColor } from "./fields/field-icon-color";
 import { FieldGroup } from "./fields/field-group";
 import { FieldAccountType } from "./fields/field-account-type";
 import { FieldInvestment } from "./fields/field-investment";
+import { FieldDebt } from "./fields/field-debt";
 import { FieldDescription } from "./fields/field-description";
 import { FieldIsActive } from "./fields/field-is-active";
 
@@ -51,6 +52,7 @@ export function AccountForm({
             <FieldGroup />
             <FieldAccountType locked={accountTypeLocked} />
             <FieldInvestment />
+            <FieldDebt />
           </div>
           <div className="space-y-4">
             <FieldDescription />

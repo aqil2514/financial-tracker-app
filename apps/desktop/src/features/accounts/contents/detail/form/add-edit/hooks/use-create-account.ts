@@ -40,6 +40,12 @@ export function useCreateAccount(options: UseCreateAccountOptions = {}) {
           [id, values.unit_label, values.current_market_value]
         );
       }
+      if (values.account_type === "debt") {
+        await db.execute(
+          "INSERT INTO debt_accounts (account_id, direction) VALUES ($1, $2)",
+          [id, values.debt_direction]
+        );
+      }
       await pushOnWrite("accounts", id);
       if (values.account_type === "investment") {
         void pushOnWrite("investment_accounts", id);

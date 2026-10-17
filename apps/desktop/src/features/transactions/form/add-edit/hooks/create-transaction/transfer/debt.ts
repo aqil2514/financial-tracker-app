@@ -38,7 +38,6 @@ export async function createDebtTransfer({
     contactId,
     amount: values.amount,
     date: values.date,
-    debtAction: values.type === "transfer" ? values.debt_action : null,
     settleDebtIds: values.type === "transfer" ? values.settle_debt_ids : [],
   });
 

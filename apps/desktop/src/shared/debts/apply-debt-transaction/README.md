@@ -42,32 +42,45 @@ ini).
 mutation dianggap selesai — bukan best-effort seperti lampiran, karena
 ini bagian inti pencatatan finansial.
 
-Deteksi apakah transfer ini melibatkan akun `account_type='debt'` dan,
-kalau ya, buat/update baris `debts`/`debt_payments` yang sesuai —
-mengikuti aturan arah di "Deteksi otomatis debts dari transfer"
-(`debt-receivable-tracking.md`):
+**Revisi 2026-10-17**: arah piutang/utang SEKARANG ditentukan dari
+`debt_accounts.direction` (`'receivable'`/`'payable'`, kolom wajib
+sejak migrasi `0051_debt_accounts_direction_required.sql`), BUKAN lagi
+dari arah transfer semata — lihat tabel lengkap di
+[konsep-utang-piutang.md](../../../../../docs/concept/konsep-utang-piutang.md)
+bagian "Jalur 1". Ini menggantikan total perilaku lama (`cash-debt`
+selalu hardcode `'receivable'`, `debt-cash` selalu minta `debtAction`
+manual dari user) — param `debtAction` sudah DIHAPUS dari
+`ApplyDebtTransactionInput`, keputusan lahir-baru vs pelunasan FIFO
+sekarang otomatis dari `direction` akun debt yang terlibat:
 
-- cash -> debt: piutang baru (`type='receivable'`), tidak ambigu.
-- debt -> cash: SELALU butuh `debtAction` eksplisit dari form —
-  `'payable'` (utang baru) atau `'settlement'` (lunasi piutang
-  existing, FIFO berdasar `settleDebtIds`).
-- debt -> debt: tidak melakukan apa-apa (di luar scope, lihat dok).
+- `cash-debt` (kas keluar, masuk ke akun debt) + akun `direction='receivable'`:
+  lahir piutang baru (perilaku lama, tidak berubah).
+- `cash-debt` + akun `direction='payable'`: pelunasan utang yang sudah
+  ada (FIFO via `settleDebtIds`) — BARU, sebelumnya selalu salah
+  hardcode jadi piutang baru (root cause bug dogfooding 2026-10-16).
+- `debt-cash` (akun debt keluar, masuk kas) + akun `direction='payable'`:
+  lahir utang baru — hasil akhir SAMA seperti `debtAction='payable'`
+  lama, tapi sekarang otomatis dari `direction`, bukan pilihan manual.
+- `debt-cash` + akun `direction='receivable'`: pelunasan piutang (FIFO)
+  — hasil akhir SAMA seperti `debtAction='settlement'` lama.
+- `debt -> debt`: tidak melakukan apa-apa (di luar scope).
 - `cash-cash`/`cash-investment`: bukan urusan fungsi ini (investment
   ditangani `apply-investment-transaction.ts`).
 - kombinasi lain (melibatkan tipe akun ketiga yang belum didukung):
-  `classifyAccountPair` throw `UnsupportedAccountPairError`, lihat
-  `classify-account-pair.ts` — seharusnya sudah dicegat lebih dulu oleh
-  validasi form (`use-transaction-debt-fields.ts`), guard di sini
-  adalah safety net.
+  `classifyAccountPair` throw `UnsupportedAccountPairError`.
+
+`DebtAccountDirectionMissingError` — dilempar kalau akun debt yang
+dipakai TIDAK punya baris `debt_accounts` sama sekali (migrasi lama
+belum sempat backfill, atau data uji coba). Tidak ada fallback diam-
+diam — tanpa `direction` tidak ada cara menentukan arah piutang/utang
+sama sekali.
 
 **Guard `type !== "transfer"` (baris pertama fungsi)** — saat ini
-HANYA dipanggil dari jalur transfer; `return none` untuk
-`income`/`expense`. Ini TODO terbuka: lihat
-[docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md](../../../../../docs/todos/done/unify-direct-writeoff-into-main-transaction-form.md)
-— guard ini perlu dibuka supaya income/expense yang direct ke akun
-`debt` juga tertangani oleh fungsi ini (bukan insert manual terpisah
-seperti pola lama `use-create-debt.ts`), opsi mana yang dipilih BELUM
-diputuskan.
+HANYA dipanggil dari jalur transfer (Jalur 1); `return none` untuk
+`income`/`expense`. Jalur 2 (income/expense langsung ke akun debt,
+lihat konsep-utang-piutang.md) BELUM diimplementasikan di fungsi ini —
+`createDirectDebtIncome`/`Expense` (di luar folder ini) masih logic
+lama yang perlu direvisi terpisah.
 
 **`sourceType == null || destinationType == null` → throw** — null
 berarti akun sudah terhapus di antara submit form dan titik ini (race),

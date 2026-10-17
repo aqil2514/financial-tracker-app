@@ -36,7 +36,11 @@ const BALANCE_EXPRESSION = `(
     ), 0)
 )`;
 
-type AccountRow = Account & { balance: number; group_name: string | null };
+type AccountRow = Account & {
+  balance: number;
+  group_name: string | null;
+  debt_direction: "receivable" | "payable" | "both" | null;
+};
 
 // Kolom accounts yang boleh muncul sebagai filterKey — harus
 // sinkron dengan FILTER_CONFIG di header/index.tsx. `name` di-qualify
@@ -106,9 +110,11 @@ export function useAccountsPaginated(
       // alias itu didefinisikan, jadi query dasar (dengan BALANCE_EXPRESSION)
       // dibungkus sebagai subquery dulu, baru difilter oleh balanceWhereClause
       // di level luar.
-      const baseSelect = `SELECT accounts.*, ${BALANCE_EXPRESSION} AS balance, account_groups.name AS group_name
+      const baseSelect = `SELECT accounts.*, ${BALANCE_EXPRESSION} AS balance, account_groups.name AS group_name,
+           debt_accounts.direction AS debt_direction
          FROM accounts
          LEFT JOIN account_groups ON account_groups.id = accounts.group_id
+         LEFT JOIN debt_accounts ON debt_accounts.account_id = accounts.id
          ${whereClause}`;
 
       const selectWithBalance = `SELECT * FROM (${baseSelect}) AS accounts_with_balance ${balanceWhereClause}`;

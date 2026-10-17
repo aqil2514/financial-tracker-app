@@ -13,6 +13,7 @@ export const accountSchema = z
     color: z.string().nullable(),
     unit_label: z.string().nullable(),
     current_market_value: z.coerce.number().nullable(),
+    debt_direction: z.enum(["receivable", "payable", "both"]).nullable(),
     label_names: z.array(z.string()),
   })
   .superRefine((values, ctx) => {
@@ -27,6 +28,9 @@ export const accountSchema = z
           message: "Nilai pasar terkini wajib diisi",
         });
       }
+    }
+    if (values.account_type === "debt" && values.debt_direction == null) {
+      ctx.addIssue({ code: "custom", path: ["debt_direction"], message: "Arah akun wajib dipilih" });
     }
     if (values.account_type === "third_party" && values.initial_balance !== 0) {
       ctx.addIssue({

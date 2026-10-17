@@ -75,7 +75,6 @@ export function useEditPayment(payment: DebtPaymentRow, onSuccess?: () => void) 
         contactId: transaction.contact_id,
         amount: values.amount,
         date: values.date,
-        debtAction: transaction.type === "transfer" ? "settlement" : null,
         settleDebtIds: transaction.type === "transfer" ? [status.debtId] : [],
         status,
         dangerousFieldsChanged,

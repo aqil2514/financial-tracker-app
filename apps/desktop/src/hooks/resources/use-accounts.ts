@@ -35,13 +35,19 @@ const SELECT_ACCOUNTS_WITH_BALANCE = `
           WHERE t.type = 'transfer' AND t.transfer_account_id = accounts.id
         ), 0)
     ) AS balance,
-    account_groups.name AS group_name
+    account_groups.name AS group_name,
+    debt_accounts.direction AS debt_direction
   FROM accounts
   LEFT JOIN account_groups ON account_groups.id = accounts.group_id
+  LEFT JOIN debt_accounts ON debt_accounts.account_id = accounts.id
   ORDER BY accounts.name COLLATE NOCASE
 `;
 
-type AccountRow = Account & { balance: number; group_name: string | null };
+type AccountRow = Account & {
+  balance: number;
+  group_name: string | null;
+  debt_direction: "receivable" | "payable" | "both" | null;
+};
 
 export function useAccounts() {
   return useQuery({

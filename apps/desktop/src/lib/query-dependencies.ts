@@ -22,6 +22,7 @@ import { transactionDaysQueryKey } from "@/features/transactions/shared/hooks/us
 import { monthSummaryQueryKey } from "@/features/transactions/shared/hooks/use-month-summary";
 import { accountSummaryQueryKey } from "@/features/account-detail/header/use-account-summary";
 import { investmentAccountQueryKey } from "@/shared/investments/use-investment-account";
+import { debtAccountQueryKey } from "@/shared/debts/use-debt-account";
 import { transactionInvestmentPurchaseQueryKey } from "@/shared/investments/use-transaction-investment-purchase";
 import { transactionInvestmentSaleQueryKey } from "@/shared/investments/use-transaction-investment-sale";
 import { investmentPurchasesQueryKey } from "@/shared/investments/use-investment-purchases";
@@ -70,6 +71,7 @@ export const QUERY_DEPENDENCIES = {
     balanceTrendQueryKey,
     accountGroupBalancesQueryKey,
     investmentAccountQueryKey, // edit akun investasi bisa menulis investment_accounts
+    debtAccountQueryKey, // edit akun debt bisa menulis debt_accounts
   ],
   accountGroups: [accountGroupsQueryKey, accountGroupBalancesQueryKey, balanceTrendQueryKey],
   categories: [categoriesQueryKey],

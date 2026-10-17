@@ -296,6 +296,18 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0049_account_type_third_party.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 50,
+            description: "debt_accounts",
+            sql: include_str!("../migrations/0050_debt_accounts.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 51,
+            description: "debt_accounts_direction_required",
+            sql: include_str!("../migrations/0051_debt_accounts_direction_required.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

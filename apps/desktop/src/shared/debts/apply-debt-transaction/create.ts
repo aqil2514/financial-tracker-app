@@ -4,6 +4,38 @@ import { classifyAccountPair } from "../classify-account-pair";
 import { settleDebtsFifo } from "./settle-fifo";
 import type { Db, TouchedDebtRows } from "./types";
 
+export class DebtAccountDirectionMissingError extends Error {
+  constructor(accountName: string) {
+    super(
+      `Akun "${accountName}" belum punya arah (Piutang/Utang) yang ditentukan — lengkapi dulu lewat "Edit Akun" sebelum dipakai di transaksi utang piutang.`
+    );
+    this.name = "DebtAccountDirectionMissingError";
+  }
+}
+
+async function getDebtAccountDirection(
+  db: Db,
+  accountId: string
+): Promise<{ name: string; direction: "receivable" | "payable" } | null> {
+  const rows = await db.select<{ name: string; direction: "receivable" | "payable" }[]>(
+    `SELECT accounts.name, debt_accounts.direction FROM debt_accounts
+     JOIN accounts ON accounts.id = debt_accounts.account_id
+     WHERE debt_accounts.account_id = $1`,
+    [accountId]
+  );
+  return rows[0] ?? null;
+}
+
+async function requireDebtAccountDirection(
+  db: Db,
+  accountId: string
+): Promise<"receivable" | "payable"> {
+  const rows = await db.select<{ name: string }[]>("SELECT name FROM accounts WHERE id = $1", [accountId]);
+  const detail = await getDebtAccountDirection(db, accountId);
+  if (!detail) throw new DebtAccountDirectionMissingError(rows[0]?.name ?? accountId);
+  return detail.direction;
+}
+
 export type ApplyDebtTransactionInput = {
   db: Db;
   transactionId: string;
@@ -13,7 +45,6 @@ export type ApplyDebtTransactionInput = {
   contactId: string | null;
   amount: number;
   date: string;
-  debtAction: "settlement" | "payable" | null;
   settleDebtIds: string[];
 };
 
@@ -25,6 +56,32 @@ async function getAccountType(db: Db, accountId: string): Promise<Account["accou
   return rows[0]?.account_type ?? null;
 }
 
+async function createDebt({
+  db,
+  type,
+  contactId,
+  amount,
+  accountId,
+  transactionId,
+  date,
+}: {
+  db: Db;
+  type: "receivable" | "payable";
+  contactId: string | null;
+  amount: number;
+  accountId: string;
+  transactionId: string;
+  date: string;
+}): Promise<TouchedDebtRows> {
+  const id = newId();
+  await db.execute(
+    `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, type, contactId, amount, accountId, transactionId, date]
+  );
+  return { debtIds: [id], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
+}
+
 export async function applyDebtTransaction({
   db,
   transactionId,
@@ -34,7 +91,6 @@ export async function applyDebtTransaction({
   contactId,
   amount,
   date,
-  debtAction,
   settleDebtIds,
 }: ApplyDebtTransactionInput): Promise<TouchedDebtRows> {
   const none: TouchedDebtRows = { debtIds: [], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
@@ -56,29 +112,16 @@ export async function applyDebtTransaction({
   }
 
   if (pairKind === "cash-debt") {
-    const id = newId();
-    await db.execute(
-      `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)
-       VALUES ($1, 'receivable', $2, $3, $4, $5, $6)`,
-      [id, contactId, amount, transferAccountId, transactionId, date]
-    );
-    return { debtIds: [id], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
+    const direction = await requireDebtAccountDirection(db, transferAccountId);
+    if (direction === "receivable") {
+      return createDebt({ db, type: "receivable", contactId, amount, accountId: transferAccountId, transactionId, date });
+    }
+    return settleDebtsFifo({ db, transactionId, accountId: transferAccountId, amount, date, settleDebtIds });
   }
 
-  // pairKind === "debt-cash"
-  if (debtAction === "payable") {
-    const id = newId();
-    await db.execute(
-      `INSERT INTO debts (id, type, contact_id, amount, account_id, transaction_id, date)
-       VALUES ($1, 'payable', $2, $3, $4, $5, $6)`,
-      [id, contactId, amount, accountId, transactionId, date]
-    );
-    return { debtIds: [id], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
+  const direction = await requireDebtAccountDirection(db, accountId);
+  if (direction === "payable") {
+    return createDebt({ db, type: "payable", contactId, amount, accountId, transactionId, date });
   }
-
-  if (debtAction === "settlement") {
-    return settleDebtsFifo({ db, transactionId, accountId, amount, date, settleDebtIds });
-  }
-
-  return none;
+  return settleDebtsFifo({ db, transactionId, accountId, amount, date, settleDebtIds });
 }

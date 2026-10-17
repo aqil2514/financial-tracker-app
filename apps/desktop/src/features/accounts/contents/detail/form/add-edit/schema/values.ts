@@ -14,6 +14,7 @@ export function defaultAccountValues(): AccountFormValues {
     color: DEFAULT_ACCOUNT_COLOR,
     unit_label: null,
     current_market_value: null,
+    debt_direction: null,
     label_names: [],
   };
 }
@@ -23,6 +24,7 @@ export function accountValuesFromEntity(
   extra?: {
     unit_label?: string | null;
     current_market_value?: number | null;
+    debt_direction?: "receivable" | "payable" | "both" | null;
     label_names?: string[];
   }
 ): AccountFormValues {
@@ -37,6 +39,7 @@ export function accountValuesFromEntity(
     color: account.color,
     unit_label: extra?.unit_label ?? null,
     current_market_value: extra?.current_market_value ?? null,
+    debt_direction: extra?.debt_direction ?? null,
     label_names: extra?.label_names ?? [],
   };
 }

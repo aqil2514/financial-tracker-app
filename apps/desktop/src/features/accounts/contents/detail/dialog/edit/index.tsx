@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useInvestmentAccount } from "@/shared/investments/use-investment-account";
+import { useDebtAccount } from "@/shared/debts/use-debt-account";
 import { useAccountLabels } from "@/shared/labels/use-account-labels";
 import { useAccountIsUsed } from "../../form/add-edit/helpers";
 import { AccountForm, accountValuesFromEntity, useUpdateAccount } from "../../form";
@@ -36,6 +37,7 @@ function AccountEditDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { data: investmentAccount } = useInvestmentAccount(account.id);
+  const { data: debtAccount } = useDebtAccount(account.id);
   const { data: labelNames } = useAccountLabels(account.id);
   const { data: accountTypeLocked } = useAccountIsUsed(account.id);
 
@@ -51,6 +53,7 @@ function AccountEditDialog({
           defaultValues={accountValuesFromEntity(account, {
             unit_label: investmentAccount?.unit_label,
             current_market_value: investmentAccount?.current_market_value,
+            debt_direction: debtAccount?.direction,
             label_names: labelNames,
           })}
           onSubmit={onSubmit}

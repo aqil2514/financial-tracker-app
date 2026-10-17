@@ -52,6 +52,13 @@ export function useUpdateAccount(account: Account, onUpdated?: () => void) {
           );
         }
       }
+      if (values.account_type === "debt") {
+        await db.execute(
+          `INSERT INTO debt_accounts (account_id, direction) VALUES ($1, $2)
+           ON CONFLICT(account_id) DO UPDATE SET direction = excluded.direction`,
+          [account.id, values.debt_direction]
+        );
+      }
       await pushOnWrite("accounts", account.id);
       if (values.account_type === "investment") {
         void pushOnWrite("investment_accounts", account.id);

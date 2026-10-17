@@ -69,12 +69,6 @@ export function useCreateDebt() {
         contactId,
         amount: values.amount,
         date: values.date,
-        // debt_type === 'payable' berarti arah transfer adalah
-        // debt->kas, yang ambigu di applyDebtTransaction tanpa
-        // debtAction eksplisit — form ini SELALU berarti "utang baru",
-        // tidak pernah pelunasan (itu tugas form "Catat Pembayaran"
-        // yang terpisah), jadi dipaksa 'payable' di sini.
-        debtAction: values.debt_type === "payable" ? "payable" : null,
         settleDebtIds: [],
       });
 

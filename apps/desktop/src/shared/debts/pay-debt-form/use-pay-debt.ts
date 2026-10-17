@@ -48,10 +48,11 @@ function now() {
  *    lihat new-debt-form/schema.ts) — NULL cuma tersisa utk baris dari
  *    sync Retailku (`source = 'retailku_sync'`, keputusan terpisah,
  *    lihat audit-kepatuhan-konsep-tipe-akun.md pertanyaan #2):
- *    - **Ada `account_id`**, `cash`: membuat 1 transaksi transfer
- *      debt->kas lalu reuse `applyDebtTransaction` dengan
- *      `debtAction: 'settlement'` (jalur FIFO yang sudah ada, walau di
- *      sini kandidatnya cuma 1 debt).
+ *    - **Ada `account_id`**, `cash`: membuat 1 transaksi transfer (arah
+ *      tergantung `debt.type`, lihat konsep-utang-piutang.md tabel
+ *      Jalur 1) lalu reuse `applyDebtTransaction` yang otomatis memilih
+ *      jalur FIFO dari `direction` akun (walau di sini kandidatnya
+ *      cuma 1 debt).
  *    - **Ada `account_id`**, `non_cash`: transaksi `expense`/`income`
  *      penutup LANGSUNG pada `debt.account_id` (lihat poin 1) +
  *      `debt_payments` dengan `transaction_id` menunjuk transaksi itu.
@@ -173,26 +174,29 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
         return transactionId;
       }
 
-      // debt.account_id adalah akun `debt` milik baris ini — arah
-      // transfer SELALU debt -> kas untuk pelunasan, apa pun type-nya
-      // (receivable maupun payable, keduanya dilunasi dengan arah yang
-      // sama: uang keluar dari akun debt virtual ke akun kas nyata).
+      // Pelunasan piutang (receivable): debt -> kas (uang keluar dari
+      // akun debt virtual, masuk kas nyata). Pelunasan utang (payable):
+      // kas -> debt (kas keluar membayar, masuk ke akun debt virtual)
+      // -- arahnya BERBEDA tergantung type, lihat konsep-utang-piutang.md
+      // tabel Jalur 1.
+      const [accountId, transferAccountId] =
+        debt.type === "receivable" ? [debt.account_id, cashAccountId] : [cashAccountId, debt.account_id];
+
       await db.execute(
         `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
          VALUES ($1, 'transfer', $2, NULL, $3, $4, $5, NULL, $6, $7)`,
-        [transactionId, values.amount, debt.account_id, cashAccountId, values.note, values.date, debt.contact_id]
+        [transactionId, values.amount, accountId, transferAccountId, values.note, values.date, debt.contact_id]
       );
 
       const touchedDebtRows = await applyDebtTransaction({
         db,
         transactionId,
         type: "transfer",
-        accountId: debt.account_id,
-        transferAccountId: cashAccountId,
+        accountId,
+        transferAccountId,
         contactId: debt.contact_id,
         amount: values.amount,
         date: values.date,
-        debtAction: "settlement",
         settleDebtIds: [debt.id],
       });
 
