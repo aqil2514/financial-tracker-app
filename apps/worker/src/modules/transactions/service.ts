@@ -6,6 +6,7 @@ import {
   applyDebtEditAction,
   checkDebtEditAllowed,
   getTransactionDebtStatus,
+  resolveDebtTransactionOutcome,
   validateDebtSettlementAmount,
   validateDebtSelfSettlement,
   validateAccountPairSupported,
@@ -179,12 +180,31 @@ async function createTransactionRow(
   // transaksi sudah terlanjur tersimpan tanpa debt_payments terkait
   // (tidak atomic, D1 batch tidak cocok krn FIFO butuh baca-lalu-tulis
   // dua fase). Lihat validateDebtSettlementAmount di debts/service.ts.
-  if (payload.type === "transfer" && payload.debtAction === "settlement") {
-    const precheck = await validateDebtSettlementAmount(env, {
-      amount: payload.amount,
-      settleDebtIds: payload.settleDebtIds ?? [],
+  //
+  // REVISI 2026-10-17: apakah ini akan jadi settlement TIDAK LAGI
+  // ditentukan dari payload.debtAction (dihapus) -- di-resolve dari
+  // direction akun debt yang terlibat lewat resolveDebtTransactionOutcome
+  // (sama fungsi yang dipakai applyDebtTransaction sendiri, sumber
+  // kebenaran tunggal, lihat debt-account-direction.md).
+  if (payload.type === "transfer") {
+    const outcome = await resolveDebtTransactionOutcome(env, {
+      type: payload.type,
+      accountId: payload.accountId,
+      transferAccountId: payload.transferAccountId ?? null,
     });
-    if (precheck.status === "rejected") return precheck;
+    if (outcome.kind === "direction_missing") {
+      return {
+        status: "rejected",
+        reason: "Akun debt ini belum punya arah (Piutang/Utang) yang ditentukan -- lengkapi dulu lewat update_account sebelum dipakai di sini.",
+      };
+    }
+    if (outcome.kind === "settle") {
+      const precheck = await validateDebtSettlementAmount(env, {
+        amount: payload.amount,
+        settleDebtIds: payload.settleDebtIds ?? [],
+      });
+      if (precheck.status === "rejected") return precheck;
+    }
   }
 
   // Precheck oversell penjualan investasi (arah investment->cash) --
@@ -268,7 +288,6 @@ async function createTransactionRow(
       contactId: resolvedContactId,
       amount: payload.amount,
       date: payload.date,
-      debtAction: payload.debtAction ?? null,
       settleDebtIds: payload.settleDebtIds ?? [],
       syncSource,
     });
@@ -425,8 +444,22 @@ async function updateTransactionRow(
   const fieldsChanged = dangerousFieldsChanged(existing, payload, resolvedContactId);
 
   // Logic #3 pre-check -- sama alasannya dgn createTransactionRow: cegah
-  // UPDATE transaksi tersimpan sementara settlement-nya ditolak.
-  if (payload.type === "transfer" && payload.debtAction === "settlement") {
+  // UPDATE transaksi tersimpan sementara settlement-nya ditolak. REVISI
+  // 2026-10-17: outcome di-resolve sekali dari direction akun (bukan
+  // payload.debtAction, dihapus) lewat resolveDebtTransactionOutcome --
+  // dipakai ulang di precheck self-settlement di bawah juga.
+  const debtOutcome = await resolveDebtTransactionOutcome(env, {
+    type: payload.type,
+    accountId: payload.accountId,
+    transferAccountId: payload.transferAccountId ?? null,
+  });
+  if (debtOutcome.kind === "direction_missing") {
+    return {
+      status: "rejected",
+      reason: "Akun debt ini belum punya arah (Piutang/Utang) yang ditentukan -- lengkapi dulu lewat update_account sebelum dipakai di sini.",
+    };
+  }
+  if (debtOutcome.kind === "settle") {
     const precheck = await validateDebtSettlementAmount(env, {
       amount: payload.amount,
       settleDebtIds: payload.settleDebtIds ?? [],
@@ -486,7 +519,7 @@ async function updateTransactionRow(
   // piutang MILIK transaksi ini sendiri (role 'principal') -- baris itu
   // akan dihapus duluan oleh applyDebtEditAction sebelum settleDebtsFifo
   // sempat membacanya, gagal senyap kalau lolos sampai situ.
-  if (payload.type === "transfer" && payload.debtAction === "settlement") {
+  if (debtOutcome.kind === "settle") {
     const selfSettlementPrecheck = validateDebtSelfSettlement(debtStatus, payload.settleDebtIds ?? []);
     if (selfSettlementPrecheck.status === "rejected") return selfSettlementPrecheck;
   }
@@ -570,7 +603,6 @@ async function updateTransactionRow(
       contactId: resolvedContactId,
       amount: payload.amount,
       date: payload.date,
-      debtAction: payload.debtAction ?? null,
       settleDebtIds: payload.settleDebtIds ?? [],
       syncSource,
       status: debtStatus,

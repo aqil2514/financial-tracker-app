@@ -16,11 +16,18 @@ export function registerCreateDebtDirect(server: McpServer) {
     {
       title: "Catat Piutang/Utang Langsung",
       description:
-        "Catat piutang/utang BARU tanpa transaksi kas apa pun -- untuk uang yang sudah berpindah DI LUAR app (pinjam tunai, barter, piutang lama). accountId wajib menunjuk akun bertipe 'debt'. Untuk piutang/utang yang lahir dari transfer kas<->debt, gunakan create_transaction dengan type=transfer.",
+        "Catat piutang/utang BARU tanpa transaksi kas apa pun -- untuk uang yang sudah berpindah DI LUAR app (pinjam tunai, barter, piutang lama). accountId wajib menunjuk akun bertipe 'debt' YANG ARAHNYA SAMA dengan `type` -- tiap akun debt punya arah TETAP (HANYA piutang atau HANYA utang), cek field `debtDirection` dari get_account_balances SEBELUM memanggil tool ini kalau tidak yakin arah akunnya, akun dengan arah berlawanan akan DITOLAK. Tool ini SELALU melahirkan piutang/utang baru -- untuk MELUNASI piutang/utang yang sudah ada tanpa uang berpindah, gunakan pay_debt_non_cash; untuk pelunasan lewat akun kas, gunakan create_transaction dengan type=transfer.",
       inputSchema: z.object({
-        type: z.enum(["receivable", "payable"]).describe("receivable = saya meminjamkan, payable = saya berutang"),
+        type: z
+          .enum(["receivable", "payable"])
+          .describe(
+            "receivable = saya meminjamkan, payable = saya berutang -- HARUS sama dengan arah accountId yang dipilih, kalau beda akan ditolak"
+          ),
         amount: z.number().positive(),
-        accountId: z.string().min(1, "Akun wajib diisi").describe("Akun bertipe 'debt'"),
+        accountId: z
+          .string()
+          .min(1, "Akun wajib diisi")
+          .describe("Akun bertipe 'debt' yang arahnya SAMA dengan type -- bukan sekadar akun bertipe 'debt' apa pun"),
         date: dateField,
         note: z.string().optional(),
         contactId: z.string().optional().describe("ID kontak, menang kalau diisi bareng contactName"),

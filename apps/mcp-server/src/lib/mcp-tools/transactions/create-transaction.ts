@@ -19,14 +19,12 @@ export const transactionFields = {
     .string()
     .optional()
     .describe("Nama kontak bahasa natural, di-resolve Worker (get-or-create) kalau contactId kosong"),
-  debtAction: z
-    .enum(["settlement", "payable"])
-    .optional()
-    .describe("Wajib diisi kalau transfer dari akun debt ke akun cash (ambigu pelunasan vs utang baru)"),
   settleDebtIds: z
     .array(z.string())
     .optional()
-    .describe("ID piutang/utang yang dilunasi, hanya dipakai saat debtAction=settlement"),
+    .describe(
+      "ID piutang/utang (debts.id) yang dilunasi -- WAJIB diisi kalau transfer ini ternyata arahnya pelunasan (ditentukan otomatis dari arah akun debt yang dipakai, cek debtDirection via get_account_balances kalau tidak yakin). Diabaikan kalau arahnya ternyata melahirkan piutang/utang baru."
+    ),
   unit: z
     .number()
     .optional()
@@ -53,7 +51,7 @@ export function registerCreateTransaction(server: McpServer) {
     {
       title: "Catat Transaksi",
       description:
-        "Catat transaksi baru (income/expense/transfer). Untuk catat/bayar piutang-utang, gunakan type=transfer dengan accountId/transferAccountId yang melibatkan akun bertipe debt, plus debtAction & settleDebtIds kalau perlu.",
+        "Catat transaksi baru (income/expense/transfer). Untuk catat/bayar piutang-utang lewat akun kas, gunakan type=transfer dengan accountId/transferAccountId yang melibatkan akun bertipe debt -- arah (melahirkan piutang/utang baru ATAU melunasi yang sudah ada) ditentukan OTOMATIS dari arah tetap akun debt tersebut (`debtDirection`, cek via get_account_balances), BUKAN pilihan manual. Isi settleDebtIds kalau ternyata arahnya pelunasan (akan ditolak dengan pesan jelas kalau salah/belum diisi).",
       inputSchema: z.object(transactionFields),
     },
     async (args, ctx) => {

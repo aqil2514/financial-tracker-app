@@ -23,13 +23,18 @@ export type PushTransactionPayload = {
   // (lihat resolveContactId call-site di service.ts). Resolve terjadi di
   // Worker (get-or-create by name case-insensitive), BUKAN di mcp-server.
   contactName?: string;
-  // Hanya relevan saat type='transfer' DAN arah debt->cash (ambigu
-  // antara pelunasan piutang existing vs utang baru) -- lihat logic
-  // #1 di mcp-server-business-logic-audit.md, port dari
-  // apply-debt-transaction.ts (ApplyDebtTransactionInput).
+  // DEAD FIELD sejak REVISI 2026-10-17 (docs/todos/plan/debt-account-direction.md)
+  // -- dulu dipakai menentukan arah debt-cash (utang baru vs pelunasan),
+  // SEKARANG arah itu otomatis dari `debt_accounts.direction`
+  // (resolveDebtTransactionOutcome, debts/service.ts), Worker TIDAK
+  // PERNAH membaca field ini lagi. Dipertahankan di schema (bukan field
+  // wajib, sekadar diabaikan kalau dikirim) demi kompatibilitas payload
+  // lama -- desktop (push-transaction.ts) tetap punya tipe ini di
+  // kontraknya tapi SUDAH TIDAK PERNAH mengisinya (dikonfirmasi dead di
+  // sisi desktop juga).
   debtAction?: "settlement" | "payable" | null;
-  // debts.id yang dipilih utk dilunasi, cuma dipakai saat
-  // debtAction === 'settlement'.
+  // debts.id yang dipilih utk dilunasi -- dipakai kalau
+  // resolveDebtTransactionOutcome menyimpulkan arah ini settlement.
   settleDebtIds?: string[];
   // Hanya relevan saat type='transfer' DAN arah cash->investment (lahir
   // baris investment_purchases) ATAU investment->cash (lahir baris

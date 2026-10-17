@@ -9,7 +9,8 @@ export function registerGetAccountBalances(server: McpServer) {
     "get_account_balances",
     {
       title: "Saldo Akun",
-      description: "Lihat saldo semua akun (atau satu akun tertentu kalau accountId diisi).",
+      description:
+        "Lihat saldo semua akun (atau satu akun tertentu kalau accountId diisi). Akun bertipe 'debt' menyertakan `debtDirection` ('receivable'/'payable'/null) -- cek ini SEBELUM memanggil create_debt_direct untuk akun tersebut, arah yang salah akan ditolak.",
       inputSchema: z.object({
         accountId: z.string().optional().describe("ID akun spesifik, kosongkan untuk semua akun"),
       }),
@@ -26,6 +27,9 @@ export function registerGetAccountBalances(server: McpServer) {
         snapshot.accountGroups.filter((g) => g.deletedAt === null).map((g) => [g.id, g.name])
       );
       const labelNamesByAccountId = buildLabelNameLookup(snapshot.accountLabels, snapshot.labels, (row) => row.accountId);
+      const directionByAccountId = new Map(
+        snapshot.debtAccounts.filter((d) => d.deletedAt === null).map((d) => [d.accountId, d.direction])
+      );
 
       const result = accounts.map((a) => ({
         id: a.id,
@@ -37,6 +41,10 @@ export function registerGetAccountBalances(server: McpServer) {
         balance: computeAccountBalance(snapshot, a.id),
         updatedAt: a.updatedAt,
         labelNames: labelNamesByAccountId.get(a.id) ?? [],
+        // Hanya terisi utk accountType === 'debt' -- arah TETAP akun ini
+        // (receivable/payable), WAJIB cocok dengan `type` saat memanggil
+        // create_debt_direct. `null` kalau akun debt belum diset arahnya.
+        debtDirection: a.accountType === "debt" ? (directionByAccountId.get(a.id) ?? null) : undefined,
       }));
 
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

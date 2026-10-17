@@ -36,6 +36,13 @@ export type AccountPayload = {
   // dari use-create-account.ts/use-update-account.ts desktop.
   unitLabel?: string | null;
   currentMarketValue?: number | null;
+  // Hanya relevan saat accountType === 'debt' (lihat debt_accounts) --
+  // port dari field "Arah" use-create-account.ts/use-update-account.ts
+  // desktop. WAJIB diisi untuk akun debt (createDirectDebt menolak akun
+  // tanpa direction), tapi tidak divalidasi di sini -- upsertAccount
+  // yang menegakkan, supaya payload lama/caller lain yang belum kirim
+  // field ini tidak membuat SEMUA request akun gagal validasi bentuk.
+  direction?: "receivable" | "payable" | null;
 };
 
 export function isAccountPayload(value: unknown): value is AccountPayload {
@@ -54,7 +61,8 @@ export function isAccountPayload(value: unknown): value is AccountPayload {
     (v.color === undefined || v.color === null || typeof v.color === "string") &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt)) &&
     (v.unitLabel === undefined || v.unitLabel === null || typeof v.unitLabel === "string") &&
-    (v.currentMarketValue === undefined || v.currentMarketValue === null || typeof v.currentMarketValue === "number")
+    (v.currentMarketValue === undefined || v.currentMarketValue === null || typeof v.currentMarketValue === "number") &&
+    (v.direction === undefined || v.direction === null || v.direction === "receivable" || v.direction === "payable")
   );
 }
 

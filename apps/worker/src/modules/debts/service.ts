@@ -22,11 +22,11 @@ export type ApplyDebtTransactionInput = {
   contactId: string | null;
   amount: number;
   date: string;
-  // Hanya relevan saat arah transfer adalah debt->cash (ambigu antara
-  // pelunasan piutang existing vs utang baru).
-  debtAction: "settlement" | "payable" | null;
-  // debts.id yang dipilih utk dilunasi -- cuma dipakai saat
-  // debtAction === 'settlement'.
+  // debts.id yang dipilih utk dilunasi -- cuma dipakai kalau
+  // resolveDebtTransactionOutcome menyimpulkan kind: 'settle' (lihat di
+  // bawah). TIDAK ada lagi `debtAction` -- arah lahir-baru vs pelunasan
+  // SEKARANG otomatis dari `debt_accounts.direction`, bukan pilihan
+  // manual client (REVISI 2026-10-17).
   settleDebtIds: string[];
   // Provenance utk baris debts/debt_payments yg di-insert di sini --
   // derive dari token request (shared/auth.ts), BUKAN dari payload client.
@@ -207,15 +207,91 @@ export async function getAccountType(env: Env, accountId: string): Promise<strin
   return row?.account_type ?? null;
 }
 
+// Port dari apply-debt-transaction/create.ts (requireDebtAccountDirection)
+// desktop -- satu-satunya sumber kebenaran arah piutang/utang akun debt,
+// lihat docs/concept/konsep-utang-piutang.md. `null` kalau akun belum
+// punya baris `debt_accounts` sama sekali (migrasi lama belum sempat
+// backfill, atau akun dibuat lewat caller yang belum kirim field
+// `direction` -- lihat accounts/service.ts upsertAccount).
+async function getDebtAccountDirection(
+  env: Env,
+  accountId: string
+): Promise<"receivable" | "payable" | null> {
+  const row = await env.DB.prepare(
+    "SELECT direction FROM debt_accounts WHERE account_id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(accountId)
+    .first<{ direction: "receivable" | "payable" }>();
+  return row?.direction ?? null;
+}
+
+// REVISI 2026-10-17 (docs/todos/plan/debt-account-direction.md): arah
+// piutang/utang SEKARANG ditentukan dari `debt_accounts.direction`
+// (SATU-SATUNYA sumber kebenaran, sama persis desktop
+// apply-debt-transaction/create.ts), BUKAN lagi dari `debtAction` yang
+// dikirim client -- param itu DIHAPUS dari input/logic di sini (tetap
+// ada di schema PushTransactionPayload demi kompatibilitas field lama,
+// tapi tidak pernah dibaca lagi). Resolusi:
+// - cash-debt + direction='receivable': piutang baru (perilaku lama).
+// - cash-debt + direction='payable': pelunasan utang (FIFO) -- BARU,
+//   sebelumnya selalu salah hardcode jadi piutang baru.
+// - debt-cash + direction='payable': utang baru -- hasil akhir SAMA
+//   seperti debtAction='payable' lama, sekarang otomatis.
+// - debt-cash + direction='receivable': pelunasan piutang (FIFO) --
+//   hasil akhir SAMA seperti debtAction='settlement' lama.
+// - debt -> debt / cash -> cash / *-investment: no-op (di luar scope).
+export type DebtTransactionOutcome =
+  | { kind: "noop" }
+  | { kind: "create"; type: "receivable" | "payable"; debtAccountId: string }
+  | { kind: "settle"; debtAccountId: string }
+  | { kind: "direction_missing"; debtAccountId: string };
+
+// Dipanggil SEBELUM insert/update baris `transactions` (precheck di
+// transactions/service.ts) UNTUK TAHU apakah kombinasi ini akan jadi
+// settlement (butuh validateDebtSettlementAmount lebih dulu demi
+// atomicity, lihat komentar createTransactionRow) -- TANPA menulis apa
+// pun. `direction_missing` kalau akun debt yang terlibat belum punya
+// `direction` ter-set (caller memutuskan reject/lanjut). `debtAccountId`
+// disertakan di tiap outcome non-noop supaya caller tidak perlu query
+// ulang `getAccountType` utk tahu akun debt mana yang relevan.
+export async function resolveDebtTransactionOutcome(
+  env: Env,
+  input: Pick<ApplyDebtTransactionInput, "type" | "accountId" | "transferAccountId">
+): Promise<DebtTransactionOutcome> {
+  const { type, accountId, transferAccountId } = input;
+  if (type !== "transfer" || transferAccountId == null) return { kind: "noop" };
+
+  const [sourceType, destinationType] = await Promise.all([
+    getAccountType(env, accountId),
+    getAccountType(env, transferAccountId),
+  ]);
+  if (sourceType == null || destinationType == null) return { kind: "noop" };
+
+  const pairKind = classifyAccountPair(sourceType, destinationType);
+  if (
+    pairKind === "cash-cash" ||
+    pairKind === "debt-debt" ||
+    pairKind === "cash-investment" ||
+    pairKind === "investment-cash"
+  ) {
+    return { kind: "noop" };
+  }
+
+  const debtAccountId = pairKind === "cash-debt" ? transferAccountId : accountId;
+  const direction = await getDebtAccountDirection(env, debtAccountId);
+  if (direction == null) return { kind: "direction_missing", debtAccountId };
+
+  const createsNewDebt =
+    (pairKind === "cash-debt" && direction === "receivable") || (pairKind === "debt-cash" && direction === "payable");
+  return createsNewDebt ? { kind: "create", type: direction, debtAccountId } : { kind: "settle", debtAccountId };
+}
+
 // Logic bisnis #1 dari mcp-server-business-logic-audit.md, port PERSIS
-// dari apps/desktop/src/shared/debts/apply-debt-transaction.ts
-// (applyDebtTransaction). Setelah baris `transactions` tersimpan,
-// deteksi apakah transfer ini melibatkan akun `account_type='debt'`
-// dan buat/update `debts`/`debt_payments` sesuai arah:
-// - cash -> debt: piutang baru (type='receivable').
-// - debt -> cash: WAJIB `debtAction` eksplisit -- 'payable' (utang
-//   baru) atau 'settlement' (lunasi piutang existing, FIFO).
-// - debt -> debt / cash -> cash: no-op (di luar scope).
+// dari apps/desktop/src/shared/debts/apply-debt-transaction/create.ts
+// (applyDebtTransaction) setelah revisi arah berbasis `direction` --
+// lihat komentar `resolveDebtTransactionOutcome` di atas. Setelah baris
+// `transactions` tersimpan, deteksi apakah transfer ini melibatkan akun
+// `account_type='debt'` dan buat/update `debts`/`debt_payments`.
 //
 // BEDA dari desktop: modul ini adalah PEMILIK logic (dipanggil dari
 // transactions/service.ts sbg PEMICU, lihat
@@ -224,88 +300,50 @@ export async function applyDebtTransaction(
   env: Env,
   input: ApplyDebtTransactionInput
 ): Promise<ApplyDebtTransactionResult> {
-  const {
-    transactionId,
-    type,
-    accountId,
-    transferAccountId,
-    contactId,
-    amount,
-    date,
-    debtAction,
-    settleDebtIds,
-    syncSource,
-  } = input;
+  const { transactionId, contactId, amount, date, settleDebtIds, syncSource } = input;
 
-  if (type !== "transfer" || transferAccountId == null) return { status: "ok" };
+  const outcome = await resolveDebtTransactionOutcome(env, input);
 
-  const [sourceType, destinationType] = await Promise.all([
-    getAccountType(env, accountId),
-    getAccountType(env, transferAccountId),
-  ]);
-  if (sourceType == null || destinationType == null) {
-    return { status: "rejected", reason: "Akun sumber/tujuan transfer tidak ditemukan." };
-  }
+  if (outcome.kind === "noop") return { status: "ok" };
 
-  // Sudah dicegat lebih dulu oleh validateAccountPairSupported (dipanggil
-  // SEBELUM insert/update transaksi di transactions/service.ts) -- throw
-  // di sini murni safety net, seharusnya tidak pernah tercapai.
-  const pairKind = classifyAccountPair(sourceType, destinationType);
-
-  if (
-    pairKind === "cash-cash" ||
-    pairKind === "debt-debt" ||
-    pairKind === "cash-investment" ||
-    pairKind === "investment-cash"
-  ) {
-    // "kas -> kas" (bukan urusan debt) ATAU "debt -> debt" (di luar
-    // scope) ATAU pasangan investment (BUKAN urusan modul debts --
-    // modul investments/ terpisah yang jadi pemilik logic itu, lihat
-    // docs/todos/plan/investment-sync.md Tahap 2) -- tidak melakukan
-    // apa-apa DI SINI.
-    return { status: "ok" };
+  if (outcome.kind === "direction_missing") {
+    return {
+      status: "rejected",
+      reason: "Akun debt ini belum punya arah (Piutang/Utang) yang ditentukan -- lengkapi dulu lewat update_account sebelum dipakai di sini.",
+    };
   }
 
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
 
-  if (pairKind === "cash-debt") {
-    // Kas -> Debt: piutang baru, tidak ambigu.
+  if (outcome.kind === "create") {
     await env.DB.prepare(
       `INSERT INTO debts
          (id, type, contact_id, amount, account_id, transaction_id, date, created_at, updated_at, sync_source)
-       VALUES (?1, 'receivable', ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8)`
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8, ?9)`
     )
-      .bind(uuidv7(), contactId, amount, transferAccountId, transactionId, date, now, syncSource)
+      .bind(uuidv7(), outcome.type, contactId, amount, outcome.debtAccountId, transactionId, date, now, syncSource)
       .run();
     return { status: "ok" };
   }
 
-  // pairKind === "debt-cash" (satu-satunya variant tersisa setelah guard
-  // no-op di atas menyaring cash-cash/debt-debt/cash-investment/
-  // investment-cash): butuh keputusan eksplisit dari caller.
-  if (debtAction === "payable") {
-    await env.DB.prepare(
-      `INSERT INTO debts
-         (id, type, contact_id, amount, account_id, transaction_id, date, created_at, updated_at, sync_source)
-       VALUES (?1, 'payable', ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8)`
-    )
-      .bind(uuidv7(), contactId, amount, accountId, transactionId, date, now, syncSource)
-      .run();
-    return { status: "ok" };
-  }
-
-  if (debtAction === "settlement") {
-    try {
-      await settleDebtsFifo(env, { transactionId, accountId, amount, date, settleDebtIds, syncSource });
-    } catch (err) {
-      if (err instanceof DebtSettlementExceedsRemainingError) {
-        return {
-          status: "rejected",
-          reason: "Nominal pelunasan melebihi total sisa piutang/utang yang dipilih.",
-        };
-      }
-      throw err;
+  // outcome.kind === "settle"
+  try {
+    await settleDebtsFifo(env, {
+      transactionId,
+      accountId: outcome.debtAccountId,
+      amount,
+      date,
+      settleDebtIds,
+      syncSource,
+    });
+  } catch (err) {
+    if (err instanceof DebtSettlementExceedsRemainingError) {
+      return {
+        status: "rejected",
+        reason: "Nominal pelunasan melebihi total sisa piutang/utang yang dipilih.",
+      };
     }
+    throw err;
   }
 
   return { status: "ok" };
@@ -564,6 +602,25 @@ export async function createDirectDebt(
     };
   }
 
+  // Validasi direction vs type -- docs/todos/plan/debt-account-direction.md
+  // "Worker + MCP juga kena gap yang sama". Mode 'direct' di jalur ini
+  // SELALU "lahir baru" (tidak ada cabang pelunasan/FIFO, beda dari
+  // applyDirectDebtTransaction desktop) -- direction akun jadi
+  // SATU-SATUNYA type yang valid, tidak ada ambiguitas.
+  const direction = await getDebtAccountDirection(env, payload.accountId);
+  if (direction == null) {
+    return {
+      status: "rejected",
+      reason: "Akun debt ini belum punya arah (Piutang/Utang) yang ditentukan -- lengkapi dulu lewat update_account sebelum dipakai di sini.",
+    };
+  }
+  if (payload.type !== direction) {
+    return {
+      status: "rejected",
+      reason: `Akun ini arahnya '${direction}', tidak cocok dengan type '${payload.type}' yang dikirim.`,
+    };
+  }
+
   const resolvedContactId = payload.contactId ?? (await resolveContactId(env, payload.contactName ?? null, syncSource));
 
   if (existing) {
@@ -677,7 +734,7 @@ async function createDebtClosingTransaction(
         created_at, updated_at, sync_source)
      VALUES (?1, ?2, ?3, NULL, ?4, NULL, ?5, ?6, NULL, ?7, ?8, ?8, ?9)`
   )
-    .bind(transactionId, transactionType, amount, debt.account_id, note, date, debt.contact_id, now, syncSource)
+    .bind(transactionId, transactionType, amount, debt.account_id, note ?? "", date, debt.contact_id, now, syncSource)
     .run();
 
   return transactionId;

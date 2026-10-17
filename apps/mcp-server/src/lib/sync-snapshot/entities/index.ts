@@ -7,6 +7,7 @@ export type {
   CategoryPeriod,
   Contact,
   Debt,
+  DebtAccount,
   DebtPayment,
   InvestmentAccount,
   InvestmentPurchase,

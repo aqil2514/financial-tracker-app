@@ -7,6 +7,7 @@ import { fetchAccounts, type AccountRow } from "./entities/accounts";
 import { fetchTransactions, type TransactionRow } from "./entities/transactions";
 import { fetchDebts, type DebtRow } from "./entities/debts";
 import { fetchDebtPayments, type DebtPaymentRow } from "./entities/debt-payments";
+import { fetchDebtAccounts, type DebtAccountRow } from "./entities/debt-accounts";
 import { fetchInvestmentAccounts, type InvestmentAccountRow } from "./entities/investment-accounts";
 import { fetchInvestmentPurchases, type InvestmentPurchaseRow } from "./entities/investment-purchases";
 import { fetchInvestmentSales, type InvestmentSaleRow } from "./entities/investment-sales";
@@ -25,6 +26,7 @@ export type SyncResponse = {
   transactions: TransactionRow[];
   debts: DebtRow[];
   debtPayments: DebtPaymentRow[];
+  debtAccounts: DebtAccountRow[];
   investmentAccounts: InvestmentAccountRow[];
   investmentPurchases: InvestmentPurchaseRow[];
   investmentSales: InvestmentSaleRow[];
@@ -48,6 +50,7 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     transactions,
     debts,
     debtPayments,
+    debtAccounts,
     investmentAccounts,
     investmentPurchases,
     investmentSales,
@@ -64,6 +67,7 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     fetchTransactions(env, filter, bind),
     fetchDebts(env, filter, bind),
     fetchDebtPayments(env, filter, bind),
+    fetchDebtAccounts(env, filter, bind),
     fetchInvestmentAccounts(env, filter, bind),
     fetchInvestmentPurchases(env, filter, bind),
     fetchInvestmentSales(env, filter, bind),
@@ -83,6 +87,7 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     transactions,
     debts,
     debtPayments,
+    debtAccounts,
     investmentAccounts,
     investmentPurchases,
     investmentSales,

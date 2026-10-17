@@ -158,6 +158,39 @@ export async function upsertAccount(
     }
   }
 
+  // Pola identik blok investment_accounts di atas -- port dari
+  // use-create-account.ts/use-update-account.ts desktop (field "Arah").
+  // `direction === undefined` di-SKIP (bukan ditolak 422), alasan sama
+  // persis `unitLabel`: desktop kirim `accounts` dan `debt_accounts`
+  // sbg 2 request terpisah, payload /accounts TIDAK PERNAH membawa
+  // direction -- menolaknya di sini akan memblokir SEMUA akun debt yang
+  // dibuat dari desktop. "WAJIB ada direction" ditegakkan di
+  // createDirectDebt (debts/service.ts), bukan di sini.
+  if (payload.accountType === "debt" && payload.direction !== undefined && payload.direction !== null) {
+    const existingDebtAccount = await env.DB.prepare(
+      "SELECT account_id FROM debt_accounts WHERE account_id = ?1"
+    )
+      .bind(payload.id)
+      .first<{ account_id: string }>();
+
+    if (existingDebtAccount) {
+      await env.DB.prepare(
+        `UPDATE debt_accounts
+         SET direction = ?1, updated_at = ?2, deleted_at = NULL
+         WHERE account_id = ?3`
+      )
+        .bind(payload.direction, now, payload.id)
+        .run();
+    } else {
+      await env.DB.prepare(
+        `INSERT INTO debt_accounts (account_id, direction, created_at, updated_at, sync_source)
+         VALUES (?1, ?2, ?3, ?3, ?4)`
+      )
+        .bind(payload.id, payload.direction, now, syncSource)
+        .run();
+    }
+  }
+
   return { status: "ok", id: payload.id };
 }
 

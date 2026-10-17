@@ -76,6 +76,13 @@ export type DebtPayment = {
   deletedAt: string | null;
 };
 
+export type DebtAccount = {
+  accountId: string;
+  direction: "receivable" | "payable";
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
 export type InvestmentAccount = {
   accountId: string;
   unitLabel: string;
@@ -162,6 +169,7 @@ export type SyncSnapshot = {
   transactions: Transaction[];
   debts: Debt[];
   debtPayments: DebtPayment[];
+  debtAccounts: DebtAccount[];
   investmentAccounts: InvestmentAccount[];
   investmentPurchases: InvestmentPurchase[];
   investmentSales: InvestmentSale[];
