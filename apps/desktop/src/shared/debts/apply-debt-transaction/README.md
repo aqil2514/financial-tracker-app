@@ -108,20 +108,56 @@ bagian "Jalur 2":
 `DebtAccountDirectionMissingError` sama seperti `create.ts` — akun
 debt wajib sudah punya `direction` ter-set.
 
-**Scope saat ini: CREATE saja.** `update-transaction/income|expense/debt.ts`
-(edit transaksi existing) BELUM direvisi — masih hardcode `'receivable'`/
-`'payable'` seperti create yang lama. Diputuskan sengaja dipisah
-(keputusan user 2026-10-17): scope edit lebih kompleks, perlu redesign
-alur ganti "debt baru" <-> "pelunasan" saat field berbahaya transaksi
-diedit (tipe/akun/nominal berubah pada transaksi yang sudah py
-`debts`/`debt_payments` terkait) — didaftarkan sebagai TODO terpisah di
-[docs/todos/plan/debt-account-direction.md](../../../../../docs/todos/plan/debt-account-direction.md).
-
 **`sourceType == null || destinationType == null` → throw** — null
 berarti akun sudah terhapus di antara submit form dan titik ini (race),
 BUKAN tipe akun baru — beda kasus dari `UnsupportedAccountPairError`
 yang dilempar `classifyAccountPair` untuk kombinasi tipe akun yang
 memang belum didukung.
+
+## apply-direct-debt-transaction-edit.ts
+
+`applyDirectDebtTransactionEdit` — versi `applyDirectDebtTransaction`
+untuk jalur EDIT transaksi income/expense langsung di akun debt,
+struktur IDENTIK `edit.ts` (`applyDebtTransactionEdit`) tapi
+mendelegasikan ke `applyDirectDebtTransaction`, bukan
+`applyDebtTransaction`. `DebtEditBlockedError`/`DebtSelfSettlementError`
+diimpor ulang dari `edit.ts` (pesannya generik, tidak menyebut
+"transfer", jadi aman dipakai lintas Jalur 1/2 tanpa duplikasi):
+
+- `status.role === 'none'`: sama seperti create, langsung
+  `applyDirectDebtTransaction`.
+- `role === 'principal'` + field berbahaya TIDAK berubah: sinkronkan
+  `debts.date` saja.
+- `principal` + field berbahaya berubah + `hasPayments`: BLOKIR
+  (`DebtEditBlockedError`).
+- `principal` + field berbahaya berubah + belum dicicil: recreate —
+  hapus `debts` lama, `applyDirectDebtTransaction` dari nilai baru.
+  `settleDebtIds` yang menyertakan `debts.id` miliknya sendiri ditolak
+  (`DebtSelfSettlementError`).
+- `role === 'payment'` + field berbahaya TIDAK berubah: sinkronkan
+  `debt_payments.date` saja.
+- `payment` + field berbahaya berubah: hapus `debt_payments` lama,
+  revert `debts.status` ke `'ongoing'` kalau perlu, lalu
+  `applyDirectDebtTransaction` dari nilai baru.
+
+Dipanggil dari `updateDirectDebtIncome`/`Expense`
+(`features/transactions/.../update-transaction/income|expense/debt.ts`).
+**Revisi 2026-10-17**: sebelumnya kedua file itu implementasi manual
+sendiri (branch `status.role` + `INSERT INTO debts` hardcode
+`'receivable'`/`'payable'`, SAMA bug-nya dengan `create-transaction`
+versi lama) dan secara eksplisit MENOLAK `status.role === 'payment'`
+(`throw new Error(...)`) — padahal edit transaksi yang berperan sebagai
+cicilan seharusnya aman di-recreate (tidak ada yang bergantung pada
+satu baris `debt_payments`), sama seperti jalur transfer. Guard
+penolakan itu DIHAPUS, `applyDirectDebtTransactionEdit` sekarang
+menangani ketiga role dengan benar.
+
+`debts.note` TIDAK lagi diisi dari `values.note` (beda dari
+implementasi lama) — `createDebt` yang dipakai ulang dari `create.ts`
+tidak menerima parameter note, konsisten dengan Jalur 1 yang sejak awal
+tidak pernah mengisi kolom ini (catatan transaksi tetap bisa diakses
+lewat `debts.transaction_id` → `transactions.note`). Keputusan eksplisit
+user (2026-10-17): diterima, tidak perlu ditambahkan balik.
 
 ## edit.ts
 
