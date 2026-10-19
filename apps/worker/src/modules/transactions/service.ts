@@ -247,8 +247,8 @@ async function createTransactionRow(
     `INSERT INTO transactions
        (id, type, amount, category_id, account_id, transfer_account_id,
         note, date, description, contact_id, created_at, updated_at, sync_source,
-        source, source_ref)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        source, source_ref, is_cash_neutral)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       payload.id,
@@ -265,7 +265,8 @@ async function createTransactionRow(
       updatedAt,
       syncSource,
       payload.source ?? "manual",
-      payload.source !== undefined ? payload.sourceRef ?? null : null
+      payload.source !== undefined ? payload.sourceRef ?? null : null,
+      payload.isCashNeutral ? 1 : 0
     )
     .run();
 
@@ -561,7 +562,8 @@ async function updateTransactionRow(
      SET type = ?1, amount = ?2, category_id = ?3, account_id = ?4, transfer_account_id = ?5,
          note = ?6, date = ?7, description = ?8, contact_id = ?9, updated_at = ?10, deleted_at = NULL,
          source = CASE WHEN ?12 = 1 THEN ?13 ELSE source END,
-         source_ref = CASE WHEN ?12 = 1 THEN ?14 ELSE source_ref END
+         source_ref = CASE WHEN ?12 = 1 THEN ?14 ELSE source_ref END,
+         is_cash_neutral = CASE WHEN ?15 = 1 THEN ?16 ELSE is_cash_neutral END
      WHERE id = ?11`
   )
     .bind(
@@ -578,7 +580,9 @@ async function updateTransactionRow(
       id,
       payload.source !== undefined ? 1 : 0,
       payload.source ?? "manual",
-      payload.source !== undefined ? payload.sourceRef ?? null : null
+      payload.source !== undefined ? payload.sourceRef ?? null : null,
+      payload.isCashNeutral !== undefined ? 1 : 0,
+      payload.isCashNeutral ? 1 : 0
     )
     .run();
 

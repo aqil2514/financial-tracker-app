@@ -15,6 +15,7 @@ export type TransactionRow = {
   sourceRef: string | null;
   updatedAt: string | null;
   deletedAt: string | null;
+  isCashNeutral: boolean;
 };
 
 type TransactionDbRow = {
@@ -32,12 +33,13 @@ type TransactionDbRow = {
   source_ref: string | null;
   updated_at: string | null;
   deleted_at: string | null;
+  is_cash_neutral: number;
 };
 
 export async function fetchTransactions(env: Env, filter: string, bind: unknown[]): Promise<TransactionRow[]> {
   const { results } = await env.DB.prepare(
     `SELECT id, type, amount, category_id, account_id, transfer_account_id, note, date, description,
-            contact_id, source, source_ref, updated_at, deleted_at
+            contact_id, source, source_ref, updated_at, deleted_at, is_cash_neutral
      FROM transactions ${filter}`
   )
     .bind(...bind)
@@ -58,5 +60,6 @@ export async function fetchTransactions(env: Env, filter: string, bind: unknown[
     sourceRef: r.source_ref,
     updatedAt: r.updated_at,
     deletedAt: r.deleted_at,
+    isCashNeutral: r.is_cash_neutral === 1,
   }));
 }

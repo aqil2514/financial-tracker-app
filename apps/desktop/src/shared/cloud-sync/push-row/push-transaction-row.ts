@@ -19,9 +19,10 @@ export async function pushTransactionRow(creds: CloudSyncCredentials, id: string
       source: "manual" | "retailku_sync";
       source_ref: string | null;
       updated_at: string | null;
+      is_cash_neutral: number;
     }[]
   >(
-    "SELECT id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, source, source_ref, updated_at FROM transactions WHERE id = $1",
+    "SELECT id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, source, source_ref, updated_at, is_cash_neutral FROM transactions WHERE id = $1",
     [id]
   );
   const row = rows[0];
@@ -40,5 +41,6 @@ export async function pushTransactionRow(creds: CloudSyncCredentials, id: string
     source: row.source,
     sourceRef: row.source_ref,
     updatedAt: row.updated_at ?? undefined,
+    isCashNeutral: row.is_cash_neutral === 1,
   });
 }

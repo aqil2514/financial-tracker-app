@@ -19,6 +19,7 @@ export function getCategoryPeriodSummary(
   const transactions = snapshot.transactions.filter(
     (t) =>
       isAlive(t) &&
+      !t.isCashNeutral &&
       t.categoryId !== null &&
       period.categoryIds.includes(t.categoryId) &&
       datePart(t.date) >= period.startDate &&

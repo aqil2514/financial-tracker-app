@@ -1,0 +1,1 @@
+ALTER TABLE transactions ADD COLUMN is_cash_neutral INTEGER NOT NULL DEFAULT 0;

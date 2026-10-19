@@ -14,8 +14,10 @@ export function useBalanceCorrectionForm(
     correctBalance.mutate(
       {
         accountId: account.id,
+        accountType: account.account_type,
         targetBalance: values.targetBalance,
         currentBalance: account.balance,
+        countAsCash: values.countAsCash,
       },
       { onSuccess: () => onOpenChange(false) }
     );

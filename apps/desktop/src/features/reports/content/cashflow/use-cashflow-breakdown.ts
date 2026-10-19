@@ -39,7 +39,7 @@ const QUERY_BY_GROUP_BY: Record<CashflowGroupBy, string> = {
     FROM transactions t
     JOIN accounts a ON a.id = t.account_id
     LEFT JOIN account_groups g ON g.id = a.group_id
-    WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3
+    WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3 AND t.is_cash_neutral = 0
     GROUP BY g.id
     ORDER BY total DESC
   `,
@@ -51,7 +51,7 @@ const QUERY_BY_GROUP_BY: Record<CashflowGroupBy, string> = {
     FROM transactions t
     LEFT JOIN categories c ON c.id = t.category_id
     LEFT JOIN categories parent ON parent.id = c.parent_id
-    WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3
+    WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3 AND t.is_cash_neutral = 0
     GROUP BY group_key
     ORDER BY total DESC
   `,
@@ -61,7 +61,7 @@ const QUERY_BY_GROUP_BY: Record<CashflowGroupBy, string> = {
       COALESCE(${PRIMARY_LABEL}, 'Tanpa Label') as label,
       SUM(t.amount) as total
     FROM transactions t
-    WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3
+    WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3 AND t.is_cash_neutral = 0
     GROUP BY group_key
     ORDER BY total DESC
   `,

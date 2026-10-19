@@ -18,6 +18,7 @@ export type PushTransactionPayload = {
   source?: TransactionSource;
   sourceRef?: string | null;
   updatedAt?: string;
+  isCashNeutral?: boolean;
 };
 
 export function pushTransaction(creds: CloudSyncCredentials, payload: PushTransactionPayload) {

@@ -10,6 +10,7 @@ export function summarizeExpenseByCategory(
 
   for (const t of snapshot.transactions) {
     if (!isAlive(t) || t.type !== "expense") continue;
+    if (t.isCashNeutral) continue;
     if (options.from && datePart(t.date) < options.from) continue;
     if (options.to && datePart(t.date) > options.to) continue;
     const key = t.categoryId ?? "__uncategorized__";

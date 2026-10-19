@@ -20,6 +20,7 @@ export function useMonthlySummary(months: number) {
         `SELECT strftime('%Y-%m', date) as month, type, SUM(amount) as total
          FROM transactions
          WHERE type IN ('income', 'expense')
+           AND is_cash_neutral = 0
            AND date >= strftime('%Y-%m', 'now', '-' || $1 || ' months') || '-01'
          GROUP BY month, type
          ORDER BY month ASC`,

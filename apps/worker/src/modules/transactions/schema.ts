@@ -52,6 +52,12 @@ export type PushTransactionPayload = {
   source?: TransactionSource;
   sourceRef?: string | null;
   updatedAt?: string;
+  // Lihat apps/desktop/docs/todos/done/cash-neutral-transaction-flag.md.
+  // Opsional: tidak dikirim -> INSERT jatuh ke default kolom (0), UPDATE
+  // mempertahankan nilai yg sudah ada (pola sama dgn source/sourceRef,
+  // lihat service.ts) -- supaya PATCH dari client lama/MCP yg tidak tahu
+  // field ini tidak diam-diam menghapus flag yg sudah di-set PC.
+  isCashNeutral?: boolean;
 };
 
 export type TransactionSource = "manual" | "retailku_sync";
@@ -123,6 +129,7 @@ export function isPushTransactionPayload(value: unknown): value is PushTransacti
     isValidInvestmentFields(v) &&
     isValidSourceFields(v) &&
     isValidDescriptionField(v) &&
+    (v.isCashNeutral === undefined || typeof v.isCashNeutral === "boolean") &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
 }
@@ -155,6 +162,7 @@ export function isPatchTransactionPayload(value: unknown): value is PatchTransac
     isValidInvestmentFields(v) &&
     isValidSourceFields(v) &&
     isValidDescriptionField(v) &&
+    (v.isCashNeutral === undefined || typeof v.isCashNeutral === "boolean") &&
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
 }

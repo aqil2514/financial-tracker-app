@@ -1,6 +1,6 @@
 "use client";
 
-import { getDb } from "@/lib/db";
+import { getDb, type Account } from "@/lib/db";
 import { newId } from "@/lib/id";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 import { dependentKeysOf } from "@/lib/query-dependencies";
@@ -13,10 +13,18 @@ function now() {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
+function resolveIsCashNeutral(accountType: Account["account_type"], countAsCash: boolean): boolean {
+  if (accountType === "debt" || accountType === "investment") return true;
+  if (accountType === "cash") return !countAsCash;
+  return false;
+}
+
 export type CorrectAccountBalanceInput = {
   accountId: string;
+  accountType: Account["account_type"];
   targetBalance: number;
   currentBalance: number;
+  countAsCash: boolean;
 };
 
 async function getOrCreateCorrectionCategoryId(
@@ -39,20 +47,27 @@ async function getOrCreateCorrectionCategoryId(
 
 export function useCorrectAccountBalance() {
   return useDbMutation({
-    mutationFn: async ({ accountId, targetBalance, currentBalance }: CorrectAccountBalanceInput) => {
+    mutationFn: async ({
+      accountId,
+      accountType,
+      targetBalance,
+      currentBalance,
+      countAsCash,
+    }: CorrectAccountBalanceInput) => {
       const diff = targetBalance - currentBalance;
       if (diff === 0) return;
 
       const type: "income" | "expense" = diff > 0 ? "income" : "expense";
       const amount = Math.abs(diff);
+      const isCashNeutral = resolveIsCashNeutral(accountType, countAsCash);
 
       const db = await getDb();
       const categoryId = await getOrCreateCorrectionCategoryId(db, type);
 
       await db.execute(
-        `INSERT INTO transactions (id, type, amount, category_id, account_id, note, date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [newId(), type, amount, categoryId, accountId, "Koreksi saldo", now()]
+        `INSERT INTO transactions (id, type, amount, category_id, account_id, note, date, is_cash_neutral)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [newId(), type, amount, categoryId, accountId, "Koreksi saldo", now(), isCashNeutral ? 1 : 0]
       );
     },
     invalidateKey: dependentKeysOf("transactions", "accounts", "categories"),

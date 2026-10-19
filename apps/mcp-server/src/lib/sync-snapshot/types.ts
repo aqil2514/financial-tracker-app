@@ -44,6 +44,7 @@ export type Transaction = {
   sourceRef: string | null;
   updatedAt: string | null;
   deletedAt: string | null;
+  isCashNeutral: boolean;
 };
 
 export type Debt = {

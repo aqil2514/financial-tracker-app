@@ -37,6 +37,7 @@ export function summarizeCashflow(
   for (const t of snapshot.transactions) {
     if (!isAlive(t)) continue;
     if (t.type !== "income" && t.type !== "expense") continue;
+    if (t.isCashNeutral) continue;
     if (options.from && datePart(t.date) < options.from) continue;
     if (options.to && datePart(t.date) > options.to) continue;
 

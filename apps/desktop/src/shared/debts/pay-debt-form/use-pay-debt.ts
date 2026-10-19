@@ -115,8 +115,8 @@ export function usePayDebt(debt: DebtListRow, onSuccess?: () => void) {
         const transactionType = debt.type === "receivable" ? "expense" : "income";
 
         await db.execute(
-          `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
-           VALUES ($1, $2, $3, NULL, $4, NULL, $5, NULL, $6, $7)`,
+          `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, is_cash_neutral)
+           VALUES ($1, $2, $3, NULL, $4, NULL, $5, NULL, $6, $7, 1)`,
           [
             transactionId,
             transactionType,

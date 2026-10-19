@@ -44,6 +44,7 @@ export type SyncResponse = {
       contactId: string | null;
       source: TransactionSource;
       sourceRef: string | null;
+      isCashNeutral: boolean;
     }
   >;
   debts: Array<

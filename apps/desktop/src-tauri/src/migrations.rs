@@ -308,6 +308,12 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0051_debt_accounts_direction_required.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 52,
+            description: "transaction_cash_neutral_flag",
+            sql: include_str!("../migrations/0052_transaction_cash_neutral_flag.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -390,6 +396,18 @@ mod tests {
             )
             .expect("gagal cek kolom accounts.is_active");
         assert_eq!(accounts_has_is_active, 1, "accounts.is_active tidak ditemukan");
+
+        let transactions_has_is_cash_neutral: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name = 'is_cash_neutral'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("gagal cek kolom transactions.is_cash_neutral");
+        assert_eq!(
+            transactions_has_is_cash_neutral, 1,
+            "transactions.is_cash_neutral tidak ditemukan"
+        );
 
         let transactions_account_id_is_uuid: i64 = conn
             .query_row(

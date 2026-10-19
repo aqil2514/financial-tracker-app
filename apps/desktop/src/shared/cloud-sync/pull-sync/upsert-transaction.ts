@@ -6,13 +6,14 @@ import type { SyncResponse } from "./types";
 export async function upsertTransaction(db: Database, row: SyncResponse["transactions"][number]) {
   if (await hasLocalSourceRefConflict(db, "transactions", row)) return;
   await db.execute(
-    `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, source, source_ref, updated_at, deleted_at, sync_source)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, 'mcp')
+    `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, source, source_ref, updated_at, deleted_at, sync_source, is_cash_neutral)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, 'mcp', $14)
      ON CONFLICT(id) DO UPDATE SET type = excluded.type, amount = excluded.amount, category_id = excluded.category_id,
        account_id = excluded.account_id, transfer_account_id = excluded.transfer_account_id, note = excluded.note,
        description = excluded.description, date = excluded.date, contact_id = excluded.contact_id,
        source = excluded.source, source_ref = excluded.source_ref,
-       updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp'`,
+       updated_at = excluded.updated_at, deleted_at = NULL, sync_source = 'mcp',
+       is_cash_neutral = excluded.is_cash_neutral`,
     [
       row.id,
       row.type,
@@ -27,6 +28,7 @@ export async function upsertTransaction(db: Database, row: SyncResponse["transac
       row.source,
       row.sourceRef,
       row.updatedAt,
+      row.isCashNeutral ? 1 : 0,
     ]
   );
 }

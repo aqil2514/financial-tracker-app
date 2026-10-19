@@ -21,6 +21,7 @@ export function useCategoryPeriodSummary(periodId: string | null) {
          FROM transactions t
          JOIN category_periods p ON p.id = $1
          WHERE t.type IN ('income', 'expense')
+           AND t.is_cash_neutral = 0
            AND date(t.date) BETWEEN p.start_date AND p.end_date
            AND t.category_id IN (
              SELECT category_id FROM category_period_categories WHERE period_id = p.id

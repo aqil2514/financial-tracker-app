@@ -27,7 +27,8 @@ export function AccountBalanceCorrectionDialog({
           penyesuaian otomatis sebesar selisihnya.
         </p>
         <AccountBalanceCorrectionForm
-          defaultValues={{ targetBalance: account.balance }}
+          accountType={account.account_type}
+          defaultValues={{ targetBalance: account.balance, countAsCash: true }}
           onSubmit={onSubmit}
           isPending={isPending}
         />

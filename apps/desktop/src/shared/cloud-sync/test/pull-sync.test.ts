@@ -117,6 +117,7 @@ describe("applySyncResponse", () => {
           contactId: null,
           source: "manual",
           sourceRef: null,
+          isCashNeutral: false,
         },
       ],
       debts: [

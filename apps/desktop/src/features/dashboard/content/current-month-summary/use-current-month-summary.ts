@@ -17,6 +17,7 @@ export function useCurrentMonthSummary() {
         `SELECT type, SUM(amount) as total
          FROM transactions
          WHERE type IN ('income', 'expense')
+           AND is_cash_neutral = 0
            AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
          GROUP BY type`
       );

@@ -18,6 +18,7 @@ export function useMonthSummary(monthStart: string) {
          FROM transactions
          WHERE strftime('%Y-%m', date) = $1
            AND type IN ('income', 'expense')
+           AND is_cash_neutral = 0
          GROUP BY type`,
         [monthStart]
       );

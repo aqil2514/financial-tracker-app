@@ -87,8 +87,8 @@ export async function applyWriteOffInvestmentTransaction({
 
   const transactionId = newId();
   await db.execute(
-    `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date)
-     VALUES ($1, 'expense', $2, NULL, $3, NULL, $4, NULL, $5)`,
+    `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, is_cash_neutral)
+     VALUES ($1, 'expense', $2, NULL, $3, NULL, $4, NULL, $5, 1)`,
     [transactionId, amount, accountId, note, date]
   );
 
