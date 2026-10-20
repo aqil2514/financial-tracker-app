@@ -4,6 +4,7 @@ import { requireAuth } from "../../shared/auth";
 import {
   handlePostDebt,
   handlePostDebtPayment,
+  handlePostDebtCorrectRemaining,
   handlePostDebtWriteOff,
   handlePostDebtPush,
   handlePostDebtPaymentPush,
@@ -16,6 +17,7 @@ export const debtsRouter = new Hono<AppContext>();
 debtsRouter.use(requireAuth);
 debtsRouter.post("/", handlePostDebt);
 debtsRouter.post("/:id/payments", handlePostDebtPayment);
+debtsRouter.post("/:id/correct-remaining", handlePostDebtCorrectRemaining);
 debtsRouter.post("/:id/write-off", handlePostDebtWriteOff);
 // Upsert-by-id MURNI utk baris desktop sudah buat sendiri (source-based
 // ownership) -- path TERPISAH dari "/" (handlePostDebt) yg SELALU bikin

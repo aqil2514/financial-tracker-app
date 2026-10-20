@@ -65,6 +65,29 @@ export function isCreateNonCashPaymentPayload(value: unknown): value is CreateNo
   );
 }
 
+// Payload POST /debts/:id/correct-remaining -- port dari
+// apps/desktop/src/shared/debts/correct-debt-remaining.ts
+// (correctDebtRemaining). targetRemaining adalah SISA yang SEHARUSNYA
+// (bukan selisih) -- pola sama "Saldo Seharusnya" di correctAccountBalance.
+// Tidak ada `id` (ini bukan upsert-by-id, service.ts yang generate id
+// transaksi/debt_payments/debt_amount_adjustments barunya sendiri).
+export type CorrectDebtRemainingPayload = {
+  targetRemaining: number;
+  date: string;
+  note: string;
+};
+
+export function isCorrectDebtRemainingPayload(value: unknown): value is CorrectDebtRemainingPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.targetRemaining === "number" &&
+    v.targetRemaining >= 0 &&
+    typeof v.date === "string" &&
+    typeof v.note === "string"
+  );
+}
+
 // Payload POST /debts/push -- khusus baris debts yg desktop SUDAH bikin
 // sendiri lewat apply-debt-transaction.ts lokal (transfer cash<->debt),
 // dipush APA ADANYA (upsert-by-id MURNI, TANPA transaksi closing --

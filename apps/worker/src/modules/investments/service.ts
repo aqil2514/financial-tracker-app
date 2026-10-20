@@ -9,6 +9,7 @@ import type {
   PushInvestmentSalePayload,
   CreateDirectInvestmentPurchasePayload,
   WriteOffInvestmentPayload,
+  CorrectInvestmentBalancePayload,
 } from "./schema";
 
 async function getAccountType(env: Env, accountId: string): Promise<string | null> {
@@ -1170,4 +1171,166 @@ export async function applyWriteOffInvestmentTransactionEdit(
     .run();
 
   return { amount, averageCost };
+}
+
+// ============================================================
+// Koreksi Saldo granular -- port PERSIS
+// apps/desktop/src/shared/investments/apply-investment-balance-correction.ts
+// (applyInvestmentBalanceCorrection). BEDA dari correctAccountBalance
+// (accounts/service.ts, menolak TOTAL akun bertipe 'investment') --
+// endpoint ini SENDIRI yang jadi jalur sah koreksi saldo investasi,
+// pola sama persis "jalur granular debt menolak lewat akun tapi
+// diizinkan lewat endpoint khusus", lihat
+// docs/todos/plan/balance-correction-derived-data-consistency.md butir 9.
+// ============================================================
+
+export type CorrectInvestmentBalanceResult =
+  | { status: "rejected"; reason: string }
+  | { status: "no_change" }
+  | {
+      status: "ok";
+      transactionId: string;
+      direction: "purchase" | "sale";
+      diffUnit: number;
+      investmentPurchaseId: string | null;
+      investmentSaleId: string | null;
+    };
+
+export class InvestmentBalanceCorrectionMismatchError extends Error {
+  constructor(expectedUnit: number, actualUnit: number) {
+    super(
+      `Koreksi saldo gagal -- ditemukan inkonsistensi internal (unit seharusnya ${expectedUnit}, hasil hitung ulang ${actualUnit}). Perubahan dibatalkan, tidak ada data yang tersimpan.`
+    );
+    this.name = "InvestmentBalanceCorrectionMismatchError";
+  }
+}
+
+// `unit` param = TOTAL unit yang SEHARUSNYA dimiliki sekarang (bukan
+// selisih, pola sama "Saldo Seharusnya"). `pricePerUnit` MANUAL utk
+// KEDUA arah (BEDA dari write-off yang selalu pakai averageCost sistem)
+// -- lihat komentar schema.ts (CorrectInvestmentBalancePayload).
+//
+// diffUnit > 0 (unit kenyataan lebih banyak): insert investment_purchases
+// baru, status 'settled', transaksi income LANGSUNG pada akun investment
+// (pola createDirectInvestmentPurchase).
+// diffUnit < 0 (unit kenyataan lebih sedikit): insert investment_sales
+// baru, price_per_unit = input manual (BUKAN averageCost spt write-off),
+// average_cost_per_unit = snapshot getAverageCostPerUnit() SAAT INI
+// (sekadar informasi, bukan dasar realized_pl), realized_pl dihitung dari
+// price_per_unit manual vs snapshot averageCost, transaksi expense.
+// adjustment_transaction_id SELALU NULL (bukan jual riil ke kas, tidak
+// ada leg P/L kedua).
+//
+// GUARD ROLLBACK MANUAL setelah tulis, pola PERSIS correctDebtRemaining
+// (debts/service.ts) -- lihat komentar panjang di sana utk alasan
+// kenapa BUKAN D1Database.batch().
+export async function correctInvestmentBalance(
+  env: Env,
+  accountId: string,
+  payload: CorrectInvestmentBalancePayload,
+  syncSource: SyncSource
+): Promise<CorrectInvestmentBalanceResult> {
+  const accountType = await getAccountType(env, accountId);
+  if (accountType == null) {
+    return { status: "rejected", reason: "Akun tidak ditemukan." };
+  }
+  if (accountType !== "investment") {
+    return { status: "rejected", reason: "Koreksi saldo granular ini wajib menunjuk ke akun bertipe 'investment'." };
+  }
+
+  const currentUnit = await getRemainingUnit(env, accountId);
+  const diffUnit = payload.unit - currentUnit;
+  if (diffUnit === 0) return { status: "no_change" };
+
+  const now = nowText();
+
+  if (diffUnit > 0) {
+    const transactionId = uuidv7();
+    const amount = payload.pricePerUnit * diffUnit;
+    await env.DB.prepare(
+      `INSERT INTO transactions
+         (id, type, amount, category_id, account_id, transfer_account_id, note, date, description,
+          created_at, updated_at, sync_source)
+       VALUES (?1, 'income', ?2, NULL, ?3, NULL, ?4, ?5, NULL, ?6, ?6, ?7)`
+    )
+      .bind(transactionId, amount, accountId, payload.note, payload.date, now, syncSource)
+      .run();
+
+    const investmentPurchaseId = uuidv7();
+    await env.DB.prepare(
+      `INSERT INTO investment_purchases
+         (id, account_id, transaction_id, unit, price_per_unit, date, status, created_at, updated_at, sync_source)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'settled', ?7, ?7, ?8)`
+    )
+      .bind(investmentPurchaseId, accountId, transactionId, diffUnit, payload.pricePerUnit, payload.date, now, syncSource)
+      .run();
+
+    const actualUnit = await getRemainingUnit(env, accountId);
+    if (actualUnit !== payload.unit) {
+      await env.DB.prepare("DELETE FROM investment_purchases WHERE id = ?1").bind(investmentPurchaseId).run();
+      await env.DB.prepare("DELETE FROM transactions WHERE id = ?1").bind(transactionId).run();
+      throw new InvestmentBalanceCorrectionMismatchError(payload.unit, actualUnit);
+    }
+
+    return {
+      status: "ok",
+      transactionId,
+      direction: "purchase",
+      diffUnit,
+      investmentPurchaseId,
+      investmentSaleId: null,
+    };
+  }
+
+  const soldUnit = Math.abs(diffUnit);
+  const averageCost = await getAverageCostPerUnit(env, accountId);
+  const amount = payload.pricePerUnit * soldUnit;
+  const realizedPl = (payload.pricePerUnit - averageCost) * soldUnit;
+
+  const transactionId = uuidv7();
+  await env.DB.prepare(
+    `INSERT INTO transactions
+       (id, type, amount, category_id, account_id, transfer_account_id, note, date, description,
+        created_at, updated_at, sync_source)
+     VALUES (?1, 'expense', ?2, NULL, ?3, NULL, ?4, ?5, NULL, ?6, ?6, ?7)`
+  )
+    .bind(transactionId, amount, accountId, payload.note, payload.date, now, syncSource)
+    .run();
+
+  const investmentSaleId = uuidv7();
+  await env.DB.prepare(
+    `INSERT INTO investment_sales
+       (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit,
+        average_cost_per_unit, realized_pl, date, status, created_at, updated_at, sync_source)
+     VALUES (?1, ?2, ?3, NULL, ?4, ?5, ?6, ?7, ?8, 'settled', ?9, ?9, ?10)`
+  )
+    .bind(
+      investmentSaleId,
+      accountId,
+      transactionId,
+      soldUnit,
+      payload.pricePerUnit,
+      averageCost,
+      realizedPl,
+      payload.date,
+      now,
+      syncSource
+    )
+    .run();
+
+  const actualUnit = await getRemainingUnit(env, accountId);
+  if (actualUnit !== payload.unit) {
+    await env.DB.prepare("DELETE FROM investment_sales WHERE id = ?1").bind(investmentSaleId).run();
+    await env.DB.prepare("DELETE FROM transactions WHERE id = ?1").bind(transactionId).run();
+    throw new InvestmentBalanceCorrectionMismatchError(payload.unit, actualUnit);
+  }
+
+  return {
+    status: "ok",
+    transactionId,
+    direction: "sale",
+    diffUnit,
+    investmentPurchaseId: null,
+    investmentSaleId,
+  };
 }

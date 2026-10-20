@@ -7,6 +7,7 @@ import {
   isSettleInvestmentSalePayload,
   isCreateDirectInvestmentPurchasePayload,
   isWriteOffInvestmentPayload,
+  isCorrectInvestmentBalancePayload,
 } from "./schema";
 import {
   pushInvestmentAccountFromPc,
@@ -18,6 +19,8 @@ import {
   deletePendingInvestmentSale,
   createDirectInvestmentPurchase,
   writeOffInvestment,
+  correctInvestmentBalance,
+  InvestmentBalanceCorrectionMismatchError,
 } from "./service";
 
 // Autentikasi ditangani requireAuth middleware, dipasang di router.ts.
@@ -166,4 +169,45 @@ export async function handlePostInvestmentWriteOff(c: Context<AppContext>) {
     { status: "ok", id: result.id, transactionId: result.transactionId, averageCost: result.averageCost },
     201
   );
+}
+
+// Koreksi granular akun 'investment' -- BEDA dari handlePostCorrectBalance
+// (accounts/controller.ts) yang menolak TOTAL akun bertipe 'investment'.
+// unit DAN pricePerUnit KEDUANYA manual (BEDA dari write-off di atas yang
+// pakai averageCost sistem) -- lihat service.ts (correctInvestmentBalance)
+// utk detail arah beli/jual + guard rollback.
+export async function handlePostInvestmentCorrectBalance(c: Context<AppContext>) {
+  const accountId = c.req.param("accountId");
+  if (!accountId) return c.json({ error: "Missing accountId" }, 400);
+
+  const body = await c.req.json().catch(() => null);
+  if (!isCorrectInvestmentBalancePayload(body)) {
+    return c.json({ error: "Invalid payload" }, 400);
+  }
+
+  try {
+    const result = await correctInvestmentBalance(c.env, accountId, body, c.get("syncSource"));
+    if (result.status === "no_change") {
+      return c.json({ status: "ok", message: "Unit yang diinput sama dengan sisa unit saat ini -- tidak ada yang perlu dikoreksi." });
+    }
+    if (result.status === "rejected") {
+      return c.json({ error: result.reason }, 422);
+    }
+    return c.json(
+      {
+        status: "ok",
+        transactionId: result.transactionId,
+        direction: result.direction,
+        diffUnit: result.diffUnit,
+        investmentPurchaseId: result.investmentPurchaseId,
+        investmentSaleId: result.investmentSaleId,
+      },
+      201
+    );
+  } catch (err) {
+    if (err instanceof InvestmentBalanceCorrectionMismatchError) {
+      return c.json({ error: err.message }, 422);
+    }
+    throw err;
+  }
 }

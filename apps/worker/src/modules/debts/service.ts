@@ -7,6 +7,7 @@ import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 import type {
   CreateDirectDebtPayload,
   CreateNonCashPaymentPayload,
+  CorrectDebtRemainingPayload,
   PushDebtPayload,
   PushDebtPaymentPayload,
 } from "./schema";
@@ -906,6 +907,183 @@ export async function writeOffDebt(
   await env.DB.prepare("UPDATE debts SET status = 'written_off' WHERE id = ?1").bind(debtId).run();
 
   return { status: "ok", transactionId };
+}
+
+// Sumber kebenaran tunggal "remaining" -- SAMA PERSIS subquery yang
+// diulang di validateDebtSettlementAmount/settleDebtsFifo di atas, cuma
+// dibungkus jadi helper utk dipakai correctDebtRemaining (butuh dipanggil
+// DUA kali: sebelum hitung diff, dan setelah tulis utk guard rollback).
+async function getDebtRemaining(env: Env, debtId: string): Promise<number> {
+  const row = await env.DB.prepare(
+    `SELECT debts.amount - COALESCE(
+       (SELECT SUM(amount) FROM debt_payments WHERE debt_payments.debt_id = debts.id), 0
+     ) AS remaining
+     FROM debts WHERE debts.id = ?1`
+  )
+    .bind(debtId)
+    .first<{ remaining: number }>();
+  return row?.remaining ?? 0;
+}
+
+export type CorrectDebtRemainingResult =
+  | { status: "not_found" }
+  | { status: "no_change" }
+  | { status: "rejected"; reason: string }
+  | {
+      status: "ok";
+      transactionId: string;
+      direction: "increase" | "decrease";
+      diff: number;
+      debtPaymentId: string | null;
+      debtAmountAdjustmentId: string | null;
+    };
+
+export class DebtRemainingCorrectionMismatchError extends Error {
+  constructor(expectedRemaining: number, actualRemaining: number) {
+    super(
+      `Koreksi nominal gagal -- ditemukan inkonsistensi internal (sisa seharusnya ${expectedRemaining}, hasil hitung ulang ${actualRemaining}). Perubahan dibatalkan, tidak ada data yang tersimpan.`
+    );
+    this.name = "DebtRemainingCorrectionMismatchError";
+  }
+}
+
+// Port PERSIS dari apps/desktop/src/shared/debts/correct-debt-remaining.ts
+// (correctDebtRemaining) -- koreksi granular per baris `debts` (BEDA dari
+// correctAccountBalance di accounts/service.ts, yang menolak TOTAL akun
+// bertipe 'debt', lihat isAccountTypeRestrictedFromDirectTransaction).
+// User input "Sisa yang Seharusnya" (targetRemaining), bukan selisih --
+// pola sama "Saldo Seharusnya" di jalur Koreksi Saldo lain.
+//
+// Dua arah, KEBALIKAN satu sama lain:
+// - turun (sisa baru < sisa sekarang): reuse pola createNonCashPayment --
+//   insert transaksi closing + debt_payments, tandai 'paid' kalau sisa
+//   baru <= 0.
+// - naik (sisa baru > sisa sekarang): transaksi closing arah 'create'
+//   (createDebtClosingTransaction) + UPDATE debts.amount LANGSUNG +
+//   insert debt_amount_adjustments (linkage audit trail, migrasi
+//   schema/0009_debt_amount_adjustments.sql -- supaya transaksi ini
+//   TIDAK salah terdeteksi yatim oleh fitur konsistensi manapun yang
+//   nanti dibuat di sisi Worker, sama alasan penambahan tabel ini di
+//   desktop, lihat apps/desktop/docs/todos/plan/
+//   balance-correction-derived-data-consistency.md).
+//
+// GUARD ROLLBACK MANUAL setelah tulis (BUKAN D1Database.batch()) --
+// keputusan sengaja supaya konsisten dgn SELURUH pola Worker yang sudah
+// ada (settleDebtsFifo, applySellInvestmentTransaction dkk SAMA SEKALI
+// tidak pernah pakai batch/transaction D1), bukan krn D1 tidak mendukung
+// atomicity sungguhan (D1 PUNYA batch() yang atomik, cuma belum ada
+// precedent pemakaiannya di codebase ini) -- lihat diskusi di
+// apps/desktop/docs/todos/plan/balance-correction-derived-data-consistency.md
+// butir 9. Hitung ulang getDebtRemaining() setelah tulis, kalau tidak
+// cocok dgn targetRemaining (artinya bug internal, bukan salah input
+// user), DELETE/UPDATE eksplisit membalik efek tulisan di atas, lempar
+// DebtRemainingCorrectionMismatchError (controller map ke 422).
+export async function correctDebtRemaining(
+  env: Env,
+  debtId: string,
+  payload: CorrectDebtRemainingPayload,
+  syncSource: SyncSource
+): Promise<CorrectDebtRemainingResult> {
+  const debt = await env.DB.prepare(
+    "SELECT type, contact_id, account_id, amount FROM debts WHERE id = ?1 AND deleted_at IS NULL"
+  )
+    .bind(debtId)
+    .first<DebtForClosingRow & { amount: number }>();
+  if (!debt) return { status: "not_found" };
+
+  if (debt.account_id == null) {
+    return {
+      status: "rejected",
+      reason: "Piutang/utang dari sinkronisasi Retailku belum bisa dikoreksi dari sini.",
+    };
+  }
+
+  const currentRemaining = await getDebtRemaining(env, debtId);
+  const diff = payload.targetRemaining - currentRemaining;
+  if (diff === 0) return { status: "no_change" };
+
+  const isDecrease = diff < 0;
+  const amount = Math.abs(diff);
+
+  if (isDecrease) {
+    const transactionId = await createDebtClosingTransaction(env, {
+      debt: { ...debt, account_id: debt.account_id },
+      amount,
+      date: payload.date,
+      note: payload.note,
+      syncSource,
+    });
+
+    const debtPaymentId = uuidv7();
+    const now = nowText();
+    await env.DB.prepare(
+      `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date, note, created_at, updated_at, sync_source)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9)`
+    )
+      .bind(debtPaymentId, debtId, amount, debt.account_id, transactionId, payload.date, payload.note, now, syncSource)
+      .run();
+
+    const statusShouldBePaid = payload.targetRemaining <= 0;
+    if (statusShouldBePaid) {
+      await env.DB.prepare("UPDATE debts SET status = 'paid' WHERE id = ?1").bind(debtId).run();
+    }
+
+    const actualRemaining = await getDebtRemaining(env, debtId);
+    if (actualRemaining !== payload.targetRemaining) {
+      if (statusShouldBePaid) {
+        await env.DB.prepare("UPDATE debts SET status = 'ongoing' WHERE id = ?1").bind(debtId).run();
+      }
+      await env.DB.prepare("DELETE FROM debt_payments WHERE id = ?1").bind(debtPaymentId).run();
+      await env.DB.prepare("DELETE FROM transactions WHERE id = ?1").bind(transactionId).run();
+      throw new DebtRemainingCorrectionMismatchError(payload.targetRemaining, actualRemaining);
+    }
+
+    return {
+      status: "ok",
+      transactionId,
+      direction: "decrease",
+      diff,
+      debtPaymentId,
+      debtAmountAdjustmentId: null,
+    };
+  }
+
+  const transactionId = await createDebtClosingTransaction(env, {
+    debt: { ...debt, account_id: debt.account_id },
+    amount,
+    date: payload.date,
+    note: payload.note,
+    syncSource,
+    closingDirection: "create",
+  });
+
+  await env.DB.prepare("UPDATE debts SET amount = amount + ?1 WHERE id = ?2").bind(diff, debtId).run();
+
+  const debtAmountAdjustmentId = uuidv7();
+  const now = nowText();
+  await env.DB.prepare(
+    `INSERT INTO debt_amount_adjustments (id, debt_id, transaction_id, delta, date, created_at, updated_at, sync_source)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?7)`
+  )
+    .bind(debtAmountAdjustmentId, debtId, transactionId, diff, payload.date, now, syncSource)
+    .run();
+
+  const actualRemaining = await getDebtRemaining(env, debtId);
+  if (actualRemaining !== payload.targetRemaining) {
+    await env.DB.prepare("DELETE FROM debt_amount_adjustments WHERE id = ?1").bind(debtAmountAdjustmentId).run();
+    await env.DB.prepare("UPDATE debts SET amount = amount - ?1 WHERE id = ?2").bind(diff, debtId).run();
+    await env.DB.prepare("DELETE FROM transactions WHERE id = ?1").bind(transactionId).run();
+    throw new DebtRemainingCorrectionMismatchError(payload.targetRemaining, actualRemaining);
+  }
+
+  return {
+    status: "ok",
+    transactionId,
+    direction: "increase",
+    diff,
+    debtPaymentId: null,
+    debtAmountAdjustmentId,
+  };
 }
 
 export type PushDebtResult =

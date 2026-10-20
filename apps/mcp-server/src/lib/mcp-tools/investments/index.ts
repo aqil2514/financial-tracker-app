@@ -5,6 +5,7 @@ import { registerSettleInvestmentSale } from "./settle-investment-sale";
 import { registerDeletePendingInvestmentSale } from "./delete-pending-investment-sale";
 import { registerCreateInvestmentPurchaseDirect } from "./create-investment-purchase-direct";
 import { registerWriteOffInvestment } from "./write-off-investment";
+import { registerCorrectInvestmentBalance } from "./correct-investment-balance";
 
 export function registerInvestmentsMcpTools(server: McpServer) {
   registerGetInvestmentSummary(server);
@@ -13,4 +14,5 @@ export function registerInvestmentsMcpTools(server: McpServer) {
   registerDeletePendingInvestmentSale(server);
   registerCreateInvestmentPurchaseDirect(server);
   registerWriteOffInvestment(server);
+  registerCorrectInvestmentBalance(server);
 }

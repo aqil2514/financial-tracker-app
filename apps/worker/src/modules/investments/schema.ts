@@ -184,3 +184,33 @@ export function isWriteOffInvestmentPayload(value: unknown): value is WriteOffIn
     (v.updatedAt === undefined || isValidUpdatedAt(v.updatedAt))
   );
 }
+
+// Payload POST /investments/correct-balance -- port dari
+// apps/desktop/src/shared/investments/apply-investment-balance-correction.ts
+// (applyInvestmentBalanceCorrection). BEDA dari CreateDirectInvestmentPurchasePayload/
+// WriteOffInvestmentPayload: unit DAN pricePerUnit KEDUANYA manual (prinsip
+// "koreksi memaksa sistem sesuai kenyataan user" -- lihat
+// docs/todos/plan/balance-correction-derived-data-consistency.md "Desain
+// form Koreksi Saldo -- Investasi"), bukan averageCost otomatis spt
+// write-off. unit = TOTAL unit yang SEHARUSNYA dimiliki sekarang (bukan
+// selisih), pricePerUnit = harga/cost per unit manual utk KEDUA arah
+// (tambah maupun kurang).
+export type CorrectInvestmentBalancePayload = {
+  unit: number;
+  pricePerUnit: number;
+  date: string;
+  note: string;
+};
+
+export function isCorrectInvestmentBalancePayload(value: unknown): value is CorrectInvestmentBalancePayload {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.unit === "number" &&
+    v.unit >= 0 &&
+    typeof v.pricePerUnit === "number" &&
+    v.pricePerUnit >= 0 &&
+    typeof v.date === "string" &&
+    typeof v.note === "string"
+  );
+}

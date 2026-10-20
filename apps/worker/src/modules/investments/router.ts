@@ -11,6 +11,7 @@ import {
   handleDeleteInvestmentSale,
   handlePostInvestmentPurchaseDirect,
   handlePostInvestmentWriteOff,
+  handlePostInvestmentCorrectBalance,
 } from "./controller";
 
 // Modul ini mendukung PEMBELIAN + PENJUALAN investasi penuh (docs/todos/
@@ -32,6 +33,12 @@ import {
 // (writeOffDebt) -- Worker SENDIRI insert transaksi income/expense +
 // baris investment_purchases/investment_sales, dipanggil LANGSUNG dari
 // MCP tanpa harus lewat desktop sama sekali.
+//
+// Endpoint /:accountId/correct-balance (ditambahkan menyusul porting
+// jalur granular desktop, lihat docs/todos/plan/
+// balance-correction-derived-data-consistency.md butir 9) -- koreksi
+// saldo granular akun investment (unit+harga KEDUANYA manual, BEDA dari
+// write-off yang pakai averageCost sistem), BUKAN jalur push.
 export const investmentsRouter = new Hono<AppContext>();
 
 investmentsRouter.use(requireAuth);
@@ -44,3 +51,4 @@ investmentsRouter.delete("/sales/push/:id", handleDeleteInvestmentSalePush);
 investmentsRouter.post("/sales/:id/settle", handlePostInvestmentSaleSettle);
 investmentsRouter.delete("/sales/:id", handleDeleteInvestmentSale);
 investmentsRouter.post("/write-off", handlePostInvestmentWriteOff);
+investmentsRouter.post("/:accountId/correct-balance", handlePostInvestmentCorrectBalance);

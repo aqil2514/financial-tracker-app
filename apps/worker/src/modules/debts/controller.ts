@@ -3,12 +3,15 @@ import type { AppContext } from "../../shared/auth";
 import {
   isCreateDirectDebtPayload,
   isCreateNonCashPaymentPayload,
+  isCorrectDebtRemainingPayload,
   isPushDebtPayload,
   isPushDebtPaymentPayload,
 } from "./schema";
 import {
   createDirectDebt,
   createNonCashPayment,
+  correctDebtRemaining,
+  DebtRemainingCorrectionMismatchError,
   writeOffDebt,
   pushDebtFromPc,
   pushDebtPaymentFromPc,
@@ -108,6 +111,49 @@ export async function handleDeleteDebtPaymentPush(c: Context<AppContext>) {
     return c.json({ error: "Debt payment not found" }, 404);
   }
   return c.json({ status: "ok", id });
+}
+
+// Koreksi granular per baris `debts` -- BEDA dari handlePostCorrectBalance
+// (accounts/controller.ts) yang menolak TOTAL akun bertipe 'debt'. Lihat
+// service.ts (correctDebtRemaining) utk detail arah naik/turun + guard
+// rollback.
+export async function handlePostDebtCorrectRemaining(c: Context<AppContext>) {
+  const debtId = c.req.param("id");
+  if (!debtId) return c.json({ error: "Missing debt id" }, 400);
+
+  const body = await c.req.json().catch(() => null);
+  if (!isCorrectDebtRemainingPayload(body)) {
+    return c.json({ error: "Invalid payload" }, 400);
+  }
+
+  try {
+    const result = await correctDebtRemaining(c.env, debtId, body, c.get("syncSource"));
+    if (result.status === "not_found") {
+      return c.json({ error: "Debt not found" }, 404);
+    }
+    if (result.status === "no_change") {
+      return c.json({ status: "ok", message: "Sisa yang diinput sama dengan sisa saat ini -- tidak ada yang perlu dikoreksi." });
+    }
+    if (result.status === "rejected") {
+      return c.json({ error: result.reason }, 422);
+    }
+    return c.json(
+      {
+        status: "ok",
+        transactionId: result.transactionId,
+        direction: result.direction,
+        diff: result.diff,
+        debtPaymentId: result.debtPaymentId,
+        debtAmountAdjustmentId: result.debtAmountAdjustmentId,
+      },
+      201
+    );
+  } catch (err) {
+    if (err instanceof DebtRemainingCorrectionMismatchError) {
+      return c.json({ error: err.message }, 422);
+    }
+    throw err;
+  }
 }
 
 export async function handlePostDebtWriteOff(c: Context<AppContext>) {
