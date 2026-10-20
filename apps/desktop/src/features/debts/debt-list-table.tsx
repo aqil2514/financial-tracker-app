@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
-import { Ban, ChevronDown, HandCoins, Inbox, SearchX, X } from "lucide-react";
+import { Ban, ChevronDown, HandCoins, Inbox, Scale, SearchX, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import { formatDate } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
 import { useDebtsList, type DebtListRow } from "@/shared/debts/use-debts-list";
 import { PayDebtDialog } from "@/shared/debts/pay-debt-form/pay-debt-dialog";
+import { CorrectDebtRemainingDialog } from "@/shared/debts/correct-debt-remaining-form/correct-debt-remaining-dialog";
 import { PaymentsList } from "@/shared/debts/payments-list";
 import { useWriteOffDebt } from "@/shared/debts/use-write-off-debt";
 import { DEBT_STATUS_LABEL, DEBT_STATUS_VARIANT } from "@/shared/debts/status-labels";
@@ -66,6 +67,7 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
   const { data, isLoading } = useDebtsList(type, page, limit, filters, sorts, dateRange);
   const [payingDebt, setPayingDebt] = useState<DebtListRow | null>(null);
   const [writingOffDebt, setWritingOffDebt] = useState<DebtListRow | null>(null);
+  const [correctingDebt, setCorrectingDebt] = useState<DebtListRow | null>(null);
   const writeOffDebt = useWriteOffDebt();
   const [expandedDebtId, setExpandedDebtId] = useState<string | null>(null);
 
@@ -204,6 +206,11 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
                                 onClick: () => setPayingDebt(debt),
                               },
                               {
+                                label: "Koreksi Nominal",
+                                icon: Scale,
+                                onClick: () => setCorrectingDebt(debt),
+                              },
+                              {
                                 label: "Tandai Dihapuskan",
                                 icon: Ban,
                                 variant: "destructive",
@@ -257,6 +264,16 @@ export function DebtListTable({ type }: { type: "receivable" | "payable" }) {
           open={payingDebt != null}
           onOpenChange={(next) => {
             if (!next) setPayingDebt(null);
+          }}
+        />
+      )}
+
+      {correctingDebt && (
+        <CorrectDebtRemainingDialog
+          debt={correctingDebt}
+          open={correctingDebt != null}
+          onOpenChange={(next) => {
+            if (!next) setCorrectingDebt(null);
           }}
         />
       )}

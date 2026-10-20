@@ -84,7 +84,8 @@ Urutan kerja yang disarankan:
 6. Daftar/konten tiap tab: riwayat titip-ambil (tab Data), daftar akun `third_party` (tab Akun), breakdown per kontak×akun (tab Ringkasan, bergantung poin 5).
 7. Form transfer `third_party → third_party` (pindah tempat/kepemilikan).
 8. Pengecualian cashflow — audit SEMUA tempat yang query cashflow (bukan cuma satu file) sebelum menganggap selesai.
-9. Worker/MCP sync — baru dipikirkan setelah desktop solid, mengikuti preseden investasi yang sempat desktop-only dulu.
+9. Audit konsistensi Koreksi Saldo untuk `third_party` — DIPINDAH dari [balance-correction-derived-data-consistency.md](balance-correction-derived-data-consistency.md) (2026-10-20): `third_party_funds` juga tabel data turunan independen dari `accounts.balance` (lihat dokumen itu bagian "Kasus Dana Pihak Ketiga"), kemungkinan rentan masalah serupa `debt`/`investment` (Koreksi Saldo generik bisa mengubah saldo akun tanpa menyesuaikan `third_party_funds`). BELUM urgent — bergantung poin 4-5 di atas (`applyThirdPartyTransaction`+mutation) selesai dulu, krn saat ini `third_party_funds` belum punya jalur insert data nyata sama sekali (belum ada yang bisa drift). Kalau sudah waktunya: cek apakah perlu guard tolak-total serupa (lihat `isAccountTypeRestrictedFromBalanceCorrection` di `lib/account-types.ts`) sebelum atau sambil mendesain jalur granularnya (pola yang sama dgn `debt`: pilih baris `third_party_funds` dulu, baru input nominal seharusnya).
+10. Worker/MCP sync — baru dipikirkan setelah desktop solid, mengikuti preseden investasi yang sempat desktop-only dulu.
 
 ## Detail & rasional keputusan
 
