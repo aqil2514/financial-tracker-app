@@ -38,6 +38,15 @@ export class InvestmentBalanceCorrectionNoopError extends Error {
   }
 }
 
+export class InvestmentBalanceCorrectionMismatchError extends Error {
+  constructor(expectedUnit: number, actualUnit: number) {
+    super(
+      `Koreksi saldo investasi gagal -- ditemukan inkonsistensi internal (sisa unit seharusnya ${expectedUnit}, hasil hitung ulang ${actualUnit}). Perubahan dibatalkan, tidak ada data yang tersimpan.`
+    );
+    this.name = "InvestmentBalanceCorrectionMismatchError";
+  }
+}
+
 export async function applyInvestmentBalanceCorrection({
   db,
   accountId,
@@ -76,6 +85,14 @@ export async function applyInvestmentBalanceCorrection({
        VALUES ($1, $2, $3, $4, $5, $6, 'settled')`,
       [investmentPurchaseId, accountId, transactionId, diffUnit, pricePerUnit, date]
     );
+
+    const actualUnit = await getRemainingUnit(db, accountId);
+    if (actualUnit !== unit) {
+      await db.execute("DELETE FROM investment_purchases WHERE id = $1", [investmentPurchaseId]);
+      await db.execute("DELETE FROM transactions WHERE id = $1", [transactionId]);
+      throw new InvestmentBalanceCorrectionMismatchError(unit, actualUnit);
+    }
+
     return {
       transactionId,
       direction: "purchase",
@@ -96,6 +113,14 @@ export async function applyInvestmentBalanceCorrection({
      VALUES ($1, $2, $3, NULL, $4, $5, $6, $7, $8, 'settled')`,
     [investmentSaleId, accountId, transactionId, soldUnit, pricePerUnit, averageCost, realizedPl, date]
   );
+
+  const actualUnit = await getRemainingUnit(db, accountId);
+  if (actualUnit !== unit) {
+    await db.execute("DELETE FROM investment_sales WHERE id = $1", [investmentSaleId]);
+    await db.execute("DELETE FROM transactions WHERE id = $1", [transactionId]);
+    throw new InvestmentBalanceCorrectionMismatchError(unit, actualUnit);
+  }
+
   return {
     transactionId,
     direction: "sale",

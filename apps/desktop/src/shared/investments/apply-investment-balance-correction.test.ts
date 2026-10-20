@@ -2,29 +2,31 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyInvestmentBalanceCorrection,
+  InvestmentBalanceCorrectionMismatchError,
   InvestmentBalanceCorrectionNoopError,
   type ApplyInvestmentBalanceCorrectionInput,
 } from "./apply-investment-balance-correction";
 
 type AccountRow = { id: string; account_type: "cash" | "debt" | "investment" };
 type InvestmentPurchaseRow = {
+  id: string;
   account_id: string;
+  transaction_id: string;
   unit: number | null;
   price_per_unit: number | null;
   status: "pending" | "settled";
 };
-type InvestmentSaleRow = { account_id: string; unit: number; status: "pending" | "settled" };
-type TransactionRow = { id: string; type: string; amount: number; account_id: string };
-type InsertedPurchaseRow = { account_id: string; transaction_id: string; unit: number; price_per_unit: number; status: string };
-type InsertedSaleRow = {
+type InvestmentSaleRow = {
+  id: string;
   account_id: string;
   transaction_id: string;
   unit: number;
   price_per_unit: number;
   average_cost_per_unit: number;
   realized_pl: number;
-  status: string;
+  status: "pending" | "settled";
 };
+type TransactionRow = { id: string; type: string; amount: number; account_id: string };
 
 function createFakeDb(seed: {
   accounts?: AccountRow[];
@@ -32,11 +34,9 @@ function createFakeDb(seed: {
   investmentSales?: InvestmentSaleRow[];
 }) {
   const accounts = seed.accounts ?? [];
-  const investmentPurchases = seed.investmentPurchases ?? [];
+  const investmentPurchases: InvestmentPurchaseRow[] = seed.investmentPurchases ?? [];
   const investmentSales: InvestmentSaleRow[] = seed.investmentSales ?? [];
   const transactions: TransactionRow[] = [];
-  const insertedPurchases: InsertedPurchaseRow[] = [];
-  const insertedSales: InsertedSaleRow[] = [];
 
   const db = {
     async select<T>(sql: string, params: unknown[] = []): Promise<T> {
@@ -71,8 +71,15 @@ function createFakeDb(seed: {
         return {};
       }
       if (sql.startsWith("INSERT INTO investment_purchases")) {
-        const [, accountId, transactionId, unit, pricePerUnit] = params as [string, string, string, number, number];
-        insertedPurchases.push({
+        const [id, accountId, transactionId, unit, pricePerUnit] = params as [
+          string,
+          string,
+          string,
+          number,
+          number,
+        ];
+        investmentPurchases.push({
+          id,
           account_id: accountId,
           transaction_id: transactionId,
           unit,
@@ -82,7 +89,7 @@ function createFakeDb(seed: {
         return {};
       }
       if (sql.startsWith("INSERT INTO investment_sales")) {
-        const [, accountId, transactionId, unit, pricePerUnit, averageCost, realizedPl] = params as [
+        const [id, accountId, transactionId, unit, pricePerUnit, averageCost, realizedPl] = params as [
           string,
           string,
           string,
@@ -91,7 +98,8 @@ function createFakeDb(seed: {
           number,
           number,
         ];
-        insertedSales.push({
+        investmentSales.push({
+          id,
           account_id: accountId,
           transaction_id: transactionId,
           unit,
@@ -102,6 +110,24 @@ function createFakeDb(seed: {
         });
         return {};
       }
+      if (sql.startsWith("DELETE FROM investment_purchases WHERE id")) {
+        const [id] = params as [string];
+        const index = investmentPurchases.findIndex((p) => p.id === id);
+        if (index >= 0) investmentPurchases.splice(index, 1);
+        return {};
+      }
+      if (sql.startsWith("DELETE FROM investment_sales WHERE id")) {
+        const [id] = params as [string];
+        const index = investmentSales.findIndex((s) => s.id === id);
+        if (index >= 0) investmentSales.splice(index, 1);
+        return {};
+      }
+      if (sql.startsWith("DELETE FROM transactions WHERE id")) {
+        const [id] = params as [string];
+        const index = transactions.findIndex((t) => t.id === id);
+        if (index >= 0) transactions.splice(index, 1);
+        return {};
+      }
       throw new Error(`Fake db.execute tidak mengenali query: ${sql}`);
     },
   };
@@ -109,16 +135,18 @@ function createFakeDb(seed: {
   return {
     db: db as unknown as ApplyInvestmentBalanceCorrectionInput["db"],
     transactions,
-    insertedPurchases,
-    insertedSales,
+    investmentPurchases,
+    investmentSales,
   };
 }
 
 describe("applyInvestmentBalanceCorrection", () => {
   it("unit seharusnya lebih besar dari sisa unit sekarang -> insert investment_purchases, transaksi income cash-neutral", async () => {
-    const { db, transactions, insertedPurchases, insertedSales } = createFakeDb({
+    const { db, transactions, investmentPurchases, investmentSales } = createFakeDb({
       accounts: [{ id: "inv1", account_type: "investment" }],
-      investmentPurchases: [{ account_id: "inv1", unit: 100, price_per_unit: 1000, status: "settled" }],
+      investmentPurchases: [
+        { id: "p1", account_id: "inv1", transaction_id: "tx0", unit: 100, price_per_unit: 1000, status: "settled" },
+      ],
     });
 
     const result = await applyInvestmentBalanceCorrection({
@@ -134,21 +162,23 @@ describe("applyInvestmentBalanceCorrection", () => {
     expect(result).toMatchObject({ direction: "purchase", diffUnit: 20, amount: 30_000 });
     expect(transactions).toHaveLength(1);
     expect(transactions[0]).toMatchObject({ type: "income", amount: 30_000, account_id: "inv1" });
-    expect(insertedPurchases).toHaveLength(1);
-    expect(insertedPurchases[0]).toMatchObject({
+    expect(investmentPurchases).toHaveLength(2);
+    expect(investmentPurchases[1]).toMatchObject({
       account_id: "inv1",
       transaction_id: transactions[0].id,
       unit: 20,
       price_per_unit: 1500,
       status: "settled",
     });
-    expect(insertedSales).toHaveLength(0);
+    expect(investmentSales).toHaveLength(0);
   });
 
   it("unit seharusnya lebih kecil dari sisa unit sekarang -> insert investment_sales manual, transaksi expense cash-neutral", async () => {
-    const { db, transactions, insertedPurchases, insertedSales } = createFakeDb({
+    const { db, transactions, investmentPurchases, investmentSales } = createFakeDb({
       accounts: [{ id: "inv1", account_type: "investment" }],
-      investmentPurchases: [{ account_id: "inv1", unit: 100, price_per_unit: 1000, status: "settled" }],
+      investmentPurchases: [
+        { id: "p1", account_id: "inv1", transaction_id: "tx0", unit: 100, price_per_unit: 1000, status: "settled" },
+      ],
     });
 
     const result = await applyInvestmentBalanceCorrection({
@@ -164,9 +194,9 @@ describe("applyInvestmentBalanceCorrection", () => {
     expect(result).toMatchObject({ direction: "sale", diffUnit: -5, amount: 4_000 });
     expect(transactions).toHaveLength(1);
     expect(transactions[0]).toMatchObject({ type: "expense", amount: 4_000, account_id: "inv1" });
-    expect(insertedPurchases).toHaveLength(0);
-    expect(insertedSales).toHaveLength(1);
-    expect(insertedSales[0]).toMatchObject({
+    expect(investmentPurchases).toHaveLength(1);
+    expect(investmentSales).toHaveLength(1);
+    expect(investmentSales[0]).toMatchObject({
       account_id: "inv1",
       transaction_id: transactions[0].id,
       unit: 5,
@@ -180,7 +210,9 @@ describe("applyInvestmentBalanceCorrection", () => {
   it("menolak kalau unit seharusnya sama dengan sisa unit sekarang (tidak ada yang dikoreksi)", async () => {
     const { db } = createFakeDb({
       accounts: [{ id: "inv1", account_type: "investment" }],
-      investmentPurchases: [{ account_id: "inv1", unit: 100, price_per_unit: 1000, status: "settled" }],
+      investmentPurchases: [
+        { id: "p1", account_id: "inv1", transaction_id: "tx0", unit: 100, price_per_unit: 1000, status: "settled" },
+      ],
     });
 
     await expect(
@@ -213,10 +245,23 @@ describe("applyInvestmentBalanceCorrection", () => {
   });
 
   it("memperhitungkan unit yang sudah terjual sebelumnya saat menghitung sisa unit sekarang", async () => {
-    const { db, insertedSales } = createFakeDb({
+    const { db, investmentSales } = createFakeDb({
       accounts: [{ id: "inv1", account_type: "investment" }],
-      investmentPurchases: [{ account_id: "inv1", unit: 100, price_per_unit: 1000, status: "settled" }],
-      investmentSales: [{ account_id: "inv1", unit: 30, status: "settled" }],
+      investmentPurchases: [
+        { id: "p1", account_id: "inv1", transaction_id: "tx0", unit: 100, price_per_unit: 1000, status: "settled" },
+      ],
+      investmentSales: [
+        {
+          id: "s1",
+          account_id: "inv1",
+          transaction_id: "tx1",
+          unit: 30,
+          price_per_unit: 1100,
+          average_cost_per_unit: 1000,
+          realized_pl: 3000,
+          status: "settled",
+        },
+      ],
     });
 
     const result = await applyInvestmentBalanceCorrection({
@@ -230,6 +275,47 @@ describe("applyInvestmentBalanceCorrection", () => {
     });
 
     expect(result).toMatchObject({ direction: "sale", diffUnit: -10 });
-    expect(insertedSales[0]).toMatchObject({ unit: 10, average_cost_per_unit: 1000 });
+    expect(investmentSales[1]).toMatchObject({ unit: 10, average_cost_per_unit: 1000 });
+  });
+
+  it("rollback manual (DELETE) kalau hasil hitung ulang remainingUnit tidak cocok dengan unit yang diminta, arah tambah", async () => {
+    const { db, transactions, investmentPurchases } = createFakeDb({
+      accounts: [{ id: "inv1", account_type: "investment" }],
+      investmentPurchases: [
+        { id: "p1", account_id: "inv1", transaction_id: "tx0", unit: 100, price_per_unit: 1000, status: "settled" },
+      ],
+    });
+
+    const originalExecute = db.execute.bind(db);
+    db.execute = async (sql: string, params: unknown[] = []) => {
+      if (sql.startsWith("INSERT INTO investment_purchases")) {
+        const result = await originalExecute(sql, params);
+        investmentPurchases.push({
+          id: "ghost",
+          account_id: "inv1",
+          transaction_id: "ghost-tx",
+          unit: 999,
+          price_per_unit: 1,
+          status: "settled",
+        });
+        return result;
+      }
+      return originalExecute(sql, params);
+    };
+
+    await expect(
+      applyInvestmentBalanceCorrection({
+        db,
+        accountId: "inv1",
+        getCategoryId: async () => null,
+        date: "2026-10-20",
+        note: "x",
+        unit: 120,
+        pricePerUnit: 1500,
+      })
+    ).rejects.toThrow(InvestmentBalanceCorrectionMismatchError);
+
+    expect(transactions).toHaveLength(0);
+    expect(investmentPurchases.find((p) => p.transaction_id !== "tx0" && p.transaction_id !== "ghost-tx")).toBeUndefined();
   });
 });

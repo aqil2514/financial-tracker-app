@@ -314,6 +314,12 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0052_transaction_cash_neutral_flag.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 53,
+            description: "debt_amount_adjustments",
+            sql: include_str!("../migrations/0053_debt_amount_adjustments.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

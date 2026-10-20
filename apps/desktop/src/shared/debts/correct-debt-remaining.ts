@@ -1,7 +1,16 @@
 import { getDb, type Debt } from "@/lib/db";
 import { newId } from "@/lib/id";
+import { remainingDebtSql } from "./remaining-debt-sql";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
+
+async function getDebtRemaining(db: Db, debtId: string): Promise<number> {
+  const rows = await db.select<{ remaining: number }[]>(
+    `SELECT ${remainingDebtSql()} AS remaining FROM debts WHERE debts.id = $1`,
+    [debtId]
+  );
+  return rows[0]?.remaining ?? 0;
+}
 
 export type CorrectDebtRemainingInput = {
   db: Db;
@@ -17,12 +26,22 @@ export type CorrectDebtRemainingResult = {
   direction: "increase" | "decrease";
   diff: number;
   debtPaymentId: string | null;
+  debtAmountAdjustmentId: string | null;
 };
 
 export class DebtRemainingCorrectionNoopError extends Error {
   constructor() {
     super("Sisa yang diinput sama dengan sisa saat ini -- tidak ada yang perlu dikoreksi.");
     this.name = "DebtRemainingCorrectionNoopError";
+  }
+}
+
+export class DebtRemainingCorrectionMismatchError extends Error {
+  constructor(expectedRemaining: number, actualRemaining: number) {
+    super(
+      `Koreksi nominal gagal -- ditemukan inkonsistensi internal (sisa seharusnya ${expectedRemaining}, hasil hitung ulang ${actualRemaining}). Perubahan dibatalkan, tidak ada data yang tersimpan.`
+    );
+    this.name = "DebtRemainingCorrectionMismatchError";
   }
 }
 
@@ -68,14 +87,40 @@ export async function correctDebtRemaining({
       [debtPaymentId, debt.id, amount, debt.account_id, transactionId, date, note]
     );
 
-    if (targetRemaining <= 0) {
+    const statusShouldBePaid = targetRemaining <= 0;
+    if (statusShouldBePaid) {
       await db.execute("UPDATE debts SET status = 'paid' WHERE id = $1", [debt.id]);
     }
 
-    return { transactionId, direction: "decrease", diff, debtPaymentId };
+    const actualRemaining = await getDebtRemaining(db, debt.id);
+    if (actualRemaining !== targetRemaining) {
+      if (statusShouldBePaid) {
+        await db.execute("UPDATE debts SET status = 'ongoing' WHERE id = $1", [debt.id]);
+      }
+      await db.execute("DELETE FROM debt_payments WHERE id = $1", [debtPaymentId]);
+      await db.execute("DELETE FROM transactions WHERE id = $1", [transactionId]);
+      throw new DebtRemainingCorrectionMismatchError(targetRemaining, actualRemaining);
+    }
+
+    return { transactionId, direction: "decrease", diff, debtPaymentId, debtAmountAdjustmentId: null };
   }
 
   await db.execute("UPDATE debts SET amount = amount + $1 WHERE id = $2", [diff, debt.id]);
 
-  return { transactionId, direction: "increase", diff, debtPaymentId: null };
+  const debtAmountAdjustmentId = newId();
+  await db.execute(
+    `INSERT INTO debt_amount_adjustments (id, debt_id, transaction_id, delta, date)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [debtAmountAdjustmentId, debt.id, transactionId, diff, date]
+  );
+
+  const actualRemaining = await getDebtRemaining(db, debt.id);
+  if (actualRemaining !== targetRemaining) {
+    await db.execute("DELETE FROM debt_amount_adjustments WHERE id = $1", [debtAmountAdjustmentId]);
+    await db.execute("UPDATE debts SET amount = amount - $1 WHERE id = $2", [diff, debt.id]);
+    await db.execute("DELETE FROM transactions WHERE id = $1", [transactionId]);
+    throw new DebtRemainingCorrectionMismatchError(targetRemaining, actualRemaining);
+  }
+
+  return { transactionId, direction: "increase", diff, debtPaymentId: null, debtAmountAdjustmentId };
 }
