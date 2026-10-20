@@ -11,8 +11,10 @@ import {
 } from "../schema";
 import { FieldTargetBalance } from "./fields/field-target-balance";
 import { FieldCountAsCash } from "./fields/field-count-as-cash";
+import { FieldInvestmentCorrection } from "./fields/field-investment-correction";
 
 type AccountBalanceCorrectionFormProps = {
+  accountId: string;
   accountType: Account["account_type"];
   defaultValues: DefaultValues<AccountBalanceCorrectionFormValues>;
   onSubmit: (values: AccountBalanceCorrectionFormOutput) => void;
@@ -20,6 +22,7 @@ type AccountBalanceCorrectionFormProps = {
 };
 
 export function AccountBalanceCorrectionForm({
+  accountId,
   accountType,
   defaultValues,
   onSubmit,
@@ -27,18 +30,22 @@ export function AccountBalanceCorrectionForm({
 }: AccountBalanceCorrectionFormProps) {
   return (
     <BaseForm<AccountBalanceCorrectionFormValues, AccountBalanceCorrectionFormOutput>
-      schema={accountBalanceCorrectionSchema}
+      schema={accountBalanceCorrectionSchema(accountType)}
       defaultValues={defaultValues}
       onSubmit={onSubmit}
       isPending={isPending}
       submitLabel="Koreksi Saldo"
     >
-      {() => (
-        <>
-          <FieldTargetBalance />
-          {accountType === "cash" && <FieldCountAsCash />}
-        </>
-      )}
+      {() =>
+        accountType === "investment" ? (
+          <FieldInvestmentCorrection accountId={accountId} />
+        ) : (
+          <>
+            <FieldTargetBalance />
+            {accountType === "cash" && <FieldCountAsCash />}
+          </>
+        )
+      }
     </BaseForm>
   );
 }

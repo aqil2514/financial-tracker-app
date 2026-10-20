@@ -4,6 +4,9 @@ import { getDb, type Account } from "@/lib/db";
 import { newId } from "@/lib/id";
 import { useDbMutation } from "@/hooks/use-db-mutation";
 import { dependentKeysOf } from "@/lib/query-dependencies";
+import { isAccountTypeRestrictedFromBalanceCorrection } from "@/lib/account-types";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
+import { applyInvestmentBalanceCorrection } from "@/shared/investments/apply-investment-balance-correction";
 
 const CORRECTION_CATEGORY_NAME = "Penyesuaian Saldo";
 
@@ -19,13 +22,21 @@ function resolveIsCashNeutral(accountType: Account["account_type"], countAsCash:
   return false;
 }
 
-export type CorrectAccountBalanceInput = {
-  accountId: string;
-  accountType: Account["account_type"];
-  targetBalance: number;
-  currentBalance: number;
-  countAsCash: boolean;
-};
+export type CorrectAccountBalanceInput =
+  | {
+      mode: "balance";
+      accountId: string;
+      accountType: Account["account_type"];
+      targetBalance: number;
+      currentBalance: number;
+      countAsCash: boolean;
+    }
+  | {
+      mode: "investment";
+      accountId: string;
+      unit: number;
+      pricePerUnit: number;
+    };
 
 async function getOrCreateCorrectionCategoryId(
   db: Awaited<ReturnType<typeof getDb>>,
@@ -47,28 +58,49 @@ async function getOrCreateCorrectionCategoryId(
 
 export function useCorrectAccountBalance() {
   return useDbMutation({
-    mutationFn: async ({
-      accountId,
-      accountType,
-      targetBalance,
-      currentBalance,
-      countAsCash,
-    }: CorrectAccountBalanceInput) => {
+    mutationFn: async (input: CorrectAccountBalanceInput) => {
+      const db = await getDb();
+
+      if (input.mode === "investment") {
+        const result = await applyInvestmentBalanceCorrection({
+          db,
+          accountId: input.accountId,
+          getCategoryId: (type) => getOrCreateCorrectionCategoryId(db, type),
+          date: now(),
+          note: "Koreksi saldo",
+          unit: input.unit,
+          pricePerUnit: input.pricePerUnit,
+        });
+
+        await pushOnWrite("transactions", result.transactionId);
+        if (result.investmentPurchaseId) void pushOnWrite("investment_purchases", result.investmentPurchaseId);
+        if (result.investmentSaleId) void pushOnWrite("investment_sales", result.investmentSaleId);
+        return;
+      }
+
+      const { accountId, accountType, targetBalance, currentBalance, countAsCash } = input;
+      if (isAccountTypeRestrictedFromBalanceCorrection(accountType)) {
+        throw new Error(
+          `Saldo akun bertipe '${accountType}' tidak bisa dikoreksi langsung karena derived dari data piutang/utang atau investasi -- gunakan transaksi transfer atau perbaiki transaksi akar penyebabnya.`
+        );
+      }
+
       const diff = targetBalance - currentBalance;
       if (diff === 0) return;
 
-      const type: "income" | "expense" = diff > 0 ? "income" : "expense";
+      const diffType: "income" | "expense" = diff > 0 ? "income" : "expense";
       const amount = Math.abs(diff);
       const isCashNeutral = resolveIsCashNeutral(accountType, countAsCash);
 
-      const db = await getDb();
-      const categoryId = await getOrCreateCorrectionCategoryId(db, type);
+      const categoryId = await getOrCreateCorrectionCategoryId(db, diffType);
 
+      const transactionId = newId();
       await db.execute(
         `INSERT INTO transactions (id, type, amount, category_id, account_id, note, date, is_cash_neutral)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [newId(), type, amount, categoryId, accountId, "Koreksi saldo", now(), isCashNeutral ? 1 : 0]
+        [transactionId, diffType, amount, categoryId, accountId, "Koreksi saldo", now(), isCashNeutral ? 1 : 0]
       );
+      await pushOnWrite("transactions", transactionId);
     },
     invalidateKey: dependentKeysOf("transactions", "accounts", "categories"),
     successMessage: "Saldo berhasil dikoreksi",

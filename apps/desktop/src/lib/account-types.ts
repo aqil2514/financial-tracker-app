@@ -8,7 +8,12 @@
  */
 export type AccountType = "cash" | "debt" | "investment" | "third_party";
 
-export const ACCOUNT_TYPES = ["cash", "debt", "investment", "third_party"] as const satisfies readonly AccountType[];
+export const ACCOUNT_TYPES = [
+  "cash",
+  "debt",
+  "investment",
+  "third_party",
+] as const satisfies readonly AccountType[];
 
 export const ACCOUNT_TYPE_OPTIONS: Array<{
   value: AccountType;
@@ -19,25 +24,38 @@ export const ACCOUNT_TYPE_OPTIONS: Array<{
   {
     value: "cash",
     label: "Kas/Bank",
-    description: "Akun uang sungguhan, seperti dompet, rekening bank, atau kartu kredit.",
+    description:
+      "Akun uang sungguhan, seperti dompet, rekening bank, atau kartu kredit.",
     badgeClassName: "bg-green-600/10 text-green-600",
   },
   {
     value: "debt",
     label: "Utang Piutang",
-    description: "Akun virtual untuk melacak pinjaman ke/dari orang lain — bukan uang sungguhan.",
+    description:
+      "Akun virtual untuk melacak pinjaman ke/dari orang lain — bukan uang sungguhan.",
     badgeClassName: "bg-red-600/10 text-red-600",
   },
   {
     value: "investment",
     label: "Investasi",
-    description: "Satu instrumen investasi tunggal (reksadana, saham, dst) — melacak unit dan harga per unit",
+    description:
+      "Satu instrumen investasi tunggal (reksadana, saham, dst) — melacak unit dan harga per unit",
     badgeClassName: "bg-blue-600/10 text-blue-600",
   },
   {
     value: "third_party",
     label: "Dana Pihak Ketiga",
-    description: "Akun virtual untuk titipan dana milik orang lain — bukan uang Anda, dibedakan per kontak.",
+    description:
+      "Akun virtual untuk titipan dana milik orang lain — bukan uang Anda, dibedakan per kontak.",
     badgeClassName: "bg-amber-600/10 text-amber-600",
   },
 ];
+
+const ACCOUNT_TYPES_RESTRICTED_FROM_BALANCE_CORRECTION: readonly AccountType[] =
+  ["debt"];
+
+export function isAccountTypeRestrictedFromBalanceCorrection(
+  accountType: AccountType,
+): boolean {
+  return ACCOUNT_TYPES_RESTRICTED_FROM_BALANCE_CORRECTION.includes(accountType);
+}
