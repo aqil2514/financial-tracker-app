@@ -14,6 +14,7 @@ import { upsertDebtPayment } from "./upsert-debt-payment";
 import { upsertInvestmentPurchase } from "./upsert-investment-purchase";
 import { upsertInvestmentSale } from "./upsert-investment-sale";
 import { upsertLabel } from "./upsert-label";
+import { upsertThirdPartyFund } from "./upsert-third-party-fund";
 import { upsertTransaction } from "./upsert-transaction";
 
 export async function applySyncResponse(response: SyncResponse): Promise<void> {
@@ -56,4 +57,8 @@ export async function applySyncResponse(response: SyncResponse): Promise<void> {
   }
 
   for (const row of response.categoryPeriods) await applyCategoryPeriodRow(db, row);
+
+  for (const row of response.thirdPartyFunds) {
+    await applyRow(db, "third_party_funds", row, upsertThirdPartyFund);
+  }
 }

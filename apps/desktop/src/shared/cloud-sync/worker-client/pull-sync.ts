@@ -110,6 +110,17 @@ export type SyncResponse = {
   categoryPeriods: Array<
     SyncRow & { name: string; startDate: string; endDate: string; categoryIds: string[] }
   >;
+  thirdPartyFunds: Array<
+    SyncRow & {
+      accountId: string;
+      contactId: string;
+      transactionId: string | null;
+      direction: "in" | "out";
+      amount: number;
+      date: string;
+      note: string | null;
+    }
+  >;
 };
 
 export function pullSync(creds: CloudSyncCredentials, since: string | null): Promise<SyncResponse> {

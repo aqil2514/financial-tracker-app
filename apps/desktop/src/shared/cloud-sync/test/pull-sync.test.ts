@@ -71,6 +71,7 @@ function emptySyncResponse(): SyncResponse {
     categoryLabels: [],
     accountLabels: [],
     categoryPeriods: [],
+    thirdPartyFunds: [],
   };
 }
 
@@ -79,7 +80,7 @@ beforeEach(() => {
 });
 
 describe("applySyncResponse", () => {
-  it("menerapkan SEMUA 16 koleksi SyncResponse ke tabel lokalnya -- regresi investment_* yang dulu terlupa", async () => {
+  it("menerapkan SEMUA 17 koleksi SyncResponse ke tabel lokalnya -- regresi investment_*/third_party_funds yang dulu terlupa", async () => {
     const { db, touchedTables } = createTableTrackingDb();
     vi.mocked(getDb).mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDb>>);
 
@@ -191,6 +192,18 @@ describe("applySyncResponse", () => {
       categoryPeriods: [
         { ...row({ id: "cp1" }), name: "Periode", startDate: "2026-01-01", endDate: "2026-03-31", categoryIds: ["c1"] },
       ],
+      thirdPartyFunds: [
+        {
+          ...row({ id: "tpf1" }),
+          accountId: "a1",
+          contactId: "ct1",
+          transactionId: "t1",
+          direction: "in",
+          amount: 10000,
+          date: "2026-10-10",
+          note: null,
+        },
+      ],
     };
 
     await applySyncResponse(response);
@@ -216,6 +229,7 @@ describe("applySyncResponse", () => {
         "account_labels",
         "category_periods",
         "category_period_categories",
+        "third_party_funds",
       ])
     );
   });
