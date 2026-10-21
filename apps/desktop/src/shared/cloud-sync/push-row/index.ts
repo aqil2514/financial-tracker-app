@@ -14,6 +14,7 @@ import { pushAttachmentRow } from "./push-attachment-row";
 import { pushLabelRow } from "./push-label-row";
 import { pushLabelJunctionRow } from "./push-label-junction-row";
 import { pushCategoryPeriodRow } from "./push-category-period-row";
+import { pushThirdPartyFundRow } from "./push-third-party-fund-row";
 
 export async function pushRowPayload(
   creds: CloudSyncCredentials,
@@ -51,5 +52,7 @@ export async function pushRowPayload(
       return pushLabelJunctionRow(creds, table, id);
     case "category_periods":
       return pushCategoryPeriodRow(creds, id);
+    case "third_party_funds":
+      return pushThirdPartyFundRow(creds, id);
   }
 }

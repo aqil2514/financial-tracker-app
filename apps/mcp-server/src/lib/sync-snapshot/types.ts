@@ -119,6 +119,19 @@ export type InvestmentSale = {
   deletedAt: string | null;
 };
 
+export type ThirdPartyFund = {
+  id: string;
+  accountId: string;
+  contactId: string;
+  transactionId: string | null;
+  direction: "in" | "out";
+  amount: number;
+  date: string;
+  note: string | null;
+  updatedAt: string | null;
+  deletedAt: string | null;
+};
+
 export type CategoryPeriod = {
   id: string;
   name: string;
@@ -179,6 +192,7 @@ export type SyncSnapshot = {
   transactionLabels: TransactionLabel[];
   categoryLabels: CategoryLabel[];
   accountLabels: AccountLabel[];
+  thirdPartyFunds: ThirdPartyFund[];
 };
 
 export async function fetchFullSnapshot(

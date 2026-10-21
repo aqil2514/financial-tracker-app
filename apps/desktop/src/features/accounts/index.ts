@@ -12,3 +12,4 @@ export {
   type AccountFormValues,
   type AccountFormOutput,
 } from "./contents/detail/form";
+export { DeleteAccountDialog } from "./contents/detail/dialog/delete";

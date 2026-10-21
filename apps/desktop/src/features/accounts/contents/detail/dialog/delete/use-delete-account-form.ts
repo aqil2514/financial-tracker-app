@@ -7,6 +7,7 @@ import type { Account } from "@/lib/db";
 import { getDb } from "@/lib/db";
 import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useDeleteAccount } from "./use-delete-account";
+import { useThirdPartyFundCount } from "./use-third-party-fund-count";
 
 type RelationAction = "unassign" | "reassign";
 
@@ -34,6 +35,13 @@ export function useDeleteAccountForm(
 
   const { data: accounts } = useAccounts();
   const { data: transactionCount } = useTransactionCountByAccount(account.id);
+  // FK third_party_funds.account_id ON DELETE CASCADE bikin unassign/
+  // reassign men-drop riwayat titip/ambil dengan cara yang tidak
+  // konsisten (lihat use-third-party-fund-count.ts) -- dilarang total
+  // selama masih ada riwayat, apa pun transactionAction yang dipilih.
+  const isThirdParty = account.account_type === "third_party";
+  const { data: thirdPartyFundCount } = useThirdPartyFundCount(account.id, isThirdParty);
+  const hasThirdPartyFunds = isThirdParty && (thirdPartyFundCount ?? 0) > 0;
   const deleteAccount = useDeleteAccount();
 
   useEffect(() => {
@@ -53,6 +61,8 @@ export function useDeleteAccountForm(
     targetAccountId != null && otherAccounts.some((a) => String(a.id) === targetAccountId);
 
   function handleConfirm() {
+    if (hasThirdPartyFunds) return;
+
     deleteAccount.mutate(
       {
         id: account.id,
@@ -67,9 +77,10 @@ export function useDeleteAccountForm(
   }
 
   const canConfirm =
-    !hasTransactions ||
-    transactionAction === "unassign" ||
-    (transactionAction === "reassign" && isTargetAccountValid);
+    !hasThirdPartyFunds &&
+    (!hasTransactions ||
+      transactionAction === "unassign" ||
+      (transactionAction === "reassign" && isTargetAccountValid));
 
   return {
     transactionAction,
@@ -79,6 +90,8 @@ export function useDeleteAccountForm(
     otherAccounts,
     hasTransactions,
     transactionCount,
+    hasThirdPartyFunds,
+    thirdPartyFundCount,
     canConfirm,
     handleConfirm,
     isPending: deleteAccount.isPending,

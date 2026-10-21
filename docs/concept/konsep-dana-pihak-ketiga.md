@@ -1,6 +1,6 @@
 # Konsep Dana Pihak Ketiga di Aplikasi Ini
 
-> Status: Model data & aturan sudah matang (diskusi 2026-10-09), 3 pertanyaan terbuka sudah diputuskan (2026-10-13, lihat "Keputusan final" di bawah), migrasi skema sudah ditulis (`apps/desktop/src-tauri/migrations/0049_account_type_third_party.sql`). BELUM: `classifyAccountPair`, `applyThirdPartyTransaction`, form, pengecualian cashflow, UI. Lihat `apps/desktop/docs/todos/plan/account-type-third-party.md` untuk checklist teknis lengkap.
+> Status: Model data & aturan sudah matang (diskusi 2026-10-09), 3 pertanyaan terbuka sudah diputuskan (2026-10-13, lihat "Keputusan final" di bawah), migrasi skema sudah ditulis (`apps/desktop/src-tauri/migrations/0049_account_type_third_party.sql`). `classifyAccountPair` + `applyThirdPartyTransaction` SUDAH ditulis (2026-10-21, lihat `apps/desktop/src/shared/third-party-funds/`) — TAPI belum disambung ke routing form transaksi/mutation nyata. BELUM: wiring form, form transfer dua-kontak, pengecualian cashflow. Lihat `apps/desktop/docs/todos/plan/account-type-third-party.md` untuk checklist teknis lengkap.
 
 ## Kenapa fitur ini ada
 

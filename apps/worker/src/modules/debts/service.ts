@@ -273,7 +273,8 @@ export async function resolveDebtTransactionOutcome(
     pairKind === "cash-cash" ||
     pairKind === "debt-debt" ||
     pairKind === "cash-investment" ||
-    pairKind === "investment-cash"
+    pairKind === "investment-cash" ||
+    pairKind === "third_party-third_party"
   ) {
     return { kind: "noop" };
   }

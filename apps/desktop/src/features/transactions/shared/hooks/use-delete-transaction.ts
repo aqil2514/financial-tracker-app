@@ -9,6 +9,7 @@ import { pushDeleteTransactionOnWrite, pushDeleteOnWrite } from "@/shared/cloud-
 import { detachDebtForDeletedTransaction, type DeletedTransactionDebtInfo } from "@/shared/debts/apply-debt-transaction";
 import { detachInvestmentPurchaseForDeletedTransaction } from "@/shared/investments/apply-investment-transaction";
 import { detachInvestmentSaleForDeletedTransaction } from "@/shared/investments/apply-sell-investment-transaction";
+import { detachThirdPartyFundsForDeletedTransaction } from "@/shared/third-party-funds";
 
 // Pesan informatif SETELAH delete berhasil -- dialog konfirmasi tetap
 // generik ("Hapus transaksi ini?"), toast tambahan ini muncul begitu
@@ -59,6 +60,14 @@ export function useDeleteTransaction() {
         if (saleInfo.adjustmentTransactionId != null) {
           await pushDeleteOnWrite("transactions", saleInfo.adjustmentTransactionId, {});
         }
+      }
+      // Beda dari debts (transaction_id SET NULL, principal tetap ada) --
+      // third_party_funds TIDAK punya makna sebagai baris yatim (FK
+      // ON DELETE SET NULL di skema cuma jaring pengaman, bukan perilaku
+      // yang diinginkan) -- dihapus total, pola sama investment_purchases.
+      const thirdPartyInfo = await detachThirdPartyFundsForDeletedTransaction(db, id);
+      for (const fundId of thirdPartyInfo.deletedThirdPartyFundIds) {
+        void pushDeleteOnWrite("third_party_funds", fundId, {});
       }
       await db.execute("DELETE FROM transactions WHERE id = $1", [id]);
 

@@ -15,6 +15,7 @@ export { pushInvestmentAccount, type PushInvestmentAccountPayload } from "./push
 export { pushInvestmentPurchase, type PushInvestmentPurchasePayload } from "./push-investment-purchase";
 export { pushInvestmentSale, type PushInvestmentSalePayload } from "./push-investment-sale";
 export { pushCategoryPeriod, type PushCategoryPeriodPayload } from "./push-category-period";
+export { pushThirdPartyFund, type PushThirdPartyFundPayload } from "./push-third-party-fund";
 
 export type { LabelScope } from "./label-scope";
 export { pushLabel, type PushLabelPayload } from "./push-label";

@@ -51,8 +51,16 @@ export const ACCOUNT_TYPE_OPTIONS: Array<{
   },
 ];
 
+// `third_party` ditambahkan 2026-10-21 (lihat docs/todos/plan/account-type-third-party.md
+// poin 9) -- third_party_funds adalah tabel data turunan independen dari
+// accounts.balance, sama persis pola debts/investment_purchases. Koreksi
+// Saldo generik (satu field nominal, ditembak ke AKUN) tidak tahu kontak
+// mana yang nominalnya salah -- satu akun third_party bisa menampung
+// riwayat BANYAK kontak independen sekaligus (persis debt). Guard
+// tolak-total ini SEMENTARA, pola sama persis "debt" sebelum jalur
+// granularnya ada -- lihat docs/todos/done/balance-correction-derived-data-consistency.md.
 const ACCOUNT_TYPES_RESTRICTED_FROM_BALANCE_CORRECTION: readonly AccountType[] =
-  ["debt"];
+  ["debt", "third_party"];
 
 export function isAccountTypeRestrictedFromBalanceCorrection(
   accountType: AccountType,

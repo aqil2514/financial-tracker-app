@@ -85,3 +85,15 @@ export type DebtPayment = {
   date: string;
   created_at: string;
 };
+
+export type ThirdPartyFund = {
+  id: string;
+  account_id: string;
+  contact_id: string;
+  transaction_id: string | null;
+  direction: "in" | "out";
+  amount: number;
+  date: string;
+  note: string | null;
+  created_at: string;
+};

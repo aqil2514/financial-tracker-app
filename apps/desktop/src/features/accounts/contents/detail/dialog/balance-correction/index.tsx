@@ -36,9 +36,9 @@ export function AccountBalanceCorrectionDialog({
         </DialogHeader>
         {isRestricted ? (
           <p className="text-muted-foreground text-sm">
-            Saldo akun bertipe Utang Piutang tidak bisa dikoreksi langsung di sini --
-            saldo akun ini mengikuti riwayat piutang/utang yang tersimpan. Perbaiki
-            lewat transaksi transfer atau betulkan transaksi akar penyebabnya.
+            {account.account_type === "third_party"
+              ? `Saldo akun Dana Pihak Ketiga tidak bisa dikoreksi langsung di sini -- saldo akun ini mengikuti riwayat titip/ambil yang tersimpan. Perbaiki lewat tab Data di halaman Dana Pihak Ketiga.`
+              : "Saldo akun bertipe Utang Piutang tidak bisa dikoreksi langsung di sini -- saldo akun ini mengikuti riwayat piutang/utang yang tersimpan. Perbaiki lewat transaksi transfer atau betulkan transaksi akar penyebabnya."}
           </p>
         ) : isInvestment && !holding ? (
           <p className="text-muted-foreground text-sm">Memuat data investasi...</p>

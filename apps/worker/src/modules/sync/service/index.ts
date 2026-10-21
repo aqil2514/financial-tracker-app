@@ -16,6 +16,7 @@ import { fetchTransactionLabels, type TransactionLabelRow } from "./entities/tra
 import { fetchCategoryLabels, type CategoryLabelRow } from "./entities/category-labels";
 import { fetchAccountLabels, type AccountLabelRow } from "./entities/account-labels";
 import { fetchCategoryPeriods, type CategoryPeriodRow } from "./entities/category-periods";
+import { fetchThirdPartyFunds, type ThirdPartyFundRow } from "./entities/third-party-funds";
 
 export type SyncResponse = {
   checkpoint: string;
@@ -35,6 +36,7 @@ export type SyncResponse = {
   categoryLabels: CategoryLabelRow[];
   accountLabels: AccountLabelRow[];
   categoryPeriods: CategoryPeriodRow[];
+  thirdPartyFunds: ThirdPartyFundRow[];
 };
 
 export async function getSyncSnapshot(env: Env, since: string | null): Promise<SyncResponse> {
@@ -59,6 +61,7 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     categoryLabels,
     accountLabels,
     categoryPeriods,
+    thirdPartyFunds,
   ] = await Promise.all([
     fetchAccountGroups(env, filter, bind),
     fetchCategories(env, filter, bind),
@@ -76,6 +79,7 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     fetchCategoryLabels(env, filter, bind),
     fetchAccountLabels(env, filter, bind),
     fetchCategoryPeriods(env, since),
+    fetchThirdPartyFunds(env, filter, bind),
   ]);
 
   return {
@@ -96,5 +100,6 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     categoryLabels,
     accountLabels,
     categoryPeriods,
+    thirdPartyFunds,
   };
 }

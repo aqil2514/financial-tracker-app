@@ -33,7 +33,8 @@ export function useCashflowTransactions(
         return db.select<Transaction[]>(
           `SELECT t.* FROM transactions t
            JOIN accounts a ON a.id = t.account_id
-           WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3 AND t.is_cash_neutral = 0 AND ${groupCondition}
+           WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3 AND t.is_cash_neutral = 0
+             AND a.account_type != 'third_party' AND ${groupCondition}
            ORDER BY t.date DESC`,
           params
         );
@@ -50,7 +51,9 @@ export function useCashflowTransactions(
 
         return db.select<Transaction[]>(
           `SELECT t.* FROM transactions t
-           WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3 AND t.is_cash_neutral = 0 AND ${labelCondition}
+           JOIN accounts a ON a.id = t.account_id
+           WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3 AND t.is_cash_neutral = 0
+             AND a.account_type != 'third_party' AND ${labelCondition}
            ORDER BY t.date DESC`,
           params
         );
@@ -62,9 +65,11 @@ export function useCashflowTransactions(
 
       return db.select<Transaction[]>(
         `SELECT t.* FROM transactions t
+         JOIN accounts a ON a.id = t.account_id
          LEFT JOIN categories c ON c.id = t.category_id
          LEFT JOIN categories parent ON parent.id = c.parent_id
-         WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3 AND t.is_cash_neutral = 0 AND ${groupCondition}
+         WHERE t.type = $1 AND date(t.date) BETWEEN $2 AND $3 AND t.is_cash_neutral = 0
+           AND a.account_type != 'third_party' AND ${groupCondition}
          ORDER BY t.date DESC`,
         params
       );

@@ -276,11 +276,11 @@ export async function correctAccountBalance(
   if (!account) return { status: "account_not_found" };
 
   if (isAccountTypeRestrictedFromDirectTransaction(account.account_type)) {
-    return {
-      status: "rejected",
-      reason:
-        "Saldo akun bertipe 'debt' tidak bisa dikoreksi langsung karena derived dari data piutang/utang -- gunakan transaksi transfer atau perbaiki transaksi akar penyebabnya.",
-    };
+    const reason =
+      account.account_type === "third_party"
+        ? "Saldo akun bertipe 'third_party' tidak bisa dikoreksi langsung karena derived dari data dana pihak ketiga -- gunakan transaksi titip/ambil atau perbaiki transaksi akar penyebabnya."
+        : "Saldo akun bertipe 'debt'/'investment' tidak bisa dikoreksi langsung karena derived dari data piutang/utang/investasi -- gunakan transaksi transfer atau perbaiki transaksi akar penyebabnya.";
+    return { status: "rejected", reason };
   }
 
   const currentBalance = await getAccountBalance(env, accountId);

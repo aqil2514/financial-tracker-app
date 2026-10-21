@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Controller, type Control } from "react-hook-form";
+import { Controller, type Control, type FieldValues } from "react-hook-form";
 
 import { Label } from "@/components/ui/label";
 import {
@@ -20,29 +20,34 @@ type ContactOption = { value: string; label: string };
 
 const CREATE_PREFIX = "__create__:";
 
-/** Bentuk minimal form yang dibutuhkan field ini — dipakai bareng oleh
- * form transaksi dan form-form lain yang juga punya field kontak (mis.
- * `new-debt-form`, `third-party`). */
-type ContactFormValues = { contact_name: string | null };
-
-type ContactFieldProps<TFieldValues extends ContactFormValues> = {
+type ContactFieldProps<TFieldValues extends FieldValues> = {
   control: Control<TFieldValues>;
   label: string;
   disabled?: boolean;
+  /** Nama field di form yang bertipe `string | null`, default
+   * "contact_name" — dioper eksplisit kalau form punya LEBIH dari satu
+   * field kontak (mis. form transfer third_party→third_party yang butuh
+   * kontak asal & tujuan independen, lihat
+   * docs/concept/konsep-dana-pihak-ketiga.md "Pindah tempat dan/atau
+   * pindah kepemilikan"). TypeScript tidak bisa memverifikasi field yang
+   * dipilih benar-benar `string | null` dari constraint generik `FieldValues`
+   * saja (lihat cast contactControl) — tanggung jawab caller memastikan
+   * nama field yang dioper memang bertipe itu di schema form-nya. */
+  name?: string;
 };
 
-export function ContactField<TFieldValues extends ContactFormValues>({
+export function ContactField<TFieldValues extends FieldValues>({
   control,
   label,
   disabled,
+  name = "contact_name",
 }: ContactFieldProps<TFieldValues>) {
   const { data: contacts } = useContacts();
   const anchor = useComboboxAnchor();
-  // react-hook-form tidak bisa menyempitkan Path<TFieldValues> generik ke
-  // literal "contact_name" hanya dari constraint TFieldValues extends
-  // ContactFormValues — cast ini aman karena constraint itu menjamin
-  // field contact_name ada dengan tipe yang sama persis.
-  const contactControl = control as unknown as Control<ContactFormValues>;
+  // Cast tujuannya menyederhanakan Path<TFieldValues> generik ke nama
+  // field dinamis (string biasa) -- lihat catatan di `name` prop soal
+  // tanggung jawab caller menjamin tipe field yang sebenarnya.
+  const contactControl = control as unknown as Control<Record<string, string | null>>;
   const [query, setQuery] = useState("");
 
   const options: ContactOption[] =
@@ -63,7 +68,7 @@ export function ContactField<TFieldValues extends ContactFormValues>({
   return (
     <Controller
       control={contactControl}
-      name="contact_name"
+      name={name}
       render={({ field, fieldState }) => {
         const similar = contacts
           ? findSimilarContacts(field.value ?? "", contacts)
@@ -75,7 +80,7 @@ export function ContactField<TFieldValues extends ContactFormValues>({
 
         return (
           <div className="space-y-2">
-            <Label htmlFor="contact_name">{label}</Label>
+            <Label htmlFor={name}>{label}</Label>
             <div ref={anchor}>
               <Combobox
                 items={displayOptions}
@@ -91,7 +96,7 @@ export function ContactField<TFieldValues extends ContactFormValues>({
                 onInputValueChange={(value: string) => setQuery(value)}
               >
                 <ComboboxInput
-                  id="contact_name"
+                  id={name}
                   placeholder="Cari atau ketik nama baru..."
                   showClear
                   disabled={disabled}

@@ -30,6 +30,8 @@ export function DeleteAccountDialog({
     otherAccounts,
     hasTransactions,
     transactionCount,
+    hasThirdPartyFunds,
+    thirdPartyFundCount,
     canConfirm,
     handleConfirm,
     isPending,
@@ -41,13 +43,15 @@ export function DeleteAccountDialog({
         <DialogHeader>
           <DialogTitle>Hapus akun &quot;{account.name}&quot;?</DialogTitle>
           <DialogDescription>
-            {hasTransactions
-              ? `Akun ini masih dipakai oleh ${transactionCount} transaksi. Pilih apa yang terjadi pada transaksi tersebut.`
-              : "Tindakan ini tidak bisa dibatalkan."}
+            {hasThirdPartyFunds
+              ? `Akun ini masih punya ${thirdPartyFundCount} riwayat titip/ambil. Hapus atau pindahkan riwayatnya dulu lewat tab Data sebelum menghapus akun ini.`
+              : hasTransactions
+                ? `Akun ini masih dipakai oleh ${transactionCount} transaksi. Pilih apa yang terjadi pada transaksi tersebut.`
+                : "Tindakan ini tidak bisa dibatalkan."}
           </DialogDescription>
         </DialogHeader>
 
-        {hasTransactions && (
+        {hasTransactions && !hasThirdPartyFunds && (
           <TransactionRelationPicker
             transactionAction={transactionAction}
             onTransactionActionChange={setTransactionAction}

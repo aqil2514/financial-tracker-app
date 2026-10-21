@@ -14,6 +14,7 @@ export type {
   InvestmentSale,
   Label,
   SyncSnapshot,
+  ThirdPartyFund,
   Transaction,
   TransactionLabel,
 } from "../types";
@@ -47,3 +48,6 @@ export { listInvestmentDetail } from "./investments/list-investment-detail";
 
 export { listCategoryPeriods } from "./category-periods/list-category-periods";
 export { getCategoryPeriodSummary } from "./category-periods/get-category-period-summary";
+
+export { summarizeThirdParty } from "./third-party/summarize-third-party";
+export { listThirdPartyDetail } from "./third-party/list-third-party-detail";

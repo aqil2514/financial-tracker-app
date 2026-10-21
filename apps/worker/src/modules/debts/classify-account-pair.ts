@@ -13,13 +13,22 @@
 // Kombinasi investment lain (investment-debt, investment-investment, dll)
 // TETAP throw UnsupportedAccountPairError -- belum ada model datanya sama
 // sekali di Worker maupun desktop.
+//
+// **Revisi 2026-10-21 (docs/todos/plan/third-party-sync.md, Tahap 2)**:
+// `third_party-third_party` ditambah -- satu-satunya kombinasi valid utk
+// tipe ini (pindah tempat dan/atau pindah kepemilikan antar akun dana
+// pihak ketiga, lihat docs/concept/konsep-dana-pihak-ketiga.md). Titip
+// masuk/ambil keluar SELALU income/expense satu sisi (bukan transfer) --
+// `cash-third_party`/`third_party-cash` SENGAJA TIDAK pernah ditambahkan,
+// sama persis keputusan desktop.
 export type AccountPairKind =
   | "cash-cash"
   | "cash-debt"
   | "debt-cash"
   | "debt-debt"
   | "cash-investment"
-  | "investment-cash";
+  | "investment-cash"
+  | "third_party-third_party";
 
 // sourceType/destinationType tetap `string` (bukan AccountType) -- datang
 // mentah dari query SQL (getAccountType, debts/service.ts), DB tidak
@@ -44,5 +53,6 @@ export function classifyAccountPair(sourceType: string, destinationType: string)
   if (sourceType === "debt" && destinationType === "debt") return "debt-debt";
   if (sourceType === "cash" && destinationType === "investment") return "cash-investment";
   if (sourceType === "investment" && destinationType === "cash") return "investment-cash";
+  if (sourceType === "third_party" && destinationType === "third_party") return "third_party-third_party";
   throw new UnsupportedAccountPairError(sourceType, destinationType);
 }

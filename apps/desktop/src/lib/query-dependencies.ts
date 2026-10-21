@@ -28,6 +28,8 @@ import { transactionInvestmentSaleQueryKey } from "@/shared/investments/use-tran
 import { investmentPurchasesQueryKey } from "@/shared/investments/use-investment-purchases";
 import { investmentSalesQueryKey } from "@/shared/investments/use-investment-sales";
 import { investmentHoldingSummaryQueryKey } from "@/shared/investments/use-investment-holding-summary";
+import { thirdPartyFundsQueryKey } from "@/features/third-party/content/data/use-third-party-funds";
+import { thirdPartySummaryQueryKey } from "@/features/third-party/content/summary/use-third-party-summary";
 
 // Peta ketergantungan query key lintas fitur: kalau data sebuah DOMAIN
 // berubah (mis. transaksi ditambah/diedit/dihapus), semua query key di
@@ -63,6 +65,8 @@ export const QUERY_DEPENDENCIES = {
     investmentPurchasesQueryKey, // riwayat lot per akun (features/investment-detail/content/) ikut berubah
     investmentSalesQueryKey, // riwayat penjualan per akun (SalesHistoryTable) ikut berubah
     investmentHoldingSummaryQueryKey, // transfer investment->cash bisa membuat/edit investment_sales, sisa unit & average cost ikut berubah
+    thirdPartyFundsQueryKey, // transaksi third_party (direct/transfer) bisa membuat/edit/hapus third_party_funds
+    thirdPartySummaryQueryKey, // sisa titipan per kontak×akun ikut berubah setiap third_party_funds berubah
   ],
   accounts: [
     accountsQueryKey,

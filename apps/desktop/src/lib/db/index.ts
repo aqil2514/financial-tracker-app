@@ -9,4 +9,5 @@ export type {
   Contact,
   Debt,
   DebtPayment,
+  ThirdPartyFund,
 } from "./types";

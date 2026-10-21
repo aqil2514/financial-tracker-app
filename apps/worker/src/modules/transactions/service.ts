@@ -29,6 +29,13 @@ import {
   resolveInvestmentSellAmount,
   getAverageCostPerUnit,
 } from "../investments/service";
+import {
+  applyDirectThirdPartyTransaction,
+  applyDirectThirdPartyTransactionEdit,
+  validateDirectThirdPartyTransaction,
+  detachThirdPartyFundsForDeletedTransaction,
+  getTransactionThirdPartyFundId,
+} from "../third-party-funds/service";
 import { resolveContactId } from "../contacts/service";
 import { detachAttachmentsForDeletedTransaction } from "../attachments/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
@@ -230,6 +237,23 @@ async function createTransactionRow(
   const contactPrecheck = await validateResolvedContactExists(env, resolvedContactId);
   if (contactPrecheck.status === "rejected") return contactPrecheck;
 
+  // Precheck oversell titip/ambil dana pihak ketiga (arah 'expense' =
+  // ambil keluar) -- SEBELUM insert baris transaksi, sama alasannya dgn
+  // precheck debt settlement/investment sale oversell di atas (reject
+  // SETELAH insert meninggalkan transaksi yatim tanpa third_party_funds
+  // terkait, lihat bug yg pernah ditemukan di desktop -- urutan ini
+  // WAJIB direplikasi persis). No-op lewat validateDirectThirdPartyTransaction
+  // kalau accountId bukan third_party atau type bukan 'expense'.
+  if (payload.type !== "transfer") {
+    const thirdPartyPrecheck = await validateDirectThirdPartyTransaction(env, {
+      type: payload.type,
+      accountId: payload.accountId,
+      contactId: resolvedContactId,
+      amount: payload.amount,
+    });
+    if (thirdPartyPrecheck.status === "rejected") return thirdPartyPrecheck;
+  }
+
   // Sumber kebenaran nominal transfer investment->cash (jual) BUKAN
   // payload.amount dari client -- dihitung ULANG dari averageCost x unit
   // SEBELUM insert (pola PERSIS use-create-transaction.ts desktop, lihat
@@ -328,6 +352,33 @@ async function createTransactionRow(
       unit: payload.unit ?? 0,
       pricePerUnit: payload.pricePerUnit ?? 0,
       status: "settled",
+      syncSource,
+    });
+  }
+
+  // Titip masuk/ambil keluar dana pihak ketiga -- PEMILIK-nya modul
+  // third-party-funds, dipicu dari sini sama persis applyDebtTransaction/
+  // applyInvestmentTransaction di atas. BEDA: income/expense SATU SISI
+  // (bukan transfer, lihat docs/concept/konsep-dana-pihak-ketiga.md),
+  // jadi di CABANG TERPISAH (bukan di dalam blok type==='transfer' di
+  // atas). syncSource !== 'pc' sama alasannya: transaksi dari PC SUDAH
+  // punya baris third_party_funds sendiri (apply-third-party-transaction.ts
+  // lokal) -- TAPI belum di-push sama sekali sampai Tahap 3
+  // (third_party_funds belum masuk QueueableTable desktop), jadi derivasi
+  // Worker di sini SEMENTARA jadi SATU-SATUNYA jalur tulis third_party_funds
+  // utk transaksi tanpa padanan lokal (MCP). Transfer third_party->third_party
+  // BELUM diwiring di sini (lihat docs/todos/plan/third-party-sync.md
+  // Tahap 2 -- payload transaksi generik cuma punya 1 contactId, transfer
+  // butuh 2 kontak independen yg baru bisa sampai ke Worker di Tahap 3).
+  if (payload.type !== "transfer" && payload.accountId && resolvedContactId && syncSource !== "pc") {
+    await applyDirectThirdPartyTransaction(env, {
+      transactionId: payload.id,
+      type: payload.type,
+      accountId: payload.accountId,
+      contactId: resolvedContactId,
+      amount,
+      date: payload.date,
+      note: payload.note,
       syncSource,
     });
   }
@@ -498,6 +549,23 @@ async function updateTransactionRow(
     status: payload.investmentStatus,
   });
   if (purchaseEditPrecheck.status === "rejected") return purchaseEditPrecheck;
+
+  // Precheck oversell titip/ambil dana pihak ketiga jalur EDIT -- sama
+  // alasannya dgn createTransactionRow, excludeId = baris third_party_funds
+  // LAMA milik transaksi ini (kalau ada), dikompensasi dulu sebelum
+  // membandingkan dgn nominal baru (pola PERSIS excludeUnit investment
+  // sale di atas).
+  if (payload.type !== "transfer") {
+    const excludeId = await getTransactionThirdPartyFundId(env, id);
+    const thirdPartyPrecheck = await validateDirectThirdPartyTransaction(env, {
+      type: payload.type,
+      accountId: payload.accountId,
+      contactId: resolvedContactId,
+      amount: payload.amount,
+      excludeId,
+    });
+    if (thirdPartyPrecheck.status === "rejected") return thirdPartyPrecheck;
+  }
 
   // Logic #2 pre-check: resolve status SEBELUM update baris transaksi
   // -- kalau nanti DebtEditBlockedError dilempar, UPDATE transactions
@@ -680,6 +748,24 @@ async function updateTransactionRow(
         syncSource,
       });
     }
+
+    // Titip masuk/ambil keluar dana pihak ketiga jalur EDIT -- sejajar
+    // applyInvestmentTransactionEdit, UPDATE in-place (bukan transfer,
+    // lihat applyDirectThirdPartyTransactionEdit). Transfer third_party->
+    // third_party BELUM diwiring di sini (sama alasan dgn createTransactionRow,
+    // lihat docs/todos/plan/third-party-sync.md Tahap 2).
+    if (payload.type !== "transfer" && payload.accountId && resolvedContactId) {
+      await applyDirectThirdPartyTransactionEdit(env, {
+        transactionId: id,
+        type: payload.type,
+        accountId: payload.accountId,
+        contactId: resolvedContactId,
+        amount,
+        date: payload.date,
+        note: payload.note,
+        syncSource,
+      });
+    }
   }
 
   return { status: "ok" };
@@ -718,6 +804,12 @@ export async function deleteTransaction(env: Env, id: string): Promise<DeleteTra
   // hard-delete object R2-nya (lihat detachAttachmentsForDeletedTransaction),
   // mencegah attachment jadi orphan spt temuan dogfooding 2026-10-09.
   await detachAttachmentsForDeletedTransaction(env, id);
+  // Sejajar detachInvestmentPurchaseForDeletedTransaction -- TANPA guard
+  // syncSource sama alasannya (soft-delete turunan murni, aman apa pun
+  // syncSource-nya). Soft-delete SEMUA baris third_party_funds milik
+  // transaksi ini (1 baris direct, 2 baris transfer -- transfer belum
+  // diwiring Tahap 2 tapi detach ini tetap aman no-op kalau tidak ada).
+  await detachThirdPartyFundsForDeletedTransaction(env, id);
 
   const now = nowText();
   await env.DB.prepare("UPDATE transactions SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")

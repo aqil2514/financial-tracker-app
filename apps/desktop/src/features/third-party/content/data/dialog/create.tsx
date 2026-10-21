@@ -16,6 +16,7 @@ import {
   type ThirdPartyFundFormOutput,
   type ThirdPartyFundFormValues,
 } from "../form/schemas";
+import { useCreateThirdPartyFund } from "../form/use-create-third-party-fund";
 import { useThirdPartyDialog } from "./context";
 
 export function ThirdPartyCreateDialog() {
@@ -27,11 +28,12 @@ export function ThirdPartyCreateDialog() {
     defaultValues: defaultThirdPartyFundValues(),
   });
 
-  // Submit sementara -- belum disambung ke mutation/DB sungguhan, lihat
-  // docs/todos/plan/account-type-third-party.md.
-  function onSubmit(values: ThirdPartyFundFormOutput) {
-    console.log(values);
-  }
+  const { onSubmit, isPending } = useCreateThirdPartyFund({
+    onCreated: () => {
+      form.reset(defaultThirdPartyFundValues());
+      closeDialog();
+    },
+  });
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && closeDialog()}>
@@ -39,7 +41,7 @@ export function ThirdPartyCreateDialog() {
         <DialogHeader>
           <DialogTitle>Catat Titip/Ambil Dana</DialogTitle>
         </DialogHeader>
-        <ThirdPartyFundForm form={form} onSubmit={onSubmit} isPending={false} />
+        <ThirdPartyFundForm form={form} onSubmit={onSubmit} isPending={isPending} />
       </DialogContent>
     </Dialog>
   );

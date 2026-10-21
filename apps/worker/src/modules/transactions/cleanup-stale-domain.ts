@@ -1,6 +1,7 @@
 import type { Env } from "../../shared/env";
 import { getAccountType, detachDebtForDeletedTransaction } from "../debts/service";
 import { detachInvestmentPurchaseForDeletedTransaction, detachInvestmentSaleForDeletedTransaction } from "../investments/service";
+import { detachThirdPartyFundsForDeletedTransaction } from "../third-party-funds/service";
 
 type ExistingAccountFields = { account_id: string | null; transfer_account_id: string | null };
 type NewAccountFields = { accountId: string; transferAccountId: string | null };
@@ -38,6 +39,8 @@ export async function cleanupStaleDomainOnAccountChange(
   const newInvolvesDebt = newTypes.includes("debt");
   const oldInvolvesInvestment = oldTypes.includes("investment");
   const newInvolvesInvestment = newTypes.includes("investment");
+  const oldInvolvesThirdParty = oldTypes.includes("third_party");
+  const newInvolvesThirdParty = newTypes.includes("third_party");
 
   if (oldInvolvesDebt && !newInvolvesDebt) {
     await detachDebtForDeletedTransaction(env, transactionId);
@@ -46,5 +49,9 @@ export async function cleanupStaleDomainOnAccountChange(
   if (oldInvolvesInvestment && !newInvolvesInvestment) {
     await detachInvestmentPurchaseForDeletedTransaction(env, transactionId);
     await detachInvestmentSaleForDeletedTransaction(env, transactionId);
+  }
+
+  if (oldInvolvesThirdParty && !newInvolvesThirdParty) {
+    await detachThirdPartyFundsForDeletedTransaction(env, transactionId);
   }
 }

@@ -16,8 +16,10 @@ export function useCurrentMonthSummary() {
       const rows = await db.select<{ type: "income" | "expense"; total: number }[]>(
         `SELECT type, SUM(amount) as total
          FROM transactions
+         JOIN accounts ON accounts.id = transactions.account_id
          WHERE type IN ('income', 'expense')
            AND is_cash_neutral = 0
+           AND accounts.account_type != 'third_party'
            AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
          GROUP BY type`
       );

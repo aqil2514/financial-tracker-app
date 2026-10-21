@@ -17,7 +17,7 @@ function now() {
 }
 
 function resolveIsCashNeutral(accountType: Account["account_type"], countAsCash: boolean): boolean {
-  if (accountType === "debt" || accountType === "investment") return true;
+  if (accountType === "debt" || accountType === "investment" || accountType === "third_party") return true;
   if (accountType === "cash") return !countAsCash;
   return false;
 }
@@ -81,7 +81,7 @@ export function useCorrectAccountBalance() {
       const { accountId, accountType, targetBalance, currentBalance, countAsCash } = input;
       if (isAccountTypeRestrictedFromBalanceCorrection(accountType)) {
         throw new Error(
-          `Saldo akun bertipe '${accountType}' tidak bisa dikoreksi langsung karena derived dari data piutang/utang atau investasi -- gunakan transaksi transfer atau perbaiki transaksi akar penyebabnya.`
+          `Saldo akun bertipe '${accountType}' tidak bisa dikoreksi langsung karena derived dari data piutang/utang atau dana pihak ketiga -- gunakan transaksi transfer atau perbaiki transaksi akar penyebabnya.`
         );
       }
 

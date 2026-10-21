@@ -2,7 +2,7 @@
 
 import { createDialogQueryContext } from "@/provider/dialog-query-state";
 
-export type ThirdPartyAccountDialogType = "create";
+export type ThirdPartyAccountDialogType = "create" | "edit" | "delete";
 
 const { DialogProvider, useDialog } = createDialogQueryContext<ThirdPartyAccountDialogType>();
 
