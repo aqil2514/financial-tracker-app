@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   testCloudSyncConnection,
@@ -8,6 +9,7 @@ import {
 } from "@/shared/cloud-sync/worker-client";
 import { useCloudSyncSettings, useSetCloudSyncSettings } from "@/shared/cloud-sync/use-cloud-sync-settings";
 import { backfillSync, type BackfillProgress, type BackfillSummary } from "@/shared/cloud-sync/backfill-sync";
+import { rejectedLogQueryKey } from "@/shared/cloud-sync/rejected-log";
 
 export type CloudSyncConnectionTestState =
   | { status: "idle" }
@@ -31,6 +33,7 @@ export type BackfillState =
 export function useCloudSyncForm() {
   const { data: settings, isLoading } = useCloudSyncSettings();
   const setSettings = useSetCloudSyncSettings();
+  const queryClient = useQueryClient();
 
   const [enabled, setEnabled] = useState(false);
   const [workerUrl, setWorkerUrl] = useState("");
@@ -74,6 +77,7 @@ export function useCloudSyncForm() {
         setBackfillState({ status: "running", progress });
       });
       setBackfillState({ status: "done", summary });
+      queryClient.invalidateQueries({ queryKey: rejectedLogQueryKey });
     } catch {
       setBackfillState({ status: "error" });
     }

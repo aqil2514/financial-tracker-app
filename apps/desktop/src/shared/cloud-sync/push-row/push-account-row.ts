@@ -24,6 +24,16 @@ export async function pushAccountRow(creds: CloudSyncCredentials, id: string): P
   );
   const row = rows[0];
   if (!row) return null;
+
+  let direction: "receivable" | "payable" | null | undefined;
+  if (row.account_type === "debt") {
+    const debtAccountRows = await db.select<{ direction: "receivable" | "payable" }[]>(
+      "SELECT direction FROM debt_accounts WHERE account_id = $1",
+      [id]
+    );
+    direction = debtAccountRows[0]?.direction ?? null;
+  }
+
   return pushAccount(creds, {
     id: row.id,
     name: row.name,
@@ -35,5 +45,6 @@ export async function pushAccountRow(creds: CloudSyncCredentials, id: string): P
     isActive: !!row.is_active,
     accountType: row.account_type,
     updatedAt: row.updated_at ?? undefined,
+    direction,
   });
 }

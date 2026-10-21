@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useRejectedLog } from "@/shared/cloud-sync/rejected-log";
 import { useCloudSyncForm } from "./use-cloud-sync-form";
 
 /**
@@ -38,6 +39,7 @@ export function CloudSyncForm() {
     handleTestConnection,
     handleBackfill,
   } = useCloudSyncForm();
+  const { data: rejectedLog } = useRejectedLog();
 
   return (
     <div className="space-y-4">
@@ -154,6 +156,29 @@ export function CloudSyncForm() {
           </p>
         )}
       </div>
+
+      {rejectedLog && rejectedLog.length > 0 && (
+        <div className="space-y-2 border-t pt-4">
+          <p className="text-sm font-medium">Data Ditolak Worker</p>
+          <p className="text-muted-foreground text-xs">
+            Baris-baris ini DITOLAK Worker saat dikirim (gagal validasi
+            bisnis, bukan masalah koneksi) — TIDAK di-retry otomatis,
+            tetap divergen dari cloud sampai datanya diperbaiki lalu
+            diedit ulang supaya terkirim lagi.
+          </p>
+          <ul className="space-y-1 text-xs">
+            {rejectedLog.map((entry) => (
+              <li key={entry.id} className="border-destructive/30 rounded border p-2">
+                <p className="font-mono">
+                  {entry.tableName} / {entry.rowId}
+                </p>
+                <p className="text-destructive">{entry.reason}</p>
+                <p className="text-muted-foreground">{entry.rejectedAt}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

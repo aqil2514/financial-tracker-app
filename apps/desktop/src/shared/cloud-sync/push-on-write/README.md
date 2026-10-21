@@ -14,7 +14,7 @@ SEMUA fungsi di folder ini TIDAK boleh melempar error ke caller (`mutationFn` ho
 
 Panggil setelah INSERT/UPDATE lokal sukses — push baris ke Worker segera, masuk antrian kalau gagal/offline.
 
-`'rejected'` (422, validasi bisnis Worker) TIDAK di-retry — data lokal valid menurut desktop sendiri, payload yang sama akan ditolak lagi tanpa ada yang berubah. Dibiarkan sebagai divergence sampai user edit ulang (akan push lagi dengan data baru).
+`'rejected'` (422, validasi bisnis Worker) TIDAK di-retry — data lokal valid menurut desktop sendiri, payload yang sama akan ditolak lagi tanpa ada yang berubah. Dibiarkan sebagai divergence sampai user edit ulang (akan push lagi dengan data baru) — TAPI dicatat ke `../rejected-log/` (gap ditemukan 2026-10-21: sebelum ini, reject hilang tanpa jejak sama sekali, satu-satunya cara ketahuan adalah compare manual SQLite vs D1).
 
 ## `push-delete-on-write.ts`
 

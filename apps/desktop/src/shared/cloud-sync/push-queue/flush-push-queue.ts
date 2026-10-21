@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import type { CloudSyncCredentials } from "../worker-client";
 import { deleteCloudRow } from "../worker-client";
 import { pushRowPayload } from "../push-row";
+import { logRejectedPush, clearRejectedLog } from "../rejected-log";
 import { markAttemptFailed } from "./mark-attempt-failed";
 import { removeFromQueue } from "./remove-from-queue";
 import type { DeletableTable, QueueableTable } from "./types";
@@ -21,8 +22,10 @@ export async function flushPushQueue(creds: CloudSyncCredentials): Promise<void>
         const result = await pushRowPayload(creds, entry.table_name, entry.row_id);
         if (result?.status === "rejected") {
           await markAttemptFailed(entry.id, `rejected: ${result.reason}`);
+          await logRejectedPush(entry.table_name, entry.row_id, result.reason);
           continue;
         }
+        await clearRejectedLog(entry.table_name, entry.row_id);
       }
       await removeFromQueue(entry.id);
     } catch (err) {

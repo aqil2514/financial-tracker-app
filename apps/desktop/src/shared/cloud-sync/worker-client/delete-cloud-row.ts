@@ -1,5 +1,6 @@
 import { request } from "./request";
 import type { CloudSyncCredentials } from "./types";
+import { WorkerRequestError } from "./worker-request-error";
 
 export type DeleteCloudPayload =
   | { table: "account_groups"; memberAction?: "unassign" | "reassign"; targetGroupId?: string }
@@ -41,8 +42,19 @@ export async function deleteCloudRow(
   payload?: Omit<Extract<DeleteCloudPayload, { table: typeof table }>, "table">
 ): Promise<void> {
   const body = payload && Object.keys(payload).length > 0 ? JSON.stringify(payload) : undefined;
-  await request(creds, `${DELETE_PATH[table]}/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    ...(body ? { body } : {}),
-  });
+  try {
+    await request(creds, `${DELETE_PATH[table]}/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      ...(body ? { body } : {}),
+    });
+  } catch (err) {
+    // 404 "not found" berarti row yang dituju MEMANG sudah tidak ada di
+    // cloud -- hasil akhirnya sama dgn delete sukses (idempotent), jangan
+    // diperlakukan sbg gagal. Tanpa ini, retry antrian bisa stuck
+    // selamanya (gap ditemukan 2026-10-21: entry retry puluhan kali tanpa
+    // pernah bisa keluar dari cloud_sync_queue krn row sumbernya sendiri
+    // tidak pernah berhasil ter-push lebih dulu).
+    if (err instanceof WorkerRequestError && err.status === 404) return;
+    throw err;
+  }
 }

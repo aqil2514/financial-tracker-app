@@ -320,6 +320,12 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0053_debt_amount_adjustments.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 54,
+            description: "cloud_sync_rejected_log",
+            sql: include_str!("../migrations/0054_cloud_sync_rejected_log.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
