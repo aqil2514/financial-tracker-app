@@ -6,7 +6,7 @@ Index ini HANYA navigasi + checklist ringkas. Detail keputusan desain, riset, da
 
 ## Status & TODO saat ini (ringkas)
 
-- [x] Tipe akun `third_party` selesai diimplementasikan penuh di `apps/desktop` (CRUD lengkap kedua tab, form transfer, pengecualian cashflow, guard Koreksi Saldo) — lihat [`apps/desktop/docs/todos/plan/account-type-third-party.md`](../../../apps/desktop/docs/todos/plan/account-type-third-party.md).
+- [x] Tipe akun `third_party` selesai diimplementasikan penuh di `apps/desktop` (CRUD lengkap kedua tab, form transfer, pengecualian cashflow, guard Koreksi Saldo) — lihat [`apps/desktop/docs/todos/done/account-type-third-party.md`](../../../apps/desktop/docs/todos/done/account-type-third-party.md).
 - [x] Tahap 0 — Riset peta gap Worker vs desktop SELESAI (2026-10-21), lihat "Latar belakang" di bawah.
 - [x] Tahap 0 — Keputusan desain scope sync: **replikasi logic penuh** (bukan CRUD data mentah), SAMA PERSIS keputusan `investment-sync.md` — lihat "Tahap 0" di bawah.
 - [x] Tahap 1 — Migrasi D1 (`accounts.account_type` CHECK + tabel baru `third_party_funds`) — SELESAI (2026-10-21), diterapkan & diverifikasi di D1 LOKAL, BELUM `--remote`.
@@ -17,7 +17,7 @@ Index ini HANYA navigasi + checklist ringkas. Detail keputusan desain, riset, da
 
 ## Latar belakang
 
-Tipe akun `third_party` sudah selesai diimplementasikan penuh di `apps/desktop` (lihat [`apps/desktop/docs/todos/plan/account-type-third-party.md`](../../../apps/desktop/docs/todos/plan/account-type-third-party.md)) — titip/ambil langsung (income/expense satu sisi), transfer `third_party→third_party` (pindah tempat/kepemilikan), validasi oversell, pengecualian cashflow, CRUD penuh kedua tab UI, guard Koreksi Saldo. Tapi ini **desktop-only**: `apps/worker` (Cloudflare, satu-satunya penulis D1 production) sama sekali belum punya tipe akun `third_party` — `AccountType` di sana masih `"cash" | "debt" | "investment"` — dan `apps/mcp-server` juga belum punya tool apa pun yang menyinggung dana pihak ketiga. Konsekuensi saat ini: data `third_party_funds` cuma ada di SQLite lokal desktop, TIDAK ter-sync ke cloud/multi-device, dan tidak bisa diakses/dikelola lewat asisten AI (beda dari transaksi, akun kas, utang piutang, dan investasi yang semuanya sudah bisa).
+Tipe akun `third_party` sudah selesai diimplementasikan penuh di `apps/desktop` (lihat [`apps/desktop/docs/todos/done/account-type-third-party.md`](../../../apps/desktop/docs/todos/done/account-type-third-party.md)) — titip/ambil langsung (income/expense satu sisi), transfer `third_party→third_party` (pindah tempat/kepemilikan), validasi oversell, pengecualian cashflow, CRUD penuh kedua tab UI, guard Koreksi Saldo. Tapi ini **desktop-only**: `apps/worker` (Cloudflare, satu-satunya penulis D1 production) sama sekali belum punya tipe akun `third_party` — `AccountType` di sana masih `"cash" | "debt" | "investment"` — dan `apps/mcp-server` juga belum punya tool apa pun yang menyinggung dana pihak ketiga. Konsekuensi saat ini: data `third_party_funds` cuma ada di SQLite lokal desktop, TIDAK ter-sync ke cloud/multi-device, dan tidak bisa diakses/dikelola lewat asisten AI (beda dari transaksi, akun kas, utang piutang, dan investasi yang semuanya sudah bisa).
 
 Fitur lintas-app: `apps/desktop` (PC, pemilik logic & UI, SUDAH selesai) → `apps/worker` (Cloudflare, BELUM ada tipe `third_party` sama sekali) → `apps/mcp-server` (Vercel, jembatan ke Claude — BELUM ada tool dana pihak ketiga apa pun).
 
