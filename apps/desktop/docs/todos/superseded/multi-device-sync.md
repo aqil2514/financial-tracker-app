@@ -1,5 +1,7 @@
 # Sinkronisasi Multi-Device (Desktop + Mobile)
 
+> **SUPERSEDED (2026-10-22)**: ide awal ini (sync dua-arah Desktop+Mobile, banyak sumber tulis independen) tidak jadi yang dibangun — lanjutannya [multi-device-sync-engine.md](multi-device-sync-engine.md) juga sudah ditandai superseded dengan alasan yang sama, lihat catatan di dokumen itu untuk apa yang benar-benar terealisasi (push satu-arah PC→cloud via Worker, dipicu kebutuhan MCP server, bukan multi-device). Satu bagian dokumen ini TETAP valid dan sudah dikerjakan terlepas dari arah sync yang dipilih: migrasi primary key `AUTOINCREMENT`→UUID (lihat "Masalah konkret..." di bawah), SELESAI dan tercatat di `docs/todos/done/uuid-migration.md`. Isi lain dipertahankan sebagai arsip.
+
 ## Latar belakang
 
 Selain rencana integrasi satu arah dengan Retailku (lihat

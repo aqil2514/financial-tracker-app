@@ -1,5 +1,7 @@
 # Integrasi Sync — Multi-Device (Custom Engine + Cloudflare)
 
+> **SUPERSEDED (2026-10-22)**: premis dokumen ini (sync DUA-ARAH antar device yang SAMA-SAMA menulis independen, PC↔HP↔cloud dengan conflict resolution penuh) TIDAK jadi yang dibangun. Yang benar-benar terealisasi dan SUDAH LIVE production sejak awal Oktober adalah arah berbeda yang diramalkan dokumen ini sendiri di baris "STATUS" di bawah: push SATU-ARAH PC→cloud (Worker+D1), dipicu kebutuhan MCP server (Claude bisa baca/tulis data tanpa PC nyala), bukan kebutuhan multi-device. Lihat [apps/worker/docs/todos/done/cloud-sync.md](../../../../worker/docs/todos/done/cloud-sync.md) (status DONE, deployed production, diverifikasi data nyata) dan [docs/todos/done/mcp-server-cloud-mirror.md](../done/mcp-server-cloud-mirror.md) untuk apa yang sebenarnya dibangun. Keputusan teknis di dokumen ini (LWW via `updated_at`, soft delete, `device_id`→`sync_source`) banyak yang akhirnya DIPAKAI juga di implementasi nyata, meski bukan lewat eksekusi todo list ini — prasyarat UUID primary key (disebut SELESAI di bawah) tetap valid dan terpakai. Isi di bawah dipertahankan sebagai arsip riset/keputusan desain, BUKAN todo list aktif — JANGAN lanjutkan Tahap 1-5 di bawah, itu tidak akan dikerjakan dalam bentuk ini.
+>
 > Catatan nama file: dokumen ini awalnya diberi nama
 > `turso-integration.md` saat Turso masih jadi kandidat utama. Setelah
 > riset Tahap 0 (2026-09-30), keputusan final JATUH ke custom sync

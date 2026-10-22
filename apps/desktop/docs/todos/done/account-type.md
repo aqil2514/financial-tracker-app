@@ -1,5 +1,25 @@
 # Account Type
 
+## Status & TODO saat ini (ringkas)
+
+Dokumen ini CIKAL BAKAL `account_type` secara umum (ditulis sebelum implementasi apa pun ada) — penjelasan lengkap tiap poin ada di bagian di bawah, sebagian sudah usang (ditulis saat `account_type` masih rencana, sekarang sudah jadi kolom sungguhan).
+
+- [x] Kolom `account_type` + CHECK constraint di `accounts` — sudah diimplementasikan penuh (lihat `lib/account-types.ts`).
+- [x] Tipe `cash` — baseline, sudah ada sejak awal.
+- [x] Tipe `debt` — sudah diimplementasikan, terbukti dipakai keseharian.
+- [x] Tipe `investment` — sudah diimplementasikan penuh, lihat [docs/todos/done/account-type-investment.md](../done/account-type-investment.md).
+- [x] Tipe `third_party` — sudah diimplementasikan penuh, lihat `docs/todos/done/account-type-third-party.md`.
+- [x] ~~Tipe `credit` (kartu kredit — limit, jatuh tempo, bunga)~~ **DITUTUP (2026-10-22)**: tidak pernah dipakai sama sekali, dan `debt` yang sudah ada terbukti cukup untuk kebutuhan sehari-hari — lihat "Catatan Keputusan" di bawah.
+- [x] ~~Tipe `forex` (valas — mata uang asal, kurs konversi)~~ **DITUTUP (2026-10-22)**: tidak pernah dipakai sama sekali, tidak ada kebutuhan nyata yang menuntutnya — lihat "Catatan Keputusan" di bawah.
+- [x] ~~Tipe `advance` (uang muka, dua arah)~~ **DITUTUP (2026-10-22)**: baik kasus investasi (settlement tertunda) MAUPUN kasus Retailku (`PURCHASE_ORDER` uang muka ke supplier) sekarang sama-sama diputuskan tidak perlu tipe akun terpisah — lihat "Catatan Keputusan" di bawah.
+- [x] ~~Tab "Per Tipe Akun" di pie chart halaman Akun (`AccountsSummarySection`)~~ **DITUTUP (2026-10-22)**: kebutuhannya sudah terpenuhi lewat section "Per Tipe Akun" di halaman Laporan (`features/reports/content/account-type/`) — user memutuskan tidak perlu duplikat tampilan yang sama di 2 tempat.
+
+### Catatan Keputusan — `credit`, `forex`, & `advance` ditutup
+
+User mengonfirmasi (2026-10-22): `credit` dan `forex` belum pernah dipakai sama sekali. Untuk `credit` khususnya, tipe `debt` yang sudah ada dinilai sudah mencukupi dan terbukti dipakai dalam keseharian — menambah tipe `credit` terpisah (dengan field limit/jatuh tempo/bunga) berarti kompleksitas tambahan (migrasi CHECK constraint baru via copy-and-rename, tabel detail baru, form baru) untuk kebutuhan yang belum terbukti ada. Sama pola dengan keputusan menutup `advance` di konteks investasi — fitur spekulatif tanpa penggunaan nyata.
+
+`advance` (termasuk kasus Retailku `PURCHASE_ORDER` yang jadi alasan awal kandidat ini muncul) juga ditutup dengan alasan serupa: uang muka cukup diwakili lewat `expense` langsung ke akun kas biasa (tidak perlu akun perantara neraca terpisah) — kalau nanti ada refund, cukup ditambal dengan transaksi `income` penyeimbang, atau paling sederhana transaksi `expense` aslinya dihapus saja, tergantung preferensi user saat itu terjadi. Tidak ada kebutuhan untuk melacak status "uang sudah keluar tapi belum final" sebagai entitas akun terpisah.
+
 ## Latar belakang
 
 Saat ini akun cuma punya `group_id` (label pengelompokan bebas, tidak mempengaruhi perilaku).

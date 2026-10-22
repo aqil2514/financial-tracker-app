@@ -1,5 +1,7 @@
 # Cloud Sync — Jalur Retailku Belum Ikut Ter-sync (`source`/`source_ref`)
 
+> **SUPERSEDED (2026-10-22)**: digantikan rombakan konsep di [docs/todos/plan/retailku-transaction-picker.md](../plan/retailku-transaction-picker.md) — desain baru mengganti sync OTOMATIS (yang auto-insert baris `source='retailku_sync'`, jadi subjek provenance dokumen ini) dengan dialog picker yang prefill form "Tambah Transaksi" untuk disubmit MANUAL oleh user. Baris hasil jalur baru akan selalu `source='manual'`, jadi seluruh premis dokumen ini (baris butuh ditandai `'retailku_sync'` + `source_ref` biar bisa dilacak/dedup) tidak berlaku lagi. Isi di bawah ini dipertahankan apa adanya sebagai arsip — JANGAN lanjutkan 2 item verifikasi yang belum dicentang, dokumen ini tidak akan dilanjutkan dalam bentuk ini.
+
 ## Latar belakang
 
 Dicatat di `Catatan Penggunaan.txt`: "Di sinkronisasi, kayaknya jalur

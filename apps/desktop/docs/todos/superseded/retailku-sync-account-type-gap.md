@@ -1,5 +1,7 @@
 # Sync Retailku — `debts`/`debt_payments` Tanpa `account_id` (Gap Konsep Tipe Akun)
 
+> **SUPERSEDED (2026-10-22)**: digantikan rombakan konsep di [docs/todos/plan/retailku-transaction-picker.md](../plan/retailku-transaction-picker.md) — desain baru (dialog picker, prefill ke form "Tambah Transaksi" yang SELALU mewajibkan akun) mencegah gap `account_id` NULL ini TERULANG untuk data baru, karena tidak ada lagi jalur auto-insert yang bisa melewatkan akun. Tapi ini TIDAK menyelesaikan data LAMA yang sudah terlanjur `account_id` NULL dari sync lama (write-off & pay-debt non_cash tetap menolak baris itu, lihat bagian "Dampak baru" di bawah) — itu tetap utang teknis terpisah kalau mau dibereskan, independen dari jalur sync mana pun yang dipakai ke depan. Isi di bawah dipertahankan sebagai arsip/referensi pertanyaan yang pernah terbuka.
+
 ## Latar belakang
 
 Ditemukan 2026-10-03 saat audit kepatuhan kode terhadap

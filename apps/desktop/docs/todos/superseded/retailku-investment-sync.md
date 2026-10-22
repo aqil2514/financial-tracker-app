@@ -1,6 +1,8 @@
 # Sync Investasi dari Retailku
 
-> **Status: BLOCKED** — didahului `account-type.md` (belum diimplementasikan
+> **SUPERSEDED (2026-10-22)**: blocker asli (`account_type` belum ada) SUDAH hilang — `account_type='investment'` sudah terimplementasi penuh, lihat [docs/todos/done/account-type-investment.md](../done/account-type-investment.md). Tapi dokumen ini sendiri jadi digantikan rombakan konsep di [docs/todos/plan/retailku-transaction-picker.md](../plan/retailku-transaction-picker.md) — rencana di bawah adalah AUTO-SYNC background (tarik `get_investment_list` lalu insert otomatis), pendekatan yang sama yang ditinggalkan untuk cashflow sync. Kalaupun sync investasi Retailku dikerjakan nanti, bentuknya bukan auto-sync lagi, tapi salah satu tool pilihan di dialog picker baru. Isi di bawah tetap berguna sebagai referensi DATA (struktur `get_investment_list`, role akun investasi Retailku), tapi rencana IMPLEMENTASI-nya (auto-sync) tidak dilanjutkan.
+>
+> **Status: BLOCKED (arsip, sudah tidak relevan)** — didahului `account-type.md` (belum diimplementasikan
 > sama sekali, `accounts.account_type` saat ini cuma `'cash'`/`'debt'`, lihat
 > migrasi `0013_account_type.sql`). Dokumen ini BARU catatan eksplorasi/temuan
 > awal, BUKAN rencana implementasi siap jalan.

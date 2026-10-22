@@ -6,7 +6,7 @@ Dokumen perencanaan kerja: riset, keputusan desain, dan checklist
 eksekusi untuk fitur/perubahan yang cukup besar untuk butuh catatan
 tertulis sebelum/selama dikerjakan — bukan untuk setiap task kecil.
 
-## Dua subfolder
+## Subfolder status
 
 - **`plan/`** — dokumen fitur yang MASIH AKTIF direncanakan atau
   dikerjakan. Ditulis SEBELUM/SELAMA implementasi, diupdate terus
@@ -16,9 +16,19 @@ tertulis sebelum/selama dikerjakan — bukan untuk setiap task kecil.
   Dipindahkan dari `plan/` ke `done/` (bukan dihapus) begitu fitur
   kelar — isinya jadi arsip/riwayat keputusan, tidak diupdate lagi
   kecuali ada koreksi faktual.
+- **`superseded/`** — dokumen rencana yang TIDAK PERNAH dikerjakan
+  (bukan `done`) DAN tidak akan dikerjakan dalam bentuk itu lagi,
+  karena digantikan rombakan konsep/pendekatan lain yang didokumentasikan
+  di tempat lain. Beda dari sekadar "dibatalkan" (yang kebutuhannya
+  hilang) — di sini kebutuhannya masih ada, tapi caranya berubah total.
+  Dipindahkan dari `plan/` (bukan dihapus), dengan catatan singkat di
+  bagian atas dokumen yang menunjuk ke dokumen rencana BARU yang
+  menggantikannya — supaya pembaca yang nyasar ke sini tahu ke mana
+  harus pindah, bukan cuma tahu "ini sudah tidak dipakai".
 
-Pola pemindahan `plan/` → `done/` ini sudah dipakai konsisten di
-`apps/desktop/docs/todos/` — lihat folder itu sbg contoh konkret.
+Pola pemindahan `plan/` → `done/`/`superseded/` ini sudah dipakai
+konsisten di `apps/desktop/docs/todos/` — lihat folder itu sbg contoh
+konkret.
 
 ## Root vs per-app
 

@@ -1,5 +1,7 @@
 # Mapping Retailku — Opsi Kategori Tidak Filter `is_active`
 
+> **SUPERSEDED (2026-10-22)**: halaman konfigurasi mapping Retailku (`features/retailku/mapping/`, tempat gap ini berada) kemungkinan ikut ditinggalkan bersama rombakan konsep sync Retailku di [docs/todos/plan/retailku-transaction-picker.md](../plan/retailku-transaction-picker.md) — desain baru (dialog picker, prefill manual) tidak butuh konfigurasi mapping field-ke-kategori tersimpan seperti jalur sync otomatis lama. Belum dikonfirmasi pasti halaman ini dihapus (tergantung nasib kode lama, lihat dokumen picker), tapi gap ini tidak lagi diprioritaskan untuk dikerjakan berdiri sendiri. Isi di bawah dipertahankan sebagai arsip.
+
 ## Status & TODO saat ini (ringkas)
 
 - [ ] Opsi kategori di mapping Retailku (`use-resources.ts`) tidak
