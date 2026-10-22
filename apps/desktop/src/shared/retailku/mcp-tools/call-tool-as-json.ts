@@ -1,9 +1,5 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
-/** Semua tool Retailku mengembalikan hasilnya sebagai satu block teks
- * berisi JSON (bukan objek terstruktur MCP sendiri) — helper generik
- * untuk parse `content[0].text`, dipakai semua fungsi `get*` di folder
- * ini supaya tidak duplikasi logic parsing. */
 export async function callToolAsJson<T>(
   client: Client,
   name: string,
@@ -16,5 +12,5 @@ export async function callToolAsJson<T>(
   }
 
   const jsonResult = JSON.parse(firstBlock.text) as T;
-  return jsonResult
+  return jsonResult;
 }
