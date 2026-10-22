@@ -531,7 +531,7 @@ export async function createDirectThirdPartyFund(
         contact_id, created_at, updated_at, sync_source)
      VALUES (?1, ?2, ?3, NULL, ?4, NULL, ?5, ?6, NULL, ?7, ?8, ?8, ?9)`
   )
-    .bind(transactionId, transactionType, payload.amount, payload.accountId, payload.note ?? null, payload.date, contactId, now, syncSource)
+    .bind(transactionId, transactionType, payload.amount, payload.accountId, payload.note ?? "", payload.date, contactId, now, syncSource)
     .run();
 
   await env.DB.prepare(
