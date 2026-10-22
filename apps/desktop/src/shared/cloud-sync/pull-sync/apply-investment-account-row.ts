@@ -1,5 +1,6 @@
 import type Database from "@tauri-apps/plugin-sql";
 
+import { logRejectedRow } from "./log-rejected-row";
 import type { SyncResponse } from "./types";
 import { upsertInvestmentAccount } from "./upsert-investment-account";
 import { wins } from "./wins";
@@ -14,10 +15,15 @@ export async function applyInvestmentAccountRow(
   );
   if (!wins(row.updatedAt, rows[0]?.updated_at ?? null)) return;
 
-  if (row.deletedAt !== null) {
-    await db.execute("DELETE FROM investment_accounts WHERE account_id = $1", [row.accountId]);
-    return;
-  }
+  try {
+    if (row.deletedAt !== null) {
+      await db.execute("DELETE FROM investment_accounts WHERE account_id = $1", [row.accountId]);
+      return;
+    }
 
-  await upsertInvestmentAccount(db, row);
+    await upsertInvestmentAccount(db, row);
+  } catch (error) {
+    // Sama alasan dengan applyRow -- parent (accounts) belum ter-pull.
+    await logRejectedRow(db, "investment_accounts", row.accountId, error);
+  }
 }

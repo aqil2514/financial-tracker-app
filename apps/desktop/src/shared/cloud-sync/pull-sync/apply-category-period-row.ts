@@ -1,5 +1,6 @@
 import type Database from "@tauri-apps/plugin-sql";
 
+import { logRejectedRow } from "./log-rejected-row";
 import type { SyncResponse } from "./types";
 import { upsertCategoryPeriod } from "./upsert-category-period";
 import { wins } from "./wins";
@@ -14,10 +15,16 @@ export async function applyCategoryPeriodRow(
   );
   if (!wins(row.updatedAt, rows[0]?.updated_at ?? null)) return;
 
-  if (row.deletedAt !== null) {
-    await db.execute("DELETE FROM category_periods WHERE id = $1", [row.id]);
-    return;
-  }
+  try {
+    if (row.deletedAt !== null) {
+      await db.execute("DELETE FROM category_periods WHERE id = $1", [row.id]);
+      return;
+    }
 
-  await upsertCategoryPeriod(db, row);
+    await upsertCategoryPeriod(db, row);
+  } catch (error) {
+    // Sama alasan dengan applyRow -- parent (categories yang direferensikan
+    // category_period_categories) belum ter-pull.
+    await logRejectedRow(db, "category_periods", row.id, error);
+  }
 }
