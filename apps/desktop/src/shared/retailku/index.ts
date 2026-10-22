@@ -2,17 +2,17 @@ export {
   useRetailkuSettings,
   useSetRetailkuSettings,
   type RetailkuSettings,
-} from "./mcp-hooks/use-retailku-settings";
+} from "./hooks/use-retailku-settings";
 export {
   useRetailkuPaymentAccounts,
   retailkuPaymentAccountsQueryKey,
-} from "./mcp-hooks/use-retailku-payment-accounts";
+} from "./hooks/use-retailku-payment-accounts";
 export {
   useRetailkuAccountMapping,
   retailkuAccountMappingQueryKey,
   type RetailkuAccountMapping,
-} from "./mcp-hooks/use-retailku-account-mapping";
-export { useRetailkuMappingIssues } from "./mcp-hooks/use-retailku-mapping-issues";
+} from "./hooks/use-retailku-account-mapping";
+export { useRetailkuMappingIssues } from "./hooks/use-retailku-mapping-issues";
 export {
   useFieldMapping,
   useSaveFieldMapping,
@@ -20,13 +20,19 @@ export {
   type FieldMapping,
   type SaveFieldMappingInput,
   type FieldMappingExtraFields,
-} from "./mcp-hooks/use-field-mapping";
+} from "./hooks/use-field-mapping";
 export {
   connectRetailkuMcp,
   assertRetailkuConfigured,
   RetailkuNotConfiguredError,
   type RetailkuMcpConfig,
-} from "./mcp-connection";
+} from "./helpers/connection";
+export {
+  RetailkuDialogProvider,
+  useRetailkuDialog,
+  type RetailkuDialogType,
+} from "./context";
+export { RetailkuPickerDialog } from "./components";
 export {
   getFinanceAccounts,
   type RetailkuFinanceAccount,
@@ -42,4 +48,4 @@ export {
   getFundTransferList,
   type RetailkuFundTransferList,
   type RetailkuFundTransferListItem,
-} from "./mcp-tools";
+} from "./helpers/tools";

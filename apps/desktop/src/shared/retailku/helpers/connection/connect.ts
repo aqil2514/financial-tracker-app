@@ -1,7 +1,7 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { RetailkuSettings } from "../mcp-hooks/use-retailku-settings";
+import type { RetailkuSettings } from "../../hooks/use-retailku-settings";
 
 export type RetailkuMcpConfig = {
   [K in keyof RetailkuSettings]: NonNullable<RetailkuSettings[K]>;

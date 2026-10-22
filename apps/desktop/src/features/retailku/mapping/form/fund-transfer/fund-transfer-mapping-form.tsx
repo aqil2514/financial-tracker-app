@@ -7,7 +7,7 @@ import {
   FormFieldText,
 } from "@/components/forms/form-fields";
 import type { Category } from "@/lib/db";
-import type { RetailkuFundTransferDetail } from "@/shared/retailku/mcp-tools";
+import type { RetailkuFundTransferDetail } from "@/shared/retailku/helpers/tools";
 import type { MappingRowDraftPatch, TransferMappingRowDraft } from "../../context/interfaces";
 import { FollowSourceToggle } from "../follow-source-toggle";
 import {

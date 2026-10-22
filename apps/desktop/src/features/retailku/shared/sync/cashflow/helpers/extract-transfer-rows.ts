@@ -1,4 +1,4 @@
-import type { getFundTransferList } from "@/shared/retailku/mcp-tools";
+import type { getFundTransferList } from "@/shared/retailku/helpers/tools";
 
 export type TransferRow = {
   key: string;

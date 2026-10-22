@@ -10,21 +10,25 @@ import {
   TransactionsHeader,
   TransactionsPageProvider,
 } from "@/features/transactions";
+import { RetailkuDialogProvider, RetailkuPickerDialog } from "@/shared/retailku";
 
 export default function TransactionsPage() {
   return (
     <TransactionsPageProvider>
       <TransactionsDialogProvider>
-        <PageContainer maxWidth="6xl">
-          <TransactionsHeader />
-          <TransactionsContent />
-        </PageContainer>
+        <RetailkuDialogProvider>
+          <PageContainer maxWidth="6xl">
+            <TransactionsHeader />
+            <TransactionsContent />
+          </PageContainer>
 
-        <TransactionsDialogs />
+          <TransactionsDialogs />
+          <RetailkuPickerDialog />
 
-        <Suspense fallback={null}>
-          <DeepLinkEditDialog />
-        </Suspense>
+          <Suspense fallback={null}>
+            <DeepLinkEditDialog />
+          </Suspense>
+        </RetailkuDialogProvider>
       </TransactionsDialogProvider>
     </TransactionsPageProvider>
   );
