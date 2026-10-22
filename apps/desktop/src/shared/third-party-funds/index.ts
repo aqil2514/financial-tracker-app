@@ -13,3 +13,5 @@ export {
   detachThirdPartyFundsForDeletedTransaction,
   InsufficientThirdPartyFundError,
 } from "./apply-third-party-transaction";
+
+export { createDirectThirdPartyFund } from "./create-direct-third-party-fund";

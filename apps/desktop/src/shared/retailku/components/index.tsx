@@ -8,8 +8,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useRetailkuDialog } from "../context";
-import { InnerRetailkuPickerProvider } from "./context";
+import { InnerRetailkuPickerProvider, useInnerRetailkuPicker } from "./context";
 import { LeftSide } from "./left-side";
+import { MappingStep } from "./mapping-step";
 import { RightSide } from "./right-side";
 
 export function RetailkuPickerDialog() {
@@ -26,12 +27,24 @@ export function RetailkuPickerDialog() {
           </DialogDescription>
         </DialogHeader>
         <InnerRetailkuPickerProvider>
-          <div className="grid h-128 grid-cols-2 divide-x rounded-lg border">
-            <LeftSide />
-            <RightSide />
-          </div>
+          <RetailkuPickerSteps />
         </InnerRetailkuPickerProvider>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function RetailkuPickerSteps() {
+  const { step } = useInnerRetailkuPicker();
+
+  if (step === "map") {
+    return <MappingStep />;
+  }
+
+  return (
+    <div className="grid h-128 grid-cols-2 divide-x rounded-lg border">
+      <LeftSide />
+      <RightSide />
+    </div>
   );
 }

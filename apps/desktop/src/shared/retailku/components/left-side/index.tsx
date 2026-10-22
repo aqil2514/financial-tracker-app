@@ -5,8 +5,6 @@ import { useInnerRetailkuPicker } from "../context";
 import { ResultList } from "./result-list";
 import { ToolPicker } from "./tool-picker";
 
-export { type RetailkuPickerListItem, DUMMY_LIST_ITEMS } from "./result-list";
-
 export function LeftSide() {
   const { selectedTool, setSelectedTool, dateRange, setDateRange, selectedItemId, setSelectedItemId } =
     useInnerRetailkuPicker();

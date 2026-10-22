@@ -1,59 +1,11 @@
 "use client";
 
+import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-export type RetailkuPickerListItem = {
-  id: string;
-  label: string;
-  description: string;
-  amount?: string;
-  note?: string;
-  date?: string;
-  status?: string;
-  fromAccount?: string;
-  toAccount?: string;
-  fee?: string;
-};
-
-export const DUMMY_LIST_ITEMS: RetailkuPickerListItem[] = [
-  {
-    id: "1",
-    label: "TRF-260926-01",
-    description: "Rp 500.000",
-    amount: "Rp 500.000",
-    note: "Setor tunai ke BCA",
-    date: "26 Sep 2026",
-    status: "POSTED",
-    fromAccount: "Kas Toko",
-    toAccount: "BCA 1234567890",
-    fee: "Rp 0",
-  },
-  {
-    id: "2",
-    label: "TRF-260926-02",
-    description: "Rp 120.000",
-    amount: "Rp 120.000",
-    note: "Transfer biaya operasional",
-    date: "26 Sep 2026",
-    status: "POSTED",
-    fromAccount: "BCA 1234567890",
-    toAccount: "Seabank",
-    fee: "Rp 2.500",
-  },
-  { id: "3", label: "TRF-260925-04", description: "Rp 75.000" },
-  { id: "4", label: "TRF-260925-03", description: "Rp 250.000" },
-  { id: "5", label: "TRF-260925-02", description: "Rp 30.000" },
-  { id: "6", label: "TRF-260925-01", description: "Rp 1.000.000" },
-  { id: "7", label: "TRF-260924-05", description: "Rp 45.000" },
-  { id: "8", label: "TRF-260924-04", description: "Rp 90.000" },
-  { id: "9", label: "TRF-260924-03", description: "Rp 60.500" },
-  { id: "10", label: "TRF-260924-02", description: "Rp 175.000" },
-  { id: "11", label: "TRF-260924-01", description: "Rp 320.000" },
-  { id: "12", label: "TRF-260923-03", description: "Rp 15.000" },
-  { id: "13", label: "TRF-260923-02", description: "Rp 410.000" },
-  { id: "14", label: "TRF-260923-01", description: "Rp 88.000" },
-  { id: "15", label: "TRF-260922-01", description: "Rp 200.000" },
-];
+import { RETAILKU_TOOLS } from "../../registry";
+import { useInnerRetailkuPicker } from "../context";
 
 export function ResultList({
   selectedId,
@@ -62,10 +14,44 @@ export function ResultList({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
+  const { client, status, selectedTool, dateRange } = useInnerRetailkuPicker();
+  const tool = selectedTool ? RETAILKU_TOOLS[selectedTool] : undefined;
+  const range = dateRange?.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : null;
+
+  const { data: items, isPending, isError } = useQuery({
+    queryKey: ["retailku-picker-list", selectedTool, range?.from, range?.to],
+    queryFn: () =>
+      tool!.fetchList(client!, {
+        dateFrom: format(range!.from, "yyyy-MM-dd"),
+        dateTo: format(range!.to, "yyyy-MM-dd"),
+      }),
+    enabled: status === "ready" && !!tool && !!range,
+  });
+
+  if (!range) {
+    return <p className="text-muted-foreground text-sm">Pilih rentang tanggal dulu untuk melihat daftar data.</p>;
+  }
+
+  if (status === "error") {
+    return <p className="text-destructive text-sm">Gagal terhubung ke Retailku.</p>;
+  }
+
+  if (status !== "ready" || isPending) {
+    return <p className="text-muted-foreground text-sm">Memuat data...</p>;
+  }
+
+  if (isError) {
+    return <p className="text-destructive text-sm">Gagal memuat data dari Retailku.</p>;
+  }
+
+  if (items && items.length === 0) {
+    return <p className="text-muted-foreground text-sm">Tidak ada data pada rentang tanggal ini.</p>;
+  }
+
   return (
     <ScrollArea className="min-h-0 rounded-lg border">
       <ul className="divide-y">
-        {DUMMY_LIST_ITEMS.map((item) => (
+        {items?.map((item) => (
           <li key={item.id}>
             <button
               type="button"

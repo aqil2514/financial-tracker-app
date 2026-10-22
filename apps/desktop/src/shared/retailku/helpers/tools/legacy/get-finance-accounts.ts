@@ -1,5 +1,5 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { callToolAsJson } from "./call-tool-as-json";
+import { callToolAsJson } from "../call-tool-as-json";
 
 /** Satu baris chart of accounts Retailku — bentuk field dikonfirmasi
  * lewat panggilan nyata ke MCP "Warung Aqil" (lihat

@@ -3,6 +3,7 @@ export {
   useSetRetailkuSettings,
   type RetailkuSettings,
 } from "./hooks/use-retailku-settings";
+export { useRetailkuMcpClient, type RetailkuMcpClientState } from "./hooks/use-retailku-mcp-client";
 export {
   useRetailkuPaymentAccounts,
   retailkuPaymentAccountsQueryKey,
@@ -33,6 +34,7 @@ export {
   type RetailkuDialogType,
 } from "./context";
 export { RetailkuPickerDialog } from "./components";
+export { RETAILKU_TOOLS, type RetailkuToolEntry, type RetailkuToolDateRange } from "./registry";
 export {
   getFinanceAccounts,
   type RetailkuFinanceAccount,

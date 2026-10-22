@@ -8,12 +8,14 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox";
+import { RETAILKU_TOOLS } from "../../registry";
 
-export const DUMMY_TOOLS = [
-  { value: "get_fund_transfer_list", label: "Transfer Dana" },
-  { value: "get_cashflow_detail", label: "Kas Harian" },
-  { value: "get_ar_ap", label: "Piutang/Utang Dagang" },
-];
+type ToolOption = { value: string; label: string };
+
+const TOOL_OPTIONS: ToolOption[] = Object.entries(RETAILKU_TOOLS).map(([value, entry]) => ({
+  value,
+  label: entry.label,
+}));
 
 export function ToolPicker({
   value,
@@ -22,14 +24,20 @@ export function ToolPicker({
   value: string | null;
   onChange: (value: string | null) => void;
 }) {
+  const selected = TOOL_OPTIONS.find((option) => option.value === value) ?? null;
+
   return (
-    <Combobox items={DUMMY_TOOLS} value={value} onValueChange={(next) => onChange(next as string | null)}>
+    <Combobox
+      items={TOOL_OPTIONS}
+      value={selected}
+      onValueChange={(next: ToolOption | null) => onChange(next?.value ?? null)}
+    >
       <ComboboxInput placeholder="Pilih tools..." />
       <ComboboxContent>
         <ComboboxEmpty>Tidak ditemukan.</ComboboxEmpty>
         <ComboboxList>
-          {(item: (typeof DUMMY_TOOLS)[number]) => (
-            <ComboboxItem key={item.value} value={item.value}>
+          {(item: ToolOption) => (
+            <ComboboxItem key={item.value} value={item}>
               {item.label}
             </ComboboxItem>
           )}
