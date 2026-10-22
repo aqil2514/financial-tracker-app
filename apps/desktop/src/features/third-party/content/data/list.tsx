@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog";
 import { QueryState } from "@/components/query-state";
+import type { FilterConfig } from "@/components/query/filters/filter.interface";
+import { FilterPanel } from "@/components/query/filters/panel";
+import type { FilterKeyOption, SelectOptionsMap } from "@/components/query/filters/panel/panel.interface";
+import { SortDropdown, type SortConfig, type SortKeyOption } from "@/components/query/sort";
+import { useAccounts } from "@/hooks/resources";
 import { useDeleteTransaction } from "@/features/transactions";
 import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
@@ -18,36 +23,90 @@ const DIRECTION_LABEL: Record<"in" | "out", string> = {
   out: "Ambil",
 };
 
+// Key SUDAH diprefix `third_party_funds.` -- harus sama persis dengan
+// FILTERABLE_COLUMNS/SORTABLE_COLUMNS di use-third-party-funds.ts (lihat
+// komentar di sana soal kenapa prefix wajib ada, bukan sekadar gaya).
+const FILTER_CONFIG: FilterKeyOption[] = [
+  { key: "third_party_funds.direction", label: "Arah", type: "select" },
+  { key: "third_party_funds.account_id", label: "Akun", type: "select" },
+];
+
+const SORT_CONFIG: SortKeyOption[] = [
+  { key: "third_party_funds.date", label: "Tanggal" },
+  { key: "third_party_funds.amount", label: "Jumlah" },
+];
+
+function useFilterSelectOptions(): SelectOptionsMap {
+  const { data: accounts } = useAccounts();
+
+  return useMemo(
+    () => ({
+      "third_party_funds.direction": [
+        { value: "in", label: "Titip" },
+        { value: "out", label: "Ambil" },
+      ],
+      "third_party_funds.account_id": (accounts ?? [])
+        .filter((account) => account.account_type === "third_party")
+        .map((account) => ({ value: account.id, label: account.name })),
+    }),
+    [accounts]
+  );
+}
+
 export function ThirdPartyFundList() {
-  const { data: funds, isLoading, error } = useThirdPartyFunds();
+  const [filters, setFilters] = useState<FilterConfig[]>([]);
+  const [sorts, setSorts] = useState<SortConfig[]>([]);
+  const selectOptions = useFilterSelectOptions();
+  const { data: funds, isLoading, error } = useThirdPartyFunds(filters, sorts);
   const [editingFund, setEditingFund] = useState<ThirdPartyFundRow | null>(null);
   const [deletingFund, setDeletingFund] = useState<ThirdPartyFundRow | null>(null);
   const deleteTransaction = useDeleteTransaction();
 
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <FilterPanel
+        config={FILTER_CONFIG}
+        selectOptions={selectOptions}
+        initialValue={filters}
+        onApplyFilter={setFilters}
+      />
+      <SortDropdown config={SORT_CONFIG} value={sorts} onChange={setSorts} />
+    </div>
+  );
+
   if (isLoading || error) {
     return (
-      <Card>
-        <CardContent>
-          <QueryState isLoading={isLoading} error={error} />
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        {toolbar}
+        <Card>
+          <CardContent>
+            <QueryState isLoading={isLoading} error={error} />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   if (!funds || funds.length === 0) {
     return (
-      <Card>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Belum ada riwayat titip/ambil. Catat lewat tombol di atas.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        {toolbar}
+        <Card>
+          <CardContent>
+            <p className="text-muted-foreground text-sm">
+              {filters.length > 0
+                ? "Tidak ada riwayat yang cocok dengan filter."
+                : "Belum ada riwayat titip/ambil. Catat lewat tombol di atas."}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
     <>
+      {toolbar}
       <Card>
         <CardContent className="p-0">
           <ul className="divide-y">

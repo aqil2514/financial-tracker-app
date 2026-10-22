@@ -1,9 +1,26 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { buildWhereClause } from "@/components/query/filters/builders/sql";
+import type { FilterConfig } from "@/components/query/filters/filter.interface";
+import { buildOrderClause } from "@/components/query/sort/builders/sql";
+import type { SortConfig } from "@/components/query/sort";
 import { getDb } from "@/lib/db";
 
+// Base key statis dipakai untuk invalidation (lib/query-dependencies.ts
+// prefix-match ini terhadap SEMUA variant filter/sort di bawahnya) —
+// JANGAN diubah jadi function, lihat queryKey aktual di dalam hook.
 export const thirdPartyFundsQueryKey = ["third-party", "funds"];
+
+// Diprefix `third_party_funds.` eksplisit (bukan nama kolom polos) karena
+// query ini LEFT JOIN ke `transactions`, yang JUGA punya kolom `date` dan
+// `amount` -- tanpa prefix, SQLite melempar "ambiguous column name" begitu
+// filter/sort dipakai. Pemanggil (list.tsx FILTER_CONFIG/SORT_CONFIG) WAJIB
+// memakai key yang SAMA PERSIS (sudah-prefixed) ini.
+const FILTERABLE_COLUMNS = ["third_party_funds.direction", "third_party_funds.account_id"] as const;
+// `direction` cuma 2 nilai ("in"/"out") -- bisa difilter, tapi urutan
+// Titip/Ambil kurang bermakna utk sort, jadi tidak masuk daftar ini.
+const SORTABLE_COLUMNS = ["third_party_funds.date", "third_party_funds.amount"] as const;
 
 export type ThirdPartyFundRow = {
   id: string;
@@ -28,15 +45,25 @@ export type ThirdPartyFundRow = {
 };
 
 /** Riwayat titip/ambil lintas SEMUA akun `third_party` — tab "Data" (lihat
- * docs/todos/plan/account-type-third-party.md, Tab Data Read). Sengaja
- * TIDAK pakai filter/sort builder generik (beda dari use-contact-summary.ts)
- * — konsisten dgn keputusan ThirdPartyAccountList (tab Akun) bahwa volume
- * data third_party biasanya kecil, query sederhana sudah cukup. */
-export function useThirdPartyFunds() {
+ * docs/todos/plan/account-type-third-party.md, Tab Data Read). Filter
+ * (arah, akun) & sort (tanggal, jumlah) dibangun lewat builder generik yang
+ * sama dgn Transaksi (`buildWhereClause`/`buildOrderClause`) — volume data
+ * third_party tetap kecil, tapi sudah cukup banyak utk butuh filter/sort,
+ * jadi dipakai builder yang sudah ada alih-alih menulis loop manual baru. */
+export function useThirdPartyFunds(filters: FilterConfig[] = [], sorts: SortConfig[] = []) {
   return useQuery({
-    queryKey: thirdPartyFundsQueryKey,
+    queryKey: [...thirdPartyFundsQueryKey, filters, sorts],
     queryFn: async (): Promise<ThirdPartyFundRow[]> => {
       const db = await getDb();
+      const { whereClause, params } = buildWhereClause(filters, FILTERABLE_COLUMNS, [
+        { condition: "third_party_funds.deleted_at IS NULL" },
+      ]);
+      const orderClause = buildOrderClause(
+        sorts,
+        SORTABLE_COLUMNS,
+        "third_party_funds.date DESC, third_party_funds.created_at DESC"
+      );
+
       return db.select<ThirdPartyFundRow[]>(
         `SELECT
            third_party_funds.id,
@@ -54,8 +81,9 @@ export function useThirdPartyFunds() {
          JOIN accounts ON accounts.id = third_party_funds.account_id
          JOIN contacts ON contacts.id = third_party_funds.contact_id
          LEFT JOIN transactions ON transactions.id = third_party_funds.transaction_id
-         WHERE third_party_funds.deleted_at IS NULL
-         ORDER BY third_party_funds.date DESC, third_party_funds.created_at DESC`
+         ${whereClause}
+         ${orderClause}`,
+        params
       );
     },
   });
