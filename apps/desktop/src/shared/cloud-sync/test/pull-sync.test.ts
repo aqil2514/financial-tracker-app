@@ -242,4 +242,53 @@ describe("applySyncResponse", () => {
 
     expect(touchedTables.size).toBe(0);
   });
+
+  it("satu baris gagal (mis. FK parent belum ter-pull) TIDAK menggagalkan seluruh pull -- regresi 2026-10-22 (kontak lama belum ter-pull saat baris baru sudah merujuknya)", async () => {
+    const touchedTables = new Set<string>();
+    const FROM_OR_INTO = /(?:FROM|INTO)\s+([a-z_]+)/gi;
+    const executedInserts: string[] = [];
+
+    const db = {
+      select: vi.fn(async () => []),
+      execute: vi.fn(async (sql: string, params?: unknown[]) => {
+        for (const match of sql.matchAll(FROM_OR_INTO)) touchedTables.add(match[1]);
+        if (sql.includes("INSERT INTO third_party_funds") && params?.[0] === "tpf-fail") {
+          throw new Error("error returned from database: (code: 787) FOREIGN KEY constraint failed");
+        }
+        executedInserts.push(sql);
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as unknown as Awaited<ReturnType<typeof getDb>>);
+
+    const response: SyncResponse = {
+      ...emptySyncResponse(),
+      thirdPartyFunds: [
+        {
+          ...row({ id: "tpf-fail" }),
+          accountId: "a1",
+          contactId: "ct-missing",
+          transactionId: "t1",
+          direction: "in",
+          amount: 10000,
+          date: "2026-10-10",
+          note: null,
+        },
+        {
+          ...row({ id: "tpf-ok" }),
+          accountId: "a1",
+          contactId: "ct1",
+          transactionId: "t1",
+          direction: "in",
+          amount: 5000,
+          date: "2026-10-10",
+          note: null,
+        },
+      ],
+    };
+
+    await expect(applySyncResponse(response)).resolves.toBeUndefined();
+
+    expect(touchedTables).toContain("cloud_sync_rejected_log");
+    expect(executedInserts.some((sql) => sql.includes("INSERT INTO third_party_funds"))).toBe(true);
+  });
 });

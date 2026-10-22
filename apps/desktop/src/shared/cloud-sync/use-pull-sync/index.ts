@@ -37,8 +37,9 @@ export function useAutoPullSync() {
           (checkpoint) => setAttachmentsCheckpoint.mutateAsync(checkpoint),
           queryClient
         );
-      } catch {
+      } catch (error) {
         // best-effort, lihat README.md
+        console.error("[useAutoPullSync] runPull gagal:", error);
         hasPulledRef.current = false;
       }
     })();

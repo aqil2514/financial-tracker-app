@@ -54,3 +54,9 @@ Hard-delete periode ikut menghapus pivotnya lewat `ON DELETE CASCADE` (`0048_cat
 ## Siapa yang update checkpoint
 
 `applySyncResponse` (di `index.ts`) tidak mengurus checkpoint — caller bertanggung jawab update checkpoint (`useSetCloudSyncCheckpoint`) SETELAH `applySyncResponse` resolve sukses.
+
+## `applyRow` menelan error per baris, bukan per seluruh pull
+
+**Bug ditemukan 2026-10-22** (dogfooding `third_party_funds`): entity baru bisa merujuk FK ke parent (kontak/akun) yang `updated_at`-nya LEBIH LAMA dari checkpoint lokal — filter incremental `WHERE updated_at > since` di Worker otomatis melewatkan parent itu di SETIAP `/sync` berikutnya, padahal child-nya (baru) tetap lolos. Sebelum fix ini, FOREIGN KEY constraint failed pada satu baris melempar exception yang membatalkan SELURUH `runPull` (termasuk `setCheckpoint`) — pull tidak akan pernah sukses lagi walau 99% data lain sehat, dan errornya tidak terlihat (tertelan `catch {}` kosong di `use-pull-sync/index.ts`, sudah diperbaiki jadi `console.error`).
+
+`applyRow` sekarang membungkus `upsert`/`DELETE` per baris dengan try/catch: gagal → catat ke `cloud_sync_rejected_log` (`log-rejected-row.ts`) lalu lanjut ke baris berikutnya, TIDAK menghentikan pull. Ini bukan solusi akar (parent yang "lama" tetap tidak ikut ter-pull) — cuma pagar supaya satu baris rusak tidak memblokir semua sync selamanya. Kalau baris yang gagal perlu benar-benar masuk, trigger parent-nya untuk ter-`updated_at` ulang (apa pun jalurnya) supaya ikut lolos filter incremental di pull berikutnya, SELAGI checkpoint belum melewati `updated_at` baris anak yang gagal — begitu checkpoint maju lewat itu, Worker tidak akan mengirim ulang baris anak itu sama sekali.
