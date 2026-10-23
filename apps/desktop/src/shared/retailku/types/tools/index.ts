@@ -47,3 +47,21 @@ export type {
   RetailkuDirectPurchasePaymentAccount,
   RetailkuDirectPurchaseJournalEntry,
 } from "./get_direct_purchase_detail";
+export type {
+  RetailkuSaleList,
+  RetailkuSaleListItem,
+  RetailkuSaleListRaw,
+  RetailkuSaleListItemRaw,
+  RetailkuSaleCustomer,
+} from "./get_sale_list";
+export type {
+  RetailkuSaleDetail,
+  RetailkuSaleDetailRaw,
+  RetailkuSaleDetailItem,
+  RetailkuSaleProductType,
+  RetailkuSalePaymentLine,
+  RetailkuSalePayment,
+  RetailkuSalePaymentItem,
+  RetailkuSaleReturn,
+  RetailkuSaleReturnRefundLine,
+} from "./get_sale_detail";

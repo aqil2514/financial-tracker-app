@@ -26,6 +26,8 @@ export { getPurchaseOrderList } from "./get_purchase_order_list";
 export { getPurchaseOrderDetail } from "./get_purchase_order_detail";
 export { getDirectPurchaseList } from "./get_direct_purchase_list";
 export { getDirectPurchaseDetail } from "./get_direct_purchase_detail";
+export { getSaleList } from "./get_sale_list";
+export { getSaleDetail } from "./get_sale_detail";
 export type {
   RetailkuCashOpnameList,
   RetailkuCashOpnameListItem,
@@ -43,4 +45,10 @@ export type {
   RetailkuDirectPurchaseListItem,
   RetailkuDirectPurchaseDetail,
   RetailkuDirectPurchasePaymentLine,
+  RetailkuSaleList,
+  RetailkuSaleListItem,
+  RetailkuSaleDetail,
+  RetailkuSaleProductType,
+  RetailkuSalePaymentLine,
+  RetailkuSalePayment,
 } from "../../types/tools";

@@ -1,6 +1,7 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { RetailkuDirectPurchaseList, RetailkuDirectPurchaseListRaw } from "../../types/tools/get_direct_purchase_list";
 import { callToolAsJson } from "./call-tool-as-json";
+import { isWithinWibDayRange } from "./wib-date-range";
 
 export async function getDirectPurchaseList(
   client: Client,
@@ -17,8 +18,8 @@ export async function getDirectPurchaseList(
 ): Promise<RetailkuDirectPurchaseList> {
   const raw = await callToolAsJson<RetailkuDirectPurchaseListRaw>(client, "get_direct_purchase_list", args);
 
-  return {
-    data: raw.data.map((item) => ({
+  const data = raw.data
+    .map((item) => ({
       id: item.id,
       number: item.number,
       status: item.status,
@@ -29,7 +30,11 @@ export async function getDirectPurchaseList(
       createdAt: item.createdAt,
       supplier: item.supplier,
       createdBy: item.createdBy,
-    })),
-    meta: raw.meta,
+    }))
+    .filter((item) => isWithinWibDayRange(item.purchaseDate, args.dateFrom, args.dateTo));
+
+  return {
+    data,
+    meta: { ...raw.meta, pagination: { ...raw.meta.pagination, total: data.length } },
   };
 }

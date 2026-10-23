@@ -1,15 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Trash2, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ThirdPartyFundFormOutput } from "@/features/third-party/content/data/form/schemas";
 import type { TransactionFormOutput } from "@/features/transactions/form/add-edit/schema";
-import { RETAILKU_TOOLS } from "../../registry";
-import type { RetailkuPackageEntry } from "../../registry/types";
 import { useRetailkuDialog } from "../../context";
 import { useInnerRetailkuPicker } from "../context";
 import { ThirdPartyFundEntryForm } from "./third-party-fund-entry-form";
@@ -19,17 +16,8 @@ import { useSavePackage, type SavePackageEntry } from "./use-save-package";
 type EntryResult = ThirdPartyFundFormOutput | TransactionFormOutput | null;
 
 export function MappingStep() {
-  const { client, status, selectedTool, selectedItemId, goToBrowseStep } = useInnerRetailkuPicker();
+  const { packageEntries: entries, goToBrowseStep } = useInnerRetailkuPicker();
   const { closeDialog } = useRetailkuDialog();
-  const tool = selectedTool ? RETAILKU_TOOLS[selectedTool] : undefined;
-
-  const { data: detailRaw } = useQuery({
-    queryKey: ["retailku-picker-detail", selectedTool, selectedItemId],
-    queryFn: () => tool!.fetchDetail(client!, selectedItemId!),
-    enabled: status === "ready" && !!tool && !!selectedItemId,
-  });
-
-  const entries: RetailkuPackageEntry[] = detailRaw && tool ? tool.toPackage(detailRaw) : [];
 
   const [results, setResults] = useState<Record<string, EntryResult>>({});
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
@@ -86,7 +74,7 @@ export function MappingStep() {
             {entries.map((entry) => {
               const isExcluded = excludedIds.has(entry.id);
               return (
-                <TabsContent key={entry.id} value={entry.id} className="space-y-4">
+                <TabsContent key={entry.id} value={entry.id} keepMounted className="space-y-4">
                   <div className="flex items-center justify-between rounded-lg border p-3">
                     <p className="text-muted-foreground text-sm">
                       {isExcluded ? "Item ini tidak akan disimpan." : "Item ini akan disimpan."}

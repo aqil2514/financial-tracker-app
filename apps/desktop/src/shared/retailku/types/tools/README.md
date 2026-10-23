@@ -13,3 +13,7 @@ Type untuk `getPurchaseOrderList`/`getPurchaseOrderDetail` — penjelasan domain
 ## `get_direct_purchase_list.ts` / `get_direct_purchase_detail.ts`
 
 Type untuk `getDirectPurchaseList`/`getDirectPurchaseDetail` — penjelasan domain (struktur `paymentLines[]`, `adjustments[]`, dll.) ada di `../../helpers/tools/README.md`.
+
+## `get_sale_list.ts` / `get_sale_detail.ts`
+
+Type untuk `getSaleList`/`getSaleDetail` — penjelasan domain (6 `RetailkuSaleProductType`, arti `totalCost` yang beda-beda per tipe, piutang vs lunas, dll.) ada di `../../helpers/tools/README.md` dan `../../registry/README.md` (`get-sale.ts`).

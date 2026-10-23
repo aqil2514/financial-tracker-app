@@ -4,28 +4,29 @@ import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RETAILKU_TOOLS } from "../../registry";
+import type { RetailkuItemToolEntry } from "../../registry/types";
 import { useInnerRetailkuPicker } from "../context";
 
 export function ResultList({
+  tool,
   selectedId,
   onSelect,
 }: {
+  tool: RetailkuItemToolEntry;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
   const { client, status, selectedTool, dateRange } = useInnerRetailkuPicker();
-  const tool = selectedTool ? RETAILKU_TOOLS[selectedTool] : undefined;
   const range = dateRange?.from && dateRange.to ? { from: dateRange.from, to: dateRange.to } : null;
 
   const { data: items, isPending, isError } = useQuery({
     queryKey: ["retailku-picker-list", selectedTool, range?.from, range?.to],
     queryFn: () =>
-      tool!.fetchList(client!, {
+      tool.fetchList(client!, {
         dateFrom: format(range!.from, "yyyy-MM-dd"),
         dateTo: format(range!.to, "yyyy-MM-dd"),
       }),
-    enabled: status === "ready" && !!tool && !!range,
+    enabled: status === "ready" && !!range,
   });
 
   if (!range) {

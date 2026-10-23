@@ -1,6 +1,7 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { RetailkuPurchaseOrderList, RetailkuPurchaseOrderListRaw } from "../../types/tools/get_purchase_order_list";
 import { callToolAsJson } from "./call-tool-as-json";
+import { isWithinWibDayRange } from "./wib-date-range";
 
 export async function getPurchaseOrderList(
   client: Client,
@@ -17,8 +18,8 @@ export async function getPurchaseOrderList(
 ): Promise<RetailkuPurchaseOrderList> {
   const raw = await callToolAsJson<RetailkuPurchaseOrderListRaw>(client, "get_purchase_order_list", args);
 
-  return {
-    data: raw.data.map((item) => ({
+  const data = raw.data
+    .map((item) => ({
       id: item.id,
       number: item.number,
       status: item.status,
@@ -30,7 +31,11 @@ export async function getPurchaseOrderList(
       createdBy: item.createdBy,
       createdAt: item.createdAt,
       items: item.items,
-    })),
-    meta: raw.meta,
+    }))
+    .filter((item) => isWithinWibDayRange(item.orderDate, args.dateFrom, args.dateTo));
+
+  return {
+    data,
+    meta: { ...raw.meta, pagination: { ...raw.meta.pagination, total: data.length } },
   };
 }

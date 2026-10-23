@@ -24,10 +24,19 @@ export type RetailkuThirdPartyFundDraft = {
 
 export type RetailkuPackageEntry = RetailkuTransactionDraft | RetailkuThirdPartyFundDraft;
 
-export type RetailkuToolEntry = {
+export type RetailkuItemToolEntry = {
+  mode?: "item";
   label: string;
   fetchList: (client: Client, range: RetailkuToolDateRange) => Promise<RetailkuPickerListItem[]>;
   fetchDetail: (client: Client, id: string) => Promise<unknown>;
   adapter: DetailAdapter;
   toPackage: (detail: unknown) => RetailkuPackageEntry[];
 };
+
+export type RetailkuSummaryToolEntry = {
+  mode: "summary";
+  label: string;
+  fetchSummary: (client: Client, range: RetailkuToolDateRange) => Promise<RetailkuPackageEntry[]>;
+};
+
+export type RetailkuToolEntry = RetailkuItemToolEntry | RetailkuSummaryToolEntry;
