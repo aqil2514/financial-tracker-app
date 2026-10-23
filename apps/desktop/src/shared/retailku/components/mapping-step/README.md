@@ -6,7 +6,9 @@ Step 2 dialog picker Retailku — menggantikan SELURUH isi dialog (bukan ditamba
 
 `MappingStep` — orchestrator. Ambil `detailRaw` lewat query yang SAMA dengan `../right-side/index.tsx` (key identik, React Query dedupe — bukan fetch ulang), panggil `tool.toPackage(detailRaw)` untuk dapat daftar entri, render satu `Tabs`/`TabsTrigger`/`TabsContent` per entri.
 
-Tiap tab TIDAK punya tombol submit sendiri — form di dalamnya melapor nilai terbarunya ke `results` (state lokal di sini) lewat `onChange`. Tombol "Simpan Semua" di footer aktif hanya kalau SEMUA entri sudah valid (`results[entry.id] != null`), memanggil `useSavePackage`.
+Tiap tab TIDAK punya tombol submit sendiri — form di dalamnya melapor nilai terbarunya ke `results` (state lokal di sini) lewat `onChange`. Tombol "Simpan Semua" di footer aktif hanya kalau SEMUA entri yang TIDAK dikecualikan (`excludedIds`, lihat di bawah) sudah valid (`results[entry.id] != null`), memanggil `useSavePackage`.
+
+Tiap tab juga punya tombol "Jangan Simpan"/"Simpan Lagi" (`excludedIds: Set<string>`, state lokal) untuk mengecualikan satu entri dari "Simpan Semua" tanpa membatalkan seluruh picker — berguna kalau satu item Retailku menghasilkan beberapa entri (mis. Cash Opname dengan beberapa dana pihak ketiga) tapi user cuma mau simpan sebagian. Entri yang dikecualikan: form-nya TIDAK dirender (`isExcluded ? null : ...`, jadi ikut ter-unmount, `useForm` dalamnya reset total) dan label tabnya dicoret (`line-through`) — tapi tab itu sendiri TETAP ada di `TabsList` (bukan dihapus dari render) supaya user bisa toggle balik ("Simpan Lagi") dan form-nya remount dari `defaultValues` semula. Hitungan `(${includedEntries.length})` di tombol "Simpan Semua" cuma menghitung entri yang tidak dikecualikan.
 
 Sengaja TIDAK pakai `@/components/pattern/array-field-tabs` (`ArrayFieldTabs`) — komponen itu didesain untuk navigasi dikontrol dari panel overview terpisah (lihat pemakaiannya di `features/retailku/mapping/`), sedangkan di sini jumlah entri kecil (biasanya 1-5) dan cukup `TabsList` biasa.
 
@@ -18,7 +20,7 @@ Pola: `useForm` sendiri per tab, `useWatch` seluruh value, lapor ke parent lewat
 
 `TransactionEntryForm` WAJIB membungkus field-nya dengan DUA provider sekaligus: `FormProvider` (react-hook-form, dibutuhkan field "sederhana" seperti `FieldNote`/`FieldDate` yang baca `useFormContext()`) DAN `TransactionFormFieldsProvider` (context custom, dibutuhkan field "kompleks" seperti `FieldAccountId`/`FieldDebtAction` yang baca `useTransactionFormFields()`) — field-field itu sendiri tidak diubah, cuma sumber context-nya dua jalur berbeda (lihat `features/transactions/form/add-edit/README.md`). `onSubmit`/`handleSubmitRef` yang diwajibkan `TransactionFormFieldsProvider` diisi no-op — tidak pernah benar-benar terpanggil karena tidak ada elemen `<form>`/tombol submit di tab ini.
 
-`TransactionEntryForm` sengaja TIDAK menyertakan `FieldAttachments`/`FieldDescription` — prefill dari Retailku tidak pernah membawa lampiran file atau deskripsi kaya, jadi dua field itu bukan kebutuhan kasus ini.
+`TransactionEntryForm` menyertakan `FieldDescription` (2026-10-24, ditambahkan supaya breakdown rich text dari `registry/get-purchase-order.ts`/`get-direct-purchase.ts` — bullet list per item + "Total Belanja" — bisa terlihat/diedit) tapi TIDAK `FieldAttachments` — prefill dari Retailku tidak pernah membawa lampiran file.
 
 ## `use-save-package.ts`
 

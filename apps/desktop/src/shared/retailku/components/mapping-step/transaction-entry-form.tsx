@@ -21,6 +21,7 @@ import { FieldDebtAction } from "@/features/transactions/form/add-edit/component
 import { FieldLabel } from "@/features/transactions/form/add-edit/components/fields/field-label";
 import { FieldInvestment } from "@/features/transactions/form/add-edit/components/fields/field-investment";
 import { FieldDate } from "@/features/transactions/form/add-edit/components/fields/field-date";
+import { FieldDescription } from "@/features/transactions/form/add-edit/components/fields/field-description";
 import { CreateAccountDialog } from "@/features/transactions/form/add-edit/components/fields/create-account-dialog";
 import { CreateCategoryDialog } from "@/features/transactions/form/add-edit/components/fields/create-category-dialog";
 
@@ -36,10 +37,6 @@ export function TransactionEntryForm({
     defaultValues: { ...defaultTransactionValues(), ...defaultValues },
   });
 
-  // Tab ini tidak punya tombol submit sendiri (lihat ../index.tsx — satu
-  // tombol "Simpan Semua" di luar) — `handleSubmitRef`/`onSubmit` di sini
-  // TIDAK PERNAH benar-benar dipanggil, cuma dipenuhi karena
-  // `TransactionFormFieldsProvider` mewajibkannya.
   const noopHandleSubmitRef = useRef<(values: TransactionFormOutput) => void>(() => {});
 
   const values = useWatch({ control: form.control });
@@ -69,6 +66,7 @@ export function TransactionEntryForm({
           <FieldLabel />
           <FieldInvestment />
           <FieldDate />
+          <FieldDescription />
         </div>
         <CreateAccountDialog />
         <CreateCategoryDialog />

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Trash2, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,19 +32,33 @@ export function MappingStep() {
   const entries: RetailkuPackageEntry[] = detailRaw && tool ? tool.toPackage(detailRaw) : [];
 
   const [results, setResults] = useState<Record<string, EntryResult>>({});
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
 
   function updateResult(entryId: string, values: EntryResult) {
     setResults((prev) => ({ ...prev, [entryId]: values }));
   }
 
-  const allValid = entries.length > 0 && entries.every((entry) => results[entry.id] != null);
+  function toggleExcluded(entryId: string) {
+    setExcludedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(entryId)) {
+        next.delete(entryId);
+      } else {
+        next.add(entryId);
+      }
+      return next;
+    });
+  }
+
+  const includedEntries = entries.filter((entry) => !excludedIds.has(entry.id));
+  const allValid = includedEntries.length > 0 && includedEntries.every((entry) => results[entry.id] != null);
 
   const { mutate: savePackage, isPending: isSaving } = useSavePackage(() => {
     closeDialog();
   });
 
   function handleSaveAll() {
-    const payload: SavePackageEntry[] = entries.map((entry) => ({
+    const payload: SavePackageEntry[] = includedEntries.map((entry) => ({
       entry,
       values: results[entry.id]!,
     }));
@@ -59,26 +74,49 @@ export function MappingStep() {
           <Tabs defaultValue={entries[0]?.id} className="w-full min-w-0">
             <TabsList>
               {entries.map((entry) => (
-                <TabsTrigger key={entry.id} value={entry.id}>
+                <TabsTrigger
+                  key={entry.id}
+                  value={entry.id}
+                  className={excludedIds.has(entry.id) ? "text-muted-foreground line-through" : undefined}
+                >
                   {entry.label}
                 </TabsTrigger>
               ))}
             </TabsList>
-            {entries.map((entry) => (
-              <TabsContent key={entry.id} value={entry.id} className="space-y-4">
-                {entry.target === "third-party-fund" ? (
-                  <ThirdPartyFundEntryForm
-                    defaultValues={entry.defaultValues}
-                    onChange={(values) => updateResult(entry.id, values)}
-                  />
-                ) : (
-                  <TransactionEntryForm
-                    defaultValues={entry.defaultValues}
-                    onChange={(values) => updateResult(entry.id, values)}
-                  />
-                )}
-              </TabsContent>
-            ))}
+            {entries.map((entry) => {
+              const isExcluded = excludedIds.has(entry.id);
+              return (
+                <TabsContent key={entry.id} value={entry.id} className="space-y-4">
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <p className="text-muted-foreground text-sm">
+                      {isExcluded ? "Item ini tidak akan disimpan." : "Item ini akan disimpan."}
+                    </p>
+                    <Button type="button" variant="outline" size="sm" onClick={() => toggleExcluded(entry.id)}>
+                      {isExcluded ? (
+                        <>
+                          <Undo2 /> Simpan Lagi
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 /> Jangan Simpan
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  {isExcluded ? null : entry.target === "third-party-fund" ? (
+                    <ThirdPartyFundEntryForm
+                      defaultValues={entry.defaultValues}
+                      onChange={(values) => updateResult(entry.id, values)}
+                    />
+                  ) : (
+                    <TransactionEntryForm
+                      defaultValues={entry.defaultValues}
+                      onChange={(values) => updateResult(entry.id, values)}
+                    />
+                  )}
+                </TabsContent>
+              );
+            })}
           </Tabs>
         )}
       </div>
@@ -87,7 +125,7 @@ export function MappingStep() {
           Kembali
         </Button>
         <Button type="button" disabled={!allValid || isSaving} onClick={handleSaveAll}>
-          {isSaving ? "Menyimpan..." : `Simpan Semua (${entries.length})`}
+          {isSaving ? "Menyimpan..." : `Simpan Semua (${includedEntries.length})`}
         </Button>
       </div>
     </div>
