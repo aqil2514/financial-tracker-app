@@ -5,6 +5,7 @@ import { Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/format-currency";
 import { formatDate } from "@/lib/format-date";
 import type { Transaction } from "@/lib/db";
@@ -81,32 +82,32 @@ function TransactionDetailDialogContent({
 
   return (
     <Dialog open={true} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Detail Transaksi</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 text-sm">
-          <div className="relative flex flex-col items-center gap-2 rounded-lg border p-6 text-center">
-            <Button
-              variant="outline"
-              size="sm"
-              className="absolute top-3 right-3"
-              onClick={onEdit}
-            >
-              <Pencil className="size-4" />
-              Edit
-            </Button>
-            <Icon className={`size-10 ${config.className}`} />
-            <p className={`text-2xl font-semibold ${config.className}`}>
-              {transaction.type === "expense" ? "-" : transaction.type === "income" ? "+" : ""}
-              {formatCurrency(transaction.amount, "IDR")}
-            </p>
-            <p className="text-muted-foreground">{config.label}</p>
-            <p className="font-medium">{transaction.note || "Tanpa catatan"}</p>
-          </div>
+        <div className="relative flex flex-col items-center gap-2 rounded-lg border p-6 text-center text-sm">
+          <Button
+            variant="outline"
+            size="sm"
+            className="absolute top-3 right-3"
+            onClick={onEdit}
+          >
+            <Pencil className="size-4" />
+            Edit
+          </Button>
+          <Icon className={`size-10 ${config.className}`} />
+          <p className={`text-2xl font-semibold ${config.className}`}>
+            {transaction.type === "expense" ? "-" : transaction.type === "income" ? "+" : ""}
+            {formatCurrency(transaction.amount, "IDR")}
+          </p>
+          <p className="text-muted-foreground">{config.label}</p>
+          <p className="font-medium">{transaction.note || "Tanpa catatan"}</p>
+        </div>
 
-          <div className="space-y-3">
+        <div className={`grid grid-cols-1 gap-6 text-sm ${description ? "sm:grid-cols-[1fr_1.2fr]" : ""}`}>
+          <div className="min-w-0 space-y-3">
             <div className="flex items-start justify-between gap-4">
               <span className="text-muted-foreground shrink-0">Akun</span>
               <div className="flex flex-col items-end gap-1">
@@ -157,24 +158,26 @@ function TransactionDetailDialogContent({
             </div>
           </div>
 
-          {attachments && attachments.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-muted-foreground">Lampiran Foto</p>
-              <div className="flex flex-wrap gap-2">
-                {attachments.map((attachment) => (
-                  <AttachmentThumbnail key={attachment.id} attachment={attachment} />
-                ))}
-              </div>
-            </div>
-          )}
-
           {description && (
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <p className="text-muted-foreground">Deskripsi</p>
-              <RichTextViewer value={description} />
+              <ScrollArea className="h-64 rounded-lg border p-3">
+                <RichTextViewer value={description} />
+              </ScrollArea>
             </div>
           )}
         </div>
+
+        {attachments && attachments.length > 0 && (
+          <div className="space-y-2 text-sm">
+            <p className="text-muted-foreground">Lampiran</p>
+            <div className="flex flex-wrap gap-2">
+              {attachments.map((attachment) => (
+                <AttachmentThumbnail key={attachment.id} attachment={attachment} />
+              ))}
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
