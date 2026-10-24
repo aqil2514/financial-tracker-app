@@ -65,3 +65,11 @@ export type {
   RetailkuSaleReturn,
   RetailkuSaleReturnRefundLine,
 } from "./get_sale_detail";
+export type {
+  RetailkuFundTransferList,
+  RetailkuFundTransferListItem,
+  RetailkuFundTransferListRaw,
+  RetailkuFundTransferListItemRaw,
+  RetailkuFundTransferAccount,
+} from "./get_fund_transfer_list";
+export type { RetailkuFundTransferDetail, RetailkuFundTransferDetailRaw } from "./get_fund_transfer_detail";
