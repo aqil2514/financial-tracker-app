@@ -19,7 +19,7 @@ export function RetailkuPickerDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && closeDialog()}>
-      <DialogContent className="sm:max-w-7xl!">
+      <DialogContent className="overflow-hidden sm:max-w-7xl!">
         <DialogHeader>
           <DialogTitle>Ambil dari Retailku</DialogTitle>
           <DialogDescription>

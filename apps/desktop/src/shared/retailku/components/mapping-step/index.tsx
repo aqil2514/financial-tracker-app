@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Trash2, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ThirdPartyFundFormOutput } from "@/features/third-party/content/data/form/schemas";
 import type { TransactionFormOutput } from "@/features/transactions/form/add-edit/schema";
@@ -55,23 +56,26 @@ export function MappingStep() {
   }
 
   return (
-    <div className="flex h-128 flex-col">
-      <div className="flex-1 overflow-y-auto p-4">
+    <div className="flex h-128 w-full min-w-0 flex-col">
+      <div className="min-w-0 flex-1 overflow-y-auto p-4">
         {entries.length === 0 ? (
           <p className="text-muted-foreground text-sm">Tidak ada data untuk dipetakan.</p>
         ) : (
           <Tabs defaultValue={entries[0]?.id} className="w-full min-w-0">
-            <TabsList>
-              {entries.map((entry) => (
-                <TabsTrigger
-                  key={entry.id}
-                  value={entry.id}
-                  className={excludedIds.has(entry.id) ? "text-muted-foreground line-through" : undefined}
-                >
-                  {entry.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <ScrollArea className="w-full min-w-0 whitespace-nowrap">
+              <TabsList className="w-max min-w-full flex-nowrap justify-start">
+                {entries.map((entry) => (
+                  <TabsTrigger
+                    key={entry.id}
+                    value={entry.id}
+                    className={excludedIds.has(entry.id) ? "text-muted-foreground shrink-0 line-through" : "shrink-0"}
+                  >
+                    {entry.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
             {entries.map((entry) => {
               const isExcluded = excludedIds.has(entry.id);
               return (
