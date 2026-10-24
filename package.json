@@ -7,8 +7,10 @@
   "scripts": {
     "dev:desktop": "npm run tauri dev --workspace=desktop",
     "build:desktop": "npm run tauri build --workspace=desktop",
-    "dev:mobile": "npm run dev --workspace=mobile",
+    "dev:mobile": "npm run start --workspace=mobile",
+    "build:mobile-development": "npm run build:development --workspace=mobile",
     "build:mobile-preview": "npm run build:preview --workspace=mobile",
+    "build:mobile-production": "npm run build:production --workspace=mobile",
     "dev:worker": "npm run dev --workspace=worker",
     "deploy:worker": "npm run deploy --workspace=worker",
     "test:desktop": "npm run test --workspace=desktop",
