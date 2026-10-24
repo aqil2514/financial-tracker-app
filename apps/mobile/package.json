@@ -1,15 +1,29 @@
 {
   "name": "mobile",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@hookform/resolvers": "^5.9.1",
     "expo": "~56.0.12",
+    "expo-constants": "~56.0.27",
+    "expo-linking": "~56.0.19",
+    "expo-router": "~56.2.22",
     "expo-status-bar": "~56.0.4",
+    "nativewind": "^4.2.7",
     "react": "19.2.3",
-    "react-native": "0.85.3"
+    "react-hook-form": "^7.91.0",
+    "react-native": "0.85.3",
+    "react-native-reanimated": "4.3.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "tailwindcss": "^3.4.19",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "babel-preset-expo": "^56.0.20",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
