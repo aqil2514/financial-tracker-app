@@ -23,8 +23,8 @@ export async function insertTransactionToDb({
   const transactionId = newId();
 
   await db.execute(
-    `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    `INSERT INTO transactions (id, type, amount, category_id, account_id, transfer_account_id, note, description, date, contact_id, source, source_ref)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
       transactionId,
       values.type,
@@ -36,6 +36,8 @@ export async function insertTransactionToDb({
       isEmptyDoc(values.description) ? null : JSON.stringify(values.description),
       values.date,
       contactId,
+      values.source_ref ? "retailku_sync" : "manual",
+      values.source_ref,
     ]
   );
 

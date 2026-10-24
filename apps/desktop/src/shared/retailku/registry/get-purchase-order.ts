@@ -51,6 +51,7 @@ function toPurchaseOrderPackage(raw: RetailkuPurchaseOrderDetail): RetailkuPacka
         note,
         description,
         date,
+        source_ref: `retailku-picker:${payment.id}-${line.id}`,
       },
       sourceDetail,
     }))

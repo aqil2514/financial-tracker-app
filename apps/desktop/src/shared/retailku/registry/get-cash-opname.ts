@@ -44,6 +44,7 @@ function toCashOpnamePackage(raw: RetailkuCashOpnameDetail): RetailkuPackageEntr
         account_id: raw.account?.id,
         note: "Selisih Cash Opname",
         date,
+        source_ref: `retailku-picker:${raw.id}`,
       },
       sourceDetail,
     });

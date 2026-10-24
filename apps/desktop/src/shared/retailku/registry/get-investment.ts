@@ -38,6 +38,7 @@ function toInvestmentPackage(raw: RetailkuInvestmentDetail): RetailkuPackageEntr
         note: raw.notes || "Pembelian Investasi Retailku",
         date,
         investment_status: raw.status === "POSTED" ? "settled" : "pending",
+        source_ref: `retailku-picker:${raw.id}`,
       },
       sourceDetail: investmentAdapter(raw),
     },

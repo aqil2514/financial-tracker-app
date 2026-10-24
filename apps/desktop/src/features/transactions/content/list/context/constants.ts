@@ -10,4 +10,8 @@ export const STATIC_FILTER_SELECT_OPTIONS: SelectOptionsMap = {
     { value: "1", label: "Ada gambar" },
     { value: "0", label: "Tidak ada gambar" },
   ],
+  source: [
+    { value: "retailku_sync", label: "Dari Retailku" },
+    { value: "manual", label: "Input Manual" },
+  ],
 };

@@ -11,6 +11,18 @@ Jembatan antara `../helpers/tools/` (fungsi mentah pemanggil tool MCP) dan `../c
 
 `../components/right-side/index.tsx` jadi dispatcher: `tool.mode === "summary"` → render `SummaryPanel`, selain itu → render `ItemPanel` (pola lama, dipindah dari isi `right-side/index.tsx` versi sebelumnya). `../components/left-side/index.tsx` juga skip render `ResultList` (yang butuh `fetchList`, tidak ada di `RetailkuSummaryToolEntry`) untuk tool mode summary — cukup `PeriodPicker`, detail+aksi sepenuhnya di panel kanan (`SummaryPanel`).
 
+### Provenance: `source_ref` (2026-10-24)
+
+Semua `toPackage`/`toEventPackage` dengan `target: "transaction"` mengisi `defaultValues.source_ref: `retailku-picker:${id unik entry}`` — field baru di `TransactionFormValues` (`features/transactions/form/add-edit/schema/schema.ts`), tidak dirender sebagai `Field*` apa pun jadi tidak muncul di UI, cuma ikut lewat lewat `defaultValues`/`useWatch`/submit.
+
+Tujuannya menandai baris `transactions` yang berasal dari picker ini, dibedakan dari input manual murni (lihat `docs/todos/superseded/cloud-sync-retailku-provenance-gap.md` — sebelumnya TIDAK ada penanda sama sekali, seluruh hasil picker tercatat `source='manual'`, keputusan desain yang disengaja saat itu). Diputuskan BUKAN memperbaiki itu, melainkan REUSE nilai `source='retailku_sync'` yang sudah ada dari migrasi `0017_transaction_source.sql` (awalnya khusus fitur sync otomatis lama yang sudah ditinggalkan) — `insertTransactionToDb` (`hooks/helper/insert-to-db.ts`) set `source: values.source_ref ? "retailku_sync" : "manual"`. Dibedakan dari format `source_ref` sync lama (`"2026-09-20"` atau `"2026-09-20:SALE"`) lewat prefix `retailku-picker:`.
+
+Keputusan SENGAJA tidak menambah nilai enum baru (mis. `'retailku_picker'`) ke CHECK constraint — SQLite tidak bisa `ALTER TABLE` untuk CHECK, perlu migrasi copy-and-rename (`docs/rules/sqlite-copy-and-rename-migration.md`) yang akan menyentuh SEMUA 13 tabel lain yang FK ke `transactions` (`debts`, `investment_purchases`, `investment_sales`, `transaction_attachments`, `entity_labels`, dst) — jauh lebih mahal daripada reuse nilai yang sudah ada, untuk fitur yang baru dites 1-2 kali.
+
+Scope SENGAJA dibatasi ke tabel `transactions` saja — entry `target: "third-party-fund"` (Cash Opname) TIDAK diisi provenance (`thirdPartyFundSchema` tidak punya field ini), dan baris `debts`/`debt_payments` turunan juga TIDAK ikut ditandai (`applyDebtTransaction`/`createDebt`/`settleDebtsFifo` di `shared/debts/apply-debt-transaction/` tidak disentuh) — kalau nanti butuh dilacak dari sisi `debts` juga, itu perubahan terpisah yang lebih mahal (mengubah signature fungsi yang dipakai SEMUA jalur debt, bukan cuma picker).
+
+Sale (`get-sale.ts`, mode summary) SENGAJA TIDAK diisi — `source_ref` dibiarkan default `null` (dari `defaultTransactionValues()`) karena satu entry hasil rangkuman berasal dari BANYAK sale sekaligus, tidak ada satu `id` tunggal yang representatif.
+
 ## `get-cash-opname.ts`
 
 Entry untuk tool `get_cash_opname_list`. `fetchList` memetakan tiap item list ke `{id, label: tanggal hitung, description: nominal selisih, raw: item list apa adanya}` — `raw` di sini TIDAK dipakai `adapter` (lihat `fetchDetail` di bawah), disimpan untuk tool lain yang mungkin tidak butuh fetch detail terpisah.

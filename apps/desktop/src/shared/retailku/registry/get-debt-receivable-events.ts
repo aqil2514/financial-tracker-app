@@ -27,12 +27,10 @@ function toEventPackage(event: RetailkuDebtReceivableEvent): RetailkuPackageEntr
       defaultValues: {
         type: "transfer",
         amount: event.amount,
-        // Akun kas & akun debt lokal TIDAK bisa diprefill — event Retailku ini tidak
-        // membawa referensi akun manapun (beda dari Fund Transfer/Investasi yang punya
-        // ID akun Retailku eksplisit), wajib dipilih manual oleh user di form.
         note: `${event.source} — ${event.description}`,
         date,
         contact_name: event.partyName,
+        source_ref: `retailku-picker:${event.id}`,
       },
     };
   }
@@ -47,13 +45,10 @@ function toEventPackage(event: RetailkuDebtReceivableEvent): RetailkuPackageEntr
     defaultValues: {
       type: "transfer",
       amount: event.amount,
-      // Sama seperti ISSUED, akun tetap manual. `settle_debt_ids` SENGAJA tidak diisi —
-      // ID debt Retailku tidak match ID `debts` lokal, dan daftar debt ongoing lokal
-      // (`useOngoingDebts`) baru termuat setelah `contact_name` ter-resolve ke
-      // `contact_id` di form. User mencentang manual debt lokal yang sesuai.
       note: `${event.source} — ${event.description}${relatedNote}`,
       date,
       contact_name: event.partyName,
+      source_ref: `retailku-picker:${event.id}`,
     },
   };
 }

@@ -11,6 +11,7 @@ const FILTER_CONFIG: FilterKeyOption[] = [
   { key: "amount", label: "Jumlah", type: "number" },
   { key: "has_attachment", label: "Gambar", type: "select" },
   { key: "label", label: "Label", type: "combobox" },
+  { key: "source", label: "Sumber Data", type: "select" },
 ];
 
 export function TransactionListFilter({

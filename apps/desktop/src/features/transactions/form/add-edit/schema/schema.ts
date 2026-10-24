@@ -17,6 +17,7 @@ export const transactionSchema = z
     price_per_unit: z.coerce.number().nullable(),
     investment_status: z.enum(["pending", "settled"]).nullable(),
     label_names: z.array(z.string()),
+    source_ref: z.string().nullable(),
   })
   .superRefine((values, ctx) => {
     if (values.type === "transfer") {

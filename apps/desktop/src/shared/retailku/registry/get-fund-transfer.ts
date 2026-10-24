@@ -40,6 +40,7 @@ function toFundTransferPackage(raw: RetailkuFundTransferDetail): RetailkuPackage
       transfer_account_id: raw.toAccount.id,
       note: raw.description || "Transfer Dana Retailku",
       date,
+      source_ref: `retailku-picker:${raw.id}-transfer`,
     },
     sourceDetail,
   });
@@ -55,6 +56,7 @@ function toFundTransferPackage(raw: RetailkuFundTransferDetail): RetailkuPackage
         account_id: raw.fromAccount.id,
         note: "Biaya Transfer Dana",
         date,
+        source_ref: `retailku-picker:${raw.id}-from-fee`,
       },
       sourceDetail,
     });
@@ -71,6 +73,7 @@ function toFundTransferPackage(raw: RetailkuFundTransferDetail): RetailkuPackage
         account_id: raw.toAccount.id,
         note: "Biaya Transfer Dana",
         date,
+        source_ref: `retailku-picker:${raw.id}-to-fee`,
       },
       sourceDetail,
     });

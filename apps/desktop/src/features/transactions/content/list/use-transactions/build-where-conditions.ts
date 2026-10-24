@@ -9,6 +9,7 @@ const FILTERABLE_COLUMNS = [
   "category_id",
   "account_id",
   "amount",
+  "source",
 ] as const;
 
 export const buildWhereConditions = (

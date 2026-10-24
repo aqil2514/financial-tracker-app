@@ -45,11 +45,8 @@ jobs:
       - name: Read release notes
         id: release_notes
         shell: bash
-        # File per versi di docs/release/<tag>.md (lihat skill dokumentasi
-        # release) -- kalau belum dibuat/lupa saat tag di-push, fallback ke
-        # teks generik supaya release tetap dibuat (bukan fail-fast).
         run: |
-          NOTES_FILE="docs/release/${{ github.ref_name }}.md"
+          NOTES_FILE="apps/desktop/docs/release/${{ github.ref_name }}.md"
           if [ -f "$NOTES_FILE" ]; then
             {
               echo "body<<RELEASE_NOTES_EOF"

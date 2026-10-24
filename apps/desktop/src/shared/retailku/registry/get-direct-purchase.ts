@@ -50,6 +50,7 @@ function toDirectPurchasePackage(raw: RetailkuDirectPurchaseDetail): RetailkuPac
       note,
       description,
       date,
+      source_ref: `retailku-picker:${line.id}`,
     },
     sourceDetail,
   }));

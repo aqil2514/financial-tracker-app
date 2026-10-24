@@ -54,7 +54,7 @@ lainnya (retailku sync).
       3 gap TERPISAH yang ketahuan saat verifikasi (kontak tidak
       ter-push, combobox key collision, 422 tidak di-retry):
       [`docs/dogfooding/2026-10-05-verifikasi-fix-debts-duplikat-dan-gap-kontak.md`](../../dogfooding/2026-10-05-verifikasi-fix-debts-duplikat-dan-gap-kontak.md).
-      Rilis: [`docs/release/v0.1.4.md`](../../release/v0.1.4.md).
+      Rilis: [`apps/desktop/docs/release/v0.1.4.md`](../../../apps/desktop/docs/release/v0.1.4.md).
 
 ## Gap ditemukan SETELAH rencana awal (lewat test manual, 2026-10-05)
 

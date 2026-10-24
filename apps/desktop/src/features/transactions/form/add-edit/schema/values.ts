@@ -26,6 +26,7 @@ export function defaultTransactionValues(
     price_per_unit: null,
     investment_status: "pending",
     label_names: [],
+    source_ref: null,
     ...overrides,
   };
 }
@@ -57,5 +58,6 @@ export function transactionValuesFromRow(
     price_per_unit: extras.pricePerUnit,
     investment_status: extras.investmentStatus,
     label_names: extras.labelNames,
+    source_ref: null,
   };
 }
