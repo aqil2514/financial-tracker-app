@@ -8,7 +8,7 @@
     "dev:desktop": "npm run tauri dev --workspace=desktop",
     "build:desktop": "npm run tauri build --workspace=desktop",
     "dev:mobile": "npm run dev --workspace=mobile",
-    "build:mobile": "npm run build:mobile --workspace=mobile",
+    "build:mobile-preview": "npm run build:preview --workspace=mobile",
     "dev:worker": "npm run dev --workspace=worker",
     "deploy:worker": "npm run deploy --workspace=worker",
     "test:desktop": "npm run test --workspace=desktop",

@@ -36,6 +36,7 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
+    "build:preview":"eas build --platform android --profile preview",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
