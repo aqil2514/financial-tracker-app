@@ -73,3 +73,11 @@ export type {
   RetailkuFundTransferAccount,
 } from "./get_fund_transfer_list";
 export type { RetailkuFundTransferDetail, RetailkuFundTransferDetailRaw } from "./get_fund_transfer_detail";
+export type {
+  RetailkuInvestmentList,
+  RetailkuInvestmentListItem,
+  RetailkuInvestmentListRaw,
+  RetailkuInvestmentListItemRaw,
+  RetailkuInvestmentAccount,
+} from "./get_investment_list";
+export type { RetailkuInvestmentDetail, RetailkuInvestmentDetailRaw } from "./get_investment_detail";
