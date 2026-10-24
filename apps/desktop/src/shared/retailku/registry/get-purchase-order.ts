@@ -36,6 +36,7 @@ function itemLabel(item: RetailkuPurchaseOrderDetail["items"][number]) {
 function toPurchaseOrderPackage(raw: RetailkuPurchaseOrderDetail): RetailkuPackageEntry[] {
   const date = toLocalDateTimeInputValue(raw.orderDate);
   const { note, description } = toPurchaseOrderNoteAndDescription(raw.items, raw.totalAmount);
+  const sourceDetail = purchaseOrderAdapter(raw);
 
   return raw.purchasePayments.flatMap((payment) =>
     payment.lines.map((line) => ({
@@ -51,6 +52,7 @@ function toPurchaseOrderPackage(raw: RetailkuPurchaseOrderDetail): RetailkuPacka
         description,
         date,
       },
+      sourceDetail,
     }))
   );
 }

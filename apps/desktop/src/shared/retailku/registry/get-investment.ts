@@ -39,6 +39,7 @@ function toInvestmentPackage(raw: RetailkuInvestmentDetail): RetailkuPackageEntr
         date,
         investment_status: raw.status === "POSTED" ? "settled" : "pending",
       },
+      sourceDetail: investmentAdapter(raw),
     },
   ];
 }

@@ -31,6 +31,7 @@ function toLocalDateTimeInputValue(iso: string) {
 function toCashOpnamePackage(raw: RetailkuCashOpnameDetail): RetailkuPackageEntry[] {
   const entries: RetailkuPackageEntry[] = [];
   const date = toLocalDateTimeInputValue(raw.countedAt);
+  const sourceDetail = cashOpnameAdapter(raw);
 
   if (raw.difference !== 0) {
     entries.push({
@@ -44,6 +45,7 @@ function toCashOpnamePackage(raw: RetailkuCashOpnameDetail): RetailkuPackageEntr
         note: "Selisih Cash Opname",
         date,
       },
+      sourceDetail,
     });
   }
 
@@ -57,9 +59,10 @@ function toCashOpnamePackage(raw: RetailkuCashOpnameDetail): RetailkuPackageEntr
         account_id: raw.account?.id,
         contact_name: fund.label,
         amount: fund.amount,
-        date, 
+        date,
         note: fund.reason,
       },
+      sourceDetail,
     });
   }
 

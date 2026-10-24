@@ -1,7 +1,7 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { TransactionFormValues } from "@/features/transactions/form/add-edit/schema";
 import type { ThirdPartyFundFormValues } from "@/features/third-party/content/data/form/schemas";
-import type { DetailAdapter, RetailkuPickerListItem } from "../types";
+import type { DetailAdapter, DetailAdapterResult, RetailkuPickerListItem } from "../types";
 
 export type RetailkuToolDateRange = {
   dateFrom: string;
@@ -13,6 +13,7 @@ export type RetailkuTransactionDraft = {
   label: string;
   target: "transaction";
   defaultValues: Partial<TransactionFormValues>;
+  sourceDetail?: DetailAdapterResult;
 };
 
 export type RetailkuThirdPartyFundDraft = {
@@ -20,6 +21,7 @@ export type RetailkuThirdPartyFundDraft = {
   label: string;
   target: "third-party-fund";
   defaultValues: Partial<ThirdPartyFundFormValues>;
+  sourceDetail?: DetailAdapterResult;
 };
 
 export type RetailkuPackageEntry = RetailkuTransactionDraft | RetailkuThirdPartyFundDraft;

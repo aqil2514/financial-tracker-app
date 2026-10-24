@@ -24,6 +24,10 @@ Pola: `useForm` sendiri per tab, `useWatch` seluruh value, lapor ke parent lewat
 
 `TransactionEntryForm` menyertakan `FieldDescription` (2026-10-24, ditambahkan supaya breakdown rich text dari `registry/get-purchase-order.ts`/`get-direct-purchase.ts` — bullet list per item + "Total Belanja" — bisa terlihat/diedit) tapi TIDAK `FieldAttachments` — prefill dari Retailku tidak pernah membawa lampiran file.
 
+## `source-detail-panel.tsx`
+
+`SourceDetailPanel` (2026-10-24) — panel read-only (`Collapsible`, default terbuka) yang menampilkan data ASLI Retailku di atas tiap form tab, supaya user tidak perlu bolak-balik cek Retailku untuk membandingkan/memverifikasi nilai saat mengedit draft. Render `RetailkuPackageEntry.sourceDetail` (field opsional baru, `DetailAdapterResult` — bentuk yang SAMA PERSIS dengan yang ditampilkan `DetailView` di step 1/`right-side`), diisi oleh `toPackage()` tiap tool registry mode `"item"` lewat `adapter(raw)` yang SUDAH ADA (bukan logic baru, cuma dipanggil sekali lagi dan ditempel ke tiap entry hasil). Entri dari tool mode `"summary"` (`get-sale.ts`) TIDAK mengisi `sourceDetail` — `SourceDetailPanel` dilewatkan untuk entri itu (`entry.sourceDetail &&` di `index.tsx`), karena mode summary tidak punya tahap `detail` tunggal per entry (satu entry = rangkuman banyak sale sekaligus, bukan satu dokumen).
+
 ## `use-save-package.ts`
 
 `useSavePackage` — mutation "Simpan Semua". Tiap entri di-insert BERURUTAN (bukan `Promise.all`): `target: "transaction"` lewat `createTransaction` (`features/transactions/.../create-transaction/`), `target: "third-party-fund"` lewat `createDirectThirdPartyFund` (`shared/third-party-funds/`, diekstrak dari `use-create-third-party-fund.ts` supaya bisa dipanggil programatik di luar hook form) — keduanya fungsi murni `(values) => Promise<string>`, tidak ada duplikasi logic insert.

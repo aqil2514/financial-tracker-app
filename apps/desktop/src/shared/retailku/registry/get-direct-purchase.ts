@@ -36,6 +36,7 @@ function itemLabel(item: RetailkuDirectPurchaseDetail["items"][number]) {
 function toDirectPurchasePackage(raw: RetailkuDirectPurchaseDetail): RetailkuPackageEntry[] {
   const date = toLocalDateTimeInputValue(raw.purchaseDate);
   const { note, description } = toDirectPurchaseNoteAndDescription(raw.items, raw.totalAmount);
+  const sourceDetail = directPurchaseAdapter(raw);
 
   return raw.paymentLines.map((line) => ({
     id: `payment-${line.id}`,
@@ -50,6 +51,7 @@ function toDirectPurchasePackage(raw: RetailkuDirectPurchaseDetail): RetailkuPac
       description,
       date,
     },
+    sourceDetail,
   }));
 }
 

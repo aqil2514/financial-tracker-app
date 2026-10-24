@@ -27,6 +27,7 @@ function toLocalDateTimeInputValue(iso: string) {
 function toFundTransferPackage(raw: RetailkuFundTransferDetail): RetailkuPackageEntry[] {
   const entries: RetailkuPackageEntry[] = [];
   const date = toLocalDateTimeInputValue(raw.transactionDate);
+  const sourceDetail = fundTransferAdapter(raw);
 
   entries.push({
     id: "transfer",
@@ -40,6 +41,7 @@ function toFundTransferPackage(raw: RetailkuFundTransferDetail): RetailkuPackage
       note: raw.description || "Transfer Dana Retailku",
       date,
     },
+    sourceDetail,
   });
 
   if (raw.fromFee > 0) {
@@ -54,6 +56,7 @@ function toFundTransferPackage(raw: RetailkuFundTransferDetail): RetailkuPackage
         note: "Biaya Transfer Dana",
         date,
       },
+      sourceDetail,
     });
   }
 
@@ -69,6 +72,7 @@ function toFundTransferPackage(raw: RetailkuFundTransferDetail): RetailkuPackage
         note: "Biaya Transfer Dana",
         date,
       },
+      sourceDetail,
     });
   }
 

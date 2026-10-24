@@ -9,6 +9,7 @@ import type { ThirdPartyFundFormOutput } from "@/features/third-party/content/da
 import type { TransactionFormOutput } from "@/features/transactions/form/add-edit/schema";
 import { useRetailkuDialog } from "../../context";
 import { useInnerRetailkuPicker } from "../context";
+import { SourceDetailPanel } from "./source-detail-panel";
 import { ThirdPartyFundEntryForm } from "./third-party-fund-entry-form";
 import { TransactionEntryForm } from "./transaction-entry-form";
 import { useSavePackage, type SavePackageEntry } from "./use-save-package";
@@ -91,16 +92,21 @@ export function MappingStep() {
                       )}
                     </Button>
                   </div>
-                  {isExcluded ? null : entry.target === "third-party-fund" ? (
-                    <ThirdPartyFundEntryForm
-                      defaultValues={entry.defaultValues}
-                      onChange={(values) => updateResult(entry.id, values)}
-                    />
-                  ) : (
-                    <TransactionEntryForm
-                      defaultValues={entry.defaultValues}
-                      onChange={(values) => updateResult(entry.id, values)}
-                    />
+                  {isExcluded ? null : (
+                    <>
+                      {entry.sourceDetail && <SourceDetailPanel detail={entry.sourceDetail} />}
+                      {entry.target === "third-party-fund" ? (
+                        <ThirdPartyFundEntryForm
+                          defaultValues={entry.defaultValues}
+                          onChange={(values) => updateResult(entry.id, values)}
+                        />
+                      ) : (
+                        <TransactionEntryForm
+                          defaultValues={entry.defaultValues}
+                          onChange={(values) => updateResult(entry.id, values)}
+                        />
+                      )}
+                    </>
                   )}
                 </TabsContent>
               );
