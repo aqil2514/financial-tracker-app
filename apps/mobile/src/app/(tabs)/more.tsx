@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { Link, type Href } from "expo-router";
+import { PageHeader } from "@/components/page-header";
 
 type MenuItem = {
   title: string;
@@ -84,22 +85,25 @@ function MenuGroupSection({ group }: { group: MenuGroup }) {
 
 export default function MorePage() {
   return (
-    <ScrollView className="flex-1 bg-white" contentContainerClassName="py-3">
-      <View className="mb-4 border-y border-neutral-200">
-        {flatMenuItems.map((item) => (
-          <MenuRow key={item.title} item={item} />
-        ))}
-      </View>
+    <View className="flex-1 bg-white">
+      <PageHeader title="Lainnya" />
+      <ScrollView className="flex-1" contentContainerClassName="py-3">
+        <View className="mb-4 border-y border-neutral-200">
+          {flatMenuItems.map((item) => (
+            <MenuRow key={item.title} item={item} />
+          ))}
+        </View>
 
-      <View className="mb-4 border-y border-neutral-200">
-        {menuGroups.map((group) => (
-          <MenuGroupSection key={group.title} group={group} />
-        ))}
-      </View>
+        <View className="mb-4 border-y border-neutral-200">
+          {menuGroups.map((group) => (
+            <MenuGroupSection key={group.title} group={group} />
+          ))}
+        </View>
 
-      <View className="mb-4 border-y border-neutral-200">
-        <MenuRow item={{ title: "Settings" }} />
-      </View>
-    </ScrollView>
+        <View className="mb-4 border-y border-neutral-200">
+          <MenuRow item={{ title: "Settings" }} />
+        </View>
+      </ScrollView>
+    </View>
   );
 }

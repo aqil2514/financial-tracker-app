@@ -1,4 +1,4 @@
-import { NativeTabs } from "expo-router/native-tabs";
+import { NativeTabs } from "expo-router/build/native-tabs/NativeTabs.js";
 
 export default function TabLayout() {
   return (

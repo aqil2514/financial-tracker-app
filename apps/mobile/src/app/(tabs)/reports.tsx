@@ -1,9 +1,10 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { PageHeader } from "@/components/page-header";
 
 export default function ReportsPage() {
   return (
-    <View>
-      <Text>Laporan</Text>
+    <View className="flex-1 bg-white">
+      <PageHeader title="Laporan" />
     </View>
   );
 }
