@@ -1,0 +1,40 @@
+export interface FilterRangeValue {
+  from: string | number | null;
+  to: string | number | null;
+}
+
+export type FilterValueType =
+  | string
+  | number
+  | boolean
+  | null
+  | string[]
+  | number[]
+  | FilterRangeValue;
+
+export type TextOperatorType = "ilike" | "not_ilike" | "is_null" | "is_not_null";
+export type SelectOperatorType = "eq" | "neq" | "is_null" | "is_not_null";
+export type NumberOperatorType =
+  | "eq"
+  | "neq"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "between"
+  | "not_between"
+  | "is_null"
+  | "is_not_null";
+
+export type FilterOperatorType = TextOperatorType | SelectOperatorType | NumberOperatorType;
+
+export interface FilterConfig {
+  filterKey: string;
+  filterValue: FilterValueType;
+  filterOperator: FilterOperatorType;
+}
+
+export interface SelectOption {
+  value: string;
+  label: string;
+}

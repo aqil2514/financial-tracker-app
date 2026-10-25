@@ -1,10 +1,12 @@
 import { View } from "react-native";
-import { PageHeader } from "@/components/page-header";
+import { TransactionHeader } from "@/features/transactions/header";
+import { TransactionList } from "@/features/transactions/content";
 
 export default function TransactionsPage() {
   return (
     <View className="flex-1 bg-white">
-      <PageHeader title="Transaksi" />
+      <TransactionHeader />
+      <TransactionList />
     </View>
   );
 }
