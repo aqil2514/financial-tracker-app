@@ -1,13 +1,14 @@
 import { SectionList, Text, View } from "react-native";
-import { DUMMY_TRANSACTIONS, type DummyTransaction } from "./dummy-data";
+import type { TransactionListItem } from "./transaction-list-item";
+import { useTransactions } from "./use-transactions";
 
-const TYPE_LABEL: Record<DummyTransaction["type"], string> = {
+const TYPE_LABEL: Record<TransactionListItem["type"], string> = {
   income: "Pemasukan",
   expense: "Pengeluaran",
   transfer: "Transfer",
 };
 
-const AMOUNT_COLOR: Record<DummyTransaction["type"], string> = {
+const AMOUNT_COLOR: Record<TransactionListItem["type"], string> = {
   income: "text-emerald-600",
   expense: "text-red-600",
   transfer: "text-neutral-900",
@@ -26,8 +27,8 @@ function formatDateLabel(date: string) {
   });
 }
 
-function groupByDate(transactions: DummyTransaction[]) {
-  const groups = new Map<string, DummyTransaction[]>();
+function groupByDate(transactions: TransactionListItem[]) {
+  const groups = new Map<string, TransactionListItem[]>();
   for (const transaction of transactions) {
     const existing = groups.get(transaction.date) ?? [];
     existing.push(transaction);
@@ -40,7 +41,16 @@ function groupByDate(transactions: DummyTransaction[]) {
 }
 
 export function TransactionList() {
-  const sections = groupByDate(DUMMY_TRANSACTIONS);
+  const { transactions, isLoading } = useTransactions();
+  const sections = groupByDate(transactions);
+
+  if (!isLoading && transactions.length === 0) {
+    return (
+      <View className="flex-1 items-center justify-center px-4">
+        <Text className="text-neutral-500">Belum ada transaksi.</Text>
+      </View>
+    );
+  }
 
   return (
     <SectionList
@@ -59,7 +69,7 @@ export function TransactionList() {
   );
 }
 
-function TransactionItem({ transaction }: { transaction: DummyTransaction }) {
+function TransactionItem({ transaction }: { transaction: TransactionListItem }) {
   const isTransfer = transaction.type === "transfer";
 
   return (
