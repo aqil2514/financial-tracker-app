@@ -14,6 +14,7 @@ export default function NewTransactionPage() {
   const db = useDatabase();
   const [isPending, setIsPending] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [defaultValues] = useState(emptyTransactionValues);
 
   async function handleSubmit(values: TransactionFormOutput) {
     setIsPending(true);
@@ -55,7 +56,7 @@ export default function NewTransactionPage() {
         bottomOffset={20}
       >
         <TransactionForm
-          defaultValues={emptyTransactionValues()}
+          defaultValues={defaultValues}
           onSubmit={handleSubmit}
           isPending={isPending}
           submitLabel="Tambah Transaksi"

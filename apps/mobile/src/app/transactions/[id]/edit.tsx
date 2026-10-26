@@ -1,6 +1,6 @@
-import { useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert } from "react-native";
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useDatabase } from "@/lib/database";
 import { TransactionForm } from "@/features/transactions/form/transaction-form";
@@ -38,15 +38,13 @@ export default function EditTransactionPage() {
   const [defaultValues, setDefaultValues] = useState<TransactionFormValues | null>(null);
   const [isPending, setIsPending] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      db.getFirstAsync<TransactionRow>("SELECT * FROM transactions WHERE id = ?", [id]).then(
-        (row) => {
-          if (row) setDefaultValues(toFormValues(row));
-        }
-      );
-    }, [db, id])
-  );
+  useEffect(() => {
+    db.getFirstAsync<TransactionRow>("SELECT * FROM transactions WHERE id = ?", [id]).then(
+      (row) => {
+        if (row) setDefaultValues(toFormValues(row));
+      }
+    );
+  }, [db, id]);
 
   async function handleSubmit(values: TransactionFormOutput) {
     setIsPending(true);
