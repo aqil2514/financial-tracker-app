@@ -19,9 +19,6 @@ const STATUS_OPTIONS: { value: CategoryStatusFilter; label: string }[] = [
   { value: "inactive", label: "Nonaktif" },
 ];
 
-// Toggle group standalone (bukan react-hook-form) — versi filter dari
-// FormFieldToggleGroup, dipakai di sini karena ini filter list, bukan
-// field form.
 function FilterToggleGroup<T extends string>({
   value,
   options,
@@ -65,11 +62,6 @@ interface CategoryFilterSheetProps {
   activeCount: number;
 }
 
-// Isi filter dipindah ke bottom sheet (bukan bar permanen di bawah page
-// header) supaya tidak motong tinggi area list — dibuka lewat tombol
-// "Filter" di header, snap ke 45% viewport (cukup buat search + 2 toggle
-// group, tidak perlu full 100% seperti FilterPanel transaksi yang
-// kontrolnya jauh lebih banyak).
 export const CategoryFilterSheet = forwardRef<CategoryFilterSheetRef, CategoryFilterSheetProps>(
   function CategoryFilterSheet({ filter, onChange, activeCount }, ref) {
     const sheetRef = useRef<BottomSheetModal>(null);

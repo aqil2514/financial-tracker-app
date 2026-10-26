@@ -10,8 +10,8 @@ Penjelasan lengkap tiap poin ada di bagian-bagian di bawah.
 - [x] Entry point navigasi: menu "Kategori" & "Periode Kategori" di `(tabs)/more.tsx` (grup Master Data), masing-masing route sendiri — lihat bagian Navigasi.
 - [x] Halaman create kategori (`categories/new.tsx`) — form lengkap + `INSERT` ke tabel `categories`, sudah fungsional.
 - [x] Form kategori (`features/categories/form/`) — schema, default values, komponen form dengan field induk (`parent_id`) yang di-filter sesuai `type` — lihat bagian Form Kategori.
-- [ ] Halaman list kategori (`categories/index.tsx`) — masih placeholder statis (belum query ke DB), FAB ke halaman create sudah aktif.
-- [ ] CRUD kategori lanjutan (update, delete, toggle aktif) — belum dimulai.
+- [x] Halaman list kategori (`categories/index.tsx`) — query sungguhan ke DB, accordion per kategori induk, badge warna by type, filter (search/type/status) via bottom sheet — lihat bagian List Kategori.
+- [ ] CRUD kategori lanjutan (update, delete, toggle aktif beneran) — belum dimulai. Dot status di list masih read-only (murni visual).
 - [ ] UI pemilihan kategori di form transaksi (sekarang masih `FormFieldText` free-text) — belum dimulai.
 - [ ] Pola "buat kategori baru inline dari form transaksi" (seperti combobox desktop) — belum diputuskan bentuk UI mobile-nya (kandidat: bottom sheet + search, mengikuti pola `AttachmentSourceSheet`).
 - [ ] FK `transactions.category_id → categories(id)` — sengaja ditunda, lihat bagian Keputusan.
@@ -65,7 +65,7 @@ File: `apps/mobile/src/lib/database/migrations/0003_categories.ts`.
 
 Diakses dari tab "Lainnya" (`(tabs)/more.tsx`), grup "Master Data":
 
-- "Kategori" → `/categories` (`app/categories/index.tsx`) — list (placeholder) + FAB ke `/categories/new`.
+- "Kategori" → `/categories` (`app/categories/index.tsx`) — list sungguhan + FAB ke `/categories/new` + tombol Filter di native header.
 - "Periode Kategori" → `/categories/periods` (`app/categories/periods/index.tsx`) — list (placeholder) + FAB ke `/categories/periods/new`.
 
 Kedua route berdiri sendiri (bukan tab di satu halaman seperti desktop, lihat bagian Keputusan di bawah soal kenapa).
@@ -83,6 +83,21 @@ File di `apps/mobile/src/features/categories/form/`:
 
 `app/categories/new.tsx` memakai `CategoryForm` ini dan langsung `INSERT INTO categories (id, name, type, parent_id)` — halaman create sudah fungsional. `app/categories/periods/new.tsx` masih placeholder polos (belum ada form Periode).
 
+## List Kategori
+
+File di `apps/mobile/src/features/categories/content/` dan `.../utils/`:
+
+- `use-categories.ts` — `SELECT * FROM categories ORDER BY name`, refetch via `useFocusEffect` (pola sama `use-transactions.ts`, tanpa React Query).
+- `utils/group-by-parent.ts` — flat list kategori dikelompokkan jadi `CategorySection[]` per kategori akar (`parent_id IS NULL`): akar dengan anak → section berisi anak-anaknya, akar tanpa anak (flat) → section `isStandalone` berisi dirinya sendiri (tidak expandable). Hierarki cuma 2 level (lihat konsep-kategori.md), jadi tidak ada rekursi lagi di bawah section.
+- `category-accordion-section.tsx` — satu section = satu `Pressable` header (dot status + nama + badge tipe berwarna + chevron) + `useState(false)` default **tertutup**, pola sama `MenuGroupSection` di `(tabs)/more.tsx`. Section `isStandalone` tidak punya chevron/isi tersembunyi sama sekali.
+- `category-list-item.tsx` — card sub-kategori di dalam section yang expand, dot status + nama + badge tipe. Belum bisa di-tap ke edit (halaman edit belum ada).
+- `category-status-dot.tsx` — dot hijau (aktif) / abu (nonaktif), **read-only** — beda dari desktop yang dot-nya clickable buat toggle cepat. Toggle aktif beneran belum dikerjakan.
+- `category-list.tsx` — `FlatList` dari `CategorySection[]`, merender `CategoryAccordionSection` per item. Pakai `FlatList` (bukan `SectionList` seperti `TransactionList`) karena tiap section butuh state expand/collapse sendiri, bukan cuma header statis.
+- `utils/filter-categories.ts` — filter `search` (nama, substring)/`type` (all/income/expense)/`status` (all/active/inactive), dieksekusi di JS (bukan SQL WHERE). Beda penting dari filter SQL biasa: kalau kategori match, induk/anaknya ikut ditampilkan juga (supaya accordion tidak kelihatan "bolong") — menyamai perilaku grouping filter di desktop (`category-list.tsx` versi desktop juga begitu).
+- `category-filter-sheet.tsx` — UI filter-nya `BottomSheetModal` (`snapPoints={["45%"]}`, bukan bar permanen di bawah header) supaya tidak memotong tinggi area list. Dibuka lewat tombol "Filter" (dengan badge jumlah filter aktif) yang dipasang di `headerRight` native Stack header `categories/index.tsx` — bukan `PageHeader` custom seperti halaman di `(tabs)/`, karena halaman ini pakai native header Expo Router (`Stack.Screen options`).
+
+**Badge warna by type** (dipakai section header & item kategori): [components/badge.tsx](../../../src/components/badge.tsx) ditambah prop `variant` (`"neutral"` default | `"income"` | `"expense"`) — emerald untuk income, red untuk expense. Pemakaian lama di `TransactionItem` tidak kasih `variant` sama sekali, otomatis fallback `"neutral"` yang classnya identik dengan sebelum perubahan ini, jadi tidak ada regresi visual di situ.
+
 ## Keputusan yang sudah diambil
 
 - **Field `icon` disertakan sejak awal skema** — beda dari desktop (di sana kolomnya ada tapi mati, tidak pernah dipakai UI). Di mobile, niatnya field ini benar-benar diaktifkan nanti (picker ikon `@expo/vector-icons`/Ionicons saat create/edit kategori), bukan kolom mati seperti desktop.
@@ -91,6 +106,9 @@ File di `apps/mobile/src/features/categories/form/`:
 - **Satu file migrasi untuk ketiga tabel** (`categories` + `category_periods` + `category_period_categories`), bukan dipecah per tabel — dianggap satu kesatuan konsep yang didiskusikan bersamaan, mengikuti pola migrasi `0002` yang juga gabungan (pragma + attachments).
 - **Tidak akan pakai React Query** untuk CRUD kategori — ini bukan keputusan baru, tapi warisan pola yang sudah berlaku di fitur transaksi (`use-transactions.ts`): mobile sengaja tidak memasang `@tanstack/react-query` sama sekali, memakai pola manual refetch via `useFocusEffect` + `useState` lokal (lihat verifikasi di `porting-transaction.md`). CRUD kategori nanti mengikuti pola yang sama, bukan kesempatan untuk mulai pasang React Query.
 - **Kategori dan Category Period jadi dua halaman terpisah**, bukan tab di satu halaman seperti desktop (`CategoryContent` dengan tab "Daftar Kategori"/"Periode"). Alasan: tab "Harian"/"Kalender" di halaman Transaksi mobile itu dua tampilan dari data yang sama (satu CRUD transaksi) — cocok jadi tab. Kategori dan Category Period masing-masing punya CRUD sendiri yang independen, jadi dipisah jadi route sendiri (`/categories` dan `/categories/periods`) lebih jujur secara arsitektur, bukan dipaksa jadi satu halaman dengan dua tab.
+- **List kategori pakai accordion (default tertutup), bukan grid+accordion seperti desktop.** Desktop render kategori induk+anak sebagai accordion dengan grid card untuk anaknya (dan expand semua by default). Mobile disederhanakan jadi satu pola: tiap kategori induk adalah satu accordion section (tertutup di awal), isinya daftar vertikal sub-kategori — lebih hemat ruang layar kecil dan tidak perlu grid responsif.
+- **Filter kategori di JS, bukan reuse `FilterPanel` generic SQL-WHERE yang dipakai Transaksi.** Alasan: search yang match induk harus tetap menampilkan semua anaknya (dan sebaliknya) supaya accordion tidak kelihatan bolong tanpa alasan jelas — `FilterPanel` filter per-baris lewat SQL WHERE tidak bisa menjaga relasi induk-anak seperti itu. Trade-off: filter kategori tidak reuse infrastruktur query generic yang sudah ada, jadi kalau kriteria filter makin kompleks nanti, pertimbangkan ulang apakah tetap worth it custom atau migrasi ke `FilterPanel`.
+- **Filter kategori ditaruh di bottom sheet (tombol "Filter" di header), bukan bar filter permanen di bawah header.** Bar permanen memotong tinggi area list; sheet (`snapPoints={["45%"]}`) dibuka on-demand lewat tombol di `headerRight`, konsisten dengan pola tombol+sheet filter Transaksi (`FilterPanel`) walau implementasi isinya beda (lihat poin di atas).
 
 ## Keputusan yang BELUM diambil
 
