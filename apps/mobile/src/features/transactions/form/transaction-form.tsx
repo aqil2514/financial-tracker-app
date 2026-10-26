@@ -1,7 +1,12 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseForm } from "@/components/forms/base-form";
-import { FormFieldNumber, FormFieldSelect, FormFieldText } from "@/components/forms/form-fields";
+import {
+  FormFieldDate,
+  FormFieldNumber,
+  FormFieldText,
+  FormFieldToggleGroup,
+} from "@/components/forms/form-fields";
 import { transactionSchema, type TransactionFormOutput, type TransactionFormValues } from "./schema";
 
 const TYPE_OPTIONS = [
@@ -60,16 +65,19 @@ export function TransactionForm({
     >
       {(form) => (
         <>
+          <FormFieldToggleGroup form={form} name="type" options={TYPE_OPTIONS} />
+
           <FormFieldText form={form} name="note" label="Catatan" placeholder="Mis. Makan siang" />
 
-          <FormFieldSelect
+          <FormFieldNumber
             form={form}
-            name="type"
-            label="Tipe Transaksi"
-            options={TYPE_OPTIONS}
+            name="amount"
+            label="Jumlah"
+            placeholder="0"
+            prefix="Rp"
+            grouped
+            useCalculator
           />
-
-          <FormFieldNumber form={form} name="amount" label="Jumlah" placeholder="0" />
 
           <FormFieldText form={form} name="account_id" label="Akun" placeholder="Mis. BCA, Cash" />
 
@@ -89,13 +97,14 @@ export function TransactionForm({
             />
           )}
 
-          <FormFieldText form={form} name="date" label="Tanggal" placeholder="YYYY-MM-DD" />
+          <FormFieldDate form={form} name="date" label="Tanggal" />
 
           <FormFieldText
             form={form}
             name="description"
             label="Deskripsi (opsional)"
             placeholder="Catatan tambahan"
+            multiline
           />
         </>
       )}

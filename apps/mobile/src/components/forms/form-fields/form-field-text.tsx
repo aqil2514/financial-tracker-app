@@ -8,6 +8,7 @@ type FormFieldTextProps<TFieldValues extends FieldValues> = {
   placeholder?: string;
   secureTextEntry?: boolean;
   disabled?: boolean;
+  multiline?: boolean;
 };
 
 export function FormFieldText<TFieldValues extends FieldValues>({
@@ -17,6 +18,7 @@ export function FormFieldText<TFieldValues extends FieldValues>({
   placeholder,
   secureTextEntry,
   disabled,
+  multiline,
 }: FormFieldTextProps<TFieldValues>) {
   return (
     <Controller
@@ -32,7 +34,13 @@ export function FormFieldText<TFieldValues extends FieldValues>({
             placeholder={placeholder}
             secureTextEntry={secureTextEntry}
             editable={!disabled}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-neutral-900"
+            multiline={multiline}
+            textAlignVertical={multiline ? "top" : "center"}
+            className={
+              multiline
+                ? "min-h-24 rounded-md border border-neutral-300 px-3 py-2 text-neutral-900"
+                : "rounded-md border border-neutral-300 px-3 py-2 text-neutral-900"
+            }
           />
           {fieldState.error && (
             <Text className="text-sm text-red-600">{fieldState.error.message}</Text>

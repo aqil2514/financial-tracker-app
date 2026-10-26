@@ -39,7 +39,14 @@
           "imageWidth": 76
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Aplikasi butuh akses galeri untuk menambahkan foto lampiran transaksi.",
+          "cameraPermission": "Aplikasi butuh akses kamera untuk memotret lampiran transaksi."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

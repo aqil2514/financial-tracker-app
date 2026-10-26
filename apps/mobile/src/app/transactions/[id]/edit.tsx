@@ -1,9 +1,11 @@
 import { useCallback, useState } from "react";
-import { Alert, ScrollView } from "react-native";
+import { Alert } from "react-native";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useDatabase } from "@/lib/database";
 import { TransactionForm } from "@/features/transactions/form/transaction-form";
 import type { TransactionFormOutput, TransactionFormValues } from "@/features/transactions/form/schema";
+import { AttachmentUploader } from "@/shared/attachments";
 
 interface TransactionRow {
   note: string;
@@ -89,17 +91,24 @@ export default function EditTransactionPage() {
   return (
     <>
       <Stack.Screen options={{ title: "Edit Transaksi" }} />
-      <ScrollView className="flex-1 bg-white" contentContainerClassName="p-4">
+      <KeyboardAwareScrollView
+        className="flex-1 bg-white"
+        contentContainerClassName="p-4 pb-12"
+        bottomOffset={20}
+      >
         {defaultValues && (
-          <TransactionForm
-            defaultValues={defaultValues}
-            onSubmit={handleSubmit}
-            isPending={isPending}
-            submitLabel="Simpan Perubahan"
-            onDelete={handleDelete}
-          />
+          <>
+            <TransactionForm
+              defaultValues={defaultValues}
+              onSubmit={handleSubmit}
+              isPending={isPending}
+              submitLabel="Simpan Perubahan"
+              onDelete={handleDelete}
+            />
+            <AttachmentUploader transactionId={id} />
+          </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </>
   );
 }

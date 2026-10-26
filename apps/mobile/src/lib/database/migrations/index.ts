@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import * as m0001 from "./0001_initial";
+import * as m0002 from "./0002_pragma_defaults_and_attachments";
 
 export interface Migration {
   up: (db: SQLiteDatabase) => Promise<void>;
@@ -9,4 +10,4 @@ export interface Migration {
 // TIDAK BOLEH diedit (lihat feedback_migration_never_edit_applied di
 // memory — prinsip yang sama berlaku di sini) — tambah file baru,
 // daftarkan di bawah, jangan sentuh entri lama.
-export const MIGRATIONS: Migration[] = [m0001];
+export const MIGRATIONS: Migration[] = [m0001, m0002];

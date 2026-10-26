@@ -9,6 +9,6 @@ export function emptyTransactionValues(): TransactionFormValues {
     transfer_account_id: null,
     note: "",
     description: null,
-    date: new Date().toISOString().slice(0, 10),
+    date: new Date().toISOString(),
   };
 }
