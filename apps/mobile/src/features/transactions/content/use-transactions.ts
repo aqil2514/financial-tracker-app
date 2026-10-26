@@ -31,6 +31,7 @@ const ALLOWED_FILTER_COLUMNS = [
   "account_id",
   "amount",
   "has_attachment",
+  "date",
 ] as const;
 
 const ALLOWED_SORT_COLUMNS = ["date", "amount"] as const;

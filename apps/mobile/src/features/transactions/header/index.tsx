@@ -12,9 +12,6 @@ interface TransactionHeaderProps {
   onSortsChange: (sorts: SortConfig[]) => void;
 }
 
-// Filters/sort state hidup di halaman (`app/(tabs)/transactions.tsx`),
-// bukan di sini — TransactionList di sibling yang sama butuh nilai
-// yang sama persis untuk membangun query.
 export function TransactionHeader({
   filters,
   onFiltersChange,

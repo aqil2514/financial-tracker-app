@@ -2,20 +2,45 @@
 
 ## Status & TODO saat ini (ringkas)
 
-Ini masih tahap assessment/riset, belum ada implementasi yang dimulai. Halaman transaksi mobile saat ini kosong total (cuma `PageHeader`), jadi ini bukan "porting" dalam arti pindah kode, melainkan bikin dari nol dengan desktop sebagai referensi fitur dan logic. Penjelasan lengkap tiap poin ada di bagian-bagian di bawah.
+**Dokumen ini ditulis di fase assessment awal (riset murni, belum ada implementasi). Sejak itu, sebagian besar sudah dikerjakan dan berfungsi** — bagian "Gap mobile saat ini", "Dependency & alternatif RN", dan "Rekomendasi urutan" di bawah **masih versi lama/usang** (dipertahankan sebagai arsip riset awal), JANGAN dijadikan rujukan status terkini. Rujukan status terkini ada di checklist ini. Penjelasan lengkap tiap poin ada di bagian-bagian di bawah.
 
-- [x] Eksplorasi fitur lengkap halaman transaksi desktop (`apps/desktop/src/features/transactions/`).
-- [x] Identifikasi gap: mobile belum punya apa-apa (list, data, form) — lihat bagian Gap Mobile Saat Ini.
-- [x] Identifikasi dependency web-only yang butuh pengganti di RN — lihat bagian Dependency & Alternatif RN.
-- [ ] Keputusan urutan porting (fase mana duluan) — belum diambil, lihat bagian Rekomendasi Urutan.
-- [ ] Keputusan database lokal mobile (`expo-sqlite`) — skema & strategi sync belum dibahas sama sekali.
-- [ ] Keputusan pengganti rich-text description (Tiptap tidak ada port RN) — belum ada arah.
-- [ ] Keputusan pengganti kalender ringkasan harian (`react-day-picker` web-only) — belum ada arah.
-- [ ] Belum ada implementasi kode apapun untuk fitur ini di mobile.
+- [x] Eksplorasi fitur lengkap halaman transaksi desktop (`apps/desktop/src/features/transactions/`) — tetap valid sebagai referensi, lihat bagian "Halaman transaksi desktop" di bawah.
+- [x] Koneksi database lokal (`expo-sqlite`) + sistem migrasi custom — `apps/mobile/src/lib/database/` (`provider.tsx`, `migrate.ts`, `migrations/`).
+- [x] List transaksi — grouped per tanggal (`SectionList`), query SQL nyata (bukan dummy) di `features/transactions/content/index.tsx` & `use-transactions.ts`.
+- [x] Filter & sort — 7 dari 9 field desktop (note, description, type, category_id, account_id, amount, has_attachment), sort date/amount — `features/transactions/header/`.
+- [x] Form create (`app/transactions/new.tsx`) & edit (`app/transactions/[id]/edit.tsx`) untuk transaksi cash dasar (income/expense/transfer) — delete juga sudah ada di halaman edit.
+- [x] Attachment (foto/kamera/dokumen) — `apps/mobile/src/shared/attachments/`, pola pending-save (create) & immediate-save (edit), lihat README-nya.
+- [x] Date-time picker native, numpad calculator untuk field amount, deskripsi sebagai plain multiline text (Tiptap desktop TIDAK diporting — keputusan final, bukan placeholder).
+- [x] Summary (Pendapatan/Pengeluaran/Total) di atas list — query `SUM()` terpisah (`use-transaction-summary.ts`), ikut filter aktif, independen dari paginasi list nanti.
+- [ ] Tab Harian/Kalender di halaman Transaksi (terinspirasi app finansial lain, lihat bagian "Tab Harian & Kalender" di bawah) — sedang dikerjakan, keputusan desain sudah diambil.
+- [ ] Pagination/infinite-scroll — belum ada sama sekali, query ambil semua baris tanpa LIMIT/OFFSET. Keputusan "klasik vs infinite scroll" masih benar-benar menggantung.
+- [ ] Label — belum ada tabel/kolom label di mobile sama sekali (dikonfirmasi komentar di `header/filter.tsx`).
+- [ ] Field debt (`contact_name`, `settle_debt_ids`) & investment (`unit`, `price_per_unit`, `investment_status`) di form — belum dikerjakan, butuh tabel `debts`/`investment_*` yang belum ada di mobile (dikonfirmasi komentar di `form/schema.ts`).
+- [ ] Import Retailku — belum dikerjakan, belum dibahas sama sekali.
+- [ ] `transactions.category_id` masih free-text, belum FK ke tabel `categories` (lihat `porting-category.md` — ditunda sengaja sampai kategori matang).
 
 ## Latar belakang
 
 Desktop sudah punya halaman transaksi yang matang dan dipakai harian. Mobile masih fase awal (lihat commit history: baru setup NativeWind, header, testing EAS build). Tujuan dokumen ini: memetakan apa yang ada di desktop, apa yang relevan untuk mobile, dan apa yang perlu pendekatan berbeda — sebagai basis diskusi sebelum mulai implementasi bertahap (disepakati tidak akan dikerjakan sekali jalan).
+
+## Tab Harian & Kalender
+
+Terinspirasi dari pola app finansial lain (bukan dari desktop — desktop pakai layout 2 kolom tetap, bukan tab), tapi juga menjawab item TODO "Kalender ringkasan harian" yang sejak awal memang tercatat belum dikerjakan di mobile.
+
+### Keputusan yang sudah diambil
+
+- **Scope tab**: hanya "Harian" dan "Kalender" dulu. Referensi punya 5 tab (+ Bulanan, Tutup buku, Memo) tapi itu fitur yang belum ada konsepnya sama sekali di desktop maupun mobile — di luar scope ini, didiskusikan terpisah nanti kalau memang mau dibuat.
+- **Tab Harian** = `TransactionList` yang sudah ada, tanpa perubahan logic sama sekali.
+- **Tab Kalender**: grid kalender bulanan via `react-native-calendars` (dependency baru), custom day rendering menampilkan ringkasan income/expense singkat per tanggal (perlu query agregasi per-hari untuk bulan yang sedang ditampilkan — mirip konsep `month-summary` di desktop).
+- **`TransactionSummary`** (Pendapatan/Pengeluaran/Total) tetap tampil di kedua tab, di atas konten tab — tidak masuk ke dalam salah satu tab saja.
+- **Interaksi tap tanggal di Kalender**: filter tanggal (`date` + operator `between`, hari yang sama dari 00:00 sampai 23:59 atau setara) **digabung** dengan filter lain yang mungkin sudah aktif dari panel filter (note/kategori/dst) — bukan mereset filter lain. Field `date` perlu ditambahkan ke `ALLOWED_FILTER_COLUMNS` di `use-transactions.ts` dan `use-transaction-summary.ts` (saat ini belum ada di daftar itu).
+- Setelah tap tanggal, **otomatis pindah ke tab Harian** menampilkan transaksi hari itu (list yang sama dipakai ulang, tidak ada komponen list kedua khusus tab Kalender).
+
+### Belum dikerjakan / menyusul
+
+- Implementasi `TransactionCalendar` (grid + custom day + query agregasi per-hari) — baru tahap rencana, belum ada kode.
+- UI tab bar itu sendiri (switcher Harian/Kalender) di atas `TransactionSummary`.
+- Pemasangan `react-native-calendars` sebagai dependency.
 
 ## Halaman transaksi desktop (ringkasan eksplorasi)
 
@@ -61,23 +86,25 @@ Desktop sudah punya halaman transaksi yang matang dan dipakai harian. Mobile mas
   - Deep link edit — dialog edit bisa dibuka dari halaman lain via `?edit=<id>`.
 - **URL state (nuqs)** — `nuqs` dipakai di tempat lain di desktop (tabs, account-detail, category-list, dialog-query-state), tapi TIDAK dipakai di halaman transaksi ini. Filter/sort/pagination/dateRange semuanya `useState` biasa (hilang saat refresh). Satu-satunya pemakaian URL murni untuk deep-link `?edit=<id>`.
 
-### Dependency & alternatif RN
+### Dependency & alternatif RN (ARSIP — prediksi awal, lihat kolom "Realisasi")
 
-| Kebutuhan | Desktop | Status untuk mobile |
-|---|---|---|
-| Data fetching/cache | `@tanstack/react-query` v5 | Kompatibel RN, tinggal pakai |
-| Form | `react-hook-form` v7 | Kompatibel RN |
-| Validasi | `zod` v4 | Kompatibel RN |
-| Tanggal | `date-fns` v4 (+ locale `id`) | Kompatibel RN |
-| Date picker/kalender | `react-day-picker` v10 (shadcn-style) | Web-only (DOM-based) — perlu `react-native-calendars` atau sejenisnya |
-| Rich text description | `@tiptap/react` + `@tiptap/pm` + `@tiptap/starter-kit` v3 | Web-only (contentEditable), tidak ada port RN resmi — perlu turun ke plain text atau editor markdown RN |
-| Tabel/list | Tidak ada (list manual + grouped per tanggal) | Portable konsepnya, tinggal `FlatList`/`SectionList` |
-| Pagination | Custom `TablePagination`, page/limit klasik | Logic portable, UI dibuat ulang |
-| Filter/Sort UI | Custom combobox/select/popover berbasis Radix (shadcn) | Radix web-only, tapi `FilterConfig`/SQL builder portable konsepnya |
-| Combobox | Custom, kemungkinan Radix/Base UI | Web-only, perlu bottom-sheet picker RN |
-| Database | `@tauri-apps/plugin-sql` (SQLite via Tauri), raw SQL dengan subquery kompleks (`EXISTS`, `GROUP_CONCAT`) | Desktop-only (Tauri) — mobile perlu `expo-sqlite`, driver beda total meski dialect SQLite sama |
-| File/attachment | `@tauri-apps/plugin-fs` + `plugin-dialog` + `plugin-clipboard-manager` (drag-drop, paste, file picker ke filesystem lokal) | Tauri-only — mobile perlu `expo-image-picker`/`expo-document-picker`/`expo-file-system`, UX beda total (tidak ada drag-drop/paste desktop) |
-| Styling/primitif | Tailwind + shadcn/ui (Radix: Dialog, Tooltip, Popover, ScrollArea, Checkbox) | Web-only — mobile butuh komponen native/RN (misal `react-native-paper`, custom, atau `@gorhom/bottom-sheet`) |
+> Kolom "Status untuk mobile" adalah prediksi dari riset awal. Kolom "Realisasi" ditambahkan belakangan setelah verifikasi terhadap kode aktual — lihat checklist status di paling atas dokumen untuk detail file.
+
+| Kebutuhan | Desktop | Status untuk mobile (prediksi awal) | Realisasi |
+|---|---|---|---|
+| Data fetching/cache | `@tanstack/react-query` v5 | Kompatibel RN, tinggal pakai | **Tidak dipakai** — diputuskan pola manual refetch via `useFocusEffect`, tanpa React Query sama sekali. |
+| Form | `react-hook-form` v7 | Kompatibel RN | Sesuai prediksi, sudah dipakai (`components/forms/base-form.tsx`). |
+| Validasi | `zod` v4 | Kompatibel RN | Sesuai prediksi, sudah dipakai (`form/schema.ts`). |
+| Tanggal | `date-fns` v4 (+ locale `id`) | Kompatibel RN | **Tidak dipasang** — util format tanggal custom sendiri (`features/transactions/utils/`), bukan `date-fns`. |
+| Date picker/kalender | `react-day-picker` v10 (shadcn-style) | Web-only — perlu `react-native-calendars` atau sejenisnya | **Bukan `react-native-calendars`** — custom `FormFieldDate` (`components/forms/form-fields/form-field-date.tsx`) pakai `@expo/ui`'s `DateTimePicker` native. |
+| Rich text description | Tiptap | Web-only — perlu turun ke plain text atau editor markdown RN | **Plain text** (bukan markdown) — `FormFieldText ... multiline`, final diputuskan. |
+| Tabel/list | Tidak ada di desktop | Portable, tinggal `FlatList`/`SectionList` | Sesuai prediksi, `SectionList` dipakai (`features/transactions/content/index.tsx`). |
+| Pagination | Custom `TablePagination`, page/limit klasik | Logic portable, UI dibuat ulang | **Belum dikerjakan sama sekali** — query ambil semua baris tanpa LIMIT/OFFSET. |
+| Filter/Sort UI | Radix (shadcn) | Radix web-only, tapi `FilterConfig`/SQL builder portable | Sesuai prediksi — sudah diimplementasikan penuh (`components/query/filters/`, `components/query/sort/`). |
+| Combobox | Custom, Radix/Base UI | Web-only, perlu bottom-sheet picker RN | Sesuai prediksi — `@gorhom/bottom-sheet` dipakai (`components/query/shared/option-picker.tsx`). |
+| Database | `@tauri-apps/plugin-sql` | Mobile perlu `expo-sqlite` | Sesuai prediksi, sudah terpasang penuh dengan sistem migrasi custom (`lib/database/`). |
+| File/attachment | Tauri plugins (drag-drop, paste, file-dialog) | Mobile perlu `expo-image-picker`/`expo-document-picker`/`expo-file-system` | Sesuai prediksi, sudah diimplementasikan penuh (`shared/attachments/`). |
+| Styling/primitif | Tailwind + shadcn/ui (Radix) | Mobile butuh komponen native/RN | **Bukan `react-native-paper`** — custom component + `@gorhom/bottom-sheet`, NativeWind untuk styling. |
 
 ### Kompleksitas
 
@@ -88,7 +115,9 @@ Desktop sudah punya halaman transaksi yang matang dan dipakai harian. Mobile mas
 
 **Kesimpulan kompleksitas**: business logic terberat bukan di UI list/filter (itu relatif generik dan portable), tapi di form tambah/edit, karena harus menangani kombinasi income/expense/transfer × cash/debt/investment dengan efek samping ke tabel lain (`debts`, `debt_payments`, `investment_purchases`, `investment_sales`, `third_party_funds`), plus validasi lintas-field dan field locking berdasarkan histori data.
 
-## Gap mobile saat ini
+## Gap mobile saat ini (ARSIP — ditulis sebelum implementasi dimulai, SUDAH USANG)
+
+> **Catatan verifikasi**: Seluruh bagian ini (termasuk "Implikasi porting" dan "Rekomendasi urutan" di bawahnya) adalah riset dari fase assessment awal, sebelum implementasi apapun dimulai. Hampir semua yang diklaim "belum ada" di sini sekarang SUDAH dikerjakan — lihat checklist status di paling atas dokumen untuk kondisi terkini. Dipertahankan apa adanya sebagai arsip riwayat diskusi (sesuai `docs/rules/todo-docs.md`), BUKAN rujukan status.
 
 - `apps/mobile/src/app/(tabs)/transactions.tsx` (10 baris) — hanya render `PageHeader` kosong. Tidak ada list, data, atau aksi apapun.
 - Komponen pendukung mobile saat ini cuma `apps/mobile/src/components/page-header.tsx` (judul + safe-area inset).
@@ -97,13 +126,15 @@ Desktop sudah punya halaman transaksi yang matang dan dipakai harian. Mobile mas
 
 **Gap fitur**: mobile saat ini = 0% dari fitur transaksi desktop. Bukan versi "lite" yang sudah ada — ini blank slate murni.
 
-## Implikasi porting (observasi, bukan keputusan)
+## Implikasi porting (ARSIP — observasi awal, lihat catatan di atas)
 
 - Bagian yang portable secara konsep (logic SQL, business rules form, Zod schema, React Query hooks) relatif independen dari UI, bisa jadi basis yang sama — tapi driver DB-nya beda total (Tauri SQL plugin vs `expo-sqlite`).
 - Bagian paling berat untuk diporting langsung karena web-only: kalender ringkasan harian (`react-day-picker`), rich text description (Tiptap), UI primitif berbasis Radix (Combobox/Dialog/Popover/ScrollArea), dan attachment uploader (drag-drop/paste/file-dialog Tauri) — semua butuh penggantian komponen/pendekatan UX, bukan copy-paste.
 - Fitur yang relatif sederhana untuk dibuat versi mobile-nya dari nol (karena tidak terlalu bergantung web API): struktur data filter/sort/pagination, grouping per tanggal, dan skema validasi form.
 
-## Rekomendasi urutan (draft, belum disepakati)
+**Catatan verifikasi**: Prediksi di atas sebagian besar terbukti benar — React Query ternyata TIDAK dipakai (diganti pola manual refetch via `useFocusEffect`), Tiptap diganti plain text (bukan editor markdown), kalender ringkasan harian masih belum dikerjakan sampai sekarang, combobox web diganti bottom-sheet (`@gorhom/bottom-sheet`) sesuai prediksi.
+
+## Rekomendasi urutan (ARSIP — draft awal, lihat catatan di atas)
 
 Belum final — perlu didiskusikan lagi sebelum mulai eksekusi. Arah kasar yang masuk akal:
 
@@ -115,3 +146,5 @@ Belum final — perlu didiskusikan lagi sebelum mulai eksekusi. Arah kasar yang 
 6. Integrasi lanjutan: attachment, label, kalender ringkasan, deep-link edit, Retailku import.
 
 Keputusan desain yang masih menggantung: pengganti Tiptap untuk description, pengganti kalender web untuk ringkasan harian, apakah pagination klasik dipertahankan atau diganti infinite scroll di mobile.
+
+**Catatan verifikasi**: Urutan 1-3 dan sebagian 5 (cash-only) sudah dieksekusi persis seperti rencana. Urutan 6 baru attachment yang selesai (label, kalender, deep-link, Retailku belum). Urutan 4 (pagination) masih benar-benar belum dikerjakan/diputuskan, sama seperti saat dokumen ini pertama ditulis. "Pengganti Tiptap" sudah final diputuskan (plain text) — lihat checklist status di atas.
