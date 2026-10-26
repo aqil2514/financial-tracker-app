@@ -15,8 +15,6 @@ interface DaySummaryRow {
   expense: number | null;
 }
 
-// `month` dalam format "YYYY-MM". `date` di tabel transactions adalah ISO
-// datetime penuh, jadi dikelompokkan per tanggal lewat substr(date, 1, 10).
 export function useMonthSummary(month: string) {
   const db = useDatabase();
   const [summary, setSummary] = useState<MonthSummaryMap>({});
