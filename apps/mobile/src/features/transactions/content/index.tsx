@@ -1,4 +1,5 @@
-import { SectionList, Text, View } from "react-native";
+import { Pressable, SectionList, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
 import type { TransactionListItem } from "./transaction-list-item";
@@ -77,10 +78,16 @@ export function TransactionList({ filters, sorts }: TransactionListProps) {
 }
 
 function TransactionItem({ transaction }: { transaction: TransactionListItem }) {
+  const router = useRouter();
   const isTransfer = transaction.type === "transfer";
 
   return (
-    <View className="rounded-lg border border-neutral-200 bg-white p-3">
+    <Pressable
+      className="rounded-lg border border-neutral-200 bg-white p-3"
+      onPress={() =>
+        router.push({ pathname: "/transactions/[id]/edit", params: { id: transaction.id } })
+      }
+    >
       <View className="flex-row items-start justify-between">
         <View className="flex-1 pr-2">
           <Text className="font-medium text-neutral-900">{transaction.note}</Text>
@@ -106,7 +113,7 @@ function TransactionItem({ transaction }: { transaction: TransactionListItem }) 
         {transaction.category && <Badge label={transaction.category} />}
         {transaction.hasAttachment && <Badge label="📎" />}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
