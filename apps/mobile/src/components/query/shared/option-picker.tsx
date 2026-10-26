@@ -36,24 +36,6 @@ interface OptionPickerMultipleProps {
 
 type OptionPickerProps = OptionPickerSingleProps | OptionPickerMultipleProps;
 
-// Primitif bersama untuk "pilih satu/beberapa dari beberapa opsi" di
-// dalam sheet filter/sort (key selector, operator selector, value
-// selector field select/combobox) — bukan bagian dari port desktop
-// (yang pakai <Select>/<Combobox> Radix mengambang), tapi building
-// block baru khusus mobile karena pola itu tidak punya ekuivalen
-// natural di RN. Nested BottomSheetModal, dipicu lewat ref dari
-// pemanggil, sesuai pola "trigger pegang ref" yang sama dengan
-// FilterPanel/SortDropdown level atas.
-//
-// Mode `searchable`: field cari di atas list, filter `options` lokal
-// berdasarkan `label` (case-insensitive) — dipakai combobox (opsi
-// bisa puluhan/ratusan), tidak dipakai select/key/operator (opsi
-// sedikit).
-//
-// Mode `multiple`: tap tidak langsung dismiss — pilihan dikumpulkan
-// di draft lokal, baru di-commit ke `onSelect` + dismiss saat tombol
-// "Selesai" ditekan. Mode single (default): tap langsung onSelect +
-// dismiss, sama seperti sebelumnya.
 export const OptionPicker = forwardRef<OptionPickerRef, OptionPickerProps>(
   function OptionPicker(props, ref) {
     const { title, options, searchable } = props;
@@ -103,6 +85,7 @@ export const OptionPicker = forwardRef<OptionPickerRef, OptionPickerProps>(
         ref={sheetRef}
         snapPoints={["60%"]}
         enableDynamicSizing={false}
+        stackBehavior="push"
         backdropComponent={(bgProps) => (
           <BottomSheetBackdrop {...bgProps} disappearsOnIndex={-1} appearsOnIndex={0} />
         )}

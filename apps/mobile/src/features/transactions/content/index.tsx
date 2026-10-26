@@ -1,4 +1,6 @@
 import { SectionList, Text, View } from "react-native";
+import type { FilterConfig } from "@/components/query/filters/filter.interface";
+import type { SortConfig } from "@/components/query/sort/sort.interface";
 import type { TransactionListItem } from "./transaction-list-item";
 import { useTransactions } from "./use-transactions";
 
@@ -40,8 +42,13 @@ function groupByDate(transactions: TransactionListItem[]) {
   }));
 }
 
-export function TransactionList() {
-  const { transactions, isLoading } = useTransactions();
+interface TransactionListProps {
+  filters?: FilterConfig[];
+  sorts?: SortConfig[];
+}
+
+export function TransactionList({ filters, sorts }: TransactionListProps) {
+  const { transactions, isLoading } = useTransactions({ filters, sorts });
   const sections = groupByDate(transactions);
 
   if (!isLoading && transactions.length === 0) {

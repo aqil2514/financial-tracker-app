@@ -1,6 +1,10 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { useDatabase } from "@/lib/database";
+import { buildWhereClause } from "@/components/query/filters/builders/sql";
+import { buildOrderClause } from "@/components/query/sort/builders/sql";
+import type { FilterConfig } from "@/components/query/filters/filter.interface";
+import type { SortConfig } from "@/components/query/sort/sort.interface";
 import type { TransactionListItem } from "./transaction-list-item";
 
 interface TransactionRow {
@@ -15,6 +19,23 @@ interface TransactionRow {
   transfer_account_id: string | null;
   has_attachment: number;
 }
+
+// Kolom yang boleh dipakai sebagai filterKey/sortKey — harus sinkron
+// dengan skema tabel transactions (lib/database/migrations/0001_initial.ts)
+// dan TRANSACTION_FILTER_CONFIG/TRANSACTION_SORT_CONFIG di features/transactions/header/.
+const ALLOWED_FILTER_COLUMNS = [
+  "note",
+  "description",
+  "type",
+  "category_id",
+  "account_id",
+  "amount",
+  "has_attachment",
+] as const;
+
+const ALLOWED_SORT_COLUMNS = ["date", "amount"] as const;
+
+const DEFAULT_ORDER = "date DESC, created_at DESC";
 
 function toListItem(row: TransactionRow): TransactionListItem {
   return {
@@ -31,6 +52,19 @@ function toListItem(row: TransactionRow): TransactionListItem {
   };
 }
 
+// buildWhereClause/buildOrderClause generate placeholder gaya Postgres
+// ($1, $2, ...), sedangkan expo-sqlite (seperti SQLite pada umumnya)
+// pakai placeholder posisional "?". $N hanya perlu diganti jadi "?" —
+// urutan params dari builder sudah sesuai urutan kemunculan $N di string.
+function toPositionalPlaceholders(clause: string): string {
+  return clause.replace(/\$\d+/g, "?");
+}
+
+interface UseTransactionsOptions {
+  filters?: FilterConfig[];
+  sorts?: SortConfig[];
+}
+
 // Query ulang tiap halaman Transaksi mendapat fokus (termasuk
 // pertama kali mount, dan tiap balik dari halaman Tambah Transaksi)
 // — belum ada invalidation/cache layer (React Query dkk) di mobile,
@@ -38,7 +72,7 @@ function toListItem(row: TransactionRow): TransactionListItem {
 // useEffect terpisah untuk initial load karena useFocusEffect sudah
 // fire saat screen pertama kali fokus — menambah useEffect lagi
 // cuma duplikasi fetch pertama.
-export function useTransactions() {
+export function useTransactions({ filters = [], sorts = [] }: UseTransactionsOptions = {}) {
   const db = useDatabase();
   const [transactions, setTransactions] = useState<TransactionListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,15 +80,24 @@ export function useTransactions() {
   const refetch = useCallback(async () => {
     setIsLoading(true);
     try {
-      const rows = await db.getAllAsync<TransactionRow>(
-        "SELECT * FROM transactions ORDER BY date DESC, created_at DESC"
+      const { whereClause, params } = buildWhereClause(filters, ALLOWED_FILTER_COLUMNS);
+      const orderClause = buildOrderClause(sorts, ALLOWED_SORT_COLUMNS, DEFAULT_ORDER);
+
+      const sql = toPositionalPlaceholders(
+        `SELECT * FROM transactions ${whereClause} ${orderClause}`
       );
+
+      const rows = await db.getAllAsync<TransactionRow>(sql, params);
       setTransactions(rows.map(toListItem));
     } finally {
       setIsLoading(false);
     }
-  }, [db]);
+  }, [db, filters, sorts]);
 
+  // useFocusEffect fire ulang bukan cuma saat screen mendapat fokus,
+  // tapi juga tiap kali identity `refetch` berubah selagi screen masih
+  // fokus (mis. user ubah filters/sorts tanpa pindah screen) — jadi
+  // satu mekanisme ini cukup, tidak perlu useEffect terpisah.
   useFocusEffect(
     useCallback(() => {
       refetch();
