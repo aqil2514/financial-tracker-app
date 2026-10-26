@@ -1,5 +1,4 @@
-import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { View } from "react-native";
 import { PageHeader } from "@/components/page-header";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
@@ -22,8 +21,6 @@ export function TransactionHeader({
   sorts,
   onSortsChange,
 }: TransactionHeaderProps) {
-  const router = useRouter();
-
   return (
     <PageHeader
       title="Transaksi"
@@ -31,12 +28,6 @@ export function TransactionHeader({
         <View className="flex-row items-center gap-2">
           <TransactionHeaderSort sorts={sorts} onChange={onSortsChange} />
           <TransactionHeaderFilter filters={filters} onApplyFilter={onFiltersChange} />
-          <Pressable
-            className="rounded-md bg-neutral-900 px-3 py-1.5"
-            onPress={() => router.push("/transactions/new")}
-          >
-            <Text className="text-sm font-medium text-white">+ Tambah</Text>
-          </Pressable>
         </View>
       }
     />

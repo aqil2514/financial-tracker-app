@@ -5,7 +5,7 @@ import { buildWhereClause } from "@/components/query/filters/builders/sql";
 import { buildOrderClause } from "@/components/query/sort/builders/sql";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
-import type { TransactionListItem } from "./transaction-list-item";
+import { TransactionListItem } from "../types";
 
 interface TransactionRow {
   id: string;

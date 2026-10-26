@@ -16,6 +16,7 @@ interface BaseFormProps<TInput extends FieldValues, TOutput> {
   onSubmit: (values: TOutput) => void;
   isPending: boolean;
   submitLabel?: string;
+  renderFooter?: (submit: () => void) => ReactNode;
   children: (form: UseFormReturn<TInput, unknown, TOutput>) => ReactNode;
 }
 
@@ -25,6 +26,7 @@ export function BaseForm<TInput extends FieldValues, TOutput>({
   onSubmit,
   isPending,
   submitLabel = "Simpan",
+  renderFooter,
   children,
 }: BaseFormProps<TInput, TOutput>) {
   const form = useForm<TInput, unknown, TOutput>({
@@ -43,17 +45,21 @@ export function BaseForm<TInput extends FieldValues, TOutput>({
     <FormProvider {...form}>
       <View className="gap-4">
         {children(form)}
-        <View className="flex-row justify-end border-t border-neutral-200 pt-3">
-          <Pressable
-            className="items-center rounded-md bg-neutral-900 px-4 py-3 disabled:opacity-50"
-            disabled={isPending}
-            onPress={() => submit()}
-          >
-            <Text className="font-medium text-white">
-              {isPending ? "Menyimpan..." : submitLabel}
-            </Text>
-          </Pressable>
-        </View>
+        {renderFooter ? (
+          renderFooter(submit)
+        ) : (
+          <View className="flex-row items-center justify-end gap-2 border-t border-neutral-200 pt-3">
+            <Pressable
+              className="items-center rounded-md bg-neutral-900 px-4 py-3 disabled:opacity-50"
+              disabled={isPending}
+              onPress={() => submit()}
+            >
+              <Text className="font-medium text-white">
+                {isPending ? "Menyimpan..." : submitLabel}
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </FormProvider>
   );

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView } from "react-native";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useDatabase } from "@/lib/database";
 import { TransactionForm } from "@/features/transactions/form/transaction-form";
@@ -91,21 +91,13 @@ export default function EditTransactionPage() {
       <Stack.Screen options={{ title: "Edit Transaksi" }} />
       <ScrollView className="flex-1 bg-white" contentContainerClassName="p-4">
         {defaultValues && (
-          <View className="gap-4">
-            <TransactionForm
-              defaultValues={defaultValues}
-              onSubmit={handleSubmit}
-              isPending={isPending}
-              submitLabel="Simpan Perubahan"
-            />
-
-            <Pressable
-              className="items-center rounded-md border border-red-200 px-4 py-3"
-              onPress={handleDelete}
-            >
-              <Text className="font-medium text-red-600">Hapus Transaksi</Text>
-            </Pressable>
-          </View>
+          <TransactionForm
+            defaultValues={defaultValues}
+            onSubmit={handleSubmit}
+            isPending={isPending}
+            submitLabel="Simpan Perubahan"
+            onDelete={handleDelete}
+          />
         )}
       </ScrollView>
     </>
