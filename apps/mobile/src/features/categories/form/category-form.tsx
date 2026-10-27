@@ -65,7 +65,7 @@ export function CategoryForm({
             form={form}
             name="name"
             label="Nama"
-            placeholder="Mis. Makanan"
+            placeholder="Mis. 🍔 Makanan"
           />
 
           <ParentCategoryField excludeId={excludeId} />

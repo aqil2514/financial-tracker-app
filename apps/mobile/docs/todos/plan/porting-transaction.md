@@ -12,12 +12,12 @@
 - [x] Attachment (foto/kamera/dokumen) — `apps/mobile/src/shared/attachments/`, pola pending-save (create) & immediate-save (edit), lihat README-nya.
 - [x] Date-time picker native, numpad calculator untuk field amount, deskripsi sebagai plain multiline text (Tiptap desktop TIDAK diporting — keputusan final, bukan placeholder).
 - [x] Summary (Pendapatan/Pengeluaran/Total) di atas list — query `SUM()` terpisah (`use-transaction-summary.ts`), ikut filter aktif, independen dari paginasi list nanti.
-- [ ] Tab Harian/Kalender di halaman Transaksi (terinspirasi app finansial lain, lihat bagian "Tab Harian & Kalender" di bawah) — sedang dikerjakan, keputusan desain sudah diambil.
+- [x] Tab Harian/Kalender di halaman Transaksi — selesai. `TransactionTabSwitcher`, `TransactionCalendar` (`react-native-calendars`, custom `CalendarDay`, `use-month-summary.ts`), tap tanggal gabung filter + pindah ke tab Harian. Lihat bagian "Tab Harian & Kalender" di bawah.
 - [ ] Pagination/infinite-scroll — belum ada sama sekali, query ambil semua baris tanpa LIMIT/OFFSET. Keputusan "klasik vs infinite scroll" masih benar-benar menggantung.
 - [ ] Label — belum ada tabel/kolom label di mobile sama sekali (dikonfirmasi komentar di `header/filter.tsx`).
 - [ ] Field debt (`contact_name`, `settle_debt_ids`) & investment (`unit`, `price_per_unit`, `investment_status`) di form — belum dikerjakan, butuh tabel `debts`/`investment_*` yang belum ada di mobile (dikonfirmasi komentar di `form/schema.ts`).
 - [ ] Import Retailku — belum dikerjakan, belum dibahas sama sekali.
-- [ ] `transactions.category_id` masih free-text, belum FK ke tabel `categories` (lihat `porting-category.md` — ditunda sengaja sampai kategori matang).
+- [x] `transactions.category_id` sekarang FK ke tabel `categories` (`ON DELETE SET NULL`) — migrasi `0004_transaction_category_fk.ts`, lihat `porting-category.md` (SELESAI) untuk detail lengkap.
 
 ## Latar belakang
 
@@ -36,11 +36,9 @@ Terinspirasi dari pola app finansial lain (bukan dari desktop — desktop pakai 
 - **Interaksi tap tanggal di Kalender**: filter tanggal (`date` + operator `between`, hari yang sama dari 00:00 sampai 23:59 atau setara) **digabung** dengan filter lain yang mungkin sudah aktif dari panel filter (note/kategori/dst) — bukan mereset filter lain. Field `date` perlu ditambahkan ke `ALLOWED_FILTER_COLUMNS` di `use-transactions.ts` dan `use-transaction-summary.ts` (saat ini belum ada di daftar itu).
 - Setelah tap tanggal, **otomatis pindah ke tab Harian** menampilkan transaksi hari itu (list yang sama dipakai ulang, tidak ada komponen list kedua khusus tab Kalender).
 
-### Belum dikerjakan / menyusul
+### Status: selesai
 
-- Implementasi `TransactionCalendar` (grid + custom day + query agregasi per-hari) — baru tahap rencana, belum ada kode.
-- UI tab bar itu sendiri (switcher Harian/Kalender) di atas `TransactionSummary`.
-- Pemasangan `react-native-calendars` sebagai dependency.
+Semua poin di bagian ini sudah diimplementasikan — lihat checklist status di paling atas dokumen.
 
 ## Halaman transaksi desktop (ringkasan eksplorasi)
 

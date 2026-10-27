@@ -1,4 +1,4 @@
-# Porting Kategori (Desktop → Mobile)
+# Porting Kategori (Desktop → Mobile) — SELESAI
 
 ## Status & TODO saat ini (ringkas)
 
@@ -16,8 +16,7 @@ Penjelasan lengkap tiap poin ada di bagian-bagian di bawah.
 - [x] Pola "buat kategori baru inline dari form transaksi" — selesai. Sheet ke-3 di `CategoryPickerSheet` (`CategoryCreateSheetBody`), bukan navigasi ke `categories/new.tsx`, supaya form transaksi yang sedang diisi tidak ter-unmount. Field dipersingkat: cuma nama (tipe dikunci ke tipe transaksi, induk otomatis dari level sheet yang sedang dibuka — tidak ada field pilih induk, supaya tidak perlu nested sheet ke-4). Tombol "+" muncul di header root sheet maupun child sheet. State nama dipisah ke sub-komponen sendiri supaya tidak memicu re-render berat 3 `BottomSheetModal` tiap keystroke (sempat bikin ngetik cepat kelihatan kacau/ketinggalan huruf — sudah di-fix). Sudah ditest manual.
 - [x] FK `transactions.category_id → categories(id)` — selesai. Migrasi `0004_transaction_category_fk.ts` (copy-and-rename, `ON DELETE SET NULL`, konsisten pola desktop). `transaction_attachments` ikut di-rebuild juga karena FK-nya menunjuk ke `transactions` (lihat `apps/desktop/docs/rules/sqlite-copy-and-rename-migration.md` — prinsip sama berlaku di mobile). Data transaksi lama (free-text `category_id`) sudah dihapus manual oleh user sebelum migrasi ini ditulis, jadi tidak perlu backfill. **Penting**: migrasi baru hanya jalan saat app di-restart total (force-close, bukan cukup Fast Refresh) — `onInit` SQLiteProvider cuma jalan sekali saat mount pertama. Setelah migrasi jalan, sempat ketahuan badge kategori di list transaksi nampilin UUID mentah (bukan nama) — sudah di-fix di `use-transactions.ts` (subquery resolve `category_id` → nama, bukan `LEFT JOIN` langsung karena `categories` juga punya kolom `type` yang bentrok dengan filter `transactions.type`). Sudah ditest manual, beres.
 - [x] Halaman Periode Kategori + CRUD Category Period — selesai, dikerjakan sekaligus karena satu paket kerja. `features/categories/period/` (schema, form, list, card). List: query `GROUP_CONCAT` nama kategori + `is_ongoing` (`date('now') BETWEEN start_date AND end_date`, badge Berlangsung/Selesai, konsisten pola desktop). Create (`categories/periods/new.tsx`) + edit (`categories/periods/[id]/edit.tsx`, sekalian delete dengan Alert konfirmasi) — update category_ids pakai pola "hapus semua assignment lama lalu insert ulang" (bukan diff granular, junction table-nya kecil). Field multi-select kategori lintas tipe (`CategoryMultiSelectField`) reuse `OptionPicker` mode `multiple` (flat list + search + checkbox, label diberi prefix tipe+induk) — bukan drill-down seperti `CategoryPickerSheet` di form transaksi, karena assign ke periode biasanya pilih beberapa kategori lintas tipe sekaligus, bukan browsing per induk. Tanggal mulai/selesai reuse `FormFieldDate` apa adanya (datetime picker, walau cuma butuh tanggal — keputusan sadar, bukan oversight). CRUD dasar (create, list, edit, delete) sudah ditest manual di device, lancar.
-- [ ] Report/ringkasan Category Period (agregasi on-the-fly dari `transactions`) — belum dimulai. Card list sudah nampilin kategori yang di-assign, tapi belum ada angka total masuk/keluar per periode.
-- [ ] Aktivasi field `icon` di UI (picker ikon saat create/edit kategori) — belum dimulai.
+- [x] Aktivasi field `icon` — selesai, tapi beda arah dari rencana awal (bukan picker ikon terpisah). Keputusan: tidak ada field `icon` di UI sama sekali — kolom `icon` di skema database tetap permanen tidak dipakai (sama seperti desktop). Sebagai gantinya, emoji diketik user langsung di depan field "Nama" yang sudah ada (emoji keyboard bawaan OS), mis. nama kategori jadi "🍔 Makanan" — tidak perlu field/komponen/migrasi baru sama sekali. Yang diubah cuma placeholder field Nama (di `category-form.tsx` dan `CategoryCreateSheetBody` quick-create) jadi contoh berisi emoji, supaya user sadar pola ini tersedia.
  
 ## Latar belakang
 
@@ -109,9 +108,11 @@ File di `apps/mobile/src/features/categories/content/` dan `.../utils/`:
 - **Filter kategori di JS, bukan reuse `FilterPanel` generic SQL-WHERE yang dipakai Transaksi.** Alasan: search yang match induk harus tetap menampilkan semua anaknya (dan sebaliknya) supaya accordion tidak kelihatan bolong tanpa alasan jelas — `FilterPanel` filter per-baris lewat SQL WHERE tidak bisa menjaga relasi induk-anak seperti itu. Trade-off: filter kategori tidak reuse infrastruktur query generic yang sudah ada, jadi kalau kriteria filter makin kompleks nanti, pertimbangkan ulang apakah tetap worth it custom atau migrasi ke `FilterPanel`.
 - **Filter kategori ditaruh di bottom sheet (tombol "Filter" di header), bukan bar filter permanen di bawah header.** Bar permanen memotong tinggi area list; sheet (`snapPoints={["45%"]}`) dibuka on-demand lewat tombol di `headerRight`, konsisten dengan pola tombol+sheet filter Transaksi (`FilterPanel`) walau implementasi isinya beda (lihat poin di atas).
 
-## Keputusan yang BELUM diambil
+## Keputusan yang sebelumnya belum diambil — sudah terjawab
 
-- Bentuk UI "pilih kategori" di form transaksi — dropdown/picker biasa dulu, atau langsung searchable bottom sheet seperti pola `AttachmentSourceSheet`?
-- Bentuk UI "buat kategori baru inline dari form transaksi" — apakah perlu di porting awal, atau CRUD kategori mandiri (halaman terpisah) dulu sampai solid, baru inline-create menyusul?
-- Urutan pengerjaan: CRUD kategori dasar dulu sampai selesai (list, update, delete, toggle aktif masih kosong), baru pemakaiannya di form transaksi — atau dikerjakan paralel/interleaved?
-- Apakah Category Period dikerjakan segera setelah kategori dasar selesai, atau ditunda sampai ada kebutuhan nyata dari pemakaian mobile (mengingat laporan/ringkasannya baru bisa jalan penuh setelah FK `category_id` terpasang)?
+Semua ini sudah diputuskan & diimplementasikan, dicatat di sini sebagai riwayat:
+
+- Bentuk UI "pilih kategori" di form transaksi → `CategoryPickerSheet`, searchable bottom sheet drill-down 2 level (bukan dropdown biasa).
+- Bentuk UI "buat kategori baru inline dari form transaksi" → dikerjakan, sheet ke-3 di `CategoryPickerSheet` (bukan navigasi halaman terpisah).
+- Urutan pengerjaan → interleaved: CRUD kategori dasar → picker di form transaksi → inline-create → FK → Category Period → aktivasi `icon`, bukan satu fitur dituntaskan penuh baru pindah ke fitur berikutnya.
+- Category Period → dikerjakan segera (bukan ditunda), sekaligus list+create+edit+delete dalam satu putaran kerja.
