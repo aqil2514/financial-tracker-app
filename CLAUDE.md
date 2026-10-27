@@ -13,3 +13,7 @@ untuk aturan yang spesifik ke app itu saja (mis. `apps/desktop/CLAUDE.md`).
   jangan hard-wrap paragraf/item list di dokumen Markdown; satu
   paragraf/item = satu baris mentah (soft wrap), biar editor yang
   membungkus tampilannya.
+- [docs/rules/table-docs.md](docs/rules/table-docs.md) — format wajib
+  dokumen `docs/tables/*`: deskripsi, SQL final (hasil gabungan semua
+  migrasi), tabel kolom, lalu catatan — representasi skema terbaru
+  yang ramah dibaca manusia.
