@@ -8,6 +8,7 @@ import {
   FormFieldToggleGroup,
 } from "@/components/forms/form-fields";
 import { transactionSchema, type TransactionFormOutput, type TransactionFormValues } from "./schema";
+import { FormFieldCategory } from "./fields/form-field-category";
 
 const TYPE_OPTIONS = [
   { value: "income", label: "Pemasukan" },
@@ -89,11 +90,9 @@ export function TransactionForm({
               placeholder="Mis. Tabungan BRI"
             />
           ) : (
-            <FormFieldText
-              form={form}
-              name="category_id"
-              label="Kategori"
-              placeholder="Mis. Makanan"
+            <FormFieldCategory
+              control={form.control}
+              type={form.watch("type") as "income" | "expense"}
             />
           )}
 

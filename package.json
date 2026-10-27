@@ -16,6 +16,7 @@
     "test:desktop": "npm run test --workspace=desktop",
     "test:desktop:watch": "npm run test:watch --workspace=desktop",
     "import:money-manager": "npm run import:money-manager --prefix internal",
-    "import:money-manager:dry-run": "npm run import:money-manager:dry-run --prefix internal"
+    "import:money-manager:dry-run": "npm run import:money-manager:dry-run --prefix internal",
+    "lint": "expo lint"
   }
 }
