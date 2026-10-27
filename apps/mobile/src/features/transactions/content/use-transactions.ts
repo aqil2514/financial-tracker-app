@@ -15,6 +15,7 @@ interface TransactionRow {
   amount: number;
   date: string;
   category_id: string | null;
+  category_name: string | null;
   account_id: string;
   transfer_account_id: string | null;
   has_attachment: number;
@@ -44,7 +45,7 @@ function toListItem(row: TransactionRow): TransactionListItem {
     note: row.note,
     description: row.description,
     type: row.type,
-    category: row.category_id,
+    category: row.category_name,
     account: row.account_id,
     transferAccount: row.transfer_account_id,
     amount: row.amount,
@@ -85,7 +86,10 @@ export function useTransactions({ filters = [], sorts = [] }: UseTransactionsOpt
       const orderClause = buildOrderClause(sorts, ALLOWED_SORT_COLUMNS, DEFAULT_ORDER);
 
       const sql = toPositionalPlaceholders(
-        `SELECT * FROM transactions ${whereClause} ${orderClause}`
+        `SELECT transactions.*,
+                (SELECT name FROM categories WHERE categories.id = transactions.category_id) as category_name
+         FROM transactions
+         ${whereClause} ${orderClause}`
       );
 
       const rows = await db.getAllAsync<TransactionRow>(sql, params);
@@ -95,10 +99,6 @@ export function useTransactions({ filters = [], sorts = [] }: UseTransactionsOpt
     }
   }, [db, filters, sorts]);
 
-  // useFocusEffect fire ulang bukan cuma saat screen mendapat fokus,
-  // tapi juga tiap kali identity `refetch` berubah selagi screen masih
-  // fokus (mis. user ubah filters/sorts tanpa pindah screen) — jadi
-  // satu mekanisme ini cukup, tidak perlu useEffect terpisah.
   useFocusEffect(
     useCallback(() => {
       refetch();
