@@ -1,8 +1,3 @@
-Transaksi
-- Tambah UX yang berkaitan dengan kalender. Jadi pas tambah data dan ada filter kalender, defaultnya di tanggal yang dipilih dari filter
-
-- Investasi jadi PR
-- Pembelian Stok juga sama
-
-Sudah dihandle
-- Di sinkronisasi, kayaknya jalur Retailku masih belum
+Desktop
+- Integrasi Retailku masih ada yang belum cocok, terutama kalo ada kasus piutang. Perilaku sekarang omzet = omzet keseluruhan dikurang piutang. Piutang = transfer dari omzet ke piutang. Hasilnya, omzet selalu minus sejumlah piutang. Contoh kasus "Omzet Dagang — Barang Dagang" di tanggal 27, awalnya 37.500 (Selisih 9k dan 9k ini adalah jumlah piutang(
+- Integrasi Retailku di penjualan konsinyasi juga kayaknya belum tepat, kemungkinan sih karena efek data lama, kebawa sampai sekarang data historisnya. Nanti dilihat lagi kalau si penitip udah ambil uangnya, kita mulai pakai data bersih.
