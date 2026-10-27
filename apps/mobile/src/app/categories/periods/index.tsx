@@ -1,22 +1,19 @@
 import { Pressable, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { PeriodList } from "@/features/categories/period/content/period-list";
+import { useCategoryPeriods } from "@/features/categories/period/content/use-category-periods";
 
 export default function CategoryPeriodsPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { periods, isLoading } = useCategoryPeriods();
 
   return (
     <>
       <Stack.Screen options={{ title: "Periode Kategori" }} />
       <View className="flex-1 bg-white">
-        <View className="flex-1 items-center justify-center gap-3 px-8">
-          <Ionicons name="calendar-outline" size={40} color="#a3a3a3" />
-          <Text className="text-center text-base font-medium text-neutral-500">
-            Belum ada periode kategori. Tambah periode pertamamu.
-          </Text>
-        </View>
+        <PeriodList periods={periods} isLoading={isLoading} />
 
         <Pressable
           className="absolute right-5 size-14 items-center justify-center rounded-full bg-neutral-900 shadow-lg"
