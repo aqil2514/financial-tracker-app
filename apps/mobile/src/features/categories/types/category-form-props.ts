@@ -7,4 +7,5 @@ export interface CategoryFormProps {
   submitLabel?: string;
   // Dibutuhkan saat edit — kategori tidak boleh jadi induk dirinya sendiri.
   excludeId?: string;
+  onDelete?: () => void;
 }

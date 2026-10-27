@@ -21,10 +21,6 @@ function toListItem(row: CategoryRow): CategoryListItem {
   };
 }
 
-// Query ulang tiap halaman Kategori mendapat fokus (termasuk pertama kali
-// mount, dan tiap balik dari halaman Tambah Kategori) — belum ada
-// invalidation/cache layer (React Query dkk) di mobile, jadi refetch
-// manual lewat useFocusEffect, sama seperti use-transactions.ts.
 export function useCategories() {
   const db = useDatabase();
   const [categories, setCategories] = useState<CategoryListItem[]>([]);
@@ -48,5 +44,16 @@ export function useCategories() {
     }, [refetch])
   );
 
-  return { categories, isLoading, refetch };
+  const toggleActive = useCallback(
+    async (id: string, nextIsActive: boolean) => {
+      await db.runAsync(`UPDATE categories SET is_active = ? WHERE id = ?`, [
+        nextIsActive ? 1 : 0,
+        id,
+      ]);
+      await refetch();
+    },
+    [db, refetch]
+  );
+
+  return { categories, isLoading, refetch, toggleActive };
 }

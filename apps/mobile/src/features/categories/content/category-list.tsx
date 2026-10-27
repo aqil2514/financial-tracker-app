@@ -6,14 +6,16 @@ import { CategoryAccordionSection } from "./category-accordion-section";
 interface CategoryListProps {
   categories: CategoryListItemType[];
   isLoading: boolean;
-  // Beda dari categories.length === 0: ini nunjukin apakah DB-nya memang
-  // kosong atau cuma hasil filter yang tidak ada yang cocok — dua pesan
-  // kosong itu beda makna buat pengguna (mirip isEmpty vs "belum ada
-  // kategori" di desktop).
   hasAnyCategory: boolean;
+  onToggleActive: (id: string, nextIsActive: boolean) => void;
 }
 
-export function CategoryList({ categories, isLoading, hasAnyCategory }: CategoryListProps) {
+export function CategoryList({
+  categories,
+  isLoading,
+  hasAnyCategory,
+  onToggleActive,
+}: CategoryListProps) {
   const sections = groupByParent(categories);
 
   if (!isLoading && categories.length === 0) {
@@ -30,8 +32,10 @@ export function CategoryList({ categories, isLoading, hasAnyCategory }: Category
     <FlatList
       data={sections}
       keyExtractor={(section) => section.id}
-      contentContainerClassName="gap-2 px-4 pb-20"
-      renderItem={({ item: section }) => <CategoryAccordionSection section={section} />}
+      contentContainerClassName="gap-2 px-4 pb-20 pt-4"
+      renderItem={({ item: section }) => (
+        <CategoryAccordionSection section={section} onToggleActive={onToggleActive} />
+      )}
     />
   );
 }

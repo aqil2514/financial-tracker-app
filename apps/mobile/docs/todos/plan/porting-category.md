@@ -11,7 +11,7 @@ Penjelasan lengkap tiap poin ada di bagian-bagian di bawah.
 - [x] Halaman create kategori (`categories/new.tsx`) — form lengkap + `INSERT` ke tabel `categories`, sudah fungsional.
 - [x] Form kategori (`features/categories/form/`) — schema, default values, komponen form dengan field induk (`parent_id`) yang di-filter sesuai `type` — lihat bagian Form Kategori.
 - [x] Halaman list kategori (`categories/index.tsx`) — query sungguhan ke DB, accordion per kategori induk, badge warna by type, filter (search/type/status) via bottom sheet — lihat bagian List Kategori.
-- [ ] CRUD kategori lanjutan (update, delete, toggle aktif beneran) — belum dimulai. Dot status di list masih read-only (murni visual).
+- [x] CRUD kategori lanjutan (update, delete, toggle aktif) — selesai. Dot status di list/accordion sudah clickable (toggle `is_active`), halaman `categories/[id]/edit.tsx` untuk update nama/tipe/induk + delete (dengan opsi lepas vs hapus beserta sub-kategori saat kategori induk masih punya anak). Sudah ditest manual.
 - [ ] UI pemilihan kategori di form transaksi (sekarang masih `FormFieldText` free-text) — belum dimulai.
 - [ ] Pola "buat kategori baru inline dari form transaksi" (seperti combobox desktop) — belum diputuskan bentuk UI mobile-nya (kandidat: bottom sheet + search, mengikuti pola `AttachmentSourceSheet`).
 - [ ] FK `transactions.category_id → categories(id)` — sengaja ditunda, lihat bagian Keputusan.

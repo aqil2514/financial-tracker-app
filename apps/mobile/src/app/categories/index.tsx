@@ -13,7 +13,7 @@ import { defaultCategoryFilter, filterCategories } from "@/features/categories/u
 export default function CategoriesPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { categories, isLoading } = useCategories();
+  const { categories, isLoading, toggleActive } = useCategories();
   const [filter, setFilter] = useState(defaultCategoryFilter);
   const filterSheetRef = useRef<CategoryFilterSheetRef>(null);
 
@@ -52,6 +52,7 @@ export default function CategoriesPage() {
           categories={filteredCategories}
           isLoading={isLoading}
           hasAnyCategory={categories.length > 0}
+          onToggleActive={toggleActive}
         />
 
         <Pressable

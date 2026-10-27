@@ -2,6 +2,10 @@ import { CategoryListItem } from "../types";
 
 export interface CategorySection {
   id: string;
+  // Id kategori asli buat section ini, null kalau section "orphans" (anak
+  // yang induknya sudah tidak ada) — section itu bukan representasi satu
+  // baris kategori, jadi tidak boleh di-toggle aktif/nonaktif.
+  categoryId: string | null;
   title: string;
   type: "income" | "expense";
   isActive: boolean;
@@ -26,6 +30,7 @@ export function groupByParent(categories: CategoryListItem[]): CategorySection[]
     const children = childrenByParent.get(category.id) ?? [];
     sections.push({
       id: category.id,
+      categoryId: category.id,
       title: category.name,
       type: category.type,
       isActive: category.isActive,
@@ -38,6 +43,7 @@ export function groupByParent(categories: CategoryListItem[]): CategorySection[]
     if (byId.has(parentId)) continue;
     sections.push({
       id: `orphans-${parentId}`,
+      categoryId: null,
       title: "Lainnya",
       type: children[0].type,
       isActive: true,
