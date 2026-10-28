@@ -17,7 +17,9 @@ interface TransactionRow {
   category_id: string | null;
   category_name: string | null;
   account_id: string;
+  account_name: string | null;
   transfer_account_id: string | null;
+  transfer_account_name: string | null;
   has_attachment: number;
 }
 
@@ -46,8 +48,8 @@ function toListItem(row: TransactionRow): TransactionListItem {
     description: row.description,
     type: row.type,
     category: row.category_name,
-    account: row.account_id,
-    transferAccount: row.transfer_account_id,
+    account: row.account_name ?? row.account_id,
+    transferAccount: row.transfer_account_name,
     amount: row.amount,
     date: row.date,
     hasAttachment: row.has_attachment === 1,
@@ -87,7 +89,9 @@ export function useTransactions({ filters = [], sorts = [] }: UseTransactionsOpt
 
       const sql = toPositionalPlaceholders(
         `SELECT transactions.*,
-                (SELECT name FROM categories WHERE categories.id = transactions.category_id) as category_name
+                (SELECT name FROM categories WHERE categories.id = transactions.category_id) as category_name,
+                (SELECT name FROM accounts WHERE accounts.id = transactions.account_id) as account_name,
+                (SELECT name FROM accounts WHERE accounts.id = transactions.transfer_account_id) as transfer_account_name
          FROM transactions
          ${whereClause} ${orderClause}`
       );

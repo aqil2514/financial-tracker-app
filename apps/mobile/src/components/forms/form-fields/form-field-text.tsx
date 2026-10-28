@@ -1,5 +1,6 @@
 import { Controller, type FieldPath, type FieldValues, type UseFormReturn } from "react-hook-form";
 import { Text, TextInput, View } from "react-native";
+import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 
 type FormFieldTextProps<TFieldValues extends FieldValues> = {
   form: UseFormReturn<TFieldValues>;
@@ -9,6 +10,12 @@ type FormFieldTextProps<TFieldValues extends FieldValues> = {
   secureTextEntry?: boolean;
   disabled?: boolean;
   multiline?: boolean;
+  // TextInput biasa tidak ter-track oleh sistem keyboard-avoidance
+  // @gorhom/bottom-sheet (butuh handleOnFocus/handleOnBlur manual) —
+  // field di dalam BottomSheetModal/BottomSheetScrollView WAJIB pakai
+  // BottomSheetTextInput, kalau tidak keyboard menutupi field saat
+  // sheet tidak bisa meluas otomatis mengikuti fokus.
+  inBottomSheet?: boolean;
 };
 
 export function FormFieldText<TFieldValues extends FieldValues>({
@@ -19,7 +26,10 @@ export function FormFieldText<TFieldValues extends FieldValues>({
   secureTextEntry,
   disabled,
   multiline,
+  inBottomSheet,
 }: FormFieldTextProps<TFieldValues>) {
+  const Input = inBottomSheet ? BottomSheetTextInput : TextInput;
+
   return (
     <Controller
       control={form.control}
@@ -27,7 +37,7 @@ export function FormFieldText<TFieldValues extends FieldValues>({
       render={({ field, fieldState }) => (
         <View className="gap-2">
           <Text className="text-sm font-medium text-neutral-700">{label}</Text>
-          <TextInput
+          <Input
             value={field.value ?? ""}
             onChangeText={field.onChange}
             onBlur={field.onBlur}

@@ -25,6 +25,7 @@ export function AccountForm({
   submitLabel,
   onDelete,
   hideKindToggle,
+  inBottomSheet,
 }: AccountFormProps) {
   return (
     <BaseForm
@@ -59,7 +60,9 @@ export function AccountForm({
           : undefined
       }
     >
-      {(form) => <AccountFormFields form={form} hideKindToggle={hideKindToggle} />}
+      {(form) => (
+        <AccountFormFields form={form} hideKindToggle={hideKindToggle} inBottomSheet={inBottomSheet} />
+      )}
     </BaseForm>
   );
 }
@@ -71,9 +74,22 @@ interface AccountFormProps {
   submitLabel?: string;
   onDelete?: () => void;
   hideKindToggle?: boolean;
+  // Field teks di sini pakai TextInput biasa secara default, yang
+  // tidak ter-track oleh sistem keyboard-avoidance @gorhom/bottom-sheet
+  // (butuh handleOnFocus/handleOnBlur manual) — set true kalau form ini
+  // dirender di dalam BottomSheetModal/BottomSheetScrollView supaya
+  // field teks pakai BottomSheetTextInput, kalau tidak keyboard
+  // menutupi field saat fokus.
+  inBottomSheet?: boolean;
 }
 
-function AccountFields({ form }: { form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput> }) {
+function AccountFields({
+  form,
+  inBottomSheet,
+}: {
+  form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
+  inBottomSheet?: boolean;
+}) {
   return (
     <>
       <IconPickerField />
@@ -82,9 +98,24 @@ function AccountFields({ form }: { form: UseFormReturn<AccountFormValues, unknow
 
       <GroupSelectField />
 
-      <FormFieldNumber form={form} name="initial_balance" label="Saldo Awal" placeholder="0" prefix="Rp" grouped />
+      <FormFieldNumber
+        form={form}
+        name="initial_balance"
+        label="Saldo Awal"
+        placeholder="0"
+        prefix="Rp"
+        grouped
+        inBottomSheet={inBottomSheet}
+      />
 
-      <FormFieldText form={form} name="description" label="Deskripsi" placeholder="Opsional" multiline />
+      <FormFieldText
+        form={form}
+        name="description"
+        label="Deskripsi"
+        placeholder="Opsional"
+        multiline
+        inBottomSheet={inBottomSheet}
+      />
 
       <FormFieldToggleGroup
         form={form}
@@ -99,9 +130,11 @@ function AccountFields({ form }: { form: UseFormReturn<AccountFormValues, unknow
 function AccountFormFields({
   form,
   hideKindToggle,
+  inBottomSheet,
 }: {
   form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
   hideKindToggle?: boolean;
+  inBottomSheet?: boolean;
 }) {
   const kind = useWatch({ control: form.control, name: "kind" });
 
@@ -114,9 +147,10 @@ function AccountFormFields({
         name="name"
         label="Nama"
         placeholder={kind === "group" ? "Mis. E-Wallet" : "Mis. Dompet"}
+        inBottomSheet={inBottomSheet}
       />
 
-      {kind === "account" && <AccountFields form={form} />}
+      {kind === "account" && <AccountFields form={form} inBottomSheet={inBottomSheet} />}
     </>
   );
 }

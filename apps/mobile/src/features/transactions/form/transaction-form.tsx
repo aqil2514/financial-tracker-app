@@ -9,6 +9,7 @@ import {
 } from "@/components/forms/form-fields";
 import { transactionSchema, type TransactionFormOutput, type TransactionFormValues } from "./schema";
 import { FormFieldCategory } from "./fields/form-field-category";
+import { FormFieldAccount } from "./fields/form-field-account";
 
 const TYPE_OPTIONS = [
   { value: "income", label: "Pemasukan" },
@@ -80,14 +81,13 @@ export function TransactionForm({
             useCalculator
           />
 
-          <FormFieldText form={form} name="account_id" label="Akun" placeholder="Mis. BCA, Cash" />
+          <FormFieldAccount control={form.control} name="account_id" label="Akun" />
 
           {form.watch("type") === "transfer" ? (
-            <FormFieldText
-              form={form}
+            <FormFieldAccount
+              control={form.control}
               name="transfer_account_id"
               label="Akun Tujuan"
-              placeholder="Mis. Tabungan BRI"
             />
           ) : (
             <FormFieldCategory

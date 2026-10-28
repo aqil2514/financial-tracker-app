@@ -1,7 +1,12 @@
 import { useRef } from "react";
 import { Controller, type FieldPath, type FieldValues, type UseFormReturn } from "react-hook-form";
 import { Pressable, Text, TextInput, View } from "react-native";
-import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetTextInput,
+  BottomSheetView,
+} from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import { NumpadCalculator } from "./numpad-calculator";
 
@@ -14,6 +19,7 @@ type FormFieldNumberProps<TFieldValues extends FieldValues> = {
   disabled?: boolean;
   grouped?: boolean;
   useCalculator?: boolean;
+  inBottomSheet?: boolean;
 };
 
 function toDigitsOnly(text: string): string {
@@ -34,8 +40,10 @@ export function FormFieldNumber<TFieldValues extends FieldValues>({
   disabled,
   grouped,
   useCalculator,
+  inBottomSheet,
 }: FormFieldNumberProps<TFieldValues>) {
   const sheetRef = useRef<BottomSheetModal>(null);
+  const Input = inBottomSheet ? BottomSheetTextInput : TextInput;
 
   return (
     <Controller
@@ -50,7 +58,7 @@ export function FormFieldNumber<TFieldValues extends FieldValues>({
             <Text className="text-sm font-medium text-neutral-700">{label}</Text>
             <View className="flex-row items-center rounded-md border border-neutral-300">
               {prefix && <Text className="pl-3 text-neutral-500">{prefix}</Text>}
-              <TextInput
+              <Input
                 keyboardType="numeric"
                 value={displayValue}
                 onChangeText={(text) => {

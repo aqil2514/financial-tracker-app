@@ -5,8 +5,8 @@ import { z } from "zod";
 // (lihat lib/database/migrations/0001_initial.ts). Belum ada contact_name/
 // settle_debt_ids/unit/price_per_unit/investment_status/label_names/
 // source_ref — semua itu butuh tabel pendukung (debts, investment_*,
-// labels) yang belum dibuat di mobile. transfer_account_id disiapkan di
-// schema karena sudah ada kolomnya di tabel, tapi field UI-nya menyusul.
+// labels) yang belum dibuat di mobile. account_id/transfer_account_id
+// menyimpan accounts.id (lihat FormFieldAccount + AccountPickerSheet).
 export const transactionSchema = z
   .object({
     type: z.enum(["income", "expense", "transfer"]),
