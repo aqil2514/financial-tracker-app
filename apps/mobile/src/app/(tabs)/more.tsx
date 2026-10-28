@@ -28,9 +28,8 @@ const menuGroups: MenuGroup[] = [
     title: "Utang Piutang",
     icon: "swap-horizontal-outline",
     items: [
-      { title: "Ringkasan Kontak", icon: "person-circle-outline" },
-      { title: "Piutang", icon: "arrow-down-circle-outline" },
-      { title: "Utang", icon: "arrow-up-circle-outline" },
+      { title: "Ringkasan Kontak", icon: "person-circle-outline", href: "/debts" as Href },
+      { title: "Utang Piutang", icon: "arrow-down-circle-outline", href: "/debts/list" as Href },
     ],
   },
   {

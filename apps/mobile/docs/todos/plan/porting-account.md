@@ -7,7 +7,7 @@ Dokumen ini INDUK/index — bukan tempat kerja teknis. Tiap tipe akun (`cash`/`d
 
 - [x] Baca konsep [konsep-tipe-akun.md](../../../../../docs/concept/konsep-tipe-akun.md) — wajib sebelum mengerjakan dokumen anak mana pun, lihat bagian "Latar belakang" di bawah.
 - [x] [porting-account-cash.md](../done/porting-account-cash.md) (SELESAI, dipindah ke `docs/todos/done/`) — tipe **Kas**. CRUD akun+grup lengkap, saldo on-the-fly, mapping icon/color, picker akun di form transaksi dengan inline-create, dan Balance Correction semuanya sudah diimplementasikan dan ditest lewat dogfooding (termasuk beberapa bug yang ditemukan & diperbaiki di sepanjang proses — lihat dokumennya untuk detail).
-- [ ] `porting-account-debt.md` — tipe **Utang/Piutang**. **Belum dibuat**, menyusul. Butuh tabel `debts`/`debt_payments`/`contacts` yang belum ada di mobile sama sekali.
+- [ ] [porting-account-debt.md](porting-account-debt.md) — tipe **Utang/Piutang**. Dokumen riset+rencana sudah dibuat (belum diimplementasikan). Butuh tabel `debt_accounts`/`debts`/`debt_payments`/`contacts` yang belum ada di mobile sama sekali.
 - [ ] `porting-account-investment.md` — tipe **Investasi**. **Belum dibuat**, menyusul. Butuh tabel `investment_*` yang belum ada di mobile sama sekali.
 - [ ] `porting-account-third-party.md` — tipe **Dana Pihak Ketiga**. **Belum dibuat**, menyusul. Butuh tabel `third_party_funds` yang belum ada di mobile sama sekali.
 
