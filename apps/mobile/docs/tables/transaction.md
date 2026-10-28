@@ -34,15 +34,15 @@ CREATE TABLE transactions (
 | `type` | TEXT | ya | - | `income`, `expense`, atau `transfer` — dibatasi `CHECK`. |
 | `amount` | REAL | ya | - | Nominal transaksi, selalu positif (arah ditentukan `type`, bukan tanda angka). |
 | `date` | TEXT | ya | - | Tanggal transaksi (bukan tanggal input/`created_at`). |
-| `category_id` | TEXT | tidak | NULL | FK ke `categories(id)`. `ON DELETE SET NULL` — kategori dihapus tidak ikut menghapus transaksinya. Masih diisi free-text di form transaksi mobile saat ini (belum pakai picker dari tabel `categories`), lihat `docs/todos/done/porting-category.md`. |
-| `account_id` | TEXT | ya | - | Akun sumber/terkait transaksi. **Belum** FK ke `accounts(id)` — masih free-text di form transaksi (lihat `docs/todos/plan/porting-account-cash.md`), FK menyusul setelah picker akun solid, sama pola `category_id`. |
-| `transfer_account_id` | TEXT | tidak | NULL | Akun tujuan, hanya relevan kalau `type = 'transfer'`. Sama seperti `account_id`, belum FK. |
+| `category_id` | TEXT | tidak | NULL | FK ke `categories(id)`. `ON DELETE SET NULL` — kategori dihapus tidak ikut menghapus transaksinya. Diisi lewat `CategoryPickerSheet` (drill-down 2 level + inline-create) di form transaksi, lihat `docs/todos/done/porting-category.md`. |
+| `account_id` | TEXT | ya | - | Akun sumber/terkait transaksi. **Belum** FK formal ke `accounts(id)` (beda dari `category_id`), tapi sejak `AccountPickerSheet` (lihat `docs/todos/done/porting-account-cash.md`) nilainya selalu valid UUID `accounts.id` secara praktik — bukan lagi free-text. FK formal (migrasi copy-and-rename seperti `0004`) belum ditulis. |
+| `transfer_account_id` | TEXT | tidak | NULL | Akun tujuan, hanya relevan kalau `type = 'transfer'`. Sama seperti `account_id` — diisi via `AccountPickerSheet`, FK formal belum ada. |
 | `has_attachment` | INTEGER | ya | 0 | Boolean (0/1) — ada/tidaknya lampiran di `transaction_attachments`. |
 | `created_at` | TEXT | ya | `datetime('now')` | Waktu baris ini dibuat (bukan tanggal transaksi). |
 | `is_cash_neutral` | INTEGER | ya | 0 | Boolean (0/1) — khusus transaksi Balance Correction akun `cash`. `0` = selisih kas fisik riil (ikut laporan cashflow), `1` = koreksi administratif saja (exclude dari cashflow). Transaksi biasa (bukan hasil Balance Correction) selalu `0`. |
 
 ## Catatan
 
-- Saldo akun **tidak** disimpan di tabel ini atau di `accounts` — selalu dihitung on-the-fly dari `SUM(amount)` tabel ini, dikelompokkan per `account_id`/`transfer_account_id` dan `type`. Lihat bagian "Saldo" di `docs/todos/plan/porting-account-cash.md` untuk rumus persisnya.
-- `account_id`/`transfer_account_id` sengaja belum diberi FK karena form transaksi masih menyimpannya sebagai teks bebas, bukan hasil pilihan dari tabel `accounts` — begitu porting akun (`porting-account-cash.md`) sampai ke tahap field picker, migrasi FK baru akan ditulis (pola copy-and-rename seperti `0004_transaction_category_fk.ts`).
+- Saldo akun **tidak** disimpan di tabel ini atau di `accounts` — selalu dihitung on-the-fly dari `SUM(amount)` tabel ini, dikelompokkan per `account_id`/`transfer_account_id` dan `type`. Lihat bagian "Saldo" di `docs/todos/done/porting-account-cash.md` untuk rumus persisnya.
+- `account_id`/`transfer_account_id` belum diberi FK formal — nilainya sudah selalu UUID `accounts.id` valid (diisi via `AccountPickerSheet`, bukan lagi teks bebas), tapi migrasi FK (pola copy-and-rename seperti `0004_transaction_category_fk.ts`) belum ditulis. Menyusul kalau dibutuhkan (mis. saat ada kebutuhan enforce integrity di level DB), bukan blocker untuk fitur apa pun saat ini.
 - Lihat juga [account.md](account.md) dan [transaction-attachment.md](transaction-attachment.md) untuk tabel yang berelasi langsung ke tabel ini.

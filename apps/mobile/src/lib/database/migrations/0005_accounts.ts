@@ -1,13 +1,13 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
-// accounts, account_groups: lihat docs/todos/plan/porting-account-cash.md
+// accounts, account_groups: lihat docs/todos/done/porting-account-cash.md
 // bagian Keputusan. Skema dasar mengacu ke migrasi desktop 0049, tapi
 // SENGAJA tanpa deleted_at (desktop sendiri tidak memakainya, murni
 // untuk Worker sync) dan tanpa sync_source (ditunda sampai semua
 // porting lokal tipe akun selesai). transactions.account_id /
-// transfer_account_id BELUM diberi FK ke accounts(id) — masih
-// free-text di form transaksi, menyusul migrasi terpisah seperti pola
-// category_id di 0004_transaction_category_fk.ts.
+// transfer_account_id BELUM diberi FK formal ke accounts(id) — nilainya
+// sudah selalu UUID valid lewat AccountPickerSheet, tapi migrasi FK
+// (pola copy-and-rename seperti category_id di 0004) belum ditulis.
 export async function up(db: SQLiteDatabase) {
   await db.execAsync(`
     CREATE TABLE account_groups (

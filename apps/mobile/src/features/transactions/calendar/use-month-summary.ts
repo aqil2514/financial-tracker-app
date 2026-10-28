@@ -23,8 +23,8 @@ export function useMonthSummary(month: string) {
     const rows = await db.getAllAsync<DaySummaryRow>(
       `SELECT
          substr(date, 1, 10) AS day,
-         SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income,
-         SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense
+         SUM(CASE WHEN type = 'income' AND is_cash_neutral = 0 THEN amount ELSE 0 END) AS income,
+         SUM(CASE WHEN type = 'expense' AND is_cash_neutral = 0 THEN amount ELSE 0 END) AS expense
        FROM transactions
        WHERE substr(date, 1, 7) = ?
        GROUP BY day`,

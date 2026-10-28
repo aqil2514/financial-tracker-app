@@ -43,8 +43,8 @@ export function useTransactionSummary({ filters = [] }: { filters?: FilterConfig
 
     const sql = toPositionalPlaceholders(
       `SELECT
-         SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income,
-         SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense
+         SUM(CASE WHEN type = 'income' AND is_cash_neutral = 0 THEN amount ELSE 0 END) AS income,
+         SUM(CASE WHEN type = 'expense' AND is_cash_neutral = 0 THEN amount ELSE 0 END) AS expense
        FROM transactions ${whereClause}`
     );
 

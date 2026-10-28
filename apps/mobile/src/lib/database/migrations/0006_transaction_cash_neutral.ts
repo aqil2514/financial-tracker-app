@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 // transactions.is_cash_neutral: dibutuhkan Balance Correction akun
-// cash (lihat docs/todos/plan/porting-account-cash.md bagian Balance
+// cash (lihat docs/todos/done/porting-account-cash.md bagian Balance
 // Correction) — 0 = selisih kas fisik riil (ikut cashflow), 1 = koreksi
 // administratif (exclude dari cashflow). ADD COLUMN biasa cukup di
 // sini (beda dari 0004) karena cuma nambah kolom nullable-default,

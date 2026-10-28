@@ -1,11 +1,29 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useDatabase } from "@/lib/database";
 import { AccountForm } from "@/features/accounts/form/account-form";
 import type { AccountFormOutput, AccountFormValues } from "@/features/accounts/form/schema";
 import { OptionPicker, type OptionPickerRef } from "@/components/query/shared/option-picker";
+import { CurrentBalanceField } from "@/features/accounts/content/current-balance-field";
+import { correctAccountBalance } from "@/features/accounts/correct-account-balance";
+
+const CURRENT_BALANCE_SQL = `
+  SELECT
+    accounts.initial_balance
+    + COALESCE((SELECT SUM(CASE
+          WHEN t.type = 'income' THEN t.amount
+          WHEN t.type = 'expense' THEN -t.amount
+          WHEN t.type = 'transfer' THEN -t.amount
+          ELSE 0 END)
+        FROM transactions t WHERE t.account_id = accounts.id), 0)
+    + COALESCE((SELECT SUM(t.amount) FROM transactions t
+        WHERE t.type = 'transfer' AND t.transfer_account_id = accounts.id), 0)
+    AS balance
+  FROM accounts
+  WHERE accounts.id = ?
+`;
 
 interface AccountRow {
   name: string;
@@ -40,6 +58,8 @@ export default function EditAccountPage() {
   const [isPending, setIsPending] = useState(false);
   const [otherAccounts, setOtherAccounts] = useState<{ value: string; label: string }[]>([]);
   const reassignPickerRef = useRef<OptionPickerRef>(null);
+  const [originalBalance, setOriginalBalance] = useState<number | null>(null);
+  const [currentBalanceInput, setCurrentBalanceInput] = useState("");
 
   useEffect(() => {
     db.getFirstAsync<AccountRow>(
@@ -49,27 +69,75 @@ export default function EditAccountPage() {
     ).then((row) => {
       if (row) setDefaultValues(toFormValues(row));
     });
+
+    db.getFirstAsync<{ balance: number }>(CURRENT_BALANCE_SQL, [id]).then((row) => {
+      const balance = row?.balance ?? 0;
+      setOriginalBalance(balance);
+      setCurrentBalanceInput(String(Math.round(balance)));
+    });
   }, [db, id]);
+
+  async function saveAccountFields(values: AccountFormOutput) {
+    await db.runAsync(
+      `UPDATE accounts
+       SET name = ?, icon = ?, color = ?, group_id = ?, initial_balance = ?, description = ?, is_active = ?
+       WHERE id = ?`,
+      [
+        values.name,
+        values.icon,
+        values.color,
+        values.group_id,
+        values.initial_balance,
+        values.description,
+        values.is_active === "true" ? 1 : 0,
+        id,
+      ]
+    );
+  }
 
   async function handleSubmit(values: AccountFormOutput) {
     setIsPending(true);
     try {
-      await db.runAsync(
-        `UPDATE accounts
-         SET name = ?, icon = ?, color = ?, group_id = ?, initial_balance = ?, description = ?, is_active = ?
-         WHERE id = ?`,
+      await saveAccountFields(values);
+
+      const targetBalance = Number(currentBalanceInput || "0");
+      if (originalBalance == null || targetBalance === originalBalance) {
+        router.back();
+        return;
+      }
+
+      Alert.alert(
+        "Hitung sebagai kas riil?",
+        "Centang Ya kalau ini memang selisih kas fisik riil (mis. ketahuan uangnya lebih/kurang) — akan ikut dihitung di laporan cashflow. Pilih Tidak kalau cuma membenarkan salah catat administratif.",
         [
-          values.name,
-          values.icon,
-          values.color,
-          values.group_id,
-          values.initial_balance,
-          values.description,
-          values.is_active === "true" ? 1 : 0,
-          id,
+          {
+            text: "Tidak",
+            onPress: async () => {
+              await correctAccountBalance({
+                db,
+                accountId: id,
+                targetBalance,
+                currentBalance: originalBalance,
+                countAsCash: false,
+              });
+              router.back();
+            },
+          },
+          {
+            text: "Ya",
+            onPress: async () => {
+              await correctAccountBalance({
+                db,
+                accountId: id,
+                targetBalance,
+                currentBalance: originalBalance,
+                countAsCash: true,
+              });
+              router.back();
+            },
+          },
         ]
       );
-      router.back();
     } finally {
       setIsPending(false);
     }
@@ -154,14 +222,19 @@ export default function EditAccountPage() {
         bottomOffset={20}
       >
         {defaultValues && (
-          <AccountForm
-            defaultValues={defaultValues}
-            onSubmit={handleSubmit}
-            isPending={isPending}
-            submitLabel="Simpan Perubahan"
-            hideKindToggle
-            onDelete={handleDelete}
-          />
+          <>
+            <View className="mb-4">
+              <CurrentBalanceField value={currentBalanceInput} onChangeText={setCurrentBalanceInput} />
+            </View>
+            <AccountForm
+              defaultValues={defaultValues}
+              onSubmit={handleSubmit}
+              isPending={isPending}
+              submitLabel="Simpan Perubahan"
+              hideKindToggle
+              onDelete={handleDelete}
+            />
+          </>
         )}
       </KeyboardAwareScrollView>
 

@@ -1,7 +1,7 @@
 
 # Tabel `accounts`
 
-Dompet/akun finansial tempat uang disimpan atau mengalir (kas, rekening bank, dompet digital, dll). Satu tabel dipakai bersama untuk semua tipe akun (`cash`, `debt`, `investment`, `third_party`) — field yang hanya relevan untuk tipe tertentu ada di tabel turunan terpisah yang mereferensikan `accounts(id)` (belum ada di mobile, masih fase tipe `cash`). Lihat [konsep-tipe-akun.md](../../../../docs/concept/konsep-tipe-akun.md) dan `docs/todos/plan/porting-account-cash.md`.
+Dompet/akun finansial tempat uang disimpan atau mengalir (kas, rekening bank, dompet digital, dll). Satu tabel dipakai bersama untuk semua tipe akun (`cash`, `debt`, `investment`, `third_party`) — field yang hanya relevan untuk tipe tertentu ada di tabel turunan terpisah yang mereferensikan `accounts(id)` (belum ada di mobile, masih fase tipe `cash`). Lihat [konsep-tipe-akun.md](../../../../docs/concept/konsep-tipe-akun.md) dan `docs/todos/done/porting-account-cash.md` (porting tipe `cash` sudah selesai).
 
 Dibuat di migrasi `0005_accounts.ts`.
 
@@ -30,8 +30,8 @@ CREATE INDEX idx_accounts_group ON accounts(group_id);
 |---|---|---|---|---|
 | `id` | TEXT | ya | - | Primary key, UUID. |
 | `name` | TEXT | ya | - | Nama akun (mis. "Dompet", "BCA"). |
-| `icon` | TEXT | tidak | NULL | **Aktif dipakai** (beda dari `categories.icon` yang mati) — identifier ikon, disimpan terpisah dari `name` (bukan ditempel sebagai emoji). Mobile belum punya mapping nama-ikon → komponen render RN untuk kolom ini — lihat `docs/todos/plan/porting-account-cash.md` bagian Keputusan. |
-| `color` | TEXT | tidak | NULL | **Aktif dipakai**. Value warna langsung (mis. hex), tidak butuh mapping. |
+| `icon` | TEXT | tidak | NULL | **Aktif dipakai** (beda dari `categories.icon` yang mati) — identifier ikon Lucide (mis. `Wallet`, `Banknote`), disimpan terpisah dari `name` (bukan ditempel sebagai emoji). Mapping nama→komponen render RN lewat `lucide-react-native` ada di `src/lib/account-icons.ts`, picker UI-nya di `IconPickerField` — lihat `docs/todos/done/porting-account-cash.md` bagian Keputusan #4. |
+| `color` | TEXT | tidak | NULL | **Aktif dipakai**. Value nama warna dari whitelist terbatas (mis. `slate`, `green`), bukan hex bebas — lookup className/hex ada di `src/lib/account-colors.ts`. |
 | `initial_balance` | REAL | ya | 0 | Saldo awal akun sebelum ada transaksi apa pun. Basis hitungan saldo berjalan — lihat bagian Catatan. |
 | `account_type` | TEXT | ya | `cash` | `cash`, `debt`, `investment`, atau `third_party` — dibatasi `CHECK`. **Terkunci** begitu akun pernah dipakai transaksi (tidak bisa diubah lagi lewat form edit). |
 | `group_id` | TEXT | tidak | NULL | FK ke `account_groups(id)`. `ON DELETE SET NULL` — grup dihapus, akun jadi "Tanpa Grup". |
@@ -41,7 +41,8 @@ CREATE INDEX idx_accounts_group ON accounts(group_id);
 
 ## Catatan
 
-- **Tidak ada kolom saldo tersimpan.** Saldo berjalan selalu dihitung on-the-fly: `initial_balance + SUM(income) - SUM(expense) - SUM(transfer keluar dari akun ini) + SUM(transfer masuk ke akun ini)`, dari tabel `transactions` dikelompokkan per `account_id`/`transfer_account_id`. Rumus ini **wajib direplikasi persis** sama seperti desktop/worker, bukan diturunkan ulang secara independen — lihat `docs/todos/plan/porting-account-cash.md` bagian Saldo untuk SQL lengkapnya.
+- **Tidak ada kolom saldo tersimpan.** Saldo berjalan selalu dihitung on-the-fly: `initial_balance + SUM(income) - SUM(expense) - SUM(transfer keluar dari akun ini) + SUM(transfer masuk ke akun ini)`, dari tabel `transactions` dikelompokkan per `account_id`/`transfer_account_id`. Rumus ini **wajib direplikasi persis** sama seperti desktop/worker, bukan diturunkan ulang secara independen — lihat `docs/todos/done/porting-account-cash.md` bagian Saldo untuk SQL lengkapnya, diimplementasikan di `src/features/accounts/content/use-accounts.ts`.
 - Sengaja **tanpa** `deleted_at`/`sync_source` dibanding skema desktop — lihat [account-group.md](account-group.md) untuk alasannya (sama, berlaku untuk kedua tabel).
 - Menghapus akun yang masih dipakai transaksi mewajibkan pilihan eksplisit "unassign" (set `account_id`/`transfer_account_id` transaksi terkait jadi NULL) atau "reassign" (pindah ke akun lain) lebih dulu — delete sendiri tetap hard delete.
-- `transactions.account_id`/`transfer_account_id` **belum** FK ke tabel ini — masih free-text di form transaksi, menyusul migrasi terpisah setelah field picker akun solid (pola sama seperti `category_id` di `0004_transaction_category_fk.ts`). Lihat [transaction.md](transaction.md).
+- `transactions.account_id`/`transfer_account_id` **masih free-text tanpa FK** ke tabel ini (beda dari `transactions.category_id` yang sudah FK ke `categories` lewat `0004_transaction_category_fk.ts`) — tapi sejak `AccountPickerSheet` (lihat `docs/todos/done/porting-account-cash.md`), nilainya selalu valid UUID `accounts.id` secara praktik, FK formal belum ditambahkan. Lihat [transaction.md](transaction.md).
+- **Koreksi saldo ("Balance Correction")**: mengubah field "Saldo Terkini" di form edit akun (`app/accounts/[id]/edit.tsx`) men-trigger insert transaksi penutup ke `transactions` (kategori otomatis "Penyesuaian Saldo", `is_cash_neutral` ditentukan dari jawaban Alert "Hitung sebagai kas riil?") — bukan UPDATE kolom apa pun di tabel ini. Lihat `docs/todos/done/porting-account-cash.md` bagian Keputusan #7 dan `src/features/accounts/correct-account-balance.ts`.

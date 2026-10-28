@@ -5,13 +5,13 @@
 
 Dokumen ini INDUK/index — bukan tempat kerja teknis. Tiap tipe akun (`cash`/`debt`/`investment`/`third_party`) punya dokumen todo anak sendiri, fokus ke detail tipenya masing-masing — mengikuti pola yang sudah terbukti bagus di `docs/todos/done/porting-category.md` (satu dokumen fokus, bukan satu dokumen raksasa campur semua hal). Penjelasan lengkap ada di bagian-bagian di bawah.
 
-- [ ] Baca konsep [konsep-tipe-akun.md](../../../../../docs/concept/konsep-tipe-akun.md) — wajib sebelum mengerjakan dokumen anak mana pun, lihat bagian "Latar belakang" di bawah.
-- [ ] [porting-account-cash.md](porting-account-cash.md) — tipe **Kas**, satu-satunya tipe yang langsung actionable sekarang (tidak butuh tabel turunan lain). Riset desktop sudah selesai (skema, CRUD, saldo on-the-fly, Balance Correction, field form, pemakaian di form transaksi) — belum ada implementasi, keputusan desain masih perlu diambil.
+- [x] Baca konsep [konsep-tipe-akun.md](../../../../../docs/concept/konsep-tipe-akun.md) — wajib sebelum mengerjakan dokumen anak mana pun, lihat bagian "Latar belakang" di bawah.
+- [x] [porting-account-cash.md](../done/porting-account-cash.md) (SELESAI, dipindah ke `docs/todos/done/`) — tipe **Kas**. CRUD akun+grup lengkap, saldo on-the-fly, mapping icon/color, picker akun di form transaksi dengan inline-create, dan Balance Correction semuanya sudah diimplementasikan dan ditest lewat dogfooding (termasuk beberapa bug yang ditemukan & diperbaiki di sepanjang proses — lihat dokumennya untuk detail).
 - [ ] `porting-account-debt.md` — tipe **Utang/Piutang**. **Belum dibuat**, menyusul. Butuh tabel `debts`/`debt_payments`/`contacts` yang belum ada di mobile sama sekali.
 - [ ] `porting-account-investment.md` — tipe **Investasi**. **Belum dibuat**, menyusul. Butuh tabel `investment_*` yang belum ada di mobile sama sekali.
 - [ ] `porting-account-third-party.md` — tipe **Dana Pihak Ketiga**. **Belum dibuat**, menyusul. Butuh tabel `third_party_funds` yang belum ada di mobile sama sekali.
 
-**Urutan pengerjaan yang masuk akal** (belum final/disepakati eksplisit, tapi mengikuti sebab-akibat yang jelas): `cash` dulu — satu-satunya tipe yang tabel turunannya tidak ada ketergantungan ke fitur lain yang belum diporting. Tipe lain nunggu fitur dasarnya sendiri lebih dulu (debt/investment/third-party masing-masing adalah porting besar sendiri, bukan sekadar "nambah satu tipe di form akun").
+**Urutan pengerjaan**: `cash` SELESAI duluan (sesuai rencana — satu-satunya tipe yang tabel turunannya tidak ada ketergantungan ke fitur lain yang belum diporting). Tipe berikutnya (`debt`/`investment`/`third_party`) belum ditentukan urutannya secara eksplisit — masing-masing adalah porting besar sendiri (butuh tabel turunan sendiri yang belum ada sama sekali di mobile), bukan sekadar "nambah satu tipe di form akun" yang sudah ada.
 
 ## Latar belakang
 
