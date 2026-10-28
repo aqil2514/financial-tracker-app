@@ -37,8 +37,7 @@ const menuGroups: MenuGroup[] = [
     title: "Master Data",
     icon: "server-outline",
     items: [
-      { title: "Akun", icon: "wallet-outline" },
-      { title: "Grup Akun", icon: "albums-outline" },
+      { title: "Akun", icon: "wallet-outline", href: "/accounts" as Href },
       { title: "Kategori", icon: "pricetags-outline", href: "/categories" as Href },
       { title: "Periode Kategori", icon: "calendar-outline", href: "/categories/periods" as Href },
       { title: "Nama Pihak", icon: "person-outline" },
