@@ -12,9 +12,10 @@ interface FormFieldAccountProps {
   control: Control<TransactionFormValues>;
   name: FieldPath<TransactionFormValues>;
   label: string;
+  disabled?: boolean;
 }
 
-export function FormFieldAccount({ control, name, label }: FormFieldAccountProps) {
+export function FormFieldAccount({ control, name, label, disabled }: FormFieldAccountProps) {
   return (
     <Controller
       control={control}
@@ -24,6 +25,7 @@ export function FormFieldAccount({ control, name, label }: FormFieldAccountProps
           label={label}
           value={field.value as string | null}
           error={fieldState.error?.message}
+          disabled={disabled}
           onChange={field.onChange}
         />
       )}
@@ -35,11 +37,13 @@ function AccountFieldInput({
   label,
   value,
   error,
+  disabled,
   onChange,
 }: {
   label: string;
   value: string | null;
   error?: string;
+  disabled?: boolean;
   onChange: (accountId: string) => void;
 }) {
   const db = useDatabase();
@@ -71,7 +75,8 @@ function AccountFieldInput({
     <View className="gap-2">
       <Text className="text-sm font-medium text-neutral-700">{label}</Text>
       <Pressable
-        className="rounded-md border border-neutral-300 px-3 py-2"
+        className="rounded-md border border-neutral-300 px-3 py-2 disabled:opacity-50"
+        disabled={disabled}
         onPress={() => pickerRef.current?.present()}
       >
         <Text className={fieldLabel ? "text-neutral-900" : "text-neutral-400"}>

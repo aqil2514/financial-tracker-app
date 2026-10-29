@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { deriveDebtFields, validateDebtFields, type OngoingDebt } from "./derive-debt-fields";
+import {
+  computeDebtFieldsLocked,
+  deriveDebtFields,
+  validateDebtFields,
+  type OngoingDebt,
+} from "./derive-debt-fields";
 
 const CASH: { accountType: "cash"; direction: null } = { accountType: "cash", direction: null };
 const RECEIVABLE: { accountType: "debt"; direction: "receivable" } = {
@@ -78,47 +83,82 @@ describe("validateDebtFields", () => {
   const needsContact = deriveDebtFields("expense", RECEIVABLE, null);
 
   it("tidak melibatkan debt: selalu lolos", () => {
-    const error = validateDebtFields(notInvolved, [], { amount: 10000, contact_id: null, settle_debt_ids: [] });
+    const error = validateDebtFields(notInvolved, [], { amount: 10000, contact_id: null, settle_debt_ids: [] }, false);
     expect(error).toBeNull();
   });
 
   it("melibatkan debt tapi contact_id kosong: ditolak", () => {
-    const error = validateDebtFields(needsContact, [], { amount: 10000, contact_id: null, settle_debt_ids: [] });
+    const error = validateDebtFields(needsContact, [], { amount: 10000, contact_id: null, settle_debt_ids: [] }, false);
     expect(error).toMatch(/Kontak wajib diisi/);
   });
 
   it("needsDebtAction true tapi settle_debt_ids kosong: ditolak", () => {
-    const error = validateDebtFields(needsContact, [], {
-      amount: 10000,
-      contact_id: "contact-1",
-      settle_debt_ids: [],
-    });
+    const error = validateDebtFields(
+      needsContact,
+      [],
+      { amount: 10000, contact_id: "contact-1", settle_debt_ids: [] },
+      false
+    );
     expect(error).toMatch(/Pilih minimal satu/);
   });
 
   it("amount melebihi total remaining debts yang dipilih: ditolak", () => {
     const ongoingDebts: OngoingDebt[] = [{ id: "debt-1", amount: 20000, date: "2026-01-01", remaining: 20000 }];
-    const error = validateDebtFields(needsContact, ongoingDebts, {
-      amount: 30000,
-      contact_id: "contact-1",
-      settle_debt_ids: ["debt-1"],
-    });
+    const error = validateDebtFields(
+      needsContact,
+      ongoingDebts,
+      { amount: 30000, contact_id: "contact-1", settle_debt_ids: ["debt-1"] },
+      false
+    );
     expect(error).toMatch(/melebihi total sisa/);
   });
 
   it("amount pas dengan total remaining debts yang dipilih: lolos", () => {
     const ongoingDebts: OngoingDebt[] = [{ id: "debt-1", amount: 20000, date: "2026-01-01", remaining: 20000 }];
-    const error = validateDebtFields(needsContact, ongoingDebts, {
-      amount: 20000,
-      contact_id: "contact-1",
-      settle_debt_ids: ["debt-1"],
-    });
+    const error = validateDebtFields(
+      needsContact,
+      ongoingDebts,
+      { amount: 20000, contact_id: "contact-1", settle_debt_ids: ["debt-1"] },
+      false
+    );
     expect(error).toBeNull();
   });
 
   it("unsupportedPairMessage ada: ditolak duluan sebelum validasi lain", () => {
     const derived = { ...needsContact, unsupportedPairMessage: "Kombinasi tidak didukung" };
-    const error = validateDebtFields(derived, [], { amount: 10000, contact_id: null, settle_debt_ids: [] });
+    const error = validateDebtFields(derived, [], { amount: 10000, contact_id: null, settle_debt_ids: [] }, false);
     expect(error).toBe("Kombinasi tidak didukung");
+  });
+
+  it("debtFieldsLocked true: selalu lolos walau contact_id kosong/settle_debt_ids kosong", () => {
+    const error = validateDebtFields(
+      needsContact,
+      [],
+      { amount: 10000, contact_id: null, settle_debt_ids: [] },
+      true
+    );
+    expect(error).toBeNull();
+  });
+});
+
+describe("computeDebtFieldsLocked", () => {
+  it("role 'none': tidak terkunci", () => {
+    expect(computeDebtFieldsLocked({ role: "none" })).toBe(false);
+  });
+
+  it("role 'principal' tanpa hasPayments: tidak terkunci", () => {
+    expect(computeDebtFieldsLocked({ role: "principal", hasPayments: false })).toBe(false);
+  });
+
+  it("role 'principal' dengan hasPayments: terkunci", () => {
+    expect(computeDebtFieldsLocked({ role: "principal", hasPayments: true })).toBe(true);
+  });
+
+  it("role 'payment': tidak terkunci (recreate selalu aman)", () => {
+    expect(computeDebtFieldsLocked({ role: "payment" })).toBe(false);
+  });
+
+  it("status null (belum termuat): tidak terkunci", () => {
+    expect(computeDebtFieldsLocked(null)).toBe(false);
   });
 });

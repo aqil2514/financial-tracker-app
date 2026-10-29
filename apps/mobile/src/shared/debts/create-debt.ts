@@ -51,5 +51,5 @@ export async function createDebt({
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [id, type, contactId, amount, accountId, transactionId, date]
   );
-  return { debtIds: [id], debtPaymentIds: [] };
+  return { debtIds: [id], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] };
 }

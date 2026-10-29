@@ -23,8 +23,7 @@ export interface DerivedDebtFields {
 // Logic murni di balik use-transaction-debt-fields.ts — dipisah dari
 // hook (yang urusannya cuma fetch sourceInfo/destinationInfo dari DB)
 // supaya testable tanpa React/useDatabase. Pola sama seperti
-// use-transaction-debt-fields.ts desktop, versi CREATE saja (belum ada
-// debtFieldsLocked — menyusul sekalian guard edit/delete).
+// use-transaction-debt-fields.ts desktop.
 export function deriveDebtFields(
   type: "income" | "expense" | "transfer",
   sourceInfo: AccountDebtInfo | null,
@@ -72,11 +71,23 @@ export function deriveDebtFields(
   };
 }
 
+// role: 'principal' DAN hasPayments true — field berbahaya (nominal/
+// akun/kontak) sudah menopang cicilan dari transaksi lain, recreate
+// akan CASCADE hapus cicilan itu kalau dibiarkan. Dikunci (disable di
+// UI) daripada ditolak baru saat submit.
+export function computeDebtFieldsLocked(
+  status: { role: "none" | "principal" | "payment"; hasPayments?: boolean } | null
+): boolean {
+  return status?.role === "principal" && status.hasPayments === true;
+}
+
 export function validateDebtFields(
   derived: DerivedDebtFields,
   ongoingDebts: OngoingDebt[],
-  values: { amount: number; contact_id: string | null; settle_debt_ids: string[] }
+  values: { amount: number; contact_id: string | null; settle_debt_ids: string[] },
+  debtFieldsLocked: boolean
 ): string | null {
+  if (debtFieldsLocked) return null;
   if (derived.unsupportedPairMessage) return derived.unsupportedPairMessage;
   if (derived.involvesDebtAccount && !values.contact_id) {
     return "Kontak wajib diisi untuk transaksi yang melibatkan akun utang piutang";

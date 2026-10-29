@@ -55,5 +55,10 @@ export async function settleDebtsFifo({
     remainingToAllocate -= allocation;
   }
 
-  return { debtIds: touchedDebtIds, debtPaymentIds: touchedDebtPaymentIds };
+  return {
+    debtIds: touchedDebtIds,
+    debtPaymentIds: touchedDebtPaymentIds,
+    deletedDebtIds: [],
+    deletedDebtPaymentIds: [],
+  };
 }

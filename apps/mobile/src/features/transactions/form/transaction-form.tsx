@@ -35,10 +35,15 @@ interface TransactionFormProps {
   isPending: boolean;
   submitLabel?: string;
   onDelete?: () => void;
+  // Diisi di mode EDIT saja — dipakai untuk query TransactionDebtStatus
+  // (role principal/payment/none) supaya field berbahaya (nominal/akun/
+  // kontak) terkunci kalau transaksi ini sudah menopang cicilan dari
+  // transaksi lain. Kosong di mode create.
+  transactionId?: string;
 }
 
 export const TransactionForm = forwardRef<TransactionFormRef, TransactionFormProps>(
-  function TransactionForm({ defaultValues, onSubmit, isPending, submitLabel, onDelete }, ref) {
+  function TransactionForm({ defaultValues, onSubmit, isPending, submitLabel, onDelete, transactionId }, ref) {
     return (
       <BaseForm
         schema={transactionSchema}
@@ -72,7 +77,7 @@ export const TransactionForm = forwardRef<TransactionFormRef, TransactionFormPro
             : undefined
         }
       >
-        {(form) => <TransactionFormFields form={form} formRef={ref} />}
+        {(form) => <TransactionFormFields form={form} formRef={ref} transactionId={transactionId} />}
       </BaseForm>
     );
   }
@@ -81,22 +86,39 @@ export const TransactionForm = forwardRef<TransactionFormRef, TransactionFormPro
 function TransactionFormFields({
   form,
   formRef,
+  transactionId,
 }: {
   form: UseFormReturn<TransactionFormValues, unknown, TransactionFormOutput>;
   formRef: React.Ref<TransactionFormRef>;
+  transactionId?: string;
 }) {
   const type = useWatch({ control: form.control, name: "type" });
   const accountId = useWatch({ control: form.control, name: "account_id" });
   const transferAccountId = useWatch({ control: form.control, name: "transfer_account_id" });
   const contactId = useWatch({ control: form.control, name: "contact_id" });
 
-  const { involvesDebtAccount, needsDebtAction, settlementDirection, ongoingDebts, validateDebtFields } =
-    useTransactionDebtFields({ type, accountId, transferAccountId, contactId });
+  const {
+    involvesDebtAccount,
+    needsDebtAction,
+    settlementDirection,
+    ongoingDebts,
+    debtFieldsLocked,
+    validateDebtFields,
+  } = useTransactionDebtFields({ type, accountId, transferAccountId, contactId, transactionId });
 
   useImperativeHandle(formRef, () => ({ validateDebtFields }), [validateDebtFields]);
 
   return (
     <>
+      {debtFieldsLocked && (
+        <View className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <Text className="text-sm text-amber-800">
+            Piutang/utang ini sudah menerima cicilan dari transaksi lain — nominal, akun, dan
+            kontak tidak bisa diubah dari sini.
+          </Text>
+        </View>
+      )}
+
       <FormFieldToggleGroup form={form} name="type" options={TYPE_OPTIONS} />
 
       <FormFieldText form={form} name="note" label="Catatan" placeholder="Mis. Makan siang" />
@@ -109,17 +131,30 @@ function TransactionFormFields({
         prefix="Rp"
         grouped
         useCalculator
+        disabled={debtFieldsLocked}
       />
 
-      <FormFieldAccount control={form.control} name="account_id" label="Akun" />
+      <FormFieldAccount
+        control={form.control}
+        name="account_id"
+        label="Akun"
+        disabled={debtFieldsLocked}
+      />
 
       {type === "transfer" ? (
-        <FormFieldAccount control={form.control} name="transfer_account_id" label="Akun Tujuan" />
+        <FormFieldAccount
+          control={form.control}
+          name="transfer_account_id"
+          label="Akun Tujuan"
+          disabled={debtFieldsLocked}
+        />
       ) : (
         <FormFieldCategory control={form.control} type={type as "income" | "expense"} />
       )}
 
-      {involvesDebtAccount && <FormFieldContact control={form.control} />}
+      {involvesDebtAccount && (
+        <FormFieldContact control={form.control} disabled={debtFieldsLocked} />
+      )}
 
       {needsDebtAction && settlementDirection && (
         <FieldDebtAction control={form.control} ongoingDebts={ongoingDebts} direction={settlementDirection} />

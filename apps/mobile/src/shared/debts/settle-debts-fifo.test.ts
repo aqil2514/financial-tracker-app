@@ -36,7 +36,7 @@ describe("settleDebtsFifo", () => {
       settleDebtIds: [],
     });
 
-    expect(result).toEqual({ debtIds: [], debtPaymentIds: [] });
+    expect(result).toEqual({ debtIds: [], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] });
     expect(debtPayments).toHaveLength(0);
   });
 

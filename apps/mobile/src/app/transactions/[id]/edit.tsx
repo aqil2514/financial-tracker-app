@@ -1,11 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useDatabase } from "@/lib/database";
-import { TransactionForm } from "@/features/transactions/form/transaction-form";
+import { TransactionForm, type TransactionFormRef } from "@/features/transactions/form/transaction-form";
 import type { TransactionFormOutput, TransactionFormValues } from "@/features/transactions/form/schema";
 import { AttachmentUploader } from "@/shared/attachments";
+import {
+  applyDebtTransactionEdit,
+  applyDirectDebtTransactionEdit,
+  cleanupStaleDebtOnAccountChange,
+  detachDebtForDeletedTransaction,
+  getTransactionDebtStatus,
+} from "@/shared/debts";
 
 interface TransactionRow {
   note: string;
@@ -18,7 +25,11 @@ interface TransactionRow {
   transfer_account_id: string | null;
 }
 
-function toFormValues(row: TransactionRow): TransactionFormValues {
+function toFormValues(
+  row: TransactionRow,
+  contactId: string | null,
+  settleDebtIds: string[]
+): TransactionFormValues {
   return {
     type: row.type,
     amount: row.amount,
@@ -28,27 +39,82 @@ function toFormValues(row: TransactionRow): TransactionFormValues {
     note: row.note,
     description: row.description,
     date: row.date,
+    contact_id: contactId,
+    settle_debt_ids: settleDebtIds,
   };
+}
+
+async function loadDebtContactId(
+  db: ReturnType<typeof useDatabase>,
+  debtId: string
+): Promise<string | null> {
+  const debt = await db.getFirstAsync<{ contact_id: string | null }>(
+    "SELECT contact_id FROM debts WHERE id = ?",
+    [debtId]
+  );
+  return debt?.contact_id ?? null;
 }
 
 export default function EditTransactionPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const db = useDatabase();
+  const formRef = useRef<TransactionFormRef>(null);
   const [defaultValues, setDefaultValues] = useState<TransactionFormValues | null>(null);
+  const [originalRow, setOriginalRow] = useState<TransactionRow | null>(null);
+  const [originalContactId, setOriginalContactId] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
   useEffect(() => {
-    db.getFirstAsync<TransactionRow>("SELECT * FROM transactions WHERE id = ?", [id]).then(
-      (row) => {
-        if (row) setDefaultValues(toFormValues(row));
+    async function load() {
+      const row = await db.getFirstAsync<TransactionRow>(
+        "SELECT * FROM transactions WHERE id = ?",
+        [id]
+      );
+      if (!row) return;
+
+      const status = await getTransactionDebtStatus(db, id);
+      let contactId: string | null = null;
+      const settleDebtIds: string[] = [];
+
+      if (status.role === "principal") {
+        contactId = await loadDebtContactId(db, status.debtId);
+      } else if (status.role === "payment") {
+        contactId = await loadDebtContactId(db, status.debtId);
+        settleDebtIds.push(status.debtId);
       }
-    );
+
+      setOriginalRow(row);
+      setOriginalContactId(contactId);
+      setDefaultValues(toFormValues(row, contactId, settleDebtIds));
+    }
+    load();
   }, [db, id]);
 
   async function handleSubmit(values: TransactionFormOutput) {
+    const debtError = formRef.current?.validateDebtFields(values);
+    if (debtError) {
+      Alert.alert("Tidak bisa disimpan", debtError);
+      return;
+    }
+    if (!originalRow) return;
+
     setIsPending(true);
     try {
+      const dangerousFieldsChanged =
+        values.type !== originalRow.type ||
+        values.account_id !== originalRow.account_id ||
+        values.transfer_account_id !== originalRow.transfer_account_id ||
+        values.amount !== originalRow.amount ||
+        values.contact_id !== originalContactId;
+
+      await cleanupStaleDebtOnAccountChange(
+        db,
+        id,
+        { accountId: originalRow.account_id, transferAccountId: originalRow.transfer_account_id },
+        { accountId: values.account_id, transferAccountId: values.transfer_account_id }
+      );
+
       await db.runAsync(
         `UPDATE transactions
          SET note = ?, description = ?, type = ?, amount = ?, date = ?,
@@ -66,6 +132,48 @@ export default function EditTransactionPage() {
           id,
         ]
       );
+
+      // Status di-query ULANG setelah cleanup (bukan dipakai dari effect
+      // load) — cleanupStaleDebtOnAccountChange bisa saja sudah mengubah
+      // role transaksi ini (mis. detach principal) sebelum baris ini
+      // jalan, jadi status versi lama berisiko stale.
+      const status = await getTransactionDebtStatus(db, id);
+
+      if (values.type === "transfer") {
+        await applyDebtTransactionEdit({
+          db,
+          transactionId: id,
+          type: values.type,
+          accountId: values.account_id,
+          transferAccountId: values.transfer_account_id,
+          contactId: values.contact_id,
+          amount: values.amount,
+          date: values.date,
+          settleDebtIds: values.settle_debt_ids,
+          status,
+          dangerousFieldsChanged,
+        });
+      } else {
+        const sourceAccount = await db.getFirstAsync<{ account_type: "cash" | "debt" }>(
+          "SELECT account_type FROM accounts WHERE id = ?",
+          [values.account_id]
+        );
+        if (sourceAccount?.account_type === "debt") {
+          await applyDirectDebtTransactionEdit({
+            db,
+            transactionId: id,
+            type: values.type,
+            accountId: values.account_id,
+            contactId: values.contact_id,
+            amount: values.amount,
+            date: values.date,
+            settleDebtIds: values.settle_debt_ids,
+            status,
+            dangerousFieldsChanged,
+          });
+        }
+      }
+
       router.back();
     } finally {
       setIsPending(false);
@@ -79,8 +187,21 @@ export default function EditTransactionPage() {
         text: "Hapus",
         style: "destructive",
         onPress: async () => {
+          const result = await detachDebtForDeletedTransaction(db, id);
           await db.runAsync("DELETE FROM transactions WHERE id = ?", [id]);
           router.back();
+
+          if (result.role === "principal") {
+            Alert.alert(
+              "Transaksi terkait piutang/utang dihapus",
+              "Riwayat piutang/utang tetap tersimpan, cuma kehilangan tautan ke transaksi ini."
+            );
+          } else if (result.role === "payment") {
+            Alert.alert(
+              "Transaksi cicilan dihapus",
+              "Cicilan ini dibatalkan — status piutang/utang terkait disesuaikan ulang."
+            );
+          }
         },
       },
     ]);
@@ -97,11 +218,13 @@ export default function EditTransactionPage() {
         {defaultValues && (
           <>
             <TransactionForm
+              ref={formRef}
               defaultValues={defaultValues}
               onSubmit={handleSubmit}
               isPending={isPending}
               submitLabel="Simpan Perubahan"
               onDelete={handleDelete}
+              transactionId={id}
             />
             <AttachmentUploader transactionId={id} />
           </>

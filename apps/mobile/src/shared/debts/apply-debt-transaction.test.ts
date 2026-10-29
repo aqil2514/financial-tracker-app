@@ -29,7 +29,7 @@ describe("applyDebtTransaction", () => {
       settleDebtIds: [],
     });
 
-    expect(result).toEqual({ debtIds: [], debtPaymentIds: [] });
+    expect(result).toEqual({ debtIds: [], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] });
     expect(debts).toHaveLength(0);
   });
 
@@ -48,7 +48,7 @@ describe("applyDebtTransaction", () => {
       settleDebtIds: [],
     });
 
-    expect(result).toEqual({ debtIds: [], debtPaymentIds: [] });
+    expect(result).toEqual({ debtIds: [], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] });
     expect(debts).toHaveLength(0);
   });
 
@@ -70,7 +70,7 @@ describe("applyDebtTransaction", () => {
       settleDebtIds: [],
     });
 
-    expect(result).toEqual({ debtIds: [], debtPaymentIds: [] });
+    expect(result).toEqual({ debtIds: [], debtPaymentIds: [], deletedDebtIds: [], deletedDebtPaymentIds: [] });
     expect(debts).toHaveLength(0);
   });
 
