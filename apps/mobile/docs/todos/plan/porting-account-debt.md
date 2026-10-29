@@ -7,9 +7,10 @@ Dokumen anak dari [porting-account.md](porting-account.md) — fokus khusus tipe
 
 ## Status & TODO saat ini (ringkas)
 
-Belum ada implementasi — dokumen ini baru hasil riset, menunggu diskusi/approval sebelum mulai kerja.
+Implementasi sudah mulai — skema database dan placeholder halaman sudah ada, logic/form masih belum digarap.
 
-- [ ] Skema database mobile: tabel `debt_accounts`, `debts`, `debt_payments`, `contacts`. Lihat bagian Skema.
+- [x] Skema database mobile: tabel `debt_accounts`, `debts`, `debt_payments`, `contacts`. Migrasi `0008_debts.ts`, didaftarkan di `migrations/index.ts`. Dokumentasi tabel: [contact.md](../../tables/contact.md), [debt.md](../../tables/debt.md).
+- [x] Placeholder 2 halaman + alur masuk dari `more.tsx` — `app/debts/index.tsx` (Ringkasan Kontak), `app/debts/list.tsx` (Utang Piutang gabungan). Isi/logic masih placeholder, lihat bagian Keputusan Terbuka untuk scope final.
 - [ ] CRUD Kontak (list, create, edit, delete) — form sederhana (`name` + `note` plain text, BUKAN rich text TipTap seperti desktop).
 - [ ] Field `direction` di `AccountForm` mobile — toggle Piutang/Payable, cuma muncul saat `kind === "account" && account_type === "debt"`, wajib diisi, upsert ke `debt_accounts`.
 - [ ] Logic `applyDebtTransaction` (Jalur 1 — transfer kas↔debt) dan `applyDirectDebtTransaction` (Jalur 2 — income/expense langsung di akun debt) — port dari `apps/desktop/src/shared/debts/`.
@@ -18,7 +19,8 @@ Belum ada implementasi — dokumen ini baru hasil riset, menunggu diskusi/approv
 - [ ] Guard edit/delete transaksi terkait debt (`role: principal/payment/none`) — port dari `apply-debt-transaction/edit.ts` dan `delete.ts`.
 - [ ] Saldo akun debt ikut rumus on-the-fly yang sudah ada di mobile (tidak perlu kolom baru, akun debt sudah otomatis ikut dihitung lewat `transactions.account_id`/`transfer_account_id` yang sudah ada).
 - [ ] Balance Correction akun debt: **DILARANG**, bukan diimplementasikan — tampilkan pesan penolakan seperti desktop, bukan form.
-- [ ] Halaman/summary debt (list per kontak, atau minimal list flat payable/receivable) — scope MVP masih perlu diputuskan, lihat bagian Keputusan Terbuka.
+- [ ] Isi halaman Ringkasan Kontak (list per kontak, metrik aktif/terbayar/belum dibayar) — scope sudah diputuskan, lihat bagian Keputusan Terbuka.
+- [ ] Isi halaman Utang Piutang (list flat gabungan payable+receivable, expand untuk cicilan, action bayar/write-off) — scope sudah diputuskan, lihat bagian Keputusan Terbuka.
 - [ ] `debt_amount_adjustments` + `correctDebtRemaining` (koreksi granular per-debt) — **kandidat di luar MVP**, lihat Keputusan Terbuka.
 
 ## Riset: implementasi debt di desktop

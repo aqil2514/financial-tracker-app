@@ -1,7 +1,7 @@
 
 # Tabel `accounts`
 
-Dompet/akun finansial tempat uang disimpan atau mengalir (kas, rekening bank, dompet digital, dll). Satu tabel dipakai bersama untuk semua tipe akun (`cash`, `debt`, `investment`, `third_party`) — field yang hanya relevan untuk tipe tertentu ada di tabel turunan terpisah yang mereferensikan `accounts(id)` (belum ada di mobile, masih fase tipe `cash`). Lihat [konsep-tipe-akun.md](../../../../docs/concept/konsep-tipe-akun.md) dan `docs/todos/done/porting-account-cash.md` (porting tipe `cash` sudah selesai).
+Dompet/akun finansial tempat uang disimpan atau mengalir (kas, rekening bank, dompet digital, dll). Satu tabel dipakai bersama untuk semua tipe akun (`cash`, `debt`, `investment`, `third_party`) — field yang hanya relevan untuk tipe tertentu ada di tabel turunan terpisah yang mereferensikan `accounts(id)`. Tipe `cash` sudah selesai porting (`docs/todos/done/porting-account-cash.md`); tipe `debt` punya tabel turunan [debt.md](debt.md) (`debt_accounts`). Lihat [konsep-tipe-akun.md](../../../../docs/concept/konsep-tipe-akun.md).
 
 Dibuat di migrasi `0005_accounts.ts`.
 
