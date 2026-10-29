@@ -1,4 +1,4 @@
-import { generateId } from "@/lib/database";
+import { generateId } from "@/lib/database/generate-id";
 import type { Db, TouchedDebtRows } from "./types";
 
 export class DebtAccountDirectionMissingError extends Error {

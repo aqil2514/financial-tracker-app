@@ -1,4 +1,4 @@
-import { generateId } from "@/lib/database";
+import { generateId } from "@/lib/database/generate-id";
 import { remainingDebtSql } from "./remaining-debt-sql";
 import { NO_TOUCHED_DEBT_ROWS, type Db, type TouchedDebtRows } from "./types";
 
