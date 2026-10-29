@@ -10,6 +10,8 @@ const BASE = {
   note: "Makan siang",
   description: null,
   date: "2026-01-01",
+  contact_id: null,
+  settle_debt_ids: [] as string[],
 };
 
 describe("transactionSchema", () => {
@@ -66,6 +68,19 @@ describe("transactionSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.amount).toBe(15000);
+    }
+  });
+
+  it("contact_id dan settle_debt_ids opsional di level zod (validasi wajib-nya di luar schema)", () => {
+    const result = transactionSchema.safeParse({
+      ...BASE,
+      contact_id: "contact-1",
+      settle_debt_ids: ["debt-1", "debt-2"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contact_id).toBe("contact-1");
+      expect(result.data.settle_debt_ids).toEqual(["debt-1", "debt-2"]);
     }
   });
 });

@@ -10,5 +10,7 @@ export function emptyTransactionValues(): TransactionFormValues {
     note: "",
     description: null,
     date: new Date().toISOString(),
+    contact_id: null,
+    settle_debt_ids: [],
   };
 }
