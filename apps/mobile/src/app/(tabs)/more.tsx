@@ -39,7 +39,7 @@ const menuGroups: MenuGroup[] = [
       { title: "Akun", icon: "wallet-outline", href: "/accounts" as Href },
       { title: "Kategori", icon: "pricetags-outline", href: "/categories" as Href },
       { title: "Periode Kategori", icon: "calendar-outline", href: "/categories/periods" as Href },
-      { title: "Nama Pihak", icon: "person-outline" },
+      { title: "Nama Pihak", icon: "person-outline", href: "/contacts" as Href },
     ],
   },
 ];
