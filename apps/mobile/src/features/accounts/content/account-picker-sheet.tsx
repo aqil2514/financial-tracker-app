@@ -157,6 +157,13 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
           ]
         );
 
+        if (values.account_type === "debt" && values.direction) {
+          await db.runAsync(`INSERT INTO debt_accounts (account_id, direction) VALUES (?, ?)`, [
+            id,
+            values.direction,
+          ]);
+        }
+
         if (values.group_id == null) {
           await loadRootOptions();
         } else if (activeGroup) {

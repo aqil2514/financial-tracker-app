@@ -21,11 +21,12 @@ export default function NewAccountPage() {
           values.name,
         ]);
       } else {
+        const id = generateId();
         await db.runAsync(
           `INSERT INTO accounts (id, name, icon, color, group_id, initial_balance, description, is_active, account_type)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            generateId(),
+            id,
             values.name,
             values.icon,
             values.color,
@@ -36,6 +37,13 @@ export default function NewAccountPage() {
             values.account_type,
           ]
         );
+
+        if (values.account_type === "debt" && values.direction) {
+          await db.runAsync(`INSERT INTO debt_accounts (account_id, direction) VALUES (?, ?)`, [
+            id,
+            values.direction,
+          ]);
+        }
       }
 
       router.back();

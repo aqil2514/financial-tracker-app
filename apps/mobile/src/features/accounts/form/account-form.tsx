@@ -18,6 +18,16 @@ const ACTIVE_OPTIONS = [
   { value: "false", label: "Nonaktif" },
 ];
 
+const ACCOUNT_TYPE_OPTIONS = [
+  { value: "cash", label: "Kas" },
+  { value: "debt", label: "Utang Piutang" },
+];
+
+const DIRECTION_OPTIONS = [
+  { value: "receivable", label: "Piutang" },
+  { value: "payable", label: "Utang" },
+];
+
 export function AccountForm({
   defaultValues,
   onSubmit,
@@ -25,6 +35,7 @@ export function AccountForm({
   submitLabel,
   onDelete,
   hideKindToggle,
+  hideAccountTypeToggle,
   inBottomSheet,
 }: AccountFormProps) {
   return (
@@ -61,7 +72,12 @@ export function AccountForm({
       }
     >
       {(form) => (
-        <AccountFormFields form={form} hideKindToggle={hideKindToggle} inBottomSheet={inBottomSheet} />
+        <AccountFormFields
+          form={form}
+          hideKindToggle={hideKindToggle}
+          hideAccountTypeToggle={hideAccountTypeToggle}
+          inBottomSheet={inBottomSheet}
+        />
       )}
     </BaseForm>
   );
@@ -74,24 +90,41 @@ interface AccountFormProps {
   submitLabel?: string;
   onDelete?: () => void;
   hideKindToggle?: boolean;
-  // Field teks di sini pakai TextInput biasa secara default, yang
-  // tidak ter-track oleh sistem keyboard-avoidance @gorhom/bottom-sheet
-  // (butuh handleOnFocus/handleOnBlur manual) — set true kalau form ini
-  // dirender di dalam BottomSheetModal/BottomSheetScrollView supaya
-  // field teks pakai BottomSheetTextInput, kalau tidak keyboard
-  // menutupi field saat fokus.
+  hideAccountTypeToggle?: boolean;
   inBottomSheet?: boolean;
 }
 
 function AccountFields({
   form,
+  hideAccountTypeToggle,
   inBottomSheet,
 }: {
   form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
+  hideAccountTypeToggle?: boolean;
   inBottomSheet?: boolean;
 }) {
+  const accountType = useWatch({ control: form.control, name: "account_type" });
+
   return (
     <>
+      {!hideAccountTypeToggle && (
+        <FormFieldToggleGroup
+          form={form}
+          name="account_type"
+          label="Tipe Akun"
+          options={ACCOUNT_TYPE_OPTIONS}
+        />
+      )}
+
+      {accountType === "debt" && (
+        <FormFieldToggleGroup
+          form={form}
+          name="direction"
+          label="Arah"
+          options={DIRECTION_OPTIONS}
+        />
+      )}
+
       <IconPickerField />
 
       <ColorPickerField />
@@ -130,10 +163,12 @@ function AccountFields({
 function AccountFormFields({
   form,
   hideKindToggle,
+  hideAccountTypeToggle,
   inBottomSheet,
 }: {
   form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
   hideKindToggle?: boolean;
+  hideAccountTypeToggle?: boolean;
   inBottomSheet?: boolean;
 }) {
   const kind = useWatch({ control: form.control, name: "kind" });
@@ -150,7 +185,13 @@ function AccountFormFields({
         inBottomSheet={inBottomSheet}
       />
 
-      {kind === "account" && <AccountFields form={form} inBottomSheet={inBottomSheet} />}
+      {kind === "account" && (
+        <AccountFields
+          form={form}
+          hideAccountTypeToggle={hideAccountTypeToggle}
+          inBottomSheet={inBottomSheet}
+        />
+      )}
     </>
   );
 }

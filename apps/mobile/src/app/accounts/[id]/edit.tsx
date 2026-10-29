@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, View } from "react-native";
+import { Alert, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useDatabase } from "@/lib/database";
@@ -33,7 +33,8 @@ interface AccountRow {
   initial_balance: number;
   description: string | null;
   is_active: number;
-  account_type: "cash";
+  account_type: "cash" | "debt";
+  direction: "receivable" | "payable" | null;
 }
 
 function toFormValues(row: AccountRow): AccountFormValues {
@@ -47,6 +48,7 @@ function toFormValues(row: AccountRow): AccountFormValues {
     description: row.description,
     is_active: row.is_active === 1 ? "true" : "false",
     account_type: row.account_type,
+    direction: row.direction,
   };
 }
 
@@ -63,8 +65,12 @@ export default function EditAccountPage() {
 
   useEffect(() => {
     db.getFirstAsync<AccountRow>(
-      `SELECT name, icon, color, group_id, initial_balance, description, is_active, account_type
-       FROM accounts WHERE id = ?`,
+      `SELECT accounts.name, accounts.icon, accounts.color, accounts.group_id,
+              accounts.initial_balance, accounts.description, accounts.is_active,
+              accounts.account_type, debt_accounts.direction
+       FROM accounts
+       LEFT JOIN debt_accounts ON debt_accounts.account_id = accounts.id
+       WHERE accounts.id = ?`,
       [id]
     ).then((row) => {
       if (row) setDefaultValues(toFormValues(row));
@@ -93,12 +99,25 @@ export default function EditAccountPage() {
         id,
       ]
     );
+
+    if (values.account_type === "debt" && values.direction) {
+      await db.runAsync(
+        `INSERT INTO debt_accounts (account_id, direction) VALUES (?, ?)
+         ON CONFLICT(account_id) DO UPDATE SET direction = excluded.direction`,
+        [id, values.direction]
+      );
+    }
   }
 
   async function handleSubmit(values: AccountFormOutput) {
     setIsPending(true);
     try {
       await saveAccountFields(values);
+
+      if (values.account_type === "debt") {
+        router.back();
+        return;
+      }
 
       const targetBalance = Number(currentBalanceInput || "0");
       if (originalBalance == null || targetBalance === originalBalance) {
@@ -224,7 +243,15 @@ export default function EditAccountPage() {
         {defaultValues && (
           <>
             <View className="mb-4">
-              <CurrentBalanceField value={currentBalanceInput} onChangeText={setCurrentBalanceInput} />
+              {defaultValues.account_type === "debt" ? (
+                <Text className="text-sm text-neutral-500">
+                  Saldo akun bertipe Utang Piutang tidak bisa dikoreksi langsung di sini — saldo
+                  akun ini mengikuti riwayat piutang/utang yang tersimpan. Perbaiki lewat transaksi
+                  transfer atau betulkan transaksi akar penyebabnya.
+                </Text>
+              ) : (
+                <CurrentBalanceField value={currentBalanceInput} onChangeText={setCurrentBalanceInput} />
+              )}
             </View>
             <AccountForm
               defaultValues={defaultValues}
@@ -232,6 +259,7 @@ export default function EditAccountPage() {
               isPending={isPending}
               submitLabel="Simpan Perubahan"
               hideKindToggle
+              hideAccountTypeToggle
               onDelete={handleDelete}
             />
           </>

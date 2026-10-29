@@ -11,5 +11,6 @@ export function emptyAccountValues(): AccountFormValues {
     description: null,
     is_active: "true",
     account_type: "cash",
+    direction: null,
   };
 }

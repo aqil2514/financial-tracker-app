@@ -11,7 +11,7 @@ Implementasi sudah mulai — skema database dan placeholder halaman sudah ada, l
 
 - [x] Skema database mobile: tabel `debt_accounts`, `debts`, `debt_payments`, `contacts`. Migrasi `0008_debts.ts`, didaftarkan di `migrations/index.ts`. Dokumentasi tabel: [contact.md](../../tables/contact.md), [debt.md](../../tables/debt.md).
 - [x] Placeholder 2 halaman + alur masuk dari `more.tsx` — `app/debts/index.tsx` (Ringkasan Kontak), `app/debts/list.tsx` (Utang Piutang gabungan). Isi/logic masih placeholder, lihat bagian Keputusan Terbuka untuk scope final.
-- [ ] CRUD Kontak (list, create, edit, delete) — form sederhana (`name` + `note` plain text, BUKAN rich text TipTap seperti desktop).
+- [x] CRUD Kontak (list, create, edit, delete) — form sederhana (`name` + `note` plain text, BUKAN rich text TipTap seperti desktop). `features/contacts/`, routes `app/contacts/`, sudah dicoba manual.
 - [ ] Field `direction` di `AccountForm` mobile — toggle Piutang/Payable, cuma muncul saat `kind === "account" && account_type === "debt"`, wajib diisi, upsert ke `debt_accounts`.
 - [ ] Logic `applyDebtTransaction` (Jalur 1 — transfer kas↔debt) dan `applyDirectDebtTransaction` (Jalur 2 — income/expense langsung di akun debt) — port dari `apps/desktop/src/shared/debts/`.
 - [ ] Alokasi FIFO pelunasan (`settleDebtsFifo`) + fragment SQL `remaining` tunggal (hindari duplikasi/drift seperti yang pernah kejadian di desktop).
