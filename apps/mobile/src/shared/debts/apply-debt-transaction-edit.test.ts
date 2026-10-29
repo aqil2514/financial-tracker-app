@@ -262,4 +262,42 @@ describe("applyDebtTransactionEdit", () => {
 
     expect(debts.find((d) => d.id === "debt-row-5")?.status).toBe("paid");
   });
+
+  it("role 'payment', field berbahaya berubah, debt induk 'written_off': direvert ke 'ongoing' kalau pembayaran baru belum menutup penuh", async () => {
+    const seedDebts: FakeDebtRow[] = [
+      {
+        id: "debt-row-5",
+        type: "receivable",
+        contact_id: "contact-10",
+        amount: 50000,
+        account_id: "debt-1",
+        transaction_id: "tx-999",
+        status: "written_off",
+        date: "2026-01-01",
+      },
+    ];
+    const seedPayments: FakeDebtPaymentRow[] = [
+      { id: "payment-8", debt_id: "debt-row-5", amount: 50000, account_id: "debt-1", transaction_id: "tx-42", date: "2026-02-01" },
+    ];
+    const { db, debts } = createFakeDb({
+      accounts: [CASH, RECEIVABLE_DEBT],
+      debtAccounts: DEBT_ACCOUNTS,
+      debts: seedDebts,
+      debtPayments: seedPayments,
+    });
+    const status: TransactionDebtStatus = { role: "payment", debtPaymentId: "payment-8", debtId: "debt-row-5" };
+
+    await applyDebtTransactionEdit({
+      db,
+      ...BASE_INPUT,
+      accountId: "debt-1",
+      transferAccountId: "cash-1",
+      amount: 1000,
+      settleDebtIds: ["debt-row-5"],
+      status,
+      dangerousFieldsChanged: true,
+    });
+
+    expect(debts.find((d) => d.id === "debt-row-5")?.status).toBe("ongoing");
+  });
 });

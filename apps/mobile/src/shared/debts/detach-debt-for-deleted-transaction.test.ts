@@ -115,4 +115,29 @@ describe("detachDebtForDeletedTransaction", () => {
     expect(debtPayments).toHaveLength(0);
     expect(debts[0].status).toBe("ongoing");
   });
+
+  it("role 'payment', menghapus transaksi PENUTUP write-off: debt direvert dari 'written_off' ke 'ongoing' (bukan nyangkut 'Dihapuskan' dengan remaining > 0)", async () => {
+    const seedDebts: FakeDebtRow[] = [
+      {
+        id: "debt-row-5",
+        type: "receivable",
+        contact_id: "contact-10",
+        amount: 50000,
+        account_id: "debt-1",
+        transaction_id: "tx-999",
+        status: "written_off",
+        date: "2026-01-01",
+      },
+    ];
+    const seedPayments: FakeDebtPaymentRow[] = [
+      { id: "payment-8", debt_id: "debt-row-5", amount: 50000, account_id: "debt-1", transaction_id: "tx-42", date: "2026-02-01" },
+    ];
+    const { db, debts, debtPayments } = createFakeDb({ debts: seedDebts, debtPayments: seedPayments });
+
+    const result = await detachDebtForDeletedTransaction(db, "tx-42");
+
+    expect(result).toEqual({ role: "payment", debtId: "debt-row-5" });
+    expect(debtPayments).toHaveLength(0);
+    expect(debts[0].status).toBe("ongoing");
+  });
 });

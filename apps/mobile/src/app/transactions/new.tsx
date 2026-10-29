@@ -1,24 +1,58 @@
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { generateId, useDatabase } from "@/lib/database";
 import { TransactionForm, type TransactionFormRef } from "@/features/transactions/form/transaction-form";
 import { emptyTransactionValues } from "@/features/transactions/form/values";
-import type { TransactionFormOutput } from "@/features/transactions/form/schema";
+import type { TransactionFormOutput, TransactionFormValues } from "@/features/transactions/form/schema";
 import { PendingAttachmentUploader } from "@/shared/attachments/pending-attachment-uploader";
 import { saveAttachmentToTransaction } from "@/shared/attachments/save-pending-attachment";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
 import { applyDebtTransaction } from "@/shared/debts/apply-debt-transaction";
 import { applyDirectDebtTransaction } from "@/shared/debts/apply-direct-debt-transaction";
 
+// Draft "Bayar" dari row di halaman Utang Piutang (app/debts/list.tsx)
+// — tombol per-row push ke sini dengan query params alih-alih dialog
+// shortcut terpisah, sesuai keputusan "jalur form transaksi umum sudah
+// cukup" di docs/todos/plan/porting-account-debt.md. Piutang dilunasi
+// debt->cash (account_id = akun debt), utang dilunasi cash->debt
+// (transfer_account_id = akun debt) — user masih pilih sendiri akun
+// kas pasangannya dan boleh ubah nominal/tanggal sebelum submit.
+function buildPayDebtDraft(params: {
+  payDebtId?: string;
+  payDebtType?: string;
+  payDebtAccountId?: string;
+  payDebtContactId?: string;
+}): TransactionFormValues | null {
+  if (!params.payDebtId || !params.payDebtType || !params.payDebtAccountId) return null;
+
+  const base = emptyTransactionValues();
+  const isReceivable = params.payDebtType === "receivable";
+
+  return {
+    ...base,
+    type: "transfer",
+    account_id: isReceivable ? params.payDebtAccountId : "",
+    transfer_account_id: isReceivable ? null : params.payDebtAccountId,
+    contact_id: params.payDebtContactId || null,
+    settle_debt_ids: [params.payDebtId],
+  };
+}
+
 export default function NewTransactionPage() {
   const router = useRouter();
   const db = useDatabase();
+  const params = useLocalSearchParams<{
+    payDebtId?: string;
+    payDebtType?: string;
+    payDebtAccountId?: string;
+    payDebtContactId?: string;
+  }>();
   const formRef = useRef<TransactionFormRef>(null);
   const [isPending, setIsPending] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
-  const [defaultValues] = useState(emptyTransactionValues);
+  const [defaultValues] = useState(() => buildPayDebtDraft(params) ?? emptyTransactionValues());
 
   async function handleSubmit(values: TransactionFormOutput) {
     const debtError = formRef.current?.validateDebtFields(values);

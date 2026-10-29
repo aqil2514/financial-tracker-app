@@ -20,6 +20,13 @@ export type FakeDebtPaymentRow = {
   transaction_id: string | null;
   date: string;
 };
+export type FakeTransactionRow = {
+  id: string;
+  type: "income" | "expense" | "transfer";
+  amount: number;
+  account_id: string | null;
+  is_cash_neutral: number;
+};
 
 // Fake in-memory db yang mengenali pola query yang dipakai shared/debts/
 // — dipakai bareng di *.test.ts file ini (tidak match glob src/**/*.test.ts
@@ -36,6 +43,7 @@ export function createFakeDb(
   const debtAccounts = seed.debtAccounts ?? [];
   const debts: FakeDebtRow[] = seed.debts ?? [];
   const debtPayments: FakeDebtPaymentRow[] = seed.debtPayments ?? [];
+  const transactions: FakeTransactionRow[] = [];
 
   function remaining(debtId: string): number {
     const debt = debts.find((d) => d.id === debtId);
@@ -95,6 +103,13 @@ export function createFakeDb(
       throw new Error(`Fake db.getAllAsync tidak mengenali query: ${sql}`);
     },
     async runAsync(sql: string, params: unknown[] = []): Promise<unknown> {
+      if (sql.startsWith("INSERT INTO transactions")) {
+        // SQL ini (write-off-debt.ts) cuma punya 5 placeholder "?" —
+        // sisanya literal langsung di SQL (NULL, datetime('now'), 1).
+        const [id, , type, amount, accountId] = params as [string, string, "income" | "expense", number, string];
+        transactions.push({ id, type, amount, account_id: accountId, is_cash_neutral: 1 });
+        return {};
+      }
       if (sql.startsWith("INSERT INTO debts")) {
         const [id, type, contactId, amount, accountId, transactionId, date] = params as [
           string,
@@ -135,6 +150,12 @@ export function createFakeDb(
         if (debt) debt.status = "paid";
         return {};
       }
+      if (sql.startsWith("UPDATE debts SET status = 'written_off'")) {
+        const [id] = params as [string];
+        const debt = debts.find((d) => d.id === id);
+        if (debt) debt.status = "written_off";
+        return {};
+      }
       if (sql.startsWith("UPDATE debts SET date")) {
         const [date, id] = params as [string, string];
         const debt = debts.find((d) => d.id === id);
@@ -149,7 +170,7 @@ export function createFakeDb(
       }
       if (sql.startsWith("UPDATE debts SET status = 'ongoing'")) {
         const [id] = params as [string];
-        const debt = debts.find((d) => d.id === id && d.status === "paid");
+        const debt = debts.find((d) => d.id === id && (d.status === "paid" || d.status === "written_off"));
         const totalPaid = debtPayments.filter((p) => p.debt_id === id).reduce((sum, p) => sum + p.amount, 0);
         if (debt && debt.amount > totalPaid) {
           debt.status = "ongoing";
@@ -178,5 +199,5 @@ export function createFakeDb(
     },
   } as unknown as Db;
 
-  return { db, accounts, debtAccounts, debts, debtPayments };
+  return { db, accounts, debtAccounts, debts, debtPayments, transactions };
 }

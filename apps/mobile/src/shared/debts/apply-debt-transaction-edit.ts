@@ -67,9 +67,11 @@ export async function applyDebtTransactionEdit({
   }
 
   await db.runAsync("DELETE FROM debt_payments WHERE id = ?", [status.debtPaymentId]);
+  // status IN ('paid', 'written_off') — lihat catatan di
+  // detach-debt-for-deleted-transaction.ts.
   await db.runAsync(
     `UPDATE debts SET status = 'ongoing'
-     WHERE id = ? AND status = 'paid' AND amount > COALESCE(
+     WHERE id = ? AND status IN ('paid', 'written_off') AND amount > COALESCE(
        (SELECT SUM(amount) FROM debt_payments WHERE debt_payments.debt_id = debts.id),
        0
      )`,

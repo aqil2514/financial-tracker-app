@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
+import { useFocusEffect } from "expo-router";
 import { useDatabase } from "@/lib/database";
 import { formatCurrency } from "@/lib/utils";
 import { getDebtPayments, type DebtPaymentRow } from "@/shared/debts";
@@ -12,15 +13,23 @@ export function PaymentsList({ debtId }: { debtId: string }) {
   const db = useDatabase();
   const [payments, setPayments] = useState<DebtPaymentRow[] | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    getDebtPayments(db, debtId).then((rows) => {
-      if (!cancelled) setPayments(rows);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [db, debtId]);
+  // useFocusEffect (bukan useEffect biasa) — row ini TIDAK unmount saat
+  // navigasi ke /transactions/new untuk catat pelunasan lalu
+  // router.back() ke sini, jadi dependency [db, debtId] yang tidak
+  // berubah tidak akan pernah re-run useEffect biasa. Row jadi
+  // menampilkan cicilan versi SEBELUM pelunasan baru sampai halaman
+  // di-unmount/mount ulang total (keluar-masuk penuh).
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getDebtPayments(db, debtId).then((rows) => {
+        if (!cancelled) setPayments(rows);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [db, debtId])
+  );
 
   if (payments === null) {
     return <Text className="p-3 text-sm text-neutral-500">Memuat cicilan...</Text>;

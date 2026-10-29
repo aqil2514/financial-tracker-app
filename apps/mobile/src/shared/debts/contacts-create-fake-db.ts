@@ -2,6 +2,7 @@ import type { Db } from "./types";
 import type { ContactDebtSummary } from "./contact-summary";
 import type { ContactDebtRow } from "./contact-debts";
 import type { DebtPaymentRow } from "./debt-payments";
+import type { DebtListRow } from "./debts-list";
 
 export type FakeContactRow = { id: string; name: string };
 export type FakeDebtRow = {
@@ -90,6 +91,25 @@ export function createContactsFakeDb(
             };
           })
           .sort((a, b) => a.contact_name.localeCompare(b.contact_name));
+        return rows as T[];
+      }
+      if (sql.includes("FROM debts") && sql.includes("LEFT JOIN contacts")) {
+        const rows: DebtListRow[] = debts
+          .map((d) => ({
+            id: d.id,
+            type: d.type,
+            contact_id: d.contact_id,
+            contact_name: contacts.find((c) => c.id === d.contact_id)?.name ?? null,
+            amount: d.amount,
+            account_id: d.account_id,
+            account_name: d.account_name ?? null,
+            transaction_id: d.transaction_id,
+            status: d.status,
+            note: d.note ?? null,
+            date: d.date,
+            remaining: remaining(d),
+          }))
+          .sort((a, b) => (a.date === b.date ? b.id.localeCompare(a.id) : b.date.localeCompare(a.date)));
         return rows as T[];
       }
       if (sql.includes("FROM debts") && sql.includes("LEFT JOIN accounts") && sql.includes("account_name")) {

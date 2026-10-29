@@ -25,9 +25,14 @@ export async function detachDebtForDeletedTransaction(
 
   if (status.role === "payment") {
     await db.runAsync("DELETE FROM debt_payments WHERE id = ?", [status.debtPaymentId]);
+    // status IN ('paid', 'written_off') — bukan cuma 'paid'. Payment
+    // penutup write-off (writeOffDebt) juga baris debt_payments biasa;
+    // kalau transaksi penutup itu dihapus dan sisa jadi > 0 lagi, debt
+    // yang tadinya 'written_off' harus ikut turun ke 'ongoing', jangan
+    // dibiarkan nyangkut "Dihapuskan" dengan remaining > 0.
     await db.runAsync(
       `UPDATE debts SET status = 'ongoing'
-       WHERE id = ? AND status = 'paid' AND amount > COALESCE(
+       WHERE id = ? AND status IN ('paid', 'written_off') AND amount > COALESCE(
          (SELECT SUM(amount) FROM debt_payments WHERE debt_payments.debt_id = debts.id),
          0
        )`,

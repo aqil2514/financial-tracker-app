@@ -27,3 +27,5 @@ export { cleanupStaleDebtOnAccountChange } from "./cleanup-stale-debt-on-account
 export { getContactSummary, type ContactDebtSummary } from "./contact-summary";
 export { getContactDebts, type ContactDebtRow } from "./contact-debts";
 export { getDebtPayments, type DebtPaymentRow } from "./debt-payments";
+export { getDebtsList, type DebtListRow } from "./debts-list";
+export { writeOffDebt, type WriteOffDebtInput } from "./write-off-debt";
