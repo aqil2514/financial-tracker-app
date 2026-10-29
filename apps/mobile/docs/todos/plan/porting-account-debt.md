@@ -7,18 +7,18 @@ Dokumen anak dari [porting-account.md](porting-account.md) — fokus khusus tipe
 
 ## Status & TODO saat ini (ringkas)
 
-Implementasi sudah mulai — skema database dan placeholder halaman sudah ada, logic/form masih belum digarap.
+Implementasi sudah berjalan — skema database, CRUD Kontak, field `direction` akun, dan logic inti (`applyDebtTransaction`/`applyDirectDebtTransaction`/FIFO) sudah ada. Belum: UI form transaksi (jembatan logic ke form), guard edit/delete, dan isi 2 halaman debt (masih placeholder).
 
 - [x] Skema database mobile: tabel `debt_accounts`, `debts`, `debt_payments`, `contacts`. Migrasi `0008_debts.ts`, didaftarkan di `migrations/index.ts`. Dokumentasi tabel: [contact.md](../../tables/contact.md), [debt.md](../../tables/debt.md).
 - [x] Placeholder 2 halaman + alur masuk dari `more.tsx` — `app/debts/index.tsx` (Ringkasan Kontak), `app/debts/list.tsx` (Utang Piutang gabungan). Isi/logic masih placeholder, lihat bagian Keputusan Terbuka untuk scope final.
 - [x] CRUD Kontak (list, create, edit, delete) — form sederhana (`name` + `note` plain text, BUKAN rich text TipTap seperti desktop). `features/contacts/`, routes `app/contacts/`, sudah dicoba manual.
-- [ ] Field `direction` di `AccountForm` mobile — toggle Piutang/Payable, cuma muncul saat `kind === "account" && account_type === "debt"`, wajib diisi, upsert ke `debt_accounts`.
-- [ ] Logic `applyDebtTransaction` (Jalur 1 — transfer kas↔debt) dan `applyDirectDebtTransaction` (Jalur 2 — income/expense langsung di akun debt) — port dari `apps/desktop/src/shared/debts/`.
-- [ ] Alokasi FIFO pelunasan (`settleDebtsFifo`) + fragment SQL `remaining` tunggal (hindari duplikasi/drift seperti yang pernah kejadian di desktop).
+- [x] Field `direction` di `AccountForm` mobile — toggle Piutang/Payable, cuma muncul saat `kind === "account" && account_type === "debt"`, wajib diisi, upsert ke `debt_accounts`. Tipe akun (toggle Kas/Utang Piutang) cuma bisa dipilih saat create, terkunci permanen saat edit. Balance Correction diblokir dengan pesan penolakan untuk akun debt. Badge tipe akun (Kas hijau/Utang Piutang merah) ditambahkan di list akun.
+- [x] Logic `applyDebtTransaction` (Jalur 1 — transfer kas↔debt) dan `applyDirectDebtTransaction` (Jalur 2 — income/expense langsung di akun debt) — port dari `apps/desktop/src/shared/debts/` ke `shared/debts/` mobile. **Belum disambung** ke `transaction-form.tsx`/schema — menunggu item UI form transaksi di bawah (butuh field kontak & settleDebtIds dulu sebagai input).
+- [x] Alokasi FIFO pelunasan (`settleDebtsFifo`) + fragment SQL `remaining` tunggal (hindari duplikasi/drift seperti yang pernah kejadian di desktop). Sudah jadi bagian dari `shared/debts/` di atas (`settle-debts-fifo.ts`, `remaining-debt-sql.ts`) — sama-sama belum dipakai UI sampai form transaksi disambung.
 - [ ] UI form transaksi: field kontak (combobox + create-inline), field pilih debts ongoing untuk pelunasan (`FieldDebtAction` ala desktop), locking field saat `debtFieldsLocked`.
 - [ ] Guard edit/delete transaksi terkait debt (`role: principal/payment/none`) — port dari `apply-debt-transaction/edit.ts` dan `delete.ts`.
 - [ ] Saldo akun debt ikut rumus on-the-fly yang sudah ada di mobile (tidak perlu kolom baru, akun debt sudah otomatis ikut dihitung lewat `transactions.account_id`/`transfer_account_id` yang sudah ada).
-- [ ] Balance Correction akun debt: **DILARANG**, bukan diimplementasikan — tampilkan pesan penolakan seperti desktop, bukan form.
+- [x] Balance Correction akun debt: **DILARANG**, bukan diimplementasikan — tampilkan pesan penolakan seperti desktop, bukan form. Sudah dikerjakan bersamaan item field `direction` di atas (`app/accounts/[id]/edit.tsx`).
 - [ ] Isi halaman Ringkasan Kontak (list per kontak, metrik aktif/terbayar/belum dibayar) — scope sudah diputuskan, lihat bagian Keputusan Terbuka.
 - [ ] Isi halaman Utang Piutang (list flat gabungan payable+receivable, expand untuk cicilan, action bayar/write-off) — scope sudah diputuskan, lihat bagian Keputusan Terbuka.
 - [ ] `debt_amount_adjustments` + `correctDebtRemaining` (koreksi granular per-debt) — **kandidat di luar MVP**, lihat Keputusan Terbuka.
