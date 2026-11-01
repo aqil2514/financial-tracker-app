@@ -19,7 +19,7 @@ type MenuGroup = {
 };
 
 const flatMenuItems: MenuItem[] = [
-  { title: "Investasi", icon: "trending-up-outline" },
+  { title: "Investasi", icon: "trending-up-outline", href: "/investments" as Href },
   { title: "Dana Pihak Ketiga", icon: "people-outline" },
 ];
 
