@@ -7,23 +7,27 @@ import { InvestmentPlStats } from "@/features/investments/content/investment-pl-
 import { PurchaseRow } from "@/features/investments/content/purchase-row";
 import { SaleRow } from "@/features/investments/content/sale-row";
 import { SettlementBreakdown } from "@/features/investments/content/settlement-breakdown";
-import { findMockInvestmentAccount } from "@/features/investments/mock-data";
+import { useInvestmentDetail } from "@/features/investments/content/use-investment-detail";
 
 export default function InvestmentDetailPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const account = findMockInvestmentAccount(id);
+  const { detail, isLoading } = useInvestmentDetail(id);
 
-  if (!account) {
+  if (!detail) {
     return (
       <>
         <Stack.Screen options={{ title: "Detail Investasi" }} />
         <View className="flex-1 items-center justify-center bg-white px-4">
-          <Text className="text-center text-neutral-500">Akun tidak ditemukan.</Text>
+          <Text className="text-center text-neutral-500">
+            {isLoading ? "Memuat..." : "Akun tidak ditemukan."}
+          </Text>
         </View>
       </>
     );
   }
+
+  const { account, purchases, sales } = detail;
 
   return (
     <>
@@ -37,17 +41,18 @@ export default function InvestmentDetailPage() {
 
         <InvestmentPlStats
           account={account}
+          purchases={purchases}
           onPressUpdateMarketValue={() => Alert.alert("Segera hadir", "Update nilai pasar belum tersedia.")}
         />
         <InvestmentActions />
-        <SettlementBreakdown purchases={account.purchases} />
+        <SettlementBreakdown purchases={purchases} />
 
         <View className="gap-2">
           <Text className="font-semibold text-neutral-900">Riwayat Pembelian</Text>
-          {account.purchases.length === 0 ? (
+          {purchases.length === 0 ? (
             <Text className="text-neutral-500">Belum ada riwayat pembelian.</Text>
           ) : (
-            account.purchases.map((purchase) => (
+            purchases.map((purchase) => (
               <PurchaseRow key={purchase.id} purchase={purchase} unitLabel={account.unitLabel} />
             ))
           )}
@@ -55,10 +60,10 @@ export default function InvestmentDetailPage() {
 
         <View className="gap-2">
           <Text className="font-semibold text-neutral-900">Riwayat Penjualan</Text>
-          {account.sales.length === 0 ? (
+          {sales.length === 0 ? (
             <Text className="text-neutral-500">Belum ada riwayat penjualan.</Text>
           ) : (
-            account.sales.map((sale) => <SaleRow key={sale.id} sale={sale} unitLabel={account.unitLabel} />)
+            sales.map((sale) => <SaleRow key={sale.id} sale={sale} unitLabel={account.unitLabel} />)
           )}
         </View>
       </ScrollView>

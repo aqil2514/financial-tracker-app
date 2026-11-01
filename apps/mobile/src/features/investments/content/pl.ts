@@ -10,7 +10,8 @@ export function formatSignedCurrency(amount: number): string {
   return `${amount >= 0 ? "+" : ""}${formatCurrency(amount)}`;
 }
 
-export function formatUnit(value: number): string {
+export function formatUnit(value: number | null): string {
+  if (value == null) return "—";
   return value.toLocaleString("id-ID", { maximumFractionDigits: 4 });
 }
 
@@ -18,8 +19,12 @@ export function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
-export function formatAgo(isoDate: string): string {
-  const days = Math.floor((Date.now() - new Date(isoDate).getTime()) / 86_400_000);
+// updated_at dari SQLite datetime('now') = "YYYY-MM-DD HH:mm:ss" dalam UTC. Tanpa "T"+"Z"
+// selisih ke waktu sekarang meleset sebesar offset timezone.
+export function formatAgo(sqliteUtc: string | null, now: number = Date.now()): string {
+  if (!sqliteUtc) return "—";
+  const normalized = sqliteUtc.includes("T") ? sqliteUtc : `${sqliteUtc.replace(" ", "T")}Z`;
+  const days = Math.floor((now - new Date(normalized).getTime()) / 86_400_000);
   if (days <= 0) return "Hari ini";
   if (days === 1) return "Kemarin";
   return `${days} hari lalu`;

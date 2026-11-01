@@ -1,19 +1,21 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { formatCurrency } from "@/lib/utils";
-import type { MockInvestmentAccount } from "../mock-data";
+import type { InvestmentAccountSummary, InvestmentPurchaseRow } from "@/shared/investments";
 import { computePl, formatAgo, formatSignedCurrency } from "./pl";
 import { StatItem } from "./stat-item";
 
 export function InvestmentPlStats({
   account,
+  purchases,
   onPressUpdateMarketValue,
 }: {
-  account: MockInvestmentAccount;
+  account: InvestmentAccountSummary;
+  purchases: InvestmentPurchaseRow[];
   onPressUpdateMarketValue: () => void;
 }) {
   const { pl, percent, toneClass } = computePl(account.currentMarketValue, account.balance);
-  const totalUnit = account.purchases.reduce((sum, purchase) => sum + purchase.unit, 0);
+  const totalUnit = purchases.reduce((sum, purchase) => sum + (purchase.unit ?? 0), 0);
   const averageCost = totalUnit !== 0 ? account.balance / totalUnit : null;
 
   return (

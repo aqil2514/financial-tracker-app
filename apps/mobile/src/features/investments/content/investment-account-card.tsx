@@ -2,14 +2,14 @@ import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Badge } from "@/components/badge";
 import { formatCurrency } from "@/lib/utils";
-import type { MockInvestmentAccount } from "../mock-data";
+import type { InvestmentAccountSummary } from "@/shared/investments";
 import { computePl, formatSignedCurrency } from "./pl";
 
 export function InvestmentAccountCard({
   account,
   onPress,
 }: {
-  account: MockInvestmentAccount;
+  account: InvestmentAccountSummary;
   onPress: () => void;
 }) {
   const { pl, percent, toneClass } = computePl(account.currentMarketValue, account.balance);
@@ -26,12 +26,9 @@ export function InvestmentAccountCard({
         <Ionicons name="chevron-forward" size={16} color="#737373" />
       </View>
 
-      {(account.groupName || account.labels.length > 0 || !account.isActive) && (
+      {(account.groupName || !account.isActive) && (
         <View className="flex-row flex-wrap gap-1">
           {account.groupName && <Badge label={account.groupName} />}
-          {account.labels.map((label) => (
-            <Badge key={label} label={label} />
-          ))}
           {!account.isActive && <Badge label="Nonaktif" />}
         </View>
       )}

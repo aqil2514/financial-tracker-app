@@ -1,11 +1,11 @@
 import { Alert, Pressable, Text, View } from "react-native";
 import { Badge } from "@/components/badge";
 import { formatCurrency } from "@/lib/utils";
-import type { MockSale } from "../mock-data";
+import type { InvestmentSaleRow } from "@/shared/investments";
 import { formatDate, formatSignedCurrency, formatUnit } from "./pl";
 import { StatusBadge } from "./status-badge";
 
-export function SaleRow({ sale, unitLabel }: { sale: MockSale; unitLabel: string }) {
+export function SaleRow({ sale, unitLabel }: { sale: InvestmentSaleRow; unitLabel: string }) {
   const plToneClass = (sale.realizedPl ?? 0) >= 0 ? "text-green-700" : "text-red-700";
 
   return (

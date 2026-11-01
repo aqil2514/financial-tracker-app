@@ -7,10 +7,11 @@ Dokumen anak dari [porting-account.md](porting-account.md) — fokus khusus tipe
 
 ## Status & TODO saat ini (ringkas)
 
-Tahap riset selesai, UI tiruan dan skema database sudah ada; logic belum dikerjakan sama sekali (UI masih memakai data mock). Isi dokumen ini adalah hasil membaca konsep dan kode desktop (`apps/desktop/src/shared/investments/`, `apps/desktop/docs/tables/investment.md`), UI desktop (`features/investments`, `features/investment-detail`) belum dibaca detail. Scope tahap di bawah masih REKOMENDASI, belum diputuskan — lihat bagian Keputusan Terbuka.
+Tahap riset selesai; skema database, form akun investasi, dan layar Investasi (membaca data asli) sudah ada. Logic transaksi (pembelian/penjualan) dan semua tombol aksi belum dikerjakan. Isi dokumen ini adalah hasil membaca konsep dan kode desktop (`apps/desktop/src/shared/investments/`, `apps/desktop/docs/tables/investment.md`), UI desktop (`features/investments`, `features/investment-detail`) belum dibaca detail. Scope tahap di bawah masih REKOMENDASI, belum diputuskan — lihat bagian Keputusan Terbuka.
 
 - [ ] Putuskan scope per tahap (lihat Keputusan Terbuka) sebelum implementasi.
-- [x] UI tiruan (data mock, tanpa logic): `app/investments/index.tsx` (statistik gabungan + daftar akun, satu layar tanpa tab) dan `app/investments/[id].tsx` (detail), entri dari `more.tsx`. Pie distribusi dan "Per Jenis Instrumen" ditunda.
+- [x] Layar Investasi: `app/investments/index.tsx` (statistik gabungan + daftar akun, satu layar tanpa tab) dan `app/investments/[id].tsx` (detail: statistik P/L, breakdown pending/settled, riwayat pembelian dan penjualan), entri dari `more.tsx`. Sudah membaca data asli lewat `shared/investments/investment-queries.ts` (`getInvestmentAccounts`, `getInvestmentDetail`) + hook `useInvestmentAccounts`/`useInvestmentDetail` (refetch saat layar fokus). Pie distribusi dan "Per Jenis Instrumen" ditunda; badge label dicabut karena mobile belum punya sistem label.
+- [ ] Tombol aksi di detail (Catat Pembelian, Jual, Write-off, Update Nilai Pasar, Settle/Hapus penjualan pending) masih placeholder alert "Segera hadir".
 - [x] Skema database mobile: tabel `investment_accounts`, `investment_purchases`, `investment_sales`. Migrasi `0009_investments.ts`, didaftarkan di `migrations/index.ts`. Dokumentasi tabel: [investment.md](../../tables/investment.md).
 - [ ] Perluas `classifyAccountPair` mobile dengan `cash-investment` dan `investment-cash` (saat ini melempar `UnsupportedAccountPairError` untuk investasi).
 - [ ] `investment-holding-math` (`getAverageCostPerUnit`, `getRemainingUnit`) dalam SATU tempat + unit test.

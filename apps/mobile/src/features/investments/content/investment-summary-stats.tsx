@@ -1,10 +1,10 @@
 import { View } from "react-native";
 import { formatCurrency } from "@/lib/utils";
-import type { MockInvestmentAccount } from "../mock-data";
+import type { InvestmentAccountSummary } from "@/shared/investments";
 import { computePl, formatSignedCurrency } from "./pl";
 import { StatItem } from "./stat-item";
 
-export function InvestmentSummaryStats({ accounts }: { accounts: MockInvestmentAccount[] }) {
+export function InvestmentSummaryStats({ accounts }: { accounts: InvestmentAccountSummary[] }) {
   const totalModal = accounts.reduce((sum, account) => sum + account.balance, 0);
   const totalMarketValue = accounts.reduce((sum, account) => sum + account.currentMarketValue, 0);
   const { pl, percent, toneClass } = computePl(totalMarketValue, totalModal);

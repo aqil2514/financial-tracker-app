@@ -1,9 +1,9 @@
 import { Text, View } from "react-native";
 import { formatCurrency } from "@/lib/utils";
-import type { MockPurchase } from "../mock-data";
+import type { InvestmentPurchaseRow } from "@/shared/investments";
 
-export function SettlementBreakdown({ purchases }: { purchases: MockPurchase[] }) {
-  const sumBy = (status: MockPurchase["status"]) =>
+export function SettlementBreakdown({ purchases }: { purchases: InvestmentPurchaseRow[] }) {
+  const sumBy = (status: InvestmentPurchaseRow["status"]) =>
     purchases.filter((purchase) => purchase.status === status).reduce((sum, purchase) => sum + purchase.amount, 0);
   const pending = sumBy("pending");
   const settled = sumBy("settled");
