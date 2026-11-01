@@ -52,12 +52,14 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
     const [isCreating, setIsCreating] = useState(false);
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 
+    // Akun investasi sengaja disembunyikan dari picker transaksi: logic transaksinya (pembelian/penjualan)
+    // belum ada, jadi transaksi ke akun itu akan tersimpan tanpa baris investment_purchases/sales.
     const loadRootOptions = useCallback(async () => {
       const groups = await db.getAllAsync<{ id: string; name: string }>(
         `SELECT id, name FROM account_groups ORDER BY name ASC`
       );
       const ungroupedAccounts = await db.getAllAsync<{ id: string; name: string }>(
-        `SELECT id, name FROM accounts WHERE group_id IS NULL AND is_active = 1 ORDER BY name ASC`
+        `SELECT id, name FROM accounts WHERE group_id IS NULL AND is_active = 1 AND account_type != 'investment' ORDER BY name ASC`
       );
 
       setRootOptions([
@@ -81,7 +83,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
     const openChildren = useCallback(
       async (group: { id: string; name: string }) => {
         const rows = await db.getAllAsync<AccountChildOptionRow>(
-          `SELECT id, name FROM accounts WHERE group_id = ? AND is_active = 1 ORDER BY name ASC`,
+          `SELECT id, name FROM accounts WHERE group_id = ? AND is_active = 1 AND account_type != 'investment' ORDER BY name ASC`,
           [group.id]
         );
         setChildOptions(rows);
@@ -299,6 +301,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
                 isPending={isCreating}
                 submitLabel="Simpan & Pilih"
                 hideKindToggle
+                hideInvestmentType
                 inBottomSheet
               />
             )}

@@ -17,9 +17,7 @@ export function AccountListItem({
 }) {
   const router = useRouter();
   const typeOption =
-    account.accountType === "cash" || account.accountType === "debt"
-      ? ACCOUNT_TYPE_OPTIONS[account.accountType]
-      : null;
+    account.accountType === "third_party" ? null : ACCOUNT_TYPE_OPTIONS[account.accountType];
 
   return (
     <Pressable

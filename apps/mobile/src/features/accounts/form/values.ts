@@ -12,5 +12,7 @@ export function emptyAccountValues(): AccountFormValues {
     is_active: "true",
     account_type: "cash",
     direction: null,
+    unit_label: null,
+    current_market_value: 0,
   };
 }

@@ -4,6 +4,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { generateId, useDatabase } from "@/lib/database";
 import { AccountForm } from "@/features/accounts/form/account-form";
 import { emptyAccountValues } from "@/features/accounts/form/values";
+import { upsertInvestmentAccount } from "@/features/accounts/upsert-investment-account";
 import type { AccountFormOutput } from "@/features/accounts/form/schema";
 
 export default function NewAccountPage() {
@@ -43,6 +44,10 @@ export default function NewAccountPage() {
             id,
             values.direction,
           ]);
+        }
+
+        if (values.account_type === "investment" && values.unit_label) {
+          await upsertInvestmentAccount(db, id, values.unit_label, values.current_market_value);
         }
       }
 

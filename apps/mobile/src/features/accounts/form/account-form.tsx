@@ -21,6 +21,7 @@ const ACTIVE_OPTIONS = [
 const ACCOUNT_TYPE_OPTIONS = [
   { value: "cash", label: "Kas" },
   { value: "debt", label: "Utang Piutang" },
+  { value: "investment", label: "Investasi" },
 ];
 
 const DIRECTION_OPTIONS = [
@@ -36,6 +37,7 @@ export function AccountForm({
   onDelete,
   hideKindToggle,
   hideAccountTypeToggle,
+  hideInvestmentType,
   inBottomSheet,
 }: AccountFormProps) {
   return (
@@ -76,6 +78,7 @@ export function AccountForm({
           form={form}
           hideKindToggle={hideKindToggle}
           hideAccountTypeToggle={hideAccountTypeToggle}
+          hideInvestmentType={hideInvestmentType}
           inBottomSheet={inBottomSheet}
         />
       )}
@@ -91,16 +94,20 @@ interface AccountFormProps {
   onDelete?: () => void;
   hideKindToggle?: boolean;
   hideAccountTypeToggle?: boolean;
+  // Sementara dipakai picker akun di form transaksi: logic transaksi untuk akun investasi belum ada.
+  hideInvestmentType?: boolean;
   inBottomSheet?: boolean;
 }
 
 function AccountFields({
   form,
   hideAccountTypeToggle,
+  hideInvestmentType,
   inBottomSheet,
 }: {
   form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
   hideAccountTypeToggle?: boolean;
+  hideInvestmentType?: boolean;
   inBottomSheet?: boolean;
 }) {
   const accountType = useWatch({ control: form.control, name: "account_type" });
@@ -112,7 +119,11 @@ function AccountFields({
           form={form}
           name="account_type"
           label="Tipe Akun"
-          options={ACCOUNT_TYPE_OPTIONS}
+          options={
+            hideInvestmentType
+              ? ACCOUNT_TYPE_OPTIONS.filter((option) => option.value !== "investment")
+              : ACCOUNT_TYPE_OPTIONS
+          }
         />
       )}
 
@@ -123,6 +134,27 @@ function AccountFields({
           label="Arah"
           options={DIRECTION_OPTIONS}
         />
+      )}
+
+      {accountType === "investment" && (
+        <>
+          <FormFieldText
+            form={form}
+            name="unit_label"
+            label="Satuan Unit"
+            placeholder="Mis. unit, lembar, gram"
+            inBottomSheet={inBottomSheet}
+          />
+          <FormFieldNumber
+            form={form}
+            name="current_market_value"
+            label="Nilai Pasar Terkini"
+            placeholder="0"
+            prefix="Rp"
+            grouped
+            inBottomSheet={inBottomSheet}
+          />
+        </>
       )}
 
       <IconPickerField />
@@ -164,11 +196,13 @@ function AccountFormFields({
   form,
   hideKindToggle,
   hideAccountTypeToggle,
+  hideInvestmentType,
   inBottomSheet,
 }: {
   form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
   hideKindToggle?: boolean;
   hideAccountTypeToggle?: boolean;
+  hideInvestmentType?: boolean;
   inBottomSheet?: boolean;
 }) {
   const kind = useWatch({ control: form.control, name: "kind" });
@@ -189,6 +223,7 @@ function AccountFormFields({
         <AccountFields
           form={form}
           hideAccountTypeToggle={hideAccountTypeToggle}
+          hideInvestmentType={hideInvestmentType}
           inBottomSheet={inBottomSheet}
         />
       )}

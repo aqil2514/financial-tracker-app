@@ -8,6 +8,7 @@ import type { AccountFormOutput, AccountFormValues } from "@/features/accounts/f
 import { OptionPicker, type OptionPickerRef } from "@/components/query/shared/option-picker";
 import { CurrentBalanceField } from "@/features/accounts/content/current-balance-field";
 import { correctAccountBalance } from "@/features/accounts/correct-account-balance";
+import { upsertInvestmentAccount } from "@/features/accounts/upsert-investment-account";
 
 const CURRENT_BALANCE_SQL = `
   SELECT
@@ -33,8 +34,10 @@ interface AccountRow {
   initial_balance: number;
   description: string | null;
   is_active: number;
-  account_type: "cash" | "debt";
+  account_type: "cash" | "debt" | "investment";
   direction: "receivable" | "payable" | null;
+  unit_label: string | null;
+  current_market_value: number | null;
 }
 
 function toFormValues(row: AccountRow): AccountFormValues {
@@ -49,6 +52,8 @@ function toFormValues(row: AccountRow): AccountFormValues {
     is_active: row.is_active === 1 ? "true" : "false",
     account_type: row.account_type,
     direction: row.direction,
+    unit_label: row.unit_label,
+    current_market_value: row.current_market_value ?? 0,
   };
 }
 
@@ -67,9 +72,11 @@ export default function EditAccountPage() {
     db.getFirstAsync<AccountRow>(
       `SELECT accounts.name, accounts.icon, accounts.color, accounts.group_id,
               accounts.initial_balance, accounts.description, accounts.is_active,
-              accounts.account_type, debt_accounts.direction
+              accounts.account_type, debt_accounts.direction,
+              investment_accounts.unit_label, investment_accounts.current_market_value
        FROM accounts
        LEFT JOIN debt_accounts ON debt_accounts.account_id = accounts.id
+       LEFT JOIN investment_accounts ON investment_accounts.account_id = accounts.id
        WHERE accounts.id = ?`,
       [id]
     ).then((row) => {
@@ -107,6 +114,10 @@ export default function EditAccountPage() {
         [id, values.direction]
       );
     }
+
+    if (values.account_type === "investment" && values.unit_label) {
+      await upsertInvestmentAccount(db, id, values.unit_label, values.current_market_value);
+    }
   }
 
   async function handleSubmit(values: AccountFormOutput) {
@@ -114,7 +125,7 @@ export default function EditAccountPage() {
     try {
       await saveAccountFields(values);
 
-      if (values.account_type === "debt") {
+      if (values.account_type !== "cash") {
         router.back();
         return;
       }
@@ -248,6 +259,12 @@ export default function EditAccountPage() {
                   Saldo akun bertipe Utang Piutang tidak bisa dikoreksi langsung di sini — saldo
                   akun ini mengikuti riwayat piutang/utang yang tersimpan. Perbaiki lewat transaksi
                   transfer atau betulkan transaksi akar penyebabnya.
+                </Text>
+              ) : defaultValues.account_type === "investment" ? (
+                <Text className="text-sm text-neutral-500">
+                  Saldo (modal) akun bertipe Investasi belum bisa dikoreksi langsung di sini —
+                  saldo akun ini mengikuti riwayat pembelian/penjualan unit. Koreksi unit akan
+                  tersedia menyusul.
                 </Text>
               ) : (
                 <CurrentBalanceField value={currentBalanceInput} onChangeText={setCurrentBalanceInput} />

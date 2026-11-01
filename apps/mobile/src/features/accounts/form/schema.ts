@@ -12,12 +12,19 @@ export const accountFormSchema = z
     initial_balance: z.coerce.number(),
     description: z.string().nullable(),
     is_active: z.enum(["true", "false"]),
-    account_type: z.enum(["cash", "debt"]),
+    account_type: z.enum(["cash", "debt", "investment"]),
     direction: z.enum(["receivable", "payable"]).nullable(),
+    unit_label: z.string().nullable(),
+    current_market_value: z.coerce.number(),
   })
   .refine(
     (values) => values.kind !== "account" || values.account_type !== "debt" || values.direction != null,
     { message: "Arah piutang/utang wajib diisi", path: ["direction"] }
+  )
+  .refine(
+    (values) =>
+      values.kind !== "account" || values.account_type !== "investment" || !!values.unit_label?.trim(),
+    { message: "Satuan unit wajib diisi", path: ["unit_label"] }
   );
 
 export type AccountFormValues = z.input<typeof accountFormSchema>;
