@@ -9,6 +9,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import { NumpadCalculator } from "./numpad-calculator";
+import { formatDecimalDisplay, parseDecimalInput } from "./decimal-input";
 
 type FormFieldNumberProps<TFieldValues extends FieldValues> = {
   form: UseFormReturn<TFieldValues>;
@@ -20,6 +21,8 @@ type FormFieldNumberProps<TFieldValues extends FieldValues> = {
   grouped?: boolean;
   useCalculator?: boolean;
   inBottomSheet?: boolean;
+  // Angka berdesimal (unit/harga per unit). Koma diterima sebagai pemisah desimal dan disimpan sebagai titik.
+  decimal?: boolean;
 };
 
 function toDigitsOnly(text: string): string {
@@ -41,6 +44,7 @@ export function FormFieldNumber<TFieldValues extends FieldValues>({
   grouped,
   useCalculator,
   inBottomSheet,
+  decimal,
 }: FormFieldNumberProps<TFieldValues>) {
   const sheetRef = useRef<BottomSheetModal>(null);
   const Input = inBottomSheet ? BottomSheetTextInput : TextInput;
@@ -51,7 +55,11 @@ export function FormFieldNumber<TFieldValues extends FieldValues>({
       name={name}
       render={({ field, fieldState }) => {
         const rawValue = field.value != null ? String(field.value) : "";
-        const displayValue = grouped ? formatGrouped(rawValue) : rawValue;
+        const displayValue = decimal
+          ? formatDecimalDisplay(rawValue, !!grouped)
+          : grouped
+            ? formatGrouped(rawValue)
+            : rawValue;
 
         return (
           <View className="gap-2">
@@ -59,10 +67,14 @@ export function FormFieldNumber<TFieldValues extends FieldValues>({
             <View className="flex-row items-center rounded-md border border-neutral-300">
               {prefix && <Text className="pl-3 text-neutral-500">{prefix}</Text>}
               <Input
-                keyboardType="numeric"
+                keyboardType={decimal ? "decimal-pad" : "numeric"}
                 value={displayValue}
                 onChangeText={(text) => {
-                  const next = grouped ? toDigitsOnly(text) : text;
+                  const next = decimal
+                    ? parseDecimalInput(text, !!grouped)
+                    : grouped
+                      ? toDigitsOnly(text)
+                      : text;
                   field.onChange(next === "" ? null : next);
                 }}
                 onBlur={field.onBlur}

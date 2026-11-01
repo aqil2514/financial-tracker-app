@@ -50,7 +50,13 @@ export async function applyDebtTransaction({
 
   const pairKind = classifyAccountPair(sourceType, destinationType);
 
-  if (pairKind === "cash-cash" || pairKind === "debt-debt") {
+  // Pasangan investasi bukan urusan modul debt — tanpa guard ini jatuh ke cabang debt->kas di bawah.
+  if (
+    pairKind === "cash-cash" ||
+    pairKind === "debt-debt" ||
+    pairKind === "cash-investment" ||
+    pairKind === "investment-cash"
+  ) {
     return NO_TOUCHED_DEBT_ROWS;
   }
 

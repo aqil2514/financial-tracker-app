@@ -1,6 +1,6 @@
 import type { Db } from "./types";
 
-export type FakeAccountRow = { id: string; account_type: "cash" | "debt"; name?: string };
+export type FakeAccountRow = { id: string; account_type: "cash" | "debt" | "investment"; name?: string };
 export type FakeDebtAccountRow = { account_id: string; direction: "receivable" | "payable" };
 export type FakeDebtRow = {
   id: string;

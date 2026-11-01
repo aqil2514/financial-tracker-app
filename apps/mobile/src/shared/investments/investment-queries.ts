@@ -1,5 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
+import { getAverageCostPerUnit } from "./investment-holding-math";
+
 type Db = SQLiteDatabase;
 
 export type InvestmentAccountSummary = {
@@ -36,6 +38,8 @@ export type InvestmentSaleRow = {
 
 export type InvestmentDetail = {
   account: InvestmentAccountSummary;
+  // null kalau belum ada pembelian settled. Rumusnya satu sumber di investment-holding-math.
+  averageCostPerUnit: number | null;
   purchases: InvestmentPurchaseRow[];
   sales: InvestmentSaleRow[];
 };
@@ -140,8 +144,11 @@ export async function getInvestmentDetail(db: Db, accountId: string): Promise<In
     [accountId]
   );
 
+  const averageCostPerUnit = await getAverageCostPerUnit(db, accountId);
+
   return {
     account: toSummary(accountRow),
+    averageCostPerUnit: averageCostPerUnit > 0 ? averageCostPerUnit : null,
     purchases: purchases.map((row) => ({
       id: row.id,
       date: row.date,

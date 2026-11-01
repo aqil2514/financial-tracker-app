@@ -14,6 +14,29 @@ const DEBT_ACCOUNTS: FakeDebtAccountRow[] = [
 ];
 
 describe("applyDebtTransaction", () => {
+  it("transfer kas<->investasi: no-op, tidak jatuh ke cabang debt", async () => {
+    const investment: FakeAccountRow = { id: "inv-1", account_type: "investment" };
+
+    for (const [accountId, transferAccountId] of [["cash-1", "inv-1"], ["inv-1", "cash-1"]]) {
+      const { db, debts } = createFakeDb({ accounts: [CASH, investment], debtAccounts: DEBT_ACCOUNTS });
+
+      const result = await applyDebtTransaction({
+        db,
+        transactionId: "tx-1",
+        type: "transfer",
+        accountId,
+        transferAccountId,
+        contactId: null,
+        amount: 10000,
+        date: "2026-01-01",
+        settleDebtIds: [],
+      });
+
+      expect(result.debtIds).toHaveLength(0);
+      expect(debts).toHaveLength(0);
+    }
+  });
+
   it("bukan transfer: no-op", async () => {
     const { db, debts } = createFakeDb({ accounts: [CASH, RECEIVABLE_DEBT], debtAccounts: DEBT_ACCOUNTS });
 

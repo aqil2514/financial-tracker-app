@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { ScrollView, Text, View } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatCurrency } from "@/lib/utils";
 import { InvestmentActions } from "@/features/investments/content/investment-actions";
@@ -13,6 +13,7 @@ import { useInvestmentDetail } from "@/features/investments/content/use-investme
 
 export default function InvestmentDetailPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { detail, isLoading, refetch } = useInvestmentDetail(id);
   const updateMarketValueRef = useRef<UpdateMarketValueSheetRef>(null);
@@ -30,7 +31,7 @@ export default function InvestmentDetailPage() {
     );
   }
 
-  const { account, purchases, sales } = detail;
+  const { account, averageCostPerUnit, purchases, sales } = detail;
 
   return (
     <>
@@ -44,10 +45,12 @@ export default function InvestmentDetailPage() {
 
         <InvestmentPlStats
           account={account}
-          purchases={purchases}
+          averageCost={averageCostPerUnit}
           onPressUpdateMarketValue={() => updateMarketValueRef.current?.present()}
         />
-        <InvestmentActions />
+        <InvestmentActions
+          onPressPurchase={() => router.push({ pathname: "/investments/[id]/purchase", params: { id: account.id } })}
+        />
         <SettlementBreakdown purchases={purchases} />
 
         <View className="gap-2">

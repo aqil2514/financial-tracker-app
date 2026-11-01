@@ -1,22 +1,20 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { formatCurrency } from "@/lib/utils";
-import type { InvestmentAccountSummary, InvestmentPurchaseRow } from "@/shared/investments";
+import type { InvestmentAccountSummary } from "@/shared/investments";
 import { computePl, formatAgo, formatSignedCurrency } from "./pl";
 import { StatItem } from "./stat-item";
 
 export function InvestmentPlStats({
   account,
-  purchases,
+  averageCost,
   onPressUpdateMarketValue,
 }: {
   account: InvestmentAccountSummary;
-  purchases: InvestmentPurchaseRow[];
+  averageCost: number | null;
   onPressUpdateMarketValue: () => void;
 }) {
   const { pl, percent, toneClass } = computePl(account.currentMarketValue, account.balance);
-  const totalUnit = purchases.reduce((sum, purchase) => sum + (purchase.unit ?? 0), 0);
-  const averageCost = totalUnit !== 0 ? account.balance / totalUnit : null;
 
   return (
     <View className="rounded-lg border border-neutral-200 bg-white px-4 py-2">
