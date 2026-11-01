@@ -1,5 +1,6 @@
 import { Alert, ScrollView, Text, View } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatCurrency } from "@/lib/utils";
 import { InvestmentActions } from "@/features/investments/content/investment-actions";
 import { InvestmentPlStats } from "@/features/investments/content/investment-pl-stats";
@@ -10,6 +11,7 @@ import { findMockInvestmentAccount } from "@/features/investments/mock-data";
 
 export default function InvestmentDetailPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const account = findMockInvestmentAccount(id);
 
   if (!account) {
@@ -26,7 +28,11 @@ export default function InvestmentDetailPage() {
   return (
     <>
       <Stack.Screen options={{ title: account.name }} />
-      <ScrollView className="flex-1 bg-white" contentContainerClassName="gap-4 p-4">
+      <ScrollView
+        className="flex-1 bg-white"
+        contentContainerClassName="gap-4 p-4"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+      >
         <Text className="text-sm text-neutral-500">Modal: {formatCurrency(account.balance)}</Text>
 
         <InvestmentPlStats

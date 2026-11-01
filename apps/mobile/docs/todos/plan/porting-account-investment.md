@@ -7,10 +7,11 @@ Dokumen anak dari [porting-account.md](porting-account.md) — fokus khusus tipe
 
 ## Status & TODO saat ini (ringkas)
 
-Baru tahap riset dan rencana — belum ada satu baris kode pun. Isi dokumen ini adalah hasil membaca konsep dan kode desktop (`apps/desktop/src/shared/investments/`, `apps/desktop/docs/tables/investment.md`), UI desktop (`features/investments`, `features/investment-detail`) belum dibaca detail. Scope tahap di bawah masih REKOMENDASI, belum diputuskan — lihat bagian Keputusan Terbuka.
+Tahap riset selesai, UI tiruan dan skema database sudah ada; logic belum dikerjakan sama sekali (UI masih memakai data mock). Isi dokumen ini adalah hasil membaca konsep dan kode desktop (`apps/desktop/src/shared/investments/`, `apps/desktop/docs/tables/investment.md`), UI desktop (`features/investments`, `features/investment-detail`) belum dibaca detail. Scope tahap di bawah masih REKOMENDASI, belum diputuskan — lihat bagian Keputusan Terbuka.
 
 - [ ] Putuskan scope per tahap (lihat Keputusan Terbuka) sebelum implementasi.
-- [ ] Skema database mobile: tabel `investment_accounts`, `investment_purchases`, `investment_sales`. Migrasi `0009_investments.ts`, didaftarkan di `migrations/index.ts`. Dokumentasi tabel `docs/tables/investment.md` versi mobile.
+- [x] UI tiruan (data mock, tanpa logic): `app/investments/index.tsx` (statistik gabungan + daftar akun, satu layar tanpa tab) dan `app/investments/[id].tsx` (detail), entri dari `more.tsx`. Pie distribusi dan "Per Jenis Instrumen" ditunda.
+- [x] Skema database mobile: tabel `investment_accounts`, `investment_purchases`, `investment_sales`. Migrasi `0009_investments.ts`, didaftarkan di `migrations/index.ts`. Dokumentasi tabel: [investment.md](../../tables/investment.md).
 - [ ] Perluas `classifyAccountPair` mobile dengan `cash-investment` dan `investment-cash` (saat ini melempar `UnsupportedAccountPairError` untuk investasi).
 - [ ] `investment-holding-math` (`getAverageCostPerUnit`, `getRemainingUnit`) dalam SATU tempat + unit test.
 - [ ] Field akun investasi di `AccountForm` mobile: `unit_label` + `current_market_value`, upsert ke `investment_accounts`. Tipe akun terkunci begitu dipakai (perluas `isAccountInUse` ke `investment_purchases`/`investment_sales`).
