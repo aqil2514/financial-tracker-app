@@ -1,13 +1,13 @@
 
-# Porting Akun Tipe Debt / Utang-Piutang (Desktop → Mobile)
+# Porting Akun Tipe Debt / Utang-Piutang (Desktop → Mobile) — SELESAI
 
-Dokumen anak dari [porting-account.md](porting-account.md) — fokus khusus tipe `debt`. Baca induknya dulu untuk konteks kenapa porting akun dipecah per tipe, dan baca [porting-account-cash.md](../done/porting-account-cash.md) sebagai referensi pola yang sudah terbukti bagus (CRUD akun, saldo on-the-fly, picker, dst — tipe `debt` WARIS semua itu, dokumen ini cuma menambahkan apa yang KHUSUS untuk `debt`).
+Dokumen anak dari [porting-account.md](../plan/porting-account.md) — fokus khusus tipe `debt`. Baca induknya dulu untuk konteks kenapa porting akun dipecah per tipe, dan baca [porting-account-cash.md](porting-account-cash.md) sebagai referensi pola yang sudah terbukti bagus (CRUD akun, saldo on-the-fly, picker, dst — tipe `debt` WARIS semua itu, dokumen ini cuma menambahkan apa yang KHUSUS untuk `debt`).
 
 **Wajib baca sebelum implementasi**: [konsep-tipe-akun.md](../../../../../docs/concept/konsep-tipe-akun.md) dan [konsep-utang-piutang.md](../../../../../docs/concept/konsep-utang-piutang.md).
 
 ## Status & TODO saat ini (ringkas)
 
-Implementasi sudah berjalan — skema database, CRUD Kontak, field `direction` akun, logic inti (`applyDebtTransaction`/`applyDirectDebtTransaction`/FIFO), UI form transaksi (create & edit), guard edit/delete, dan halaman Ringkasan Kontak sudah selesai. Belum: isi halaman Utang Piutang (masih placeholder) dan koreksi granular (`debt_amount_adjustments`, di luar MVP).
+**Porting akun tipe debt SELESAI (MVP)** — skema database, CRUD Kontak, field `direction` akun, logic inti (`applyDebtTransaction`/`applyDirectDebtTransaction`/FIFO), UI form transaksi (create & edit), guard edit/delete, dan kedua halaman debt (Ringkasan Kontak + Utang Piutang) sudah jadi dan sudah dicoba manual. Yang sengaja tidak dikerjakan: `debt_amount_adjustments` (koreksi granular, di luar MVP). Satu bug pre-existing di desktop belum diperbaiki (lihat catatan dogfooding di item Utang Piutang).
 
 - [x] Skema database mobile: tabel `debt_accounts`, `debts`, `debt_payments`, `contacts`. Migrasi `0008_debts.ts`, didaftarkan di `migrations/index.ts`. Dokumentasi tabel: [contact.md](../../tables/contact.md), [debt.md](../../tables/debt.md).
 - [x] Placeholder 2 halaman + alur masuk dari `more.tsx` — `app/debts/index.tsx` (Ringkasan Kontak), `app/debts/list.tsx` (Utang Piutang gabungan). Isi/logic masih placeholder, lihat bagian Keputusan Terbuka untuk scope final.
@@ -20,8 +20,9 @@ Implementasi sudah berjalan — skema database, CRUD Kontak, field `direction` a
 - [x] Saldo akun debt ikut rumus on-the-fly yang sudah ada di mobile (tidak perlu kolom baru, akun debt sudah otomatis ikut dihitung lewat `transactions.account_id`/`transfer_account_id` yang sudah ada) — tidak butuh kode tambahan, otomatis benar sejak porting cash.
 - [x] Balance Correction akun debt: **DILARANG**, bukan diimplementasikan — tampilkan pesan penolakan seperti desktop, bukan form. Sudah dikerjakan bersamaan item field `direction` di atas (`app/accounts/[id]/edit.tsx`).
 - [x] Isi halaman Ringkasan Kontak (list per kontak, metrik aktif/terbayar/belum dibayar) — `app/debts/index.tsx` + halaman detail per kontak `app/debts/contact/[id].tsx` (riwayat lengkap semua status, expand untuk cicilan). Read-only (tanpa tombol bayar langsung, sesuai keputusan). Query baru `shared/debts/{contact-summary,contact-debts,debt-payments}.ts`, 12 unit test baru.
-- [ ] Isi halaman Utang Piutang (list flat gabungan payable+receivable, expand untuk cicilan, action bayar/write-off) — scope sudah diputuskan, lihat bagian Keputusan Terbuka.
-- [ ] `debt_amount_adjustments` + `correctDebtRemaining` (koreksi granular per-debt) — **kandidat di luar MVP**, lihat Keputusan Terbuka.
+- [x] Isi halaman Utang Piutang (list flat gabungan payable+receivable, expand untuk cicilan, action bayar/write-off) — `app/debts/list.tsx`. Action "Bayar" navigasi ke `/transactions/new` dengan query params (draft form transaksi pre-filled: akun debt, kontak, `settle_debt_ids`), bukan dialog shortcut terpisah, sesuai keputusan. Action "Tandai Dihapuskan" (`writeOffDebt`) langsung eksekusi + refetch. Query baru `shared/debts/{debts-list,write-off-debt}.ts`, 6 unit test baru.
+  - **Bug ditemukan & diperbaiki lewat dogfooding** (lihat [docs/dogfooding/2026-10-29-debt-written-off-stuck-after-delete-closing-transaction.md](../../../../../docs/dogfooding/2026-10-29-debt-written-off-stuck-after-delete-closing-transaction.md)): `PaymentsList` pakai `useEffect` biasa, jadi stale saat kembali dari form transaksi tanpa unmount — diganti `useFocusEffect`. Juga: downgrade status debt saat payment dihapus cuma mengecek `status = 'paid'`, tidak mencakup `'written_off'` — debt yang di-write-off lalu transaksi penutupnya dihapus nyangkut status "Dihapuskan" walau remaining > 0. Diperbaiki di 3 file (`detach-debt-for-deleted-transaction.ts`, `apply-debt-transaction-edit.ts`, `apply-direct-debt-transaction-edit.ts`) jadi `status IN ('paid', 'written_off')`. **Bug yang sama masih ada di desktop, belum diperbaiki di sana.**
+- **DI LUAR CAKUPAN dokumen ini — `debt_amount_adjustments` + `correctDebtRemaining`** (koreksi granular per-debt): kandidat di luar MVP, sengaja tidak dikerjakan. Keterbatasannya disadari, bukan terlewat — lihat Keputusan Terbuka.
 
 ## Riset: implementasi debt di desktop
 
