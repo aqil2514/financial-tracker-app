@@ -23,5 +23,5 @@ export function useInvestmentDetail(accountId: string) {
     }, [refetch])
   );
 
-  return { detail, isLoading };
+  return { detail, isLoading, refetch };
 }

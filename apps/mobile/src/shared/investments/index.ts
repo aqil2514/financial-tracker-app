@@ -6,3 +6,4 @@ export {
   type InvestmentPurchaseRow,
   type InvestmentSaleRow,
 } from "./investment-queries";
+export { updateMarketValue } from "./update-market-value";

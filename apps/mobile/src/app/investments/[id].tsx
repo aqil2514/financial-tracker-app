@@ -1,4 +1,5 @@
-import { Alert, ScrollView, Text, View } from "react-native";
+import { useRef } from "react";
+import { ScrollView, Text, View } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatCurrency } from "@/lib/utils";
@@ -7,12 +8,14 @@ import { InvestmentPlStats } from "@/features/investments/content/investment-pl-
 import { PurchaseRow } from "@/features/investments/content/purchase-row";
 import { SaleRow } from "@/features/investments/content/sale-row";
 import { SettlementBreakdown } from "@/features/investments/content/settlement-breakdown";
+import { UpdateMarketValueSheet, type UpdateMarketValueSheetRef } from "@/features/investments/content/update-market-value-sheet";
 import { useInvestmentDetail } from "@/features/investments/content/use-investment-detail";
 
 export default function InvestmentDetailPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { detail, isLoading } = useInvestmentDetail(id);
+  const { detail, isLoading, refetch } = useInvestmentDetail(id);
+  const updateMarketValueRef = useRef<UpdateMarketValueSheetRef>(null);
 
   if (!detail) {
     return (
@@ -42,7 +45,7 @@ export default function InvestmentDetailPage() {
         <InvestmentPlStats
           account={account}
           purchases={purchases}
-          onPressUpdateMarketValue={() => Alert.alert("Segera hadir", "Update nilai pasar belum tersedia.")}
+          onPressUpdateMarketValue={() => updateMarketValueRef.current?.present()}
         />
         <InvestmentActions />
         <SettlementBreakdown purchases={purchases} />
@@ -67,6 +70,13 @@ export default function InvestmentDetailPage() {
           )}
         </View>
       </ScrollView>
+
+      <UpdateMarketValueSheet
+        ref={updateMarketValueRef}
+        accountId={account.id}
+        currentValue={account.currentMarketValue}
+        onUpdated={refetch}
+      />
     </>
   );
 }

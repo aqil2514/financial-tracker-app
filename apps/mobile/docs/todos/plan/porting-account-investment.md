@@ -11,7 +11,7 @@ Tahap riset selesai; skema database, form akun investasi, dan layar Investasi (m
 
 - [ ] Putuskan scope per tahap (lihat Keputusan Terbuka) sebelum implementasi.
 - [x] Layar Investasi: `app/investments/index.tsx` (statistik gabungan + daftar akun, satu layar tanpa tab) dan `app/investments/[id].tsx` (detail: statistik P/L, breakdown pending/settled, riwayat pembelian dan penjualan), entri dari `more.tsx`. Sudah membaca data asli lewat `shared/investments/investment-queries.ts` (`getInvestmentAccounts`, `getInvestmentDetail`) + hook `useInvestmentAccounts`/`useInvestmentDetail` (refetch saat layar fokus). Pie distribusi dan "Per Jenis Instrumen" ditunda; badge label dicabut karena mobile belum punya sistem label.
-- [ ] Tombol aksi di detail (Catat Pembelian, Jual, Write-off, Update Nilai Pasar, Settle/Hapus penjualan pending) masih placeholder alert "Segera hadir".
+- [ ] Tombol aksi di detail (Catat Pembelian, Jual, Write-off, Settle/Hapus penjualan pending) masih placeholder alert "Segera hadir".
 - [x] Skema database mobile: tabel `investment_accounts`, `investment_purchases`, `investment_sales`. Migrasi `0009_investments.ts`, didaftarkan di `migrations/index.ts`. Dokumentasi tabel: [investment.md](../../tables/investment.md).
 - [ ] Perluas `classifyAccountPair` mobile dengan `cash-investment` dan `investment-cash` (saat ini melempar `UnsupportedAccountPairError` untuk investasi).
 - [ ] `investment-holding-math` (`getAverageCostPerUnit`, `getRemainingUnit`) dalam SATU tempat + unit test.
@@ -19,7 +19,7 @@ Tahap riset selesai; skema database, form akun investasi, dan layar Investasi (m
 - [ ] **Cabut guard sementara** begitu logic transaksi investasi ada: akun investasi disembunyikan dari picker akun form transaksi (`account-picker-sheet.tsx`) dan opsi tipe Investasi disembunyikan di create-inline picker (prop `hideInvestmentType` di `AccountForm`). Tanpa guard ini transaksi ke akun investasi tersimpan tanpa baris `investment_purchases`/`investment_sales` (transfer malah melempar `UnsupportedAccountPairError` setelah transaksinya sudah di-insert).
 - [ ] Perluas guard "tipe akun terkunci" (`isAccountInUse`) ke `investment_purchases`/`investment_sales` — saat ini tipe sudah terkunci permanen di edit, jadi baru relevan kalau aturan kunci dilonggarkan.
 - [ ] Tahap A — pembelian: `applyInvestmentTransaction` (create/edit/delete) + field unit/harga per unit/status di form transaksi + guard `InvestmentPurchaseEditBlockedError`.
-- [ ] Tahap A — Update Nilai Pasar (tanpa transaksi) + Unrealized P/L.
+- [x] Tahap A — Update Nilai Pasar (tanpa transaksi) + Unrealized P/L: bottom sheet `update-market-value-sheet.tsx` dari ikon edit di detail, `shared/investments/update-market-value.ts` (`updated_at` selalu maju, beda dari form akun yang hanya maju kalau nilainya berubah).
 - [ ] Tahap A — direct purchase (`record_mode: 'direct'`, unit masuk tanpa kas, termasuk saldo/unit awal sebelum pakai app).
 - [ ] Tahap A — halaman Ringkasan dan Detail investasi (riwayat pembelian, breakdown pending/settled, average cost).
 - [ ] Tahap B — penjualan: `applySellInvestmentTransaction` (average cost, validasi oversell, dua leg transaksi), dialog Jual (pending/settled), aksi Settle, hapus penjualan pending, edit/delete transaksi penjualan.
