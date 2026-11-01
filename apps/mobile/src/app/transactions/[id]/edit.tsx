@@ -13,6 +13,11 @@ import {
   detachDebtForDeletedTransaction,
   getTransactionDebtStatus,
 } from "@/shared/debts";
+import {
+  applyInvestmentTransactionEdit,
+  detachInvestmentPurchaseForDeletedTransaction,
+  InvestmentPurchaseEditBlockedError,
+} from "@/shared/investments";
 
 interface TransactionRow {
   note: string;
@@ -101,6 +106,24 @@ export default function EditTransactionPage() {
 
     setIsPending(true);
     try {
+      // Sebelum menulis apa pun: penolakan tidak boleh meninggalkan transaksi yang sudah berubah.
+      try {
+        await applyInvestmentTransactionEdit({
+          db,
+          transactionId: id,
+          type: values.type,
+          accountId: values.account_id,
+          transferAccountId: values.transfer_account_id,
+          date: values.date,
+        });
+      } catch (error) {
+        if (error instanceof InvestmentPurchaseEditBlockedError) {
+          Alert.alert("Tidak bisa disimpan", error.message);
+          return;
+        }
+        throw error;
+      }
+
       const dangerousFieldsChanged =
         values.type !== originalRow.type ||
         values.account_id !== originalRow.account_id ||
@@ -187,9 +210,24 @@ export default function EditTransactionPage() {
         text: "Hapus",
         style: "destructive",
         onPress: async () => {
-          const result = await detachDebtForDeletedTransaction(db, id);
-          await db.runAsync("DELETE FROM transactions WHERE id = ?", [id]);
+          // `as` supaya TS tidak mempersempit ke { role: "none" } (nilainya baru diisi di dalam closure).
+          let result = { role: "none" } as Awaited<ReturnType<typeof detachDebtForDeletedTransaction>>;
+          let investmentResult = { role: "none" } as Awaited<
+            ReturnType<typeof detachInvestmentPurchaseForDeletedTransaction>
+          >;
+          await db.withTransactionAsync(async () => {
+            result = await detachDebtForDeletedTransaction(db, id);
+            investmentResult = await detachInvestmentPurchaseForDeletedTransaction(db, id);
+            await db.runAsync("DELETE FROM transactions WHERE id = ?", [id]);
+          });
           router.back();
+
+          if (investmentResult.role === "purchase") {
+            Alert.alert(
+              "Pembelian investasi ikut dihapus",
+              "Riwayat pembelian yang lahir dari transaksi ini dihapus bersamanya, dan modal akun investasi menyesuaikan."
+            );
+          }
 
           if (result.role === "principal") {
             Alert.alert(

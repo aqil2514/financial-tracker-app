@@ -17,6 +17,7 @@ export type InvestmentAccountSummary = {
 
 export type InvestmentPurchaseRow = {
   id: string;
+  transactionId: string | null;
   date: string;
   unit: number | null;
   pricePerUnit: number | null;
@@ -110,6 +111,7 @@ export async function getInvestmentDetail(db: Db, accountId: string): Promise<In
   // sudah dihapus (transaction_id jadi NULL). Pembelian langsung (hibah/bonus/saldo awal) = transaksi income.
   const purchases = await db.getAllAsync<{
     id: string;
+    transaction_id: string | null;
     date: string;
     unit: number | null;
     price_per_unit: number | null;
@@ -117,7 +119,7 @@ export async function getInvestmentDetail(db: Db, accountId: string): Promise<In
     amount: number;
     is_direct: number;
   }>(
-    `SELECT p.id, p.date, p.unit, p.price_per_unit, p.status,
+    `SELECT p.id, p.transaction_id, p.date, p.unit, p.price_per_unit, p.status,
             COALESCE(t.amount, p.unit * p.price_per_unit, 0) AS amount,
             CASE WHEN t.type = 'income' THEN 1 ELSE 0 END AS is_direct
      FROM investment_purchases p
@@ -151,6 +153,7 @@ export async function getInvestmentDetail(db: Db, accountId: string): Promise<In
     averageCostPerUnit: averageCostPerUnit > 0 ? averageCostPerUnit : null,
     purchases: purchases.map((row) => ({
       id: row.id,
+      transactionId: row.transaction_id,
       date: row.date,
       unit: row.unit,
       pricePerUnit: row.price_per_unit,
@@ -168,5 +171,37 @@ export async function getInvestmentDetail(db: Db, accountId: string): Promise<In
       status: row.status,
       isWriteOff: row.price_per_unit === 0,
     })),
+  };
+}
+
+export type InvestmentPurchaseDetail = {
+  id: string;
+  accountId: string;
+  transactionId: string | null;
+  unit: number | null;
+  pricePerUnit: number | null;
+  status: "pending" | "settled";
+};
+
+export async function getInvestmentPurchase(db: Db, purchaseId: string): Promise<InvestmentPurchaseDetail | null> {
+  const row = await db.getFirstAsync<{
+    id: string;
+    account_id: string;
+    transaction_id: string | null;
+    unit: number | null;
+    price_per_unit: number | null;
+    status: "pending" | "settled";
+  }>(`SELECT id, account_id, transaction_id, unit, price_per_unit, status FROM investment_purchases WHERE id = ?`, [
+    purchaseId,
+  ]);
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    transactionId: row.transaction_id,
+    unit: row.unit,
+    pricePerUnit: row.price_per_unit,
+    status: row.status,
   };
 }

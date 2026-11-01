@@ -59,7 +59,17 @@ export default function InvestmentDetailPage() {
             <Text className="text-neutral-500">Belum ada riwayat pembelian.</Text>
           ) : (
             purchases.map((purchase) => (
-              <PurchaseRow key={purchase.id} purchase={purchase} unitLabel={account.unitLabel} />
+              <PurchaseRow
+                key={purchase.id}
+                purchase={purchase}
+                unitLabel={account.unitLabel}
+                onPress={() =>
+                  router.push({
+                    pathname: "/investments/[id]/edit-purchase",
+                    params: { id: account.id, purchaseId: purchase.id },
+                  })
+                }
+              />
             ))
           )}
         </View>

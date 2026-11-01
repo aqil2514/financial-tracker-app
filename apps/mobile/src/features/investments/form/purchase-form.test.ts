@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { derivePurchase } from "./derive-purchase";
-import { purchaseFormSchema, type PurchaseFormOutput } from "./schema";
+import { computePricePerUnit, derivePurchase } from "./derive-purchase";
+import { editPurchaseFormSchema, purchaseFormSchema, type PurchaseFormOutput } from "./schema";
 import { emptyPurchaseValues } from "./values";
 
 function parse(overrides: Record<string, unknown>) {
@@ -69,5 +69,33 @@ describe("derivePurchase", () => {
     const result = derivePurchase({ ...base, source: "direct", status: "pending" });
     expect(result.status).toBe("settled");
     expect(result.cashAccountId).toBeNull();
+  });
+});
+
+describe("computePricePerUnit", () => {
+  it("satuan apa adanya, total dibagi unit, kosong jadi null", () => {
+    expect(computePricePerUnit("unit", 500, 3)).toBe(500);
+    expect(computePricePerUnit("total", 1500, 3)).toBe(500);
+    expect(computePricePerUnit("unit", null, 3)).toBeNull();
+  });
+});
+
+describe("editPurchaseFormSchema", () => {
+  const parseEdit = (values: Record<string, unknown>) =>
+    editPurchaseFormSchema.safeParse({ unit: null, price_mode: "unit", price_input: null, status: "pending", ...values });
+  const editPaths = (result: ReturnType<typeof parseEdit>) =>
+    result.success ? [] : result.error.issues.map((issue) => issue.path.join("."));
+
+  it("pending: unit dan harga boleh kosong", () => {
+    expect(parseEdit({}).success).toBe(true);
+  });
+
+  it("settled: unit dan harga wajib", () => {
+    expect(editPaths(parseEdit({ status: "settled" }))).toEqual(expect.arrayContaining(["unit", "price_input"]));
+    expect(parseEdit({ status: "settled", unit: "12.5", price_input: "80000" }).success).toBe(true);
+  });
+
+  it("mode total tanpa unit ditolak", () => {
+    expect(editPaths(parseEdit({ price_mode: "total", price_input: "1000" }))).toContain("price_input");
   });
 });
