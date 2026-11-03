@@ -2,7 +2,7 @@
 
 Sesi ini mengerjakan porting tipe akun **Investasi** desktop → mobile (`apps/mobile`) dari nol sampai **Tahap A selesai dan terverifikasi di device fisik** lewat screenshot user: skema, form akun, layar daftar + detail, Update Nilai Pasar, Catat Pembelian (transfer dan direct), Edit Pembelian, hapus transaksi pembelian. **Tahap B (penjualan, settle, write-off) belum dimulai.** Sebelum itu sesi dibuka dengan memverifikasi klaim di dokumen porting debt (benar, lalu dipindah ke `done/`).
 
-Dokumen induk kerja: [apps/mobile/docs/todos/plan/porting-account-investment.md](../../../apps/mobile/docs/todos/plan/porting-account-investment.md) (checklist tunggal di paling atas, status terkini ada di sana — baca itu dulu). Konsep wajib dibaca sebelum menyentuh kode investasi: [docs/concept/konsep-investasi.md](../../concept/konsep-investasi.md). Skema mobile: [apps/mobile/docs/tables/investment.md](../../../apps/mobile/docs/tables/investment.md).
+Dokumen induk kerja: [apps/mobile/docs/todos/done/porting-account-investment.md](../../../apps/mobile/docs/todos/done/porting-account-investment.md) (checklist tunggal di paling atas, status terkini ada di sana — baca itu dulu). Konsep wajib dibaca sebelum menyentuh kode investasi: [docs/concept/konsep-investasi.md](../../concept/konsep-investasi.md). Skema mobile: [apps/mobile/docs/tables/investment.md](../../../apps/mobile/docs/tables/investment.md).
 
 ## Status git saat handover
 
@@ -77,7 +77,7 @@ Sudah di-commit user (urut lama → baru): `Placeholder investasi`, `Schema tabl
 
 ## Cara melanjutkan (saran urutan)
 
-1. Baca checklist di [porting-account-investment.md](../../../apps/mobile/docs/todos/plan/porting-account-investment.md), lalu [konsep-investasi.md](../../concept/konsep-investasi.md) bagian "Penjualan/penarikan sebagian" dan "Dana BARU cair saat settled".
+1. Baca checklist di [porting-account-investment.md](../../../apps/mobile/docs/todos/done/porting-account-investment.md), lalu [konsep-investasi.md](../../concept/konsep-investasi.md) bagian "Penjualan/penarikan sebagian" dan "Dana BARU cair saat settled".
 2. Minta user commit dulu perubahan yang tertunda, atau tanyakan.
 3. Jalankan `npx vitest run` dan `npx tsc --noEmit` di `apps/mobile` untuk baseline (196 test; kalau `tsc` mengeluh soal route, lihat Temuan #4).
 4. Mulai Tahap B dengan pertanyaan desain (Belum dikerjakan #1), bukan langsung kode. Logic dulu dengan test di `createSqliteTestDb`, UI sesudahnya — pola yang terbukti nyaman di Tahap A.

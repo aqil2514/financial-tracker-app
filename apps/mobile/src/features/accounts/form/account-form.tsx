@@ -94,7 +94,7 @@ interface AccountFormProps {
   onDelete?: () => void;
   hideKindToggle?: boolean;
   hideAccountTypeToggle?: boolean;
-  // Sementara dipakai picker akun di form transaksi: logic transaksi untuk akun investasi belum ada.
+  // Dipakai picker akun di form transaksi: akun investasi permanen hanya lewat layar Investasi.
   hideInvestmentType?: boolean;
   inBottomSheet?: boolean;
 }

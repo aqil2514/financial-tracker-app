@@ -262,9 +262,10 @@ export default function EditAccountPage() {
                 </Text>
               ) : defaultValues.account_type === "investment" ? (
                 <Text className="text-sm text-neutral-500">
-                  Saldo (modal) akun bertipe Investasi belum bisa dikoreksi langsung di sini —
-                  saldo akun ini mengikuti riwayat pembelian/penjualan unit. Koreksi unit akan
-                  tersedia menyusul.
+                  Saldo (modal) akun bertipe Investasi tidak bisa dikoreksi langsung di sini —
+                  saldo akun ini mengikuti riwayat pembelian/penjualan unit. Untuk unit yang
+                  kurang, pakai Catat Pembelian dengan sumber “Tanpa kas”; untuk unit yang
+                  berlebih, pakai Write-off, keduanya dari layar Investasi.
                 </Text>
               ) : (
                 <CurrentBalanceField value={currentBalanceInput} onChangeText={setCurrentBalanceInput} />

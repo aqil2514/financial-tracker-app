@@ -1,7 +1,7 @@
 
 # Tabel `investment_accounts`, `investment_purchases`, `investment_sales`
 
-Tiga tabel yang satu kesatuan domain tipe akun **Investasi**, mendampingi akun bertipe `investment` di [account.md](account.md). Satu akun investasi = satu instrumen tunggal (bukan portofolio gabungan). `investment_accounts` menyimpan detail manual level akun (satuan unit dan nilai pasar terkini); `investment_purchases` mencatat riwayat pembelian per lot; `investment_sales` mencatat riwayat penjualan/pelepasan per lot. Lihat [konsep-tipe-akun.md](../../../../docs/concept/konsep-tipe-akun.md) dan [konsep-investasi.md](../../../../docs/concept/konsep-investasi.md) untuk aturan bisnisnya, dan [porting-account-investment.md](../todos/plan/porting-account-investment.md) untuk riset porting dari desktop.
+Tiga tabel yang satu kesatuan domain tipe akun **Investasi**, mendampingi akun bertipe `investment` di [account.md](account.md). Satu akun investasi = satu instrumen tunggal (bukan portofolio gabungan). `investment_accounts` menyimpan detail manual level akun (satuan unit dan nilai pasar terkini); `investment_purchases` mencatat riwayat pembelian per lot; `investment_sales` mencatat riwayat penjualan/pelepasan per lot. Lihat [konsep-tipe-akun.md](../../../../docs/concept/konsep-tipe-akun.md) dan [konsep-investasi.md](../../../../docs/concept/konsep-investasi.md) untuk aturan bisnisnya, dan [porting-account-investment.md](../todos/done/porting-account-investment.md) untuk riset porting dari desktop.
 
 Ketiga tabel dibuat di migrasi `0009_investments.ts`.
 

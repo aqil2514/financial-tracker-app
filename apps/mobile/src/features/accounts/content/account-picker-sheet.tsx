@@ -58,6 +58,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
       const groups = await db.getAllAsync<{ id: string; name: string }>(
         `SELECT id, name FROM account_groups ORDER BY name ASC`
       );
+      // Akun investasi sengaja tidak dipilih di form transaksi: beli/jual/write-off hanya lewat layar Investasi.
       const ungroupedAccounts = await db.getAllAsync<{ id: string; name: string }>(
         `SELECT id, name FROM accounts WHERE group_id IS NULL AND is_active = 1 AND account_type != 'investment' ORDER BY name ASC`
       );
