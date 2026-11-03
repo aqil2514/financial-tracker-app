@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Text } from "react-native";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 import { BaseForm } from "@/components/forms/base-form";
@@ -10,6 +11,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { formatSignedCurrency, formatUnit } from "../content/pl";
 import { computePricePerUnit } from "./derive-purchase";
+import { SellAllCheckbox } from "./sell-all-checkbox";
 import { sellFormSchema, type SellFormOutput, type SellFormValues } from "./schema";
 
 const STATUS_OPTIONS = [
@@ -59,8 +61,14 @@ function SellFormFields({ form, cashAccountOptions, unitLabel, remainingUnit, av
     control: form.control,
     name: ["status", "price_mode", "unit", "price_input"],
   });
+  const [sellAll, setSellAll] = useState(false);
   const isSettled = status === "settled";
   const unitName = unitLabel || "unit";
+
+  function handleSellAll(next: boolean) {
+    setSellAll(next);
+    form.setValue("unit", next ? remainingUnit : null, { shouldValidate: true, shouldDirty: true });
+  }
 
   const unitNumber = Number(unit);
   const priceNumber = Number(priceInput);
@@ -83,7 +91,15 @@ function SellFormFields({ form, cashAccountOptions, unitLabel, remainingUnit, av
           : "Order jual masih diproses: unit langsung berkurang, tapi kas belum tersentuh sampai Anda menekan Settle."}
       </Hint>
 
-      <FormFieldNumber form={form} name="unit" label={`Jumlah ${unitName} dijual`} placeholder="0" decimal />
+      <FormFieldNumber
+        form={form}
+        name="unit"
+        label={`Jumlah ${unitName} dijual`}
+        placeholder="0"
+        decimal
+        disabled={sellAll}
+      />
+      <SellAllCheckbox checked={sellAll} remainingUnit={remainingUnit} unitLabel={unitLabel} onChange={handleSellAll} />
 
       <FormFieldToggleGroup form={form} name="price_mode" label="Input harga jual" options={PRICE_MODE_OPTIONS} />
       <FormFieldNumber

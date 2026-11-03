@@ -31,8 +31,10 @@ export {
   getTransactionInvestmentSale,
   InsufficientInvestmentUnitsError,
   recordInvestmentSale,
+  recordInvestmentWriteOff,
   settleInvestmentSale,
   type InvestmentSaleLegInfo,
   type RecordInvestmentSaleInput,
+  type RecordInvestmentWriteOffInput,
 } from "./investment-sale";
-export { updateInvestmentPurchase,type UpdateInvestmentPurchaseInput } from "./update-investment-purchase";
+export { updateInvestmentPurchase, type UpdateInvestmentPurchaseInput } from "./update-investment-purchase";

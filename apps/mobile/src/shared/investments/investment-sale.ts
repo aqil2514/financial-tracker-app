@@ -122,6 +122,46 @@ export async function recordInvestmentSale(input: RecordInvestmentSaleInput): Pr
   return saleId;
 }
 
+export type RecordInvestmentWriteOffInput = {
+  db: SQLiteDatabase;
+  investmentAccountId: string;
+  unit: number;
+  date: string;
+  note: string;
+};
+
+// Unit hilang tanpa kas masuk (hibah keluar, delisting). Baris investment_sales dengan price_per_unit = 0
+// (pembeda write-off), selalu settled, tanpa leg kas. Satu transaksi expense langsung di akun investasi
+// sebesar average_cost × unit (dihitung otomatis, bukan input), realized_pl = kerugian penuh.
+export async function recordInvestmentWriteOff(input: RecordInvestmentWriteOffInput): Promise<string> {
+  const { db, investmentAccountId, unit, date, note } = input;
+  const saleId = generateId();
+  const transactionId = generateId();
+
+  await db.withTransactionAsync(async () => {
+    const remaining = await getRemainingUnit(db, investmentAccountId);
+    if (unit > remaining) throw new InsufficientInvestmentUnitsError(remaining, unit);
+
+    const averageCost = await getAverageCostPerUnit(db, investmentAccountId);
+    const loss = averageCost * unit;
+
+    await db.runAsync(
+      `INSERT INTO transactions (id, note, description, type, amount, date, category_id, account_id, transfer_account_id)
+       VALUES (?, ?, NULL, 'expense', ?, ?, NULL, ?, NULL)`,
+      [transactionId, note, loss, date, investmentAccountId]
+    );
+    await db.runAsync(
+      `INSERT INTO investment_sales
+        (id, account_id, transaction_id, adjustment_transaction_id, unit, price_per_unit,
+         average_cost_per_unit, realized_pl, date, status)
+       VALUES (?, ?, ?, NULL, ?, 0, ?, ?, ?, 'settled')`,
+      [saleId, investmentAccountId, transactionId, unit, averageCost, -loss, date]
+    );
+  });
+
+  return saleId;
+}
+
 type SaleRowForSettle = {
   account_id: string;
   unit: number;

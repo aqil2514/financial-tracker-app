@@ -72,6 +72,7 @@ export default function InvestmentDetailPage() {
         <InvestmentActions
           onPressPurchase={() => router.push({ pathname: "/investments/[id]/purchase", params: { id: account.id } })}
           onPressSell={() => router.push({ pathname: "/investments/[id]/sell", params: { id: account.id } })}
+          onPressWriteOff={() => router.push({ pathname: "/investments/[id]/write-off", params: { id: account.id } })}
         />
         <SettlementBreakdown purchases={purchases} />
 

@@ -7,7 +7,7 @@ export function computePl(marketValue: number, balance: number) {
 }
 
 export function formatSignedCurrency(amount: number): string {
-  return `${amount >= 0 ? "+" : ""}${formatCurrency(amount)}`;
+  return amount < 0 ? `-${formatCurrency(-amount)}` : `+${formatCurrency(amount)}`;
 }
 
 export function formatUnit(value: number | null): string {

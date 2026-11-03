@@ -86,7 +86,22 @@ export const sellFormSchema = z
 export type SellFormValues = z.input<typeof sellFormSchema>;
 export type SellFormOutput = z.output<typeof sellFormSchema>;
 
-export const settleSaleFormSchema = z.object({
+export const writeOffFormSchema = z
+  .object({
+    unit: unitField,
+    date: z.string().min(1, "Tanggal wajib diisi"),
+    note: z.string(),
+  })
+  .superRefine((values, ctx) => {
+    if (values.unit == null) {
+      ctx.addIssue({ code: "custom", path: ["unit"], message: "Jumlah unit wajib diisi" });
+    }
+  });
+
+export type WriteOffFormValues = z.input<typeof writeOffFormSchema>;
+export type WriteOffFormOutput = z.output<typeof writeOffFormSchema>;
+
+export const settleSaleFormSchema =z.object({
   cash_account_id: z.string().min(1, "Akun kas tujuan wajib dipilih"),
 });
 

@@ -8,6 +8,7 @@ import {
   getTransactionInvestmentSale,
   InsufficientInvestmentUnitsError,
   recordInvestmentSale,
+  recordInvestmentWriteOff,
   settleInvestmentSale,
 } from "./investment-sale";
 import { recordInvestmentPurchase } from "./record-investment-purchase";
@@ -263,5 +264,70 @@ describe("hapus transaksi penjualan", () => {
     expect((await getTransactionInvestmentSale(db, sale.transaction_id as string)).role).toBe("sale");
     expect((await getTransactionInvestmentSale(db, sale.adjustment_transaction_id as string)).role).toBe("sale");
     expect((await getTransactionInvestmentSale(db, "tidak-ada")).role).toBe("none");
+  });
+});
+
+describe("recordInvestmentWriteOff", () => {
+  it("saldo investasi turun average_cost × unit lewat expense langsung, tanpa menyentuh kas", async () => {
+    await seedHolding();
+    const cashBefore = (await cashBalance()) as number;
+
+    await recordInvestmentWriteOff({ db, investmentAccountId: "inv", unit: 30, date: DATE, note: "Delisting" });
+
+    expect(await balance("inv")).toBe(700_000);
+    expect((await cashBalance()) as number).toBe(cashBefore);
+    const [sale] = await sales();
+    expect(sale).toMatchObject({
+      status: "settled",
+      price_per_unit: 0,
+      average_cost_per_unit: 10_000,
+      realized_pl: -300_000,
+      adjustment_transaction_id: null,
+    });
+    const tx = await db.getFirstAsync<{ type: string; amount: number; account_id: string; transfer_account_id: string | null }>(
+      "SELECT type, amount, account_id, transfer_account_id FROM transactions WHERE id = ?",
+      [sale.transaction_id as string]
+    );
+    expect(tx).toEqual({ type: "expense", amount: 300_000, account_id: "inv", transfer_account_id: null });
+  });
+
+  it("muncul di detail sebagai write-off dan memotong sisa unit", async () => {
+    await seedHolding();
+    await recordInvestmentWriteOff({ db, investmentAccountId: "inv", unit: 30, date: DATE, note: "x" });
+
+    const detail = await getInvestmentDetail(db, "inv");
+    expect(detail?.sales[0]).toMatchObject({ isWriteOff: true, realizedPl: -300_000 });
+    await expect(
+      recordInvestmentWriteOff({ db, investmentAccountId: "inv", unit: 71, date: DATE, note: "x" })
+    ).rejects.toBeInstanceOf(InsufficientInvestmentUnitsError);
+  });
+
+  it("jual biasa dengan P/L nol tidak terbaca sebagai write-off", async () => {
+    await seedHolding();
+    await recordInvestmentSale({ ...SALE, db, cashAccountId: "cash", unit: 10, pricePerUnit: 10_000, status: "settled" });
+    expect((await getInvestmentDetail(db, "inv"))?.sales[0].isWriteOff).toBe(false);
+  });
+
+  it("hapus transaksinya menghapus baris write-off dan mengembalikan saldo", async () => {
+    await seedHolding();
+    await recordInvestmentWriteOff({ db, investmentAccountId: "inv", unit: 30, date: DATE, note: "x" });
+    const [sale] = await sales();
+
+    await db.withTransactionAsync(async () => {
+      await detachInvestmentSaleForDeletedTransaction(db, sale.transaction_id as string);
+      await db.runAsync("DELETE FROM transactions WHERE id = ?", [sale.transaction_id as string]);
+    });
+
+    expect(await sales()).toHaveLength(0);
+    expect(await balance("inv")).toBe(1_000_000);
+  });
+
+  it("oversell: ditolak tanpa transaksi yatim", async () => {
+    await seedHolding();
+    const txBefore = await count("transactions");
+    await expect(
+      recordInvestmentWriteOff({ db, investmentAccountId: "inv", unit: 101, date: DATE, note: "x" })
+    ).rejects.toBeInstanceOf(InsufficientInvestmentUnitsError);
+    expect(await count("transactions")).toBe(txBefore);
   });
 });

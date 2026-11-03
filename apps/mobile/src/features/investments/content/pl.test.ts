@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePl, formatAgo } from "./pl";
+import { computePl, formatAgo, formatSignedCurrency } from "./pl";
 
 describe("computePl", () => {
   it("untung: pl positif dan persen dari modal", () => {
@@ -33,5 +33,13 @@ describe("formatAgo", () => {
 
   it("format ISO dengan T tetap diterima", () => {
     expect(formatAgo("2026-11-07T12:00:00Z", now)).toBe("3 hari lalu");
+  });
+});
+
+describe("formatSignedCurrency", () => {
+  it("tanda di depan simbol Rp, bukan di antara Rp dan angka", () => {
+    expect(formatSignedCurrency(500_000)).toBe(`+${formatSignedCurrency(500_000).slice(1)}`);
+    expect(formatSignedCurrency(-5_000).startsWith("-Rp")).toBe(true);
+    expect(formatSignedCurrency(5_000).startsWith("+Rp")).toBe(true);
   });
 });
