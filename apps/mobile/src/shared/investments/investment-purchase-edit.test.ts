@@ -65,6 +65,28 @@ describe("detachInvestmentPurchaseForDeletedTransaction", () => {
     expect(remaining[0].transaction_id).not.toBe(t1);
   });
 
+  it("unit pembelian settled sudah terjual: hapus DITOLAK dan baris tetap ada", async () => {
+    const t1 = await seedBoughtThenSold();
+
+    await expect(detachInvestmentPurchaseForDeletedTransaction(db, t1)).rejects.toBeInstanceOf(
+      InvestmentPurchaseEditBlockedError
+    );
+    expect(await purchaseRows()).toHaveLength(1);
+  });
+
+  it("pesan penolakan hapus menyebut hapus, bukan ubah", async () => {
+    const t1 = await seedBoughtThenSold();
+
+    await expect(detachInvestmentPurchaseForDeletedTransaction(db, t1)).rejects.toThrow("tidak bisa dihapus");
+  });
+
+  it("pembelian pending tidak pernah diblok walau ada penjualan", async () => {
+    await seedBoughtThenSold();
+    const pending = await recordInvestmentPurchase({ db, investmentAccountId: "inv", cashAccountId: "cash", amount: 1, unit: 5, pricePerUnit: 1, date: DATE, note: "p", status: "pending" });
+
+    expect((await detachInvestmentPurchaseForDeletedTransaction(db, pending)).role).toBe("purchase");
+  });
+
   it("tanpa detach, menghapus transaksi meninggalkan baris yatim (alasan fungsi ini ada)", async () => {
     const t1 = await recordInvestmentPurchase({ db, investmentAccountId: "inv", cashAccountId: "cash", amount: 1, unit: 5, pricePerUnit: 1, date: DATE, note: "a", status: "settled" });
 

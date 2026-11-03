@@ -25,4 +25,14 @@ export {
   applyInvestmentTransactionEdit,
   type ApplyInvestmentTransactionEditInput,
 } from "./apply-investment-transaction-edit";
-export { updateInvestmentPurchase, type UpdateInvestmentPurchaseInput } from "./update-investment-purchase";
+export {
+  deletePendingInvestmentSale,
+  detachInvestmentSaleForDeletedTransaction,
+  getTransactionInvestmentSale,
+  InsufficientInvestmentUnitsError,
+  recordInvestmentSale,
+  settleInvestmentSale,
+  type InvestmentSaleLegInfo,
+  type RecordInvestmentSaleInput,
+} from "./investment-sale";
+export { updateInvestmentPurchase,type UpdateInvestmentPurchaseInput } from "./update-investment-purchase";

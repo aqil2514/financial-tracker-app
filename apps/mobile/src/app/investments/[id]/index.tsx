@@ -1,7 +1,8 @@
 import { useRef } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useDatabase } from "@/lib/database";
 import { formatCurrency } from "@/lib/utils";
 import { InvestmentActions } from "@/features/investments/content/investment-actions";
 import { InvestmentPlStats } from "@/features/investments/content/investment-pl-stats";
@@ -10,10 +11,12 @@ import { SaleRow } from "@/features/investments/content/sale-row";
 import { SettlementBreakdown } from "@/features/investments/content/settlement-breakdown";
 import { UpdateMarketValueSheet, type UpdateMarketValueSheetRef } from "@/features/investments/content/update-market-value-sheet";
 import { useInvestmentDetail } from "@/features/investments/content/use-investment-detail";
+import { deletePendingInvestmentSale } from "@/shared/investments";
 
 export default function InvestmentDetailPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const db = useDatabase();
   const insets = useSafeAreaInsets();
   const { detail, isLoading, refetch } = useInvestmentDetail(id);
   const updateMarketValueRef = useRef<UpdateMarketValueSheetRef>(null);
@@ -33,6 +36,24 @@ export default function InvestmentDetailPage() {
 
   const { account, averageCostPerUnit, purchases, sales } = detail;
 
+  function confirmDeletePendingSale(saleId: string) {
+    Alert.alert("Hapus penjualan pending?", "Unit yang tertahan dikembalikan. Kas tidak berubah karena belum tersentuh.", [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deletePendingInvestmentSale(db, saleId);
+            await refetch();
+          } catch (error) {
+            Alert.alert("Gagal menghapus", error instanceof Error ? error.message : "Terjadi kesalahan.");
+          }
+        },
+      },
+    ]);
+  }
+
   return (
     <>
       <Stack.Screen options={{ title: account.name }} />
@@ -50,6 +71,7 @@ export default function InvestmentDetailPage() {
         />
         <InvestmentActions
           onPressPurchase={() => router.push({ pathname: "/investments/[id]/purchase", params: { id: account.id } })}
+          onPressSell={() => router.push({ pathname: "/investments/[id]/sell", params: { id: account.id } })}
         />
         <SettlementBreakdown purchases={purchases} />
 
@@ -79,7 +101,30 @@ export default function InvestmentDetailPage() {
           {sales.length === 0 ? (
             <Text className="text-neutral-500">Belum ada riwayat penjualan.</Text>
           ) : (
-            sales.map((sale) => <SaleRow key={sale.id} sale={sale} unitLabel={account.unitLabel} />)
+            sales.map((sale) => (
+              <SaleRow
+                key={sale.id}
+                sale={sale}
+                unitLabel={account.unitLabel}
+                // Penjualan settled dikelola lewat transaksinya (lihat dan hapus di sana).
+                onPress={
+                  sale.transactionId
+                    ? () =>
+                        router.push({
+                          pathname: "/transactions/[id]/edit",
+                          params: { id: sale.transactionId as string },
+                        })
+                    : undefined
+                }
+                onSettle={() =>
+                  router.push({
+                    pathname: "/investments/[id]/settle-sale",
+                    params: { id: account.id, saleId: sale.id },
+                  })
+                }
+                onDelete={() => confirmDeletePendingSale(sale.id)}
+              />
+            ))
           )}
         </View>
       </ScrollView>

@@ -28,6 +28,7 @@ export type InvestmentPurchaseRow = {
 
 export type InvestmentSaleRow = {
   id: string;
+  transactionId: string | null;
   date: string;
   unit: number;
   pricePerUnit: number;
@@ -132,6 +133,7 @@ export async function getInvestmentDetail(db: Db, accountId: string): Promise<In
   // price_per_unit = 0 menandai write-off (unit hilang tanpa kas masuk).
   const sales = await db.getAllAsync<{
     id: string;
+    transaction_id: string | null;
     date: string;
     unit: number;
     price_per_unit: number;
@@ -139,7 +141,7 @@ export async function getInvestmentDetail(db: Db, accountId: string): Promise<In
     realized_pl: number | null;
     status: "pending" | "settled";
   }>(
-    `SELECT id, date, unit, price_per_unit, average_cost_per_unit, realized_pl, status
+    `SELECT id, transaction_id, date, unit, price_per_unit, average_cost_per_unit, realized_pl, status
      FROM investment_sales
      WHERE account_id = ?
      ORDER BY date DESC, created_at DESC`,
@@ -163,6 +165,7 @@ export async function getInvestmentDetail(db: Db, accountId: string): Promise<In
     })),
     sales: sales.map((row) => ({
       id: row.id,
+      transactionId: row.transaction_id,
       date: row.date,
       unit: row.unit,
       pricePerUnit: row.price_per_unit,

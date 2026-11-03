@@ -66,3 +66,29 @@ export const editPurchaseFormSchema = z
 
 export type EditPurchaseFormValues = z.input<typeof editPurchaseFormSchema>;
 export type EditPurchaseFormOutput = z.output<typeof editPurchaseFormSchema>;
+
+export const sellFormSchema = z
+  .object({
+    unit: unitField,
+    price_mode: priceModeField,
+    price_input: priceInputField,
+    date: z.string().min(1, "Tanggal wajib diisi"),
+    status: z.enum(["pending", "settled"]),
+    cash_account_id: z.string().nullable(),
+  })
+  .superRefine((values, ctx) => {
+    validateUnitAndPrice(values, true, ctx);
+    if (values.status === "settled" && !values.cash_account_id) {
+      ctx.addIssue({ code: "custom", path: ["cash_account_id"], message: "Akun kas tujuan wajib dipilih" });
+    }
+  });
+
+export type SellFormValues = z.input<typeof sellFormSchema>;
+export type SellFormOutput = z.output<typeof sellFormSchema>;
+
+export const settleSaleFormSchema = z.object({
+  cash_account_id: z.string().min(1, "Akun kas tujuan wajib dipilih"),
+});
+
+export type SettleSaleFormValues = z.input<typeof settleSaleFormSchema>;
+export type SettleSaleFormOutput = z.output<typeof settleSaleFormSchema>;

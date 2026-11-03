@@ -1,16 +1,24 @@
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Badge } from "@/components/badge";
 import { formatCurrency } from "@/lib/utils";
 import type { InvestmentSaleRow } from "@/shared/investments";
 import { formatDate, formatSignedCurrency, formatUnit } from "./pl";
 import { StatusBadge } from "./status-badge";
 
-export function SaleRow({ sale, unitLabel }: { sale: InvestmentSaleRow; unitLabel: string }) {
+type SaleRowProps = {
+  sale: InvestmentSaleRow;
+  unitLabel: string;
+  onPress?: () => void;
+  onSettle: () => void;
+  onDelete: () => void;
+};
+
+export function SaleRow({ sale, unitLabel, onPress, onSettle, onDelete }: SaleRowProps) {
   const plToneClass = (sale.realizedPl ?? 0) >= 0 ? "text-green-700" : "text-red-700";
 
   return (
     <View className="gap-2 rounded-md border border-neutral-200 p-3">
-      <View className="flex-row items-center justify-between gap-2">
+      <Pressable className="flex-row items-center justify-between gap-2" disabled={!onPress} onPress={onPress}>
         <View className="gap-0.5">
           <Text className="text-sm font-medium text-neutral-900">{formatDate(sale.date)}</Text>
           <Text className="text-xs text-neutral-500">
@@ -26,19 +34,13 @@ export function SaleRow({ sale, unitLabel }: { sale: InvestmentSaleRow; unitLabe
             <StatusBadge status={sale.status} />
           </View>
         </View>
-      </View>
+      </Pressable>
       {sale.status === "pending" && (
         <View className="flex-row gap-2 border-t border-neutral-100 pt-2">
-          <Pressable
-            className="flex-1 items-center rounded-md border border-neutral-300 py-1.5"
-            onPress={() => Alert.alert("Segera hadir", "Aksi Settle belum tersedia.")}
-          >
+          <Pressable className="flex-1 items-center rounded-md border border-neutral-300 py-1.5" onPress={onSettle}>
             <Text className="text-sm text-neutral-900">Settle</Text>
           </Pressable>
-          <Pressable
-            className="flex-1 items-center rounded-md border border-red-200 py-1.5"
-            onPress={() => Alert.alert("Segera hadir", "Hapus penjualan pending belum tersedia.")}
-          >
+          <Pressable className="flex-1 items-center rounded-md border border-red-200 py-1.5" onPress={onDelete}>
             <Text className="text-sm text-red-700">Hapus</Text>
           </Pressable>
         </View>

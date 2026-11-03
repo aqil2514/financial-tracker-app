@@ -16,6 +16,8 @@ import {
 import {
   applyInvestmentTransactionEdit,
   detachInvestmentPurchaseForDeletedTransaction,
+  detachInvestmentSaleForDeletedTransaction,
+  getTransactionInvestmentSale,
   InvestmentPurchaseEditBlockedError,
 } from "@/shared/investments";
 
@@ -103,6 +105,16 @@ export default function EditTransactionPage() {
       return;
     }
     if (!originalRow) return;
+
+    // Kedua leg penjualan investasi (transfer + penyesuaian P/L) nilainya turunan dari average cost saat
+    // dijual; mengeditnya lewat form umum merusak kaitannya. Hapus lalu catat ulang dari layar Investasi.
+    if ((await getTransactionInvestmentSale(db, id)).role === "sale") {
+      Alert.alert(
+        "Tidak bisa diedit",
+        "Transaksi ini bagian dari penjualan investasi. Hapus transaksinya (penjualan ikut terhapus), lalu catat ulang dari layar Investasi."
+      );
+      return;
+    }
 
     setIsPending(true);
     try {
@@ -215,12 +227,29 @@ export default function EditTransactionPage() {
           let investmentResult = { role: "none" } as Awaited<
             ReturnType<typeof detachInvestmentPurchaseForDeletedTransaction>
           >;
-          await db.withTransactionAsync(async () => {
-            result = await detachDebtForDeletedTransaction(db, id);
-            investmentResult = await detachInvestmentPurchaseForDeletedTransaction(db, id);
-            await db.runAsync("DELETE FROM transactions WHERE id = ?", [id]);
-          });
+          let saleResult = { role: "none" } as Awaited<ReturnType<typeof detachInvestmentSaleForDeletedTransaction>>;
+          try {
+            await db.withTransactionAsync(async () => {
+              result = await detachDebtForDeletedTransaction(db, id);
+              investmentResult = await detachInvestmentPurchaseForDeletedTransaction(db, id);
+              saleResult = await detachInvestmentSaleForDeletedTransaction(db, id);
+              await db.runAsync("DELETE FROM transactions WHERE id = ?", [id]);
+            });
+          } catch (error) {
+            if (error instanceof InvestmentPurchaseEditBlockedError) {
+              Alert.alert("Tidak bisa dihapus", error.message);
+              return;
+            }
+            throw error;
+          }
           router.back();
+
+          if (saleResult.role === "sale") {
+            Alert.alert(
+              "Penjualan investasi ikut dihapus",
+              "Baris penjualan dan transaksi pasangannya (transfer dan penyesuaian P/L) dihapus bersamanya; unit kembali ke akun investasi."
+            );
+          }
 
           if (investmentResult.role === "purchase") {
             Alert.alert(
