@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toLocalDateTime } from "@/lib/utils/local-datetime";
 import { Alert, Text } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -15,7 +16,7 @@ import {
 const DEFAULT_NOTE = "Write-off investasi";
 
 function emptyWriteOffValues(): WriteOffFormValues {
-  return { unit: null, date: new Date().toISOString(), note: "" };
+  return { unit: null, date: toLocalDateTime(), note: "" };
 }
 
 type Holding = { name: string; unitLabel: string; remainingUnit: number; averageCost: number };

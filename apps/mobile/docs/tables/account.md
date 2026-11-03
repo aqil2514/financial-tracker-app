@@ -18,7 +18,8 @@ CREATE TABLE accounts (
   group_id TEXT REFERENCES account_groups(id) ON DELETE SET NULL,
   description TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
 );
 
 CREATE INDEX idx_accounts_group ON accounts(group_id);
@@ -38,11 +39,12 @@ CREATE INDEX idx_accounts_group ON accounts(group_id);
 | `description` | TEXT | tidak | NULL | Catatan tambahan, bebas. |
 | `is_active` | INTEGER | ya | 1 | Boolean (0/1). Field biasa di form edit (bukan quick-toggle seperti dot status kategori). |
 | `created_at` | TEXT | ya | `datetime('now')` | Waktu baris dibuat. |
+| `updated_at` | TEXT | tidak | NULL | Waktu terakhir baris berubah (UTC, `YYYY-MM-DD HH:mm:ss`), dasar pembanding last-write-wins untuk sync. Ditambahkan di `0011`, di-backfill dari `created_at`. Diisi otomatis trigger (INSERT tanpa nilai, UPDATE yang tidak menyentuhnya); hasil pull menulisnya eksplisit. Lihat [cloud-sync.md](cloud-sync.md). |
 
 ## Catatan
 
 - **Tidak ada kolom saldo tersimpan.** Saldo berjalan selalu dihitung on-the-fly: `initial_balance + SUM(income) - SUM(expense) - SUM(transfer keluar dari akun ini) + SUM(transfer masuk ke akun ini)`, dari tabel `transactions` dikelompokkan per `account_id`/`transfer_account_id`. Rumus ini **wajib direplikasi persis** sama seperti desktop/worker, bukan diturunkan ulang secara independen — lihat `docs/todos/done/porting-account-cash.md` bagian Saldo untuk SQL lengkapnya, diimplementasikan di `src/features/accounts/content/use-accounts.ts`.
-- Sengaja **tanpa** `deleted_at`/`sync_source` dibanding skema desktop — lihat [account-group.md](account-group.md) untuk alasannya (sama, berlaku untuk kedua tabel).
+- Sengaja **tanpa** `deleted_at`/`sync_source` dibanding skema desktop — lihat [account-group.md](account-group.md) untuk alasannya (sama, berlaku untuk kedua tabel). `updated_at` ada sejak `0011`.
 - Menghapus akun yang masih dipakai transaksi mewajibkan pilihan eksplisit "unassign" (set `account_id`/`transfer_account_id` transaksi terkait jadi NULL) atau "reassign" (pindah ke akun lain) lebih dulu — delete sendiri tetap hard delete.
 - `transactions.account_id`/`transfer_account_id` **masih free-text tanpa FK** ke tabel ini (beda dari `transactions.category_id` yang sudah FK ke `categories` lewat `0004_transaction_category_fk.ts`) — tapi sejak `AccountPickerSheet` (lihat `docs/todos/done/porting-account-cash.md`), nilainya selalu valid UUID `accounts.id` secara praktik, FK formal belum ditambahkan. Lihat [transaction.md](transaction.md).
 - **Koreksi saldo ("Balance Correction")**: mengubah field "Saldo Terkini" di form edit akun (`app/accounts/[id]/edit.tsx`) men-trigger insert transaksi penutup ke `transactions` (kategori otomatis "Penyesuaian Saldo", `is_cash_neutral` ditentukan dari jawaban Alert "Hitung sebagai kas riil?") — bukan UPDATE kolom apa pun di tabel ini. Lihat `docs/todos/done/porting-account-cash.md` bagian Keputusan #7 dan `src/features/accounts/correct-account-balance.ts`.

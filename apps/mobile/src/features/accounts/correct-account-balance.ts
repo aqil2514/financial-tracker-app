@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from "expo-sqlite";
+import { toLocalDateTime } from "@/lib/utils/local-datetime";
 import { generateId } from "@/lib/database";
 
 const CORRECTION_CATEGORY_NAME = "Penyesuaian Saldo";
@@ -49,6 +50,6 @@ export async function correctAccountBalance({
   await db.runAsync(
     `INSERT INTO transactions (id, type, amount, category_id, account_id, note, date, is_cash_neutral)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [generateId(), type, amount, categoryId, accountId, "Koreksi saldo", new Date().toISOString(), isCashNeutral]
+    [generateId(), type, amount, categoryId, accountId, "Koreksi saldo", toLocalDateTime(), isCashNeutral]
   );
 }

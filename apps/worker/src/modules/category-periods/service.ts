@@ -2,8 +2,9 @@ import type { Env } from "../../shared/env";
 import type { SyncSource } from "../../shared/auth";
 import type { CategoryPeriodPayload } from "./schema";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
+import { findMissingParent } from "../../shared/parent-check";
 
-export type UpsertCategoryPeriodResult = { status: "ok"; id: string } | { status: "stale" };
+export type UpsertCategoryPeriodResult = { status: "ok"; id: string } | { status: "stale" } | { status: "rejected"; reason: string };
 
 // Upsert-by-id MURNI, pola PERSIS pushDebtFromPc (debts/service.ts) --
 // `id` dari payload (desktop generate uuidv7), LWW via `updatedAt`.
@@ -24,6 +25,11 @@ export async function upsertCategoryPeriod(
   const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
   const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
   if (decision.outcome === "stale") return { status: "stale" };
+
+  const missingParent = await findMissingParent(env, [
+    ...payload.categoryIds.map((entry) => ({ table: "categories" as const, id: entry.categoryId, label: "Kategori" })),
+  ]);
+  if (missingParent) return { status: "rejected", reason: missingParent };
 
   if (!existing) {
     const now = nowText();

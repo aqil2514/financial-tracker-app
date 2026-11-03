@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toLocalDate } from "@/lib/utils/local-datetime";
 import { View } from "react-native";
 import { Calendar, type DateData } from "react-native-calendars";
 import { CalendarDay } from "./calendar-day";
@@ -9,7 +10,7 @@ interface TransactionCalendarProps {
 }
 
 function currentMonth(): string {
-  return new Date().toISOString().slice(0, 7);
+  return toLocalDate().slice(0, 7);
 }
 
 export function TransactionCalendar({ onSelectDate }: TransactionCalendarProps) {

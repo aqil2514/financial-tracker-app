@@ -3,6 +3,7 @@ import type { Env } from "../../shared/env";
 import type { SyncSource } from "../../shared/auth";
 import { classifyAccountPair } from "../debts/classify-account-pair";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
+import { findMissingParent } from "../../shared/parent-check";
 import type {
   PushInvestmentAccountPayload,
   PushInvestmentPurchasePayload,
@@ -734,7 +735,7 @@ export async function deletePendingInvestmentSale(env: Env, saleId: string): Pro
   return { status: "ok" };
 }
 
-export type PushResult = { status: "ok"; id: string } | { status: "stale" };
+export type PushResult = { status: "ok"; id: string } | { status: "stale" } | { status: "rejected"; reason: string };
 
 // Upsert-by-id MURNI utk baris investment_accounts yg desktop SUDAH buat
 // sendiri (form akun investasi lokal) -- pola PERSIS pushDebtFromPc
@@ -754,6 +755,11 @@ export async function pushInvestmentAccountFromPc(
   const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
   const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
   if (decision.outcome === "stale") return { status: "stale" };
+
+  const missingParent = await findMissingParent(env, [
+    { table: "accounts", id: payload.accountId, label: "Akun" },
+  ]);
+  if (missingParent) return { status: "rejected", reason: missingParent };
 
   const now = nowText();
   if (existing) {
@@ -799,6 +805,12 @@ export async function pushInvestmentPurchaseFromPc(
   const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
   const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
   if (decision.outcome === "stale") return { status: "stale" };
+
+  const missingParent = await findMissingParent(env, [
+    { table: "accounts", id: payload.accountId, label: "Akun" },
+    { table: "transactions", id: payload.transactionId, label: "Transaksi" },
+  ]);
+  if (missingParent) return { status: "rejected", reason: missingParent };
 
   const now = nowText();
   if (existing) {
@@ -884,6 +896,13 @@ export async function pushInvestmentSaleFromPc(
   const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
   const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
   if (decision.outcome === "stale") return { status: "stale" };
+
+  const missingParent = await findMissingParent(env, [
+    { table: "accounts", id: payload.accountId, label: "Akun" },
+    { table: "transactions", id: payload.transactionId, label: "Transaksi" },
+    { table: "transactions", id: payload.adjustmentTransactionId, label: "Transaksi penyesuaian" },
+  ]);
+  if (missingParent) return { status: "rejected", reason: missingParent };
 
   const now = nowText();
   if (existing) {

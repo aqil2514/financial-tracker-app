@@ -1,4 +1,5 @@
 import type { TransactionFormValues } from "./schema";
+import { toLocalDateTime } from "@/lib/utils/local-datetime";
 
 export function emptyTransactionValues(): TransactionFormValues {
   return {
@@ -9,7 +10,7 @@ export function emptyTransactionValues(): TransactionFormValues {
     transfer_account_id: null,
     note: "",
     description: null,
-    date: new Date().toISOString(),
+    date: toLocalDateTime(),
     contact_id: null,
     settle_debt_ids: [],
   };

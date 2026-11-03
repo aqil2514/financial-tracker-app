@@ -23,4 +23,7 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     currentVersion = i + 1;
     await db.execAsync(`PRAGMA user_version = ${currentVersion}`);
   }
+
+  // Penanda "sedang apply pull" tidak boleh tertinggal 1 kalau proses mati di tengah pull: antrean push mati.
+  await db.execAsync("UPDATE cloud_sync_state SET applying_pull = 0 WHERE id = 1 AND applying_pull = 1");
 }

@@ -13,7 +13,8 @@ CREATE TABLE category_periods (
   name TEXT NOT NULL,
   start_date TEXT NOT NULL,
   end_date TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
 );
 
 CREATE TABLE category_period_categories (
@@ -37,6 +38,7 @@ CREATE INDEX idx_category_period_categories_category ON category_period_categori
 | `start_date` | TEXT | ya | - | Tanggal mulai jendela periode. |
 | `end_date` | TEXT | ya | - | Tanggal akhir jendela periode. |
 | `created_at` | TEXT | ya | `datetime('now')` | Waktu baris dibuat. |
+| `updated_at` | TEXT | tidak | NULL | Waktu terakhir baris berubah (UTC, `YYYY-MM-DD HH:mm:ss`), dasar pembanding last-write-wins untuk sync. Ditambahkan di `0011`, di-backfill dari `created_at`. Diisi otomatis trigger (INSERT tanpa nilai, UPDATE yang tidak menyentuhnya); hasil pull menulisnya eksplisit. Lihat [cloud-sync.md](cloud-sync.md). |
 
 ## Kolom — `category_period_categories`
 

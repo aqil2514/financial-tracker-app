@@ -4,6 +4,7 @@ import type { SyncSource } from "../../shared/auth";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
 import { resolveContactId } from "../contacts/service";
 import type { PushThirdPartyFundPayload, CreateDirectThirdPartyFundPayload } from "./schema";
+import { findMissingParent } from "../../shared/parent-check";
 
 async function getAccountType(env: Env, accountId: string): Promise<string | null> {
   const row = await env.DB.prepare("SELECT account_type FROM accounts WHERE id = ?1 AND deleted_at IS NULL")
@@ -365,7 +366,7 @@ export async function detachThirdPartyFundsForDeletedTransaction(
   return { thirdPartyFundIds: [], deletedThirdPartyFundIds: rows.map((r) => r.id) };
 }
 
-export type PushResult = { status: "ok"; id: string } | { status: "stale" };
+export type PushResult = { status: "ok"; id: string } | { status: "stale" } | { status: "rejected"; reason: string };
 
 // Upsert-by-id MURNI utk baris third_party_funds yg desktop SUDAH buat
 // sendiri (apply-third-party-transaction.ts lokal, baik jalur direct
@@ -385,6 +386,13 @@ export async function pushThirdPartyFundFromPc(
   const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
   const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
   if (decision.outcome === "stale") return { status: "stale" };
+
+  const missingParent = await findMissingParent(env, [
+    { table: "accounts", id: payload.accountId, label: "Akun" },
+    { table: "contacts", id: payload.contactId, label: "Kontak" },
+    { table: "transactions", id: payload.transactionId, label: "Transaksi" },
+  ]);
+  if (missingParent) return { status: "rejected", reason: missingParent };
 
   const now = nowText();
   if (existing) {

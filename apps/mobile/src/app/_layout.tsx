@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AppDatabaseProvider } from "@/lib/database";
+import { CloudSyncProvider } from "@/shared/cloud-sync";
 import "../../global.css"
 
 export default function RootLayout() {
@@ -12,11 +13,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
         <AppDatabaseProvider>
-          <BottomSheetModalProvider>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            </Stack>
-          </BottomSheetModalProvider>
+          <CloudSyncProvider>
+            <BottomSheetModalProvider>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              </Stack>
+            </BottomSheetModalProvider>
+          </CloudSyncProvider>
         </AppDatabaseProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>

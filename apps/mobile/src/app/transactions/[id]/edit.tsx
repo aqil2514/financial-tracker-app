@@ -35,6 +35,7 @@ interface TransactionRow {
   category_id: string | null;
   account_id: string;
   transfer_account_id: string | null;
+  contact_id: string | null;
 }
 
 function toFormValues(
@@ -95,6 +96,8 @@ export default function EditTransactionPage() {
         contactId = await loadDebtContactId(db, status.debtId);
         settleDebtIds.push(status.debtId);
       }
+      // Kontak yang tersimpan di transaksi menang atas kontak debts (baris lama sebelum kolom ini ada tidak punya).
+      contactId = row.contact_id ?? contactId;
 
       setOriginalRow(row);
       setOriginalContactId(contactId);
@@ -168,7 +171,7 @@ export default function EditTransactionPage() {
       await db.runAsync(
         `UPDATE transactions
          SET note = ?, description = ?, type = ?, amount = ?, date = ?,
-             category_id = ?, account_id = ?, transfer_account_id = ?
+             category_id = ?, account_id = ?, transfer_account_id = ?, contact_id = ?
          WHERE id = ?`,
         [
           values.note,
@@ -179,6 +182,7 @@ export default function EditTransactionPage() {
           values.category_id,
           values.account_id,
           values.transfer_account_id,
+          values.contact_id,
           id,
         ]
       );

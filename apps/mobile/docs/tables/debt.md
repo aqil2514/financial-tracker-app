@@ -23,7 +23,8 @@ CREATE TABLE debts (
   status TEXT NOT NULL DEFAULT 'ongoing' CHECK (status IN ('ongoing', 'paid', 'written_off')),
   note TEXT,
   date TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
 );
 CREATE INDEX idx_debts_contact_id ON debts(contact_id);
 CREATE INDEX idx_debts_status ON debts(status);
@@ -36,7 +37,8 @@ CREATE TABLE debt_payments (
   transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
   note TEXT,
   date TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
 );
 CREATE INDEX idx_debt_payments_debt ON debt_payments(debt_id);
 ```
@@ -64,6 +66,7 @@ CREATE INDEX idx_debt_payments_debt ON debt_payments(debt_id);
 | `note` | TEXT | tidak | NULL | Catatan tambahan, bebas. |
 | `date` | TEXT | ya | - | Tanggal LAHIR piutang/utang ini (dipakai sebagai urutan FIFO pelunasan, bukan tanggal bayar). |
 | `created_at` | TEXT | ya | `datetime('now')` | Waktu baris dibuat. |
+| `updated_at` | TEXT | tidak | NULL | Waktu terakhir baris berubah (UTC, `YYYY-MM-DD HH:mm:ss`), dasar pembanding last-write-wins untuk sync. Ditambahkan di `0011`, di-backfill dari `created_at`. Diisi otomatis trigger (INSERT tanpa nilai, UPDATE yang tidak menyentuhnya); hasil pull menulisnya eksplisit. Lihat [cloud-sync.md](cloud-sync.md). |
 
 ### `debt_payments`
 
@@ -77,10 +80,11 @@ CREATE INDEX idx_debt_payments_debt ON debt_payments(debt_id);
 | `note` | TEXT | tidak | NULL | Catatan tambahan, bebas. |
 | `date` | TEXT | ya | - | Tanggal pembayaran/cicilan ini terjadi. |
 | `created_at` | TEXT | ya | `datetime('now')` | Waktu baris dibuat. |
+| `updated_at` | TEXT | tidak | NULL | Waktu terakhir baris berubah (UTC, `YYYY-MM-DD HH:mm:ss`), dasar pembanding last-write-wins untuk sync. Ditambahkan di `0011`, di-backfill dari `created_at`. Diisi otomatis trigger (INSERT tanpa nilai, UPDATE yang tidak menyentuhnya); hasil pull menulisnya eksplisit. Lihat [cloud-sync.md](cloud-sync.md). |
 
 ## Catatan
 
-- Ketiga tabel ini sengaja **tanpa** `updated_at`/`deleted_at`/`sync_source` (infrastruktur cloud-sync desktop↔worker) dan **tanpa** `source`/`source_ref` (integrasi Retailku, tidak relevan di mobile) dibanding skema final desktop — sama seperti keputusan [account.md](account.md)/[account-group.md](account-group.md), ditunda sampai semua porting lokal tipe akun selesai dan putaran sync dibahas ulang.
+- `debts` dan `debt_payments` punya `updated_at` sejak `0011` (`debt_accounts` tidak: `direction` ikut payload akun, lihat [cloud-sync.md](cloud-sync.md)). Ketiga tabel sengaja **tanpa** `deleted_at`/`sync_source` dan **tanpa** `source`/`source_ref` (integrasi Retailku, tidak relevan di mobile) dibanding skema final desktop — lihat [account.md](account.md)/[account-group.md](account-group.md).
 - **`remaining` (sisa belum lunas suatu `debts`) tidak disimpan sebagai kolom** — selalu dihitung `amount - COALESCE(SUM(debt_payments.amount), 0)` dikelompokkan per `debt_id`. Fragment SQL ini **wajib satu sumber kebenaran**, jangan diduplikasi manual di banyak tempat (list, alokasi FIFO, validasi) — desktop pernah mengalami bug nyata karena fragment ini di-copy-paste dan salah satu kopiannya lupa filter soft-delete. Mobile otomatis lebih sederhana karena `debt_payments` di sini tidak punya `deleted_at`.
 - **Saldo akun debt** ikut rumus on-the-fly yang sama seperti akun `cash` (lihat [account.md](account.md)) — tidak ada kolom saldo terpisah, akun debt otomatis ikut terhitung lewat `transactions.account_id`/`transfer_account_id` yang sudah ada.
 - **Dua jalur pembuatan/perubahan `debts`**: Jalur 1 — transfer kas↔akun debt (arah lahir/lunas dibaca dari `debt_accounts.direction`); Jalur 2 — income/expense langsung di akun debt tanpa kas berpindah. Detail lengkap kombinasi dan alokasi FIFO ada di [porting-account-debt.md](../todos/plan/porting-account-debt.md).

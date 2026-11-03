@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { Link, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { PageHeader } from "@/components/page-header";
+import { useCloudSync } from "@/shared/cloud-sync";
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
@@ -10,6 +11,7 @@ type MenuItem = {
   title: string;
   icon: IoniconName;
   href?: Href;
+  badge?: { text: string; tone: "neutral" | "error" };
 };
 
 type MenuGroup = {
@@ -62,6 +64,11 @@ function MenuRow({ item }: { item: MenuItem }) {
       <Pressable className="flex-row items-center gap-3 border-b border-neutral-100 px-4 py-3.5">
         <Ionicons name={item.icon} size={18} color="#171717" />
         <Text className="text-base text-neutral-900">{item.title}</Text>
+        {item.badge && (
+          <Text className={`ml-auto text-xs ${item.badge.tone === "error" ? "text-red-600" : "text-neutral-500"}`}>
+            {item.badge.text}
+          </Text>
+        )}
       </Pressable>
     </Link>
   );
@@ -93,7 +100,18 @@ function MenuGroupSection({ group }: { group: MenuGroup }) {
   );
 }
 
+function useSyncBadge(): MenuItem["badge"] {
+  const { snapshot } = useCloudSync();
+  if (snapshot.status === "off") return undefined;
+  if (snapshot.status === "error") return { text: "Gagal sync", tone: "error" };
+  if (snapshot.status === "syncing") return { text: "Menyinkronkan...", tone: "neutral" };
+  if (snapshot.pending > 0) return { text: `${snapshot.pending} menunggu`, tone: "neutral" };
+  return { text: "Tersinkron", tone: "neutral" };
+}
+
 export default function MorePage() {
+  const syncBadge = useSyncBadge();
+
   return (
     <View className="flex-1 bg-white">
       <PageHeader title="Lainnya" />
@@ -111,7 +129,7 @@ export default function MorePage() {
         </View>
 
         <View className="mb-4 border-y border-neutral-200">
-          <MenuRow item={{ title: "Settings", icon: "settings-outline" }} />
+          <MenuRow item={{ title: "Settings", icon: "settings-outline", href: "/settings" as Href, badge: syncBadge }} />
         </View>
       </ScrollView>
     </View>

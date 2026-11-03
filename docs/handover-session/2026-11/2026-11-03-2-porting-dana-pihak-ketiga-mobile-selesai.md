@@ -49,7 +49,7 @@ Sesi ini mem-porting tipe akun **Dana Pihak Ketiga** (`third_party`) desktop →
 
 1. **Commit** (lihat Status git).
 2. **Pesan blokir Balance Correction** menyebut "layar Dana Pihak Ketiga"; sudah ada sekarang, tapi teks belum diperiksa di device.
-3. **Di luar cakupan, sengaja ditunda**: sync (`sync_source`, `deleted_at`, antrean push; bug pull `third_party_funds` di production desktop juga masih belum terselesaikan — lihat memory), Koreksi Nominal granular per baris, edit baris transfer.
+3. **Di luar cakupan, sengaja ditunda**: sync (`sync_source`, `deleted_at`, antrean push; catatan: bug pull `third_party_funds` di production desktop SUDAH tuntas 2026-10-22, lihat [handover itu](../2026-10/2026-10-22-1-pull-sync-third-party-funds-root-cause-tuntas-note-not-null-fix.md) — pernyataan "belum terselesaikan" di versi awal dokumen ini salah, bersumber dari memory yang kedaluwarsa), Koreksi Nominal granular per baris, edit baris transfer.
 4. **Sisa dari sesi 1** (belum dijawab user): kosmetik investasi (pemisah ribuan field unit, pembulatan harga rata-rata, P/L nol netral), indikator nilai pasar basi, validasi inline unit > sisa, pilihan ESLint desktop.
 5. **Kandidat refactor kecil**: pindahkan `StatItem` dan `formatDate` ke `components/` / `lib/` karena sekarang dipakai dua fitur.
 6. Temuan #2 di atas (`account_id` NOT NULL vs unassign) — cek dan perbaiki kalau ternyata error.
@@ -63,4 +63,4 @@ Sesi ini mem-porting tipe akun **Dana Pihak Ketiga** (`third_party`) desktop →
 1. Minta user commit (dua commit terpisah disarankan), lalu `npx vitest run` dan `npx tsc --noEmit` di `apps/mobile` untuk baseline (257 test).
 2. Minta user mencoba item "belum dikonfirmasi" di atas, terutama tiga jenis Pindah.
 3. Tanyakan temuan #2 (apakah "Lepas Saja & Hapus" error) dan pertanyaan kosmetik sisa sesi 1.
-4. Porting akun lokal sudah tuntas; fase berikutnya secara roadmap adalah sync mobile ↔ cloud (belum direncanakan, bahas dulu dengan user; ingat bug pull `third_party_funds` di production).
+4. Porting akun lokal sudah tuntas; fase berikutnya secara roadmap adalah sync mobile ↔ cloud (belum direncanakan, bahas dulu dengan user). Catatan arsitektur: desain multi-device Desktop+Mobile lama sudah ditandai SUPERSEDED (2026-10-22); yang benar-benar ada adalah push satu-arah PC→Worker/D1 (+ pull untuk data dari MCP), dengan auth dua token (`PC_SYNC_TOKEN`/`MCP_SYNC_TOKEN`) dan `sync_source` `pc`|`mcp`. Mobile belum punya tempat di arsitektur itu.

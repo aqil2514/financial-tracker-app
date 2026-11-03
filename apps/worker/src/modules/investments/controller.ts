@@ -31,6 +31,9 @@ export async function handlePostInvestmentAccountPush(c: Context<AppContext>) {
   }
 
   const result = await pushInvestmentAccountFromPc(c.env, body, c.get("syncSource"));
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.accountId });
   }
@@ -44,6 +47,9 @@ export async function handlePostInvestmentPurchasePush(c: Context<AppContext>) {
   }
 
   const result = await pushInvestmentPurchaseFromPc(c.env, body, c.get("syncSource"));
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }
@@ -68,6 +74,9 @@ export async function handlePostInvestmentSalePush(c: Context<AppContext>) {
   }
 
   const result = await pushInvestmentSaleFromPc(c.env, body, c.get("syncSource"));
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }

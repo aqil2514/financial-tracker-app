@@ -11,6 +11,9 @@ export async function handlePostThirdPartyFundPush(c: Context<AppContext>) {
   }
 
   const result = await pushThirdPartyFundFromPc(c.env, body, c.get("syncSource"));
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }

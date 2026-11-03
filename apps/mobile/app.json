@@ -46,7 +46,8 @@
           "photosPermission": "Aplikasi butuh akses galeri untuk menambahkan foto lampiran transaksi.",
           "cameraPermission": "Aplikasi butuh akses kamera untuk memotret lampiran transaksi."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

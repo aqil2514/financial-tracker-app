@@ -52,9 +52,9 @@ export function CategoryPeriodForm({
 
           <CategoryMultiSelectField />
 
-          <FormFieldDate form={form} name="start_date" label="Tanggal Mulai" />
+          <FormFieldDate form={form} name="start_date" label="Tanggal Mulai" mode="date" />
 
-          <FormFieldDate form={form} name="end_date" label="Tanggal Selesai" />
+          <FormFieldDate form={form} name="end_date" label="Tanggal Selesai" mode="date" />
         </>
       )}
     </BaseForm>

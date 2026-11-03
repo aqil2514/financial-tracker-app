@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toLocalDateTime } from "@/lib/utils/local-datetime";
 import { Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -20,7 +21,7 @@ export default function RecordThirdPartyFundPage() {
     account_id: null,
     contact_id: null,
     amount: 0,
-    date: new Date().toISOString(),
+    date: toLocalDateTime(),
     note: "",
   }));
 

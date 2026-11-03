@@ -1,4 +1,5 @@
 import { generateId } from "@/lib/database/generate-id";
+import { LOCAL_DATETIME_SQL } from "@/lib/utils/local-datetime";
 import type { Db } from "./types";
 
 export type WriteOffDebtInput = {
@@ -25,14 +26,14 @@ export async function writeOffDebt({ db, debtId, type, accountId, remaining }: W
 
   await db.runAsync(
     `INSERT INTO transactions (id, note, description, type, amount, date, category_id, account_id, transfer_account_id, is_cash_neutral)
-     VALUES (?, ?, NULL, ?, ?, datetime('now'), NULL, ?, NULL, 1)`,
+     VALUES (?, ?, NULL, ?, ?, ${LOCAL_DATETIME_SQL}, NULL, ?, NULL, 1)`,
     [transactionId, "Penutup piutang/utang dihapuskan", transactionType, remaining, accountId]
   );
 
   const paymentId = generateId();
   await db.runAsync(
     `INSERT INTO debt_payments (id, debt_id, amount, account_id, transaction_id, date)
-     VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+     VALUES (?, ?, ?, ?, ?, ${LOCAL_DATETIME_SQL})`,
     [paymentId, debtId, remaining, accountId, transactionId]
   );
 

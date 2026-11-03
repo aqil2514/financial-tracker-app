@@ -15,7 +15,8 @@ CREATE TABLE categories (
   type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
   parent_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
   is_active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
 );
 
 CREATE INDEX idx_categories_parent ON categories(parent_id);
@@ -32,6 +33,7 @@ CREATE INDEX idx_categories_parent ON categories(parent_id);
 | `parent_id` | TEXT | tidak | NULL | Self-reference ke `categories(id)`. `ON DELETE SET NULL`. Secara skema tidak dibatasi kedalaman, tapi UI hanya memperlakukan ini sebagai dua level (akar + anak langsung). |
 | `is_active` | INTEGER | ya | 1 | Boolean (0/1). Toggle cepat dari list untuk menyembunyikan kategori dari opsi pemilihan tanpa menghapus riwayat transaksi yang masih menempel. |
 | `created_at` | TEXT | ya | `datetime('now')` | Waktu baris dibuat. |
+| `updated_at` | TEXT | tidak | NULL | Waktu terakhir baris berubah (UTC, `YYYY-MM-DD HH:mm:ss`), dasar pembanding last-write-wins untuk sync. Ditambahkan di `0011`, di-backfill dari `created_at`. Diisi otomatis trigger (INSERT tanpa nilai, UPDATE yang tidak menyentuhnya); hasil pull menulisnya eksplisit. Lihat [cloud-sync.md](cloud-sync.md). |
 
 ## Catatan
 

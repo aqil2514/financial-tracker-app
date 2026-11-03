@@ -1,4 +1,5 @@
 import type { PurchaseFormValues } from "./schema";
+import { toLocalDateTime } from "@/lib/utils/local-datetime";
 
 export function emptyPurchaseValues(): PurchaseFormValues {
   return {
@@ -8,7 +9,7 @@ export function emptyPurchaseValues(): PurchaseFormValues {
     unit: null,
     price_mode: "unit",
     price_input: null,
-    date: new Date().toISOString(),
+    date: toLocalDateTime(),
     note: "",
     status: "pending",
   };

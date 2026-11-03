@@ -4,6 +4,7 @@ import type { SyncSource } from "../../shared/auth";
 import { classifyAccountPair, UnsupportedAccountPairError } from "./classify-account-pair";
 import { resolveContactId } from "../contacts/service";
 import { nowText, resolveIncomingUpdatedAt, decideLww } from "../../shared/lww";
+import { findMissingParent } from "../../shared/parent-check";
 import type {
   CreateDirectDebtPayload,
   CreateNonCashPaymentPayload,
@@ -1089,7 +1090,8 @@ export async function correctDebtRemaining(
 
 export type PushDebtResult =
   | { status: "ok"; id: string }
-  | { status: "stale" };
+  | { status: "stale" }
+  | { status: "rejected"; reason: string };
 
 // Upsert-by-id MURNI utk baris debts yg desktop SUDAH buat sendiri
 // (apply-debt-transaction.ts lokal) -- BEDA dari createDirectDebt:
@@ -1110,6 +1112,13 @@ export async function pushDebtFromPc(
   const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
   const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
   if (decision.outcome === "stale") return { status: "stale" };
+
+  const missingParent = await findMissingParent(env, [
+    { table: "contacts", id: payload.contactId, label: "Kontak" },
+    { table: "accounts", id: payload.accountId, label: "Akun" },
+    { table: "transactions", id: payload.transactionId, label: "Transaksi" },
+  ]);
+  if (missingParent) return { status: "rejected", reason: missingParent };
 
   const now = nowText();
   if (existing) {
@@ -1187,6 +1196,13 @@ export async function pushDebtPaymentFromPc(
   const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
   const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
   if (decision.outcome === "stale") return { status: "stale" };
+
+  const missingParent = await findMissingParent(env, [
+    { table: "debts", id: payload.debtId, label: "Utang/piutang" },
+    { table: "accounts", id: payload.accountId, label: "Akun" },
+    { table: "transactions", id: payload.transactionId, label: "Transaksi" },
+  ]);
+  if (missingParent) return { status: "rejected", reason: missingParent };
 
   const now = nowText();
   if (existing) {

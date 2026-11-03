@@ -68,6 +68,9 @@ export async function handlePostDebtPush(c: Context<AppContext>) {
   }
 
   const result = await pushDebtFromPc(c.env, body, c.get("syncSource"));
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }
@@ -81,6 +84,9 @@ export async function handlePostDebtPaymentPush(c: Context<AppContext>) {
   }
 
   const result = await pushDebtPaymentFromPc(c.env, body, c.get("syncSource"));
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }

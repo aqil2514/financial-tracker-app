@@ -66,8 +66,8 @@ export default function NewTransactionPage() {
       const transactionId = generateId();
       await db.runAsync(
         `INSERT INTO transactions
-          (id, note, description, type, amount, date, category_id, account_id, transfer_account_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, note, description, type, amount, date, category_id, account_id, transfer_account_id, contact_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           transactionId,
           values.note,
@@ -78,6 +78,7 @@ export default function NewTransactionPage() {
           values.category_id,
           values.account_id,
           values.transfer_account_id,
+          values.contact_id,
         ]
       );
 

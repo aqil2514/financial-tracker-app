@@ -23,7 +23,8 @@ CREATE TABLE investment_purchases (
   price_per_unit REAL,
   date TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'settled')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
 );
 CREATE INDEX idx_investment_purchases_account ON investment_purchases(account_id);
 CREATE INDEX idx_investment_purchases_transaction ON investment_purchases(transaction_id);
@@ -39,7 +40,8 @@ CREATE TABLE investment_sales (
   realized_pl REAL,
   date TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'settled')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
 );
 CREATE INDEX idx_investment_sales_account ON investment_sales(account_id);
 CREATE INDEX idx_investment_sales_transaction ON investment_sales(transaction_id);
@@ -55,7 +57,7 @@ CREATE INDEX idx_investment_sales_adjustment_transaction ON investment_sales(adj
 | `account_id` | TEXT | ya | - | Primary key SEKALIGUS foreign key ke `accounts(id)` — relasi 1:1, satu baris per akun bertipe `investment`. `ON DELETE CASCADE` — akun dihapus, baris detail ini ikut terhapus. |
 | `unit_label` | TEXT | ya | - | Satuan tampilan unit instrumen ini (mis. "lembar", "unit", "gram"), bebas teks, murni kosmetik untuk UI, tidak dipakai logic apa pun. |
 | `current_market_value` | REAL | ya | 0 | Nilai pasar TOTAL instrumen ini saat ini — **diupdate manual oleh user**, BUKAN ditarik dari API harga dan BUKAN dihitung dari unit × harga. Update kolom ini TIDAK membuat transaksi apa pun dan TIDAK mengubah `accounts.balance`. |
-| `updated_at` | TEXT | ya | `datetime('now')` | Waktu terakhir `unit_label`/`current_market_value` berubah, dipakai sebagai indikator staleness nilai pasar ("diupdate X hari lalu"). Nilainya UTC (SQLite `datetime('now')`). **Tidak ada trigger** — kode yang mengupdate nilai pasar wajib mengisinya sendiri. |
+| `updated_at` | TEXT | ya | `datetime('now')` | Waktu terakhir `unit_label`/`current_market_value` berubah, dipakai sebagai indikator staleness nilai pasar ("diupdate X hari lalu"). Nilainya UTC (SQLite `datetime('now')`). Sejak `0011` ada trigger `updated_at` (menggeser nilainya kalau UPDATE tidak menyentuhnya), tapi kode update nilai pasar tetap mengisinya eksplisit. |
 
 ### `investment_purchases`
 
@@ -69,6 +71,7 @@ CREATE INDEX idx_investment_sales_adjustment_transaction ON investment_sales(adj
 | `date` | TEXT | ya | - | Tanggal pembelian. |
 | `status` | TEXT | ya | `pending` | `pending` atau `settled`, dibatasi `CHECK`. Pembelian `pending` tetap ikut `total_unit` untuk Unrealized P/L tapi TIDAK ikut unit yang bisa dijual (lihat Catatan). |
 | `created_at` | TEXT | ya | `datetime('now')` | Waktu baris dibuat. |
+| `updated_at` | TEXT | tidak | NULL | Waktu terakhir baris berubah (UTC, `YYYY-MM-DD HH:mm:ss`), dasar pembanding last-write-wins untuk sync. Ditambahkan di `0011`, di-backfill dari `created_at`. Diisi otomatis trigger (INSERT tanpa nilai, UPDATE yang tidak menyentuhnya); hasil pull menulisnya eksplisit. Lihat [cloud-sync.md](cloud-sync.md). |
 
 ### `investment_sales`
 
@@ -85,10 +88,11 @@ CREATE INDEX idx_investment_sales_adjustment_transaction ON investment_sales(adj
 | `date` | TEXT | ya | - | Tanggal penjualan. |
 | `status` | TEXT | ya | `pending` | `pending` atau `settled`, dibatasi `CHECK`. Write-off selalu `settled`. |
 | `created_at` | TEXT | ya | `datetime('now')` | Waktu baris dibuat. |
+| `updated_at` | TEXT | tidak | NULL | Waktu terakhir baris berubah (UTC, `YYYY-MM-DD HH:mm:ss`), dasar pembanding last-write-wins untuk sync. Ditambahkan di `0011`, di-backfill dari `created_at`. Diisi otomatis trigger (INSERT tanpa nilai, UPDATE yang tidak menyentuhnya); hasil pull menulisnya eksplisit. Lihat [cloud-sync.md](cloud-sync.md). |
 
 ## Catatan
 
-- Ketiga tabel ini sengaja **tanpa** `deleted_at`/`sync_source` (infrastruktur cloud-sync desktop↔worker) dibanding skema final desktop, dan `investment_purchases`/`investment_sales` juga tanpa `updated_at` — sama seperti keputusan [account.md](account.md) dan [debt.md](debt.md), ditunda sampai semua porting lokal tipe akun selesai.
+- Ketiga tabel sengaja **tanpa** `deleted_at`/`sync_source` dibanding skema final desktop; `investment_purchases`/`investment_sales` mendapat `updated_at` di `0011`. Lihat [cloud-sync.md](cloud-sync.md).
 - **Modal (cost basis) tidak disimpan di sini** — modal = `accounts.balance`, dihitung on-the-fly dari transaksi seperti tipe akun lain (lihat [account.md](account.md)). Update `current_market_value` tidak mengubahnya. Agregat total kekayaan tetap menjumlah `accounts.balance`, bukan nilai pasar.
 - **Total unit tidak disimpan sebagai kolom.** Ada DUA rumus yang tidak boleh dicampur, dan keduanya wajib satu sumber kebenaran (jangan diduplikasi manual): `total_unit` untuk Unrealized P/L = pembelian `pending` + `settled`; sisa unit yang bisa dijual (basis cek oversell dan average cost) = `SUM(unit, pembelian settled) − SUM(unit, penjualan pending + settled)`. Average cost = `SUM(unit × price_per_unit) / SUM(unit)` atas pembelian `settled` saja (bukan FIFO).
 - **Penjualan `pending` tidak boleh membuat transaksi apa pun** — kas belum tersentuh meski unit sudah dikurangi dari sisa unit secara optimis. Transaksi (`transaction_id` dan `adjustment_transaction_id`) baru dibuat saat Settle, yang meminta user memilih akun kas tujuan.

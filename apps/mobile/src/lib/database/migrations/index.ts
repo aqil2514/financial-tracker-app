@@ -9,6 +9,10 @@ import * as m0007 from "./0007_fix_orphaned_account_group_id";
 import * as m0008 from "./0008_debts";
 import * as m0009 from "./0009_investments";
 import * as m0010 from "./0010_third_party_funds";
+import * as m0011 from "./0011_sync_updated_at";
+import * as m0012 from "./0012_cloud_sync";
+import * as m0013 from "./0013_local_datetime_format";
+import * as m0014 from "./0014_attachment_sync_triggers";
 
 export interface Migration {
   up: (db: SQLiteDatabase) => Promise<void>;
@@ -29,4 +33,8 @@ export const MIGRATIONS: Migration[] = [
   m0008,
   m0009,
   m0010,
+  m0011,
+  m0012,
+  m0013,
+  m0014,
 ];

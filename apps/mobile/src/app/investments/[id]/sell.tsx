@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toLocalDateTime } from "@/lib/utils/local-datetime";
 import { Alert, Text } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -18,7 +19,7 @@ function emptySellValues(): SellFormValues {
     unit: null,
     price_mode: "unit",
     price_input: null,
-    date: new Date().toISOString(),
+    date: toLocalDateTime(),
     status: "pending",
     cash_account_id: null,
   };
