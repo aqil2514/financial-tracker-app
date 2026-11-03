@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { useDatabase } from "@/lib/database";
+import { EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL } from "@/shared/third-party-funds";
 
 export interface DaySummary {
   income: number;
@@ -26,7 +27,7 @@ export function useMonthSummary(month: string) {
          SUM(CASE WHEN type = 'income' AND is_cash_neutral = 0 THEN amount ELSE 0 END) AS income,
          SUM(CASE WHEN type = 'expense' AND is_cash_neutral = 0 THEN amount ELSE 0 END) AS expense
        FROM transactions
-       WHERE substr(date, 1, 7) = ?
+       WHERE substr(date, 1, 7) = ? AND ${EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL}
        GROUP BY day`,
       [month]
     );

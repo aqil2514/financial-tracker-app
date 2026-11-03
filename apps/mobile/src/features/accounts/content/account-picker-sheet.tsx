@@ -58,9 +58,9 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
       const groups = await db.getAllAsync<{ id: string; name: string }>(
         `SELECT id, name FROM account_groups ORDER BY name ASC`
       );
-      // Akun investasi sengaja tidak dipilih di form transaksi: beli/jual/write-off hanya lewat layar Investasi.
+      // Akun investasi dan dana pihak ketiga sengaja tidak dipilih di form transaksi: hanya lewat layar khususnya.
       const ungroupedAccounts = await db.getAllAsync<{ id: string; name: string }>(
-        `SELECT id, name FROM accounts WHERE group_id IS NULL AND is_active = 1 AND account_type != 'investment' ORDER BY name ASC`
+        `SELECT id, name FROM accounts WHERE group_id IS NULL AND is_active = 1 AND account_type NOT IN ('investment', 'third_party') ORDER BY name ASC`
       );
 
       setRootOptions([
@@ -84,7 +84,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
     const openChildren = useCallback(
       async (group: { id: string; name: string }) => {
         const rows = await db.getAllAsync<AccountChildOptionRow>(
-          `SELECT id, name FROM accounts WHERE group_id = ? AND is_active = 1 AND account_type != 'investment' ORDER BY name ASC`,
+          `SELECT id, name FROM accounts WHERE group_id = ? AND is_active = 1 AND account_type NOT IN ('investment', 'third_party') ORDER BY name ASC`,
           [group.id]
         );
         setChildOptions(rows);
@@ -303,6 +303,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
                 submitLabel="Simpan & Pilih"
                 hideKindToggle
                 hideInvestmentType
+                hideThirdPartyType
                 inBottomSheet
               />
             )}

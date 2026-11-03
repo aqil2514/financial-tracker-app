@@ -34,7 +34,7 @@ interface AccountRow {
   initial_balance: number;
   description: string | null;
   is_active: number;
-  account_type: "cash" | "debt" | "investment";
+  account_type: "cash" | "debt" | "investment" | "third_party";
   direction: "receivable" | "payable" | null;
   unit_label: string | null;
   current_market_value: number | null;
@@ -204,7 +204,7 @@ export default function EditAccountPage() {
 
   async function openReassignPicker() {
     const rows = await db.getAllAsync<{ id: string; name: string }>(
-      "SELECT id, name FROM accounts WHERE id != ? ORDER BY name ASC",
+      "SELECT id, name FROM accounts WHERE id != ? AND account_type NOT IN ('investment', 'third_party') ORDER BY name ASC",
       [id]
     );
 
@@ -218,6 +218,19 @@ export default function EditAccountPage() {
   }
 
   async function handleDelete() {
+    // FK third_party_funds.account_id CASCADE akan menghapus riwayat diam-diam, dan reassign tidak memindahkannya.
+    const funds = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM third_party_funds WHERE account_id = ?",
+      [id]
+    );
+    if ((funds?.count ?? 0) > 0) {
+      Alert.alert(
+        "Akun tidak bisa dihapus",
+        `Akun ini masih punya ${funds?.count} riwayat titip/ambil/pindah. Hapus semua riwayatnya dulu lewat layar Dana Pihak Ketiga.`
+      );
+      return;
+    }
+
     const row = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM transactions WHERE account_id = ? OR transfer_account_id = ?",
       [id, id]
@@ -266,6 +279,12 @@ export default function EditAccountPage() {
                   saldo akun ini mengikuti riwayat pembelian/penjualan unit. Untuk unit yang
                   kurang, pakai Catat Pembelian dengan sumber “Tanpa kas”; untuk unit yang
                   berlebih, pakai Write-off, keduanya dari layar Investasi.
+                </Text>
+              ) : defaultValues.account_type === "third_party" ? (
+                <Text className="text-sm text-neutral-500">
+                  Saldo akun bertipe Dana Pihak Ketiga tidak bisa dikoreksi langsung di sini —
+                  saldo akun ini mengikuti riwayat titip/ambil/pindah yang tersimpan. Perbaiki
+                  lewat layar Dana Pihak Ketiga.
                 </Text>
               ) : (
                 <CurrentBalanceField value={currentBalanceInput} onChangeText={setCurrentBalanceInput} />

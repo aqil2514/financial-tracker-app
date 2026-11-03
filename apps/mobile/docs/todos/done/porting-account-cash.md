@@ -1,7 +1,7 @@
 
 # Porting Akun Tipe Cash (Desktop → Mobile) — SELESAI
 
-Dokumen anak dari [porting-account.md](../plan/porting-account.md) — fokus khusus tipe `cash`. Baca induknya dulu untuk konteks kenapa porting akun dipecah per tipe.
+Dokumen anak dari [porting-account.md](porting-account.md) — fokus khusus tipe `cash`. Baca induknya dulu untuk konteks kenapa porting akun dipecah per tipe.
 
 ## Status & TODO saat ini (ringkas)
 

@@ -1,8 +1,14 @@
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 import { BaseForm } from "@/components/forms/base-form";
-import { FormFieldNumber, FormFieldText, FormFieldToggleGroup } from "@/components/forms/form-fields";
+import {
+  FormFieldNumber,
+  FormFieldSelect,
+  FormFieldText,
+  FormFieldToggleGroup,
+} from "@/components/forms/form-fields";
 import { accountFormSchema, type AccountFormOutput, type AccountFormValues } from "./schema";
 import { GroupSelectField } from "./fields/group-select";
 import { IconPickerField } from "./fields/icon-picker";
@@ -22,6 +28,7 @@ const ACCOUNT_TYPE_OPTIONS = [
   { value: "cash", label: "Kas" },
   { value: "debt", label: "Utang Piutang" },
   { value: "investment", label: "Investasi" },
+  { value: "third_party", label: "Dana Pihak Ketiga" },
 ];
 
 const DIRECTION_OPTIONS = [
@@ -38,6 +45,7 @@ export function AccountForm({
   hideKindToggle,
   hideAccountTypeToggle,
   hideInvestmentType,
+  hideThirdPartyType,
   inBottomSheet,
 }: AccountFormProps) {
   return (
@@ -79,6 +87,7 @@ export function AccountForm({
           hideKindToggle={hideKindToggle}
           hideAccountTypeToggle={hideAccountTypeToggle}
           hideInvestmentType={hideInvestmentType}
+          hideThirdPartyType={hideThirdPartyType}
           inBottomSheet={inBottomSheet}
         />
       )}
@@ -96,6 +105,8 @@ interface AccountFormProps {
   hideAccountTypeToggle?: boolean;
   // Dipakai picker akun di form transaksi: akun investasi permanen hanya lewat layar Investasi.
   hideInvestmentType?: boolean;
+  // Idem: dana pihak ketiga permanen hanya lewat layar Dana Pihak Ketiga.
+  hideThirdPartyType?: boolean;
   inBottomSheet?: boolean;
 }
 
@@ -103,27 +114,33 @@ function AccountFields({
   form,
   hideAccountTypeToggle,
   hideInvestmentType,
+  hideThirdPartyType,
   inBottomSheet,
 }: {
   form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
   hideAccountTypeToggle?: boolean;
   hideInvestmentType?: boolean;
+  hideThirdPartyType?: boolean;
   inBottomSheet?: boolean;
 }) {
   const accountType = useWatch({ control: form.control, name: "account_type" });
 
+  useEffect(() => {
+    if (accountType === "third_party") form.setValue("initial_balance", 0);
+  }, [accountType, form]);
+
   return (
     <>
       {!hideAccountTypeToggle && (
-        <FormFieldToggleGroup
+        <FormFieldSelect
           form={form}
           name="account_type"
           label="Tipe Akun"
-          options={
-            hideInvestmentType
-              ? ACCOUNT_TYPE_OPTIONS.filter((option) => option.value !== "investment")
-              : ACCOUNT_TYPE_OPTIONS
-          }
+          options={ACCOUNT_TYPE_OPTIONS.filter(
+            (option) =>
+              !(hideInvestmentType && option.value === "investment") &&
+              !(hideThirdPartyType && option.value === "third_party")
+          )}
         />
       )}
 
@@ -163,15 +180,17 @@ function AccountFields({
 
       <GroupSelectField />
 
-      <FormFieldNumber
-        form={form}
-        name="initial_balance"
-        label="Saldo Awal"
-        placeholder="0"
-        prefix="Rp"
-        grouped
-        inBottomSheet={inBottomSheet}
-      />
+      {accountType !== "third_party" && (
+        <FormFieldNumber
+          form={form}
+          name="initial_balance"
+          label="Saldo Awal"
+          placeholder="0"
+          prefix="Rp"
+          grouped
+          inBottomSheet={inBottomSheet}
+        />
+      )}
 
       <FormFieldText
         form={form}
@@ -197,12 +216,14 @@ function AccountFormFields({
   hideKindToggle,
   hideAccountTypeToggle,
   hideInvestmentType,
+  hideThirdPartyType,
   inBottomSheet,
 }: {
   form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
   hideKindToggle?: boolean;
   hideAccountTypeToggle?: boolean;
   hideInvestmentType?: boolean;
+  hideThirdPartyType?: boolean;
   inBottomSheet?: boolean;
 }) {
   const kind = useWatch({ control: form.control, name: "kind" });
@@ -224,6 +245,7 @@ function AccountFormFields({
           form={form}
           hideAccountTypeToggle={hideAccountTypeToggle}
           hideInvestmentType={hideInvestmentType}
+          hideThirdPartyType={hideThirdPartyType}
           inBottomSheet={inBottomSheet}
         />
       )}

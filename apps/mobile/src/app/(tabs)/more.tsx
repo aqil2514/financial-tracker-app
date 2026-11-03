@@ -20,7 +20,7 @@ type MenuGroup = {
 
 const flatMenuItems: MenuItem[] = [
   { title: "Investasi", icon: "trending-up-outline", href: "/investments" as Href },
-  { title: "Dana Pihak Ketiga", icon: "people-outline" },
+  { title: "Dana Pihak Ketiga", icon: "people-outline", href: "/third-party" as Href },
 ];
 
 const menuGroups: MenuGroup[] = [

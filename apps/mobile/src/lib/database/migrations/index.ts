@@ -8,6 +8,7 @@ import * as m0006 from "./0006_transaction_cash_neutral";
 import * as m0007 from "./0007_fix_orphaned_account_group_id";
 import * as m0008 from "./0008_debts";
 import * as m0009 from "./0009_investments";
+import * as m0010 from "./0010_third_party_funds";
 
 export interface Migration {
   up: (db: SQLiteDatabase) => Promise<void>;
@@ -27,4 +28,5 @@ export const MIGRATIONS: Migration[] = [
   m0007,
   m0008,
   m0009,
+  m0010,
 ];

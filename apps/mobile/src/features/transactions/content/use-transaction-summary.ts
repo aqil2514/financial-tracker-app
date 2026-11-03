@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { useDatabase } from "@/lib/database";
+import { EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL } from "@/shared/third-party-funds";
 import { buildWhereClause } from "@/components/query/filters/builders/sql";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 
@@ -43,8 +44,8 @@ export function useTransactionSummary({ filters = [] }: { filters?: FilterConfig
 
     const sql = toPositionalPlaceholders(
       `SELECT
-         SUM(CASE WHEN type = 'income' AND is_cash_neutral = 0 THEN amount ELSE 0 END) AS income,
-         SUM(CASE WHEN type = 'expense' AND is_cash_neutral = 0 THEN amount ELSE 0 END) AS expense
+         SUM(CASE WHEN type = 'income' AND is_cash_neutral = 0 AND ${EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL} THEN amount ELSE 0 END) AS income,
+         SUM(CASE WHEN type = 'expense' AND is_cash_neutral = 0 AND ${EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL} THEN amount ELSE 0 END) AS expense
        FROM transactions ${whereClause}`
     );
 

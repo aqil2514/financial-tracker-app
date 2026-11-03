@@ -1,26 +1,34 @@
 import { useEffect, useRef, useState } from "react";
-import { Controller, type Control } from "react-hook-form";
+import { Controller, type Control, type FieldValues, type Path } from "react-hook-form";
 import { Pressable, Text, View } from "react-native";
 import { useDatabase } from "@/lib/database";
 import {
   ContactPickerSheet,
   type ContactPickerSheetRef,
 } from "@/features/contacts/content/contact-picker-sheet";
-import type { TransactionFormValues } from "../schema";
 
-interface FormFieldContactProps {
-  control: Control<TransactionFormValues>;
+// Generik supaya bisa dipakai dua kali dalam satu form (mis. kontak asal/tujuan di form pindah dana pihak ketiga).
+interface FormFieldContactProps<TFieldValues extends FieldValues> {
+  control: Control<TFieldValues>;
+  name?: Path<TFieldValues>;
+  label?: string;
   disabled?: boolean;
 }
 
-export function FormFieldContact({ control, disabled }: FormFieldContactProps) {
+export function FormFieldContact<TFieldValues extends FieldValues>({
+  control,
+  name = "contact_id" as Path<TFieldValues>,
+  label = "Kontak",
+  disabled,
+}: FormFieldContactProps<TFieldValues>) {
   return (
     <Controller
       control={control}
-      name="contact_id"
+      name={name}
       render={({ field, fieldState }) => (
         <ContactFieldInput
-          value={field.value}
+          label={label}
+          value={field.value ?? null}
           error={fieldState.error?.message}
           disabled={disabled}
           onChange={field.onChange}
@@ -31,11 +39,13 @@ export function FormFieldContact({ control, disabled }: FormFieldContactProps) {
 }
 
 function ContactFieldInput({
+  label: fieldLabel,
   value,
   error,
   disabled,
   onChange,
 }: {
+  label: string;
   value: string | null;
   error?: string;
   disabled?: boolean;
@@ -68,7 +78,7 @@ function ContactFieldInput({
 
   return (
     <View className="gap-2">
-      <Text className="text-sm font-medium text-neutral-700">Kontak</Text>
+      <Text className="text-sm font-medium text-neutral-700">{fieldLabel}</Text>
       <Pressable
         className="rounded-md border border-neutral-300 px-3 py-2 disabled:opacity-50"
         disabled={disabled}

@@ -20,6 +20,11 @@ import {
   getTransactionInvestmentSale,
   InvestmentPurchaseEditBlockedError,
 } from "@/shared/investments";
+import {
+  detachThirdPartyFundsForDeletedTransaction,
+  getTransactionThirdPartyFund,
+  ThirdPartyFundEditBlockedError,
+} from "@/shared/third-party-funds";
 
 interface TransactionRow {
   note: string;
@@ -112,6 +117,16 @@ export default function EditTransactionPage() {
       Alert.alert(
         "Tidak bisa diedit",
         "Transaksi ini bagian dari penjualan investasi. Hapus transaksinya (penjualan ikut terhapus), lalu catat ulang dari layar Investasi."
+      );
+      return;
+    }
+
+    // Baris third_party_funds menyimpan akun, kontak, arah, dan nominal sendiri; mengedit transaksinya lewat form
+    // umum membuat keduanya tidak sinkron. Titip/ambil/pindah hanya lewat layar Dana Pihak Ketiga.
+    if ((await getTransactionThirdPartyFund(db, id)).role === "fund") {
+      Alert.alert(
+        "Tidak bisa diedit",
+        "Transaksi ini bagian dari riwayat Dana Pihak Ketiga. Ubah nominal/tanggal/catatannya dari layar Dana Pihak Ketiga, atau hapus lalu catat ulang."
       );
       return;
     }
@@ -228,21 +243,30 @@ export default function EditTransactionPage() {
             ReturnType<typeof detachInvestmentPurchaseForDeletedTransaction>
           >;
           let saleResult = { role: "none" } as Awaited<ReturnType<typeof detachInvestmentSaleForDeletedTransaction>>;
+          let fundResult = { role: "none" } as Awaited<ReturnType<typeof detachThirdPartyFundsForDeletedTransaction>>;
           try {
             await db.withTransactionAsync(async () => {
               result = await detachDebtForDeletedTransaction(db, id);
               investmentResult = await detachInvestmentPurchaseForDeletedTransaction(db, id);
               saleResult = await detachInvestmentSaleForDeletedTransaction(db, id);
+              fundResult = await detachThirdPartyFundsForDeletedTransaction(db, id);
               await db.runAsync("DELETE FROM transactions WHERE id = ?", [id]);
             });
           } catch (error) {
-            if (error instanceof InvestmentPurchaseEditBlockedError) {
+            if (error instanceof InvestmentPurchaseEditBlockedError || error instanceof ThirdPartyFundEditBlockedError) {
               Alert.alert("Tidak bisa dihapus", error.message);
               return;
             }
             throw error;
           }
           router.back();
+
+          if (fundResult.role === "fund") {
+            Alert.alert(
+              "Riwayat Dana Pihak Ketiga ikut dihapus",
+              "Baris riwayat titip/ambil/pindah yang lahir dari transaksi ini dihapus bersamanya, dan sisa titipan menyesuaikan."
+            );
+          }
 
           if (saleResult.role === "sale") {
             Alert.alert(

@@ -16,8 +16,7 @@ export function AccountListItem({
   onToggleActive: (id: string, nextIsActive: boolean) => void;
 }) {
   const router = useRouter();
-  const typeOption =
-    account.accountType === "third_party" ? null : ACCOUNT_TYPE_OPTIONS[account.accountType];
+  const typeOption = ACCOUNT_TYPE_OPTIONS[account.accountType];
 
   return (
     <Pressable

@@ -1,7 +1,7 @@
 
 # Porting Akun Tipe Debt / Utang-Piutang (Desktop → Mobile) — SELESAI
 
-Dokumen anak dari [porting-account.md](../plan/porting-account.md) — fokus khusus tipe `debt`. Baca induknya dulu untuk konteks kenapa porting akun dipecah per tipe, dan baca [porting-account-cash.md](porting-account-cash.md) sebagai referensi pola yang sudah terbukti bagus (CRUD akun, saldo on-the-fly, picker, dst — tipe `debt` WARIS semua itu, dokumen ini cuma menambahkan apa yang KHUSUS untuk `debt`).
+Dokumen anak dari [porting-account.md](porting-account.md) — fokus khusus tipe `debt`. Baca induknya dulu untuk konteks kenapa porting akun dipecah per tipe, dan baca [porting-account-cash.md](porting-account-cash.md) sebagai referensi pola yang sudah terbukti bagus (CRUD akun, saldo on-the-fly, picker, dst — tipe `debt` WARIS semua itu, dokumen ini cuma menambahkan apa yang KHUSUS untuk `debt`).
 
 **Wajib baca sebelum implementasi**: [konsep-tipe-akun.md](../../../../../docs/concept/konsep-tipe-akun.md) dan [konsep-utang-piutang.md](../../../../../docs/concept/konsep-utang-piutang.md).
 

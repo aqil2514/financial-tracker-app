@@ -12,7 +12,7 @@ export const accountFormSchema = z
     initial_balance: z.coerce.number(),
     description: z.string().nullable(),
     is_active: z.enum(["true", "false"]),
-    account_type: z.enum(["cash", "debt", "investment"]),
+    account_type: z.enum(["cash", "debt", "investment", "third_party"]),
     direction: z.enum(["receivable", "payable"]).nullable(),
     unit_label: z.string().nullable(),
     current_market_value: z.coerce.number(),
@@ -25,6 +25,11 @@ export const accountFormSchema = z
     (values) =>
       values.kind !== "account" || values.account_type !== "investment" || !!values.unit_label?.trim(),
     { message: "Satuan unit wajib diisi", path: ["unit_label"] }
+  )
+  // Setiap rupiah di akun ini harus bisa ditelusuri ke kontak lewat third_party_funds, bukan lahir dari saldo awal.
+  .refine(
+    (values) => values.kind !== "account" || values.account_type !== "third_party" || values.initial_balance === 0,
+    { message: "Akun Dana Pihak Ketiga tidak boleh punya saldo awal", path: ["initial_balance"] }
   );
 
 export type AccountFormValues = z.input<typeof accountFormSchema>;

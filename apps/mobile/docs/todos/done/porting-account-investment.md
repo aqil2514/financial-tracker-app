@@ -1,7 +1,7 @@
 
 # Porting Akun Tipe Investasi (Desktop → Mobile) — SELESAI
 
-Dokumen anak dari [porting-account.md](../plan/porting-account.md) — fokus khusus tipe `investment`. Baca induknya dulu untuk konteks kenapa porting akun dipecah per tipe, dan baca [porting-account-cash.md](porting-account-cash.md) serta [porting-account-debt.md](porting-account-debt.md) sebagai referensi pola yang sudah terbukti (CRUD akun, saldo on-the-fly, picker, guard edit/delete, pemisahan logic ke `shared/<domain>/` — tipe `investment` WARIS semua itu, dokumen ini cuma menambahkan apa yang KHUSUS untuk `investment`).
+Dokumen anak dari [porting-account.md](porting-account.md) — fokus khusus tipe `investment`. Baca induknya dulu untuk konteks kenapa porting akun dipecah per tipe, dan baca [porting-account-cash.md](porting-account-cash.md) serta [porting-account-debt.md](porting-account-debt.md) sebagai referensi pola yang sudah terbukti (CRUD akun, saldo on-the-fly, picker, guard edit/delete, pemisahan logic ke `shared/<domain>/` — tipe `investment` WARIS semua itu, dokumen ini cuma menambahkan apa yang KHUSUS untuk `investment`).
 
 **Wajib baca sebelum implementasi**: [konsep-tipe-akun.md](../../../../../docs/concept/konsep-tipe-akun.md) dan [konsep-investasi.md](../../../../../docs/concept/konsep-investasi.md). Aturan krusial yang tidak boleh terlewat: penjualan berstatus `pending` TIDAK BOLEH membuat transaksi apa pun sampai `settled`.
 
