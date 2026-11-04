@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { FlatList, Keyboard, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -7,6 +7,7 @@ import {
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
+import { SheetSearchInput } from "@/components/forms/sheet-search-input";
 import { generateId, useDatabase } from "@/lib/database";
 import { AccountForm } from "@/features/accounts/form/account-form";
 import { emptyAccountValues } from "@/features/accounts/form/values";
@@ -23,6 +24,12 @@ const CREATE_ACCOUNT_ROW: AccountRootOptionRow = {
   id: "__create_account__",
   name: "Akun Baru",
 };
+
+interface AccountSearchRow {
+  id: string;
+  name: string;
+  group_name: string | null;
+}
 
 interface AccountChildOptionRow {
   id: string;
@@ -51,6 +58,18 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
     const [createDefaultValues, setCreateDefaultValues] = useState<AccountFormValues | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+    const [searchableAccounts, setSearchableAccounts] = useState<AccountSearchRow[]>([]);
+    const [search, setSearch] = useState("");
+
+    const searchResults = useMemo(() => {
+      const keyword = search.trim().toLowerCase();
+      if (!keyword) return null;
+      return searchableAccounts.filter(
+        (account) =>
+          account.name.toLowerCase().includes(keyword) ||
+          account.group_name?.toLowerCase().includes(keyword)
+      );
+    }, [searchableAccounts, search]);
 
     // Akun investasi sengaja disembunyikan dari picker transaksi: logic transaksinya (pembelian/penjualan)
     // belum ada, jadi transaksi ke akun itu akan tersimpan tanpa baris investment_purchases/sales.
@@ -61,6 +80,16 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
       // Akun investasi dan dana pihak ketiga sengaja tidak dipilih di form transaksi: hanya lewat layar khususnya.
       const ungroupedAccounts = await db.getAllAsync<{ id: string; name: string }>(
         `SELECT id, name FROM accounts WHERE group_id IS NULL AND is_active = 1 AND account_type NOT IN ('investment', 'third_party') ORDER BY name ASC`
+      );
+
+      // Semua akun yang bisa dipilih (lintas grup), dipakai hasil pencarian.
+      setSearchableAccounts(
+        await db.getAllAsync<AccountSearchRow>(
+          `SELECT a.id, a.name, g.name as group_name
+           FROM accounts a LEFT JOIN account_groups g ON g.id = a.group_id
+           WHERE a.is_active = 1 AND a.account_type NOT IN ('investment', 'third_party')
+           ORDER BY a.name ASC`
+        )
       );
 
       setRootOptions([
@@ -76,6 +105,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
 
     useImperativeHandle(ref, () => ({
       present: async () => {
+        setSearch("");
         await loadRootOptions();
         rootSheetRef.current?.present();
       },
@@ -103,6 +133,11 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
         openChildren({ id: option.id, name: option.name });
         return;
       }
+      onSelect({ id: option.id, name: option.name });
+      rootSheetRef.current?.dismiss();
+    }
+
+    function handleSelectSearchResult(option: AccountSearchRow) {
       onSelect({ id: option.id, name: option.name });
       rootSheetRef.current?.dismiss();
     }
@@ -209,9 +244,35 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
                 <Text className="text-sm font-medium text-neutral-900">Grup</Text>
               </Pressable>
             </View>
+            <View className="mb-2">
+              <SheetSearchInput onChangeDebounced={setSearch} placeholder="Cari akun..." />
+            </View>
+            {searchResults ? (
+              searchResults.length === 0 ? (
+                <Text className="py-4 text-center text-neutral-500">Tidak ada akun yang cocok.</Text>
+              ) : (
+                <FlatList
+                  data={searchResults}
+                  keyExtractor={(item) => item.id}
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => (
+                    <Pressable
+                      className="border-b border-neutral-100 py-3"
+                      onPress={() => handleSelectSearchResult(item)}
+                    >
+                      <Text className="text-neutral-900">{item.name}</Text>
+                      {item.group_name && (
+                        <Text className="text-xs text-neutral-500">{item.group_name}</Text>
+                      )}
+                    </Pressable>
+                  )}
+                />
+              )
+            ) : (
             <FlatList
               data={rootOptions}
               keyExtractor={(item) => item.id}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) =>
                 item.kind === "create-account" ? (
                   <Pressable
@@ -234,6 +295,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
                 )
               }
             />
+            )}
           </View>
         </BottomSheetModal>
 

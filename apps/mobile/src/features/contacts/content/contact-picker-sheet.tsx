@@ -1,12 +1,9 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetTextInput,
-} from "@gorhom/bottom-sheet";
+import { BottomSheetBackdrop, BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
+import { SheetSearchInput, type SheetSearchInputRef } from "@/components/forms/sheet-search-input";
 import { generateId, useDatabase } from "@/lib/database";
 
 interface ContactOptionRow {
@@ -22,47 +19,12 @@ interface ContactPickerSheetProps {
   onSelect: (contact: { id: string; name: string }) => void;
 }
 
-// BottomSheetTextInput TIDAK terkontrol (tanpa prop `value`) — dibaca
-// lewat ref, bukan di-echo balik dari state React tiap keystroke.
-// Versi sebelumnya (value={search} controlled, meski sudah di-debounce
-// untuk FlatList) masih bikin cursor native "mundur-maju" sekilas saat
-// mengetik/hapus cepat — React Native TextInput terkontrol yang
-// di-render ulang sering rawan race antara posisi cursor native vs
-// value yang di-push balik dari JS. Uncontrolled menghilangkan race
-// itu total: native input yang sepenuhnya pegang kendali karakter dan
-// posisi cursor, JS cuma "mendengarkan" lewat onChangeText.
-const ContactSearchInput = forwardRef<
-  { getValue: () => string },
-  { onChangeDebounced: (value: string) => void }
->(function ContactSearchInput({ onChangeDebounced }, ref) {
-  const valueRef = useRef("");
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useImperativeHandle(ref, () => ({ getValue: () => valueRef.current }));
-
-  function handleChangeText(text: string) {
-    valueRef.current = text;
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => onChangeDebounced(text), 150);
-  }
-
-  return (
-    <BottomSheetTextInput
-      defaultValue=""
-      onChangeText={handleChangeText}
-      placeholder="Cari atau buat kontak baru..."
-      autoFocus
-      className="rounded-md border border-neutral-300 px-3 py-2 text-neutral-900"
-    />
-  );
-});
-
 export const ContactPickerSheet = forwardRef<ContactPickerSheetRef, ContactPickerSheetProps>(
   function ContactPickerSheet({ onSelect }, ref) {
     const db = useDatabase();
     const insets = useSafeAreaInsets();
     const sheetRef = useRef<BottomSheetModal>(null);
-    const searchInputRef = useRef<{ getValue: () => string }>(null);
+    const searchInputRef = useRef<SheetSearchInputRef>(null);
     const [options, setOptions] = useState<ContactOptionRow[]>([]);
     const [search, setSearch] = useState("");
     const [isCreating, setIsCreating] = useState(false);
@@ -126,7 +88,12 @@ export const ContactPickerSheet = forwardRef<ContactPickerSheetRef, ContactPicke
       >
         <View className="flex-1 gap-2 px-4" style={{ paddingBottom: insets.bottom + 16 }}>
           <Text className="text-lg font-semibold text-neutral-900">Pilih Kontak</Text>
-          <ContactSearchInput ref={searchInputRef} onChangeDebounced={setSearch} />
+          <SheetSearchInput
+            ref={searchInputRef}
+            onChangeDebounced={setSearch}
+            placeholder="Cari atau buat kontak baru..."
+            autoFocus
+          />
 
           {search.trim() !== "" && !exactMatch && (
             <Pressable

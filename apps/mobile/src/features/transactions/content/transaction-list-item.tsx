@@ -12,6 +12,8 @@ export function TransactionItem({
 }) {
   const router = useRouter();
   const isTransfer = transaction.type === "transfer";
+  // date = "YYYY-MM-DDTHH:mm"; baris lama bisa hanya tanggal (tanpa jam).
+  const time = transaction.date.split("T")[1]?.slice(0, 5).replace(":", ".");
   const description = descriptionToPlainText(transaction.description).replace(/\s*\n\s*/g, " · ");
 
   return (
@@ -40,14 +42,17 @@ export function TransactionItem({
               : transaction.account}
           </Text>
         </View>
-        <Text className={`font-semibold ${AMOUNT_COLOR[transaction.type]}`}>
-          {transaction.type === "expense"
-            ? "-"
-            : transaction.type === "income"
-              ? "+"
-              : ""}
-          {formatCurrency(transaction.amount)}
-        </Text>
+        <View className="items-end">
+          <Text className={`font-semibold ${AMOUNT_COLOR[transaction.type]}`}>
+            {transaction.type === "expense"
+              ? "-"
+              : transaction.type === "income"
+                ? "+"
+                : ""}
+            {formatCurrency(transaction.amount)}
+          </Text>
+          {time && <Text className="mt-0.5 text-xs text-neutral-500">{time}</Text>}
+        </View>
       </View>
 
       <View className="mt-2 flex-row items-center gap-2">

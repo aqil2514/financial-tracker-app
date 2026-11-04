@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import {
   BottomSheetBackdrop,
@@ -8,6 +8,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import { Badge } from "@/components/badge";
+import { SheetSearchInput } from "@/components/forms/sheet-search-input";
 import { generateId, useDatabase } from "@/lib/database";
 
 interface CategoryOptionRow {
@@ -15,6 +16,12 @@ interface CategoryOptionRow {
   name: string;
   parent_id: string | null;
   has_children: number;
+}
+
+interface CategorySearchRow {
+  id: string;
+  name: string;
+  parent_name: string | null;
 }
 
 const TYPE_LABEL = {
@@ -87,6 +94,18 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
     const [createParentId, setCreateParentId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [createSessionId, setCreateSessionId] = useState(0);
+    const [searchableCategories, setSearchableCategories] = useState<CategorySearchRow[]>([]);
+    const [search, setSearch] = useState("");
+
+    const searchResults = useMemo(() => {
+      const keyword = search.trim().toLowerCase();
+      if (!keyword) return null;
+      return searchableCategories.filter(
+        (category) =>
+          category.name.toLowerCase().includes(keyword) ||
+          category.parent_name?.toLowerCase().includes(keyword)
+      );
+    }, [searchableCategories, search]);
 
     const loadRootOptions = useCallback(async () => {
       const rows = await db.getAllAsync<CategoryOptionRow>(
@@ -98,10 +117,25 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
         [type]
       );
       setRootOptions(rows);
+
+      // Kategori yang bisa dipilih langsung (tanpa anak) lintas induk,
+      // dipakai hasil pencarian — induk yang punya anak tetap tidak bisa
+      // dipilih, sama seperti alur browse.
+      setSearchableCategories(
+        await db.getAllAsync<CategorySearchRow>(
+          `SELECT c.id, c.name, p.name as parent_name
+           FROM categories c LEFT JOIN categories p ON p.id = c.parent_id
+           WHERE c.type = ? AND c.is_active = 1
+             AND NOT EXISTS(SELECT 1 FROM categories child WHERE child.parent_id = c.id)
+           ORDER BY c.name ASC`,
+          [type]
+        )
+      );
     }, [db, type]);
 
     useImperativeHandle(ref, () => ({
       present: async () => {
+        setSearch("");
         await loadRootOptions();
         rootSheetRef.current?.present();
       },
@@ -126,6 +160,11 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
         openChildren({ id: option.id, name: option.name });
         return;
       }
+      onSelect({ id: option.id, name: option.name });
+      rootSheetRef.current?.dismiss();
+    }
+
+    function handleSelectSearchResult(option: CategorySearchRow) {
       onSelect({ id: option.id, name: option.name });
       rootSheetRef.current?.dismiss();
     }
@@ -175,6 +214,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
           snapPoints={["60%"]}
           enableDynamicSizing={false}
           stackBehavior="push"
+          android_keyboardInputMode="adjustResize"
           backdropComponent={(props) => (
             <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
           )}
@@ -186,7 +226,33 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
                 <Ionicons name="add-circle-outline" size={24} color="#171717" />
               </Pressable>
             </View>
-            {rootOptions.length === 0 ? (
+            <View className="mb-2">
+              <SheetSearchInput onChangeDebounced={setSearch} placeholder="Cari kategori..." />
+            </View>
+            {searchResults ? (
+              searchResults.length === 0 ? (
+                <Text className="py-4 text-center text-neutral-500">
+                  Tidak ada kategori yang cocok.
+                </Text>
+              ) : (
+                <FlatList
+                  data={searchResults}
+                  keyExtractor={(item) => item.id}
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => (
+                    <Pressable
+                      className="border-b border-neutral-100 py-3"
+                      onPress={() => handleSelectSearchResult(item)}
+                    >
+                      <Text className="text-neutral-900">{item.name}</Text>
+                      {item.parent_name && (
+                        <Text className="text-xs text-neutral-500">{item.parent_name}</Text>
+                      )}
+                    </Pressable>
+                  )}
+                />
+              )
+            ) : rootOptions.length === 0 ? (
               <Text className="py-4 text-center text-neutral-500">
                 Belum ada kategori aktif untuk tipe ini.
               </Text>
@@ -194,6 +260,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
               <FlatList
                 data={rootOptions}
                 keyExtractor={(item) => item.id}
+                keyboardShouldPersistTaps="handled"
                 renderItem={({ item }) => (
                   <Pressable
                     className="flex-row items-center justify-between border-b border-neutral-100 py-3"

@@ -3,6 +3,10 @@ import { Controller, type FieldPath, type FieldValues, type UseFormReturn } from
 import { Pressable, Text, View } from "react-native";
 import { OptionPicker, type OptionPickerRef } from "@/components/query/shared/option-picker";
 
+// Pencarian hanya muncul di daftar yang cukup panjang; untuk pilihan
+// pendek (mis. Jenis, 2-3 opsi) kolom cari cuma memakan ruang.
+const SEARCHABLE_MIN_OPTIONS = 7;
+
 type FormFieldSelectOption = {
   value: string;
   label: string;
@@ -63,6 +67,7 @@ export function FormFieldSelect<TFieldValues extends FieldValues>({
               ref={pickerRef}
               title={label}
               options={pickerOptions}
+              searchable={pickerOptions.length > SEARCHABLE_MIN_OPTIONS}
               value={field.value ?? null}
               onSelect={(value) => field.onChange(value === "" ? null : value)}
             />
