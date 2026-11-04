@@ -5,6 +5,7 @@ import { useWatch, type UseFormReturn } from "react-hook-form";
 import { BaseForm } from "@/components/forms/base-form";
 import {
   FormFieldDate,
+  FormFieldDescription,
   FormFieldNumber,
   FormFieldText,
   FormFieldToggleGroup,
@@ -162,13 +163,7 @@ function TransactionFormFields({
 
       <FormFieldDate form={form} name="date" label="Tanggal" />
 
-      <FormFieldText
-        form={form}
-        name="description"
-        label="Deskripsi (opsional)"
-        placeholder="Catatan tambahan"
-        multiline
-      />
+      <FormFieldDescription form={form} name="description" label="Deskripsi (opsional)" />
     </>
   );
 }

@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type PageHeaderProps = {
-  title: string;
+  title: ReactNode;
   actions?: ReactNode;
 };
 
@@ -15,7 +15,11 @@ export function PageHeader({ title, actions }: PageHeaderProps) {
       style={{ paddingTop: insets.top }}
       className="flex-row items-center justify-between border-b border-neutral-200 bg-white px-4 pb-3"
     >
-      <Text className="text-2xl font-bold text-neutral-900">{title}</Text>
+      {typeof title === "string" ? (
+        <Text className="text-2xl font-bold text-neutral-900">{title}</Text>
+      ) : (
+        title
+      )}
       {actions}
     </View>
   );

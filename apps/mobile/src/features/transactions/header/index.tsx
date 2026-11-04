@@ -3,9 +3,12 @@ import { PageHeader } from "@/components/page-header";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
 import { TransactionHeaderFilter } from "./filter";
+import { MonthNavigator } from "./month-navigator";
 import { TransactionHeaderSort } from "./sort";
 
 interface TransactionHeaderProps {
+  month: string | null;
+  onMonthChange: (month: string | null) => void;
   filters: FilterConfig[];
   onFiltersChange: (filters: FilterConfig[]) => void;
   sorts: SortConfig[];
@@ -13,6 +16,8 @@ interface TransactionHeaderProps {
 }
 
 export function TransactionHeader({
+  month,
+  onMonthChange,
   filters,
   onFiltersChange,
   sorts,
@@ -20,7 +25,7 @@ export function TransactionHeader({
 }: TransactionHeaderProps) {
   return (
     <PageHeader
-      title="Transaksi"
+      title={<MonthNavigator month={month} onChange={onMonthChange} />}
       actions={
         <View className="flex-row items-center gap-2">
           <TransactionHeaderSort sorts={sorts} onChange={onSortsChange} />

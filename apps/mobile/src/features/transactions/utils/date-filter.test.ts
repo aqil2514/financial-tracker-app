@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDateFilter, replaceDateFilter } from "./date-filter";
+import { buildDateFilter, buildMonthFilter, shiftMonth, withDateScope } from "./date-filter";
 
 describe("buildDateFilter", () => {
   it("membuat rentang 00:00:00 - 23:59:59 untuk satu tanggal kalender", () => {
@@ -13,29 +13,41 @@ describe("buildDateFilter", () => {
   });
 });
 
-describe("replaceDateFilter", () => {
-  it("menambah filter tanggal baru kalau belum ada filter tanggal sebelumnya", () => {
-    const result = replaceDateFilter([], "2026-03-15");
-    expect(result).toHaveLength(1);
-    expect(result[0].filterKey).toBe("date");
-  });
-
-  it("menggantikan filter tanggal lama, bukan menambah duplikat", () => {
-    const first = replaceDateFilter([], "2026-03-15");
-    const second = replaceDateFilter(first, "2026-03-20");
-
-    expect(second).toHaveLength(1);
-    expect(second[0].filterValue).toEqual({
-      from: "2026-03-20T00:00:00",
-      to: "2026-03-20T23:59:59",
+describe("buildMonthFilter", () => {
+  it("rentang awal sampai akhir bulan, termasuk Februari kabisat", () => {
+    expect(buildMonthFilter("2026-11").filterValue).toEqual({
+      from: "2026-11-01T00:00:00",
+      to: "2026-11-30T23:59:59",
+    });
+    expect(buildMonthFilter("2028-02").filterValue).toEqual({
+      from: "2028-02-01T00:00:00",
+      to: "2028-02-29T23:59:59",
     });
   });
+});
 
-  it("tidak mengubah filter lain yang bukan filter tanggal", () => {
-    const otherFilter = { filterKey: "type", filterOperator: "eq" as const, filterValue: "income" };
-    const result = replaceDateFilter([otherFilter], "2026-03-15");
+describe("shiftMonth", () => {
+  it("melewati batas tahun", () => {
+    expect(shiftMonth("2026-01", -1)).toBe("2025-12");
+    expect(shiftMonth("2026-12", 1)).toBe("2027-01");
+  });
+});
 
-    expect(result).toHaveLength(2);
-    expect(result).toContainEqual(otherFilter);
+describe("withDateScope", () => {
+  const other = { filterKey: "type", filterOperator: "eq" as const, filterValue: "income" };
+
+  it("semua waktu tanpa hari: filter dikembalikan apa adanya", () => {
+    expect(withDateScope([other], null, null)).toEqual([other]);
+  });
+
+  it("bulan ditambahkan sebagai filter tanggal", () => {
+    expect(withDateScope([other], "2026-11", null)).toEqual([other, buildMonthFilter("2026-11")]);
+  });
+
+  it("hari mengalahkan bulan dan tidak mengubah filter lain", () => {
+    expect(withDateScope([other], "2026-11", "2026-11-04")).toEqual([
+      other,
+      buildDateFilter("2026-11-04"),
+    ]);
   });
 });

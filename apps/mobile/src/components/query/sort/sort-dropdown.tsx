@@ -1,4 +1,5 @@
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 import { OptionPicker, type OptionPickerRef } from "../shared/option-picker";
@@ -47,12 +48,16 @@ export function SortDropdown({ config, value, onChange }: SortDropdownProps) {
   return (
     <>
       <Pressable
-        className="flex-row items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5"
+        className="flex-row items-center gap-1 rounded-md border border-neutral-300 px-2.5 py-1.5"
+        accessibilityLabel="Urutkan"
         onPress={handlePresent}
       >
-        <Text className="text-sm font-medium text-neutral-900">
-          Urutkan{value.length > 0 ? ` (${value.length})` : ""}
-        </Text>
+        <Ionicons name="swap-vertical-outline" size={18} color="#171717" />
+        {value.length > 0 && (
+          <View className="min-w-5 items-center rounded-full bg-neutral-900 px-1.5">
+            <Text className="text-xs font-medium text-white">{value.length}</Text>
+          </View>
+        )}
       </Pressable>
 
       <BottomSheetModal

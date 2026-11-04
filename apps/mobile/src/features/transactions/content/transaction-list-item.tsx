@@ -1,6 +1,6 @@
 import { Badge } from "@/components/badge";
 import { AMOUNT_COLOR, TYPE_LABEL } from "@/constants";
-import { formatCurrency } from "@/lib/utils";
+import { descriptionToPlainText, formatCurrency } from "@/lib/utils";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { TransactionListItem } from "../types";
@@ -12,6 +12,7 @@ export function TransactionItem({
 }) {
   const router = useRouter();
   const isTransfer = transaction.type === "transfer";
+  const description = descriptionToPlainText(transaction.description).replace(/\s*\n\s*/g, " · ");
 
   return (
     <Pressable
@@ -28,9 +29,9 @@ export function TransactionItem({
           <Text className="font-medium text-neutral-900">
             {transaction.note}
           </Text>
-          {transaction.description && (
+          {description && (
             <Text className="mt-0.5 text-xs text-neutral-500" numberOfLines={1}>
-              {transaction.description}
+              {description}
             </Text>
           )}
           <Text className="mt-1 text-xs text-neutral-500">
