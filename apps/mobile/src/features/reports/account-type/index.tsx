@@ -1,8 +1,9 @@
-import { Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { Skeleton } from "@/components/skeleton";
 import { ACCOUNT_TYPE_OPTIONS } from "@/lib/account-types";
 import { formatCurrency } from "@/lib/utils";
-import { toBreakdownChartData } from "../shared/breakdown-chart-data";
+import { breakdownRowKey, toBreakdownChartData } from "../shared/breakdown-chart-data";
 import { BreakdownPie } from "../shared/breakdown-pie";
 import { useBalancesByAccountType } from "./use-balances-by-account-type";
 
@@ -11,6 +12,7 @@ const ACCOUNT_TYPE_COLORS = ["#2563eb", "#f97316", "#22c55e", "#eab308", "#a855f
 
 export function AccountTypeSection() {
   const { data: balances, isLoading } = useBalancesByAccountType();
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const { rows } = toBreakdownChartData(
     balances.map((row) => ({
@@ -45,15 +47,23 @@ export function AccountTypeSection() {
   return (
     <View className="gap-4">
       <View className="rounded-lg border border-neutral-200 p-3">
-        <BreakdownPie rows={rows} />
+        <BreakdownPie rows={rows} selectedKey={selectedKey} onSelect={setSelectedKey} />
       </View>
 
       {rows.map((row) => {
         // Unrealized P/L hanya untuk investasi, informasional (tidak masuk total/pie).
         const pl = row.total_market_value != null ? row.total_market_value - row.total : null;
+        const key = breakdownRowKey(row);
+        const isSelected = key === selectedKey;
 
         return (
-          <View key={row.account_type} className="gap-1 rounded-lg border border-neutral-200 p-3">
+          <Pressable
+            key={key}
+            className={`gap-1 rounded-lg border p-3 ${
+              isSelected ? "border-neutral-900 bg-neutral-50" : "border-neutral-200"
+            }`}
+            onPress={() => setSelectedKey(isSelected ? null : key)}
+          >
             <View className="flex-row items-center gap-2">
               <View className="size-2.5 rounded-full" style={{ backgroundColor: row.color }} />
               <Text className="text-sm text-neutral-500">{row.label}</Text>
@@ -66,7 +76,7 @@ export function AccountTypeSection() {
                 {formatCurrency(Math.abs(pl))}
               </Text>
             )}
-          </View>
+          </Pressable>
         );
       })}
     </View>

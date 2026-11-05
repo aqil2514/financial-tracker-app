@@ -20,6 +20,11 @@ export interface BreakdownChartRow extends BreakdownInputRow {
   color: string;
 }
 
+// Kunci stabil sebuah baris untuk pilihan/React key; group_key null = bucket "Tanpa ...".
+export function breakdownRowKey(row: BreakdownInputRow): string {
+  return row.group_key ?? row.label;
+}
+
 export function toBreakdownChartData<T extends BreakdownInputRow>(
   rows: T[],
   palette: string[] = BREAKDOWN_COLORS

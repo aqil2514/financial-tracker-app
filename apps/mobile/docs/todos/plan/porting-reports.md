@@ -38,17 +38,17 @@ Desktop punya halaman laporan dengan 4 tab (`apps/desktop/src/features/reports/c
 - Periode di mobile satu bulan penuh (navigator bulan bersama, `components/month-navigator.tsx`), bukan rentang bebas seperti `PeriodPicker` desktop.
 - Query dan filter disalin dari desktop: `is_cash_neutral = 0` dan `EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL`; breakdown di-GROUP BY id (bukan nama), kategori anak digabung ke induknya.
 - Dimensi "Label" desktop belum ada di mobile karena tabel label belum ada, lihat `porting-labels.md`.
-- Pie chart memakai `PieChart` dari `react-native-chart-kit` tanpa lubang tengah (donut desktop tidak didukung library).
+- Pie chart digambar sendiri dengan `react-native-svg` (`features/reports/shared/breakdown-pie.tsx`, geometri di `donut-geometry.ts`), bukan `PieChart` chart-kit, supaya bisa berbentuk donut dengan sela antar irisan dan animasi terbuka melingkar seperti Recharts di desktop.
 - Helper bulan (`currentMonth`, `shiftMonth`, `monthDateRange`) ada di `lib/utils/month.ts` dan dipakai bersama halaman Transaksi.
 
 ## Catatan implementasi Per Tipe Akun
 
 - Rumus saldo dan filter akun aktif disalin dari desktop (`use-balances-by-account-type.ts`) dan sama dengan rumus saldo di `use-accounts.ts` mobile. Akun nonaktif tidak dihitung.
 - Tab ini tidak terikat bulan (saldo saat ini), jadi navigator bulan di header hanya tampil di tab Cashflow.
-- `PieChart` tidak bisa menggambar nilai negatif (mis. saldo utang), jadi pie hanya memuat tipe bertotal positif. Kartu tiap tipe tetap menampilkan total penuh, dan persentase dihitung terhadap jumlah semua tipe (termasuk negatif) seperti di desktop.
+- Donut tidak bisa menggambar nilai negatif (mis. saldo utang), jadi pie hanya memuat tipe bertotal positif. Kartu tiap tipe tetap menampilkan total penuh, dan persentase dihitung terhadap jumlah semua tipe (termasuk negatif) seperti di desktop.
 - Pie chart, helper data, dan palet dibagi dengan Cashflow di `features/reports/shared/`. `TabSwitcher` jadi komponen umum di `components/tab-switcher.tsx`, dipakai halaman Transaksi dan Laporan.
 
 ## Catatan teknis
 
-- Grafik memakai `react-native-chart-kit`, sesuai keputusan permanen sebelumnya. Jangan pakai library chart lain.
+- Grafik garis dan batang memakai `react-native-chart-kit`, sesuai keputusan permanen sebelumnya; jangan pakai library chart lain. Pengecualian: pie/donut digambar langsung dengan `react-native-svg` (sudah dependency langsung), bukan library chart baru.
 - Akun investasi dan dana pihak ketiga punya konsep saldo sendiri — pegang `docs/concept/konsep-investasi.md` saat menghitung saldo/cashflow yang menyentuh keduanya.

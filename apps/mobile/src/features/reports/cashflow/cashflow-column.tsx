@@ -1,7 +1,8 @@
-import { Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { Skeleton } from "@/components/skeleton";
 import { formatCurrency } from "@/lib/utils";
-import { toBreakdownChartData } from "../shared/breakdown-chart-data";
+import { breakdownRowKey, toBreakdownChartData } from "../shared/breakdown-chart-data";
 import { BreakdownPie } from "../shared/breakdown-pie";
 import type { CashflowBreakdownRow } from "./use-cashflow-breakdown";
 
@@ -13,6 +14,7 @@ interface CashflowColumnProps {
 
 export function CashflowColumn({ title, rows, isLoading }: CashflowColumnProps) {
   const { total, rows: chartRows } = toBreakdownChartData(rows);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -42,24 +44,32 @@ export function CashflowColumn({ title, rows, isLoading }: CashflowColumnProps) 
         <Text className="py-2 text-sm text-neutral-500">Belum ada data pada periode ini.</Text>
       ) : (
         <>
-          <BreakdownPie rows={chartRows} />
+          <BreakdownPie rows={chartRows} selectedKey={selectedKey} onSelect={setSelectedKey} />
 
-          {chartRows.map((row) => (
-            <View
-              key={row.group_key ?? row.label}
-              className="flex-row items-center justify-between gap-3 border-t border-neutral-100 pt-2"
-            >
-              <View className="flex-1 flex-row items-center gap-2">
-                <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: row.color }}>
-                  <Text className="text-xs font-medium text-white">{row.percent.toFixed(0)}%</Text>
+          {chartRows.map((row) => {
+            const key = breakdownRowKey(row);
+            const isSelected = key === selectedKey;
+
+            return (
+              <Pressable
+                key={key}
+                className={`flex-row items-center justify-between gap-3 rounded-md border-t border-neutral-100 px-1 py-2 ${
+                  isSelected ? "bg-neutral-100" : ""
+                }`}
+                onPress={() => setSelectedKey(isSelected ? null : key)}
+              >
+                <View className="flex-1 flex-row items-center gap-2">
+                  <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: row.color }}>
+                    <Text className="text-xs font-medium text-white">{row.percent.toFixed(0)}%</Text>
+                  </View>
+                  <Text className="flex-1 text-neutral-900" numberOfLines={1}>
+                    {row.label}
+                  </Text>
                 </View>
-                <Text className="flex-1 text-neutral-900" numberOfLines={1}>
-                  {row.label}
-                </Text>
-              </View>
-              <Text className="text-sm text-neutral-500">{formatCurrency(row.total)}</Text>
-            </View>
-          ))}
+                <Text className="text-sm text-neutral-500">{formatCurrency(row.total)}</Text>
+              </Pressable>
+            );
+          })}
         </>
       )}
     </View>
