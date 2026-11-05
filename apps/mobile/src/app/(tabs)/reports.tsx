@@ -1,36 +1,43 @@
-import { Dimensions, ScrollView, View } from "react-native";
-import { BarChart } from "react-native-chart-kit";
+import { useState } from "react";
+import { ScrollView, View } from "react-native";
+import { MonthNavigator } from "@/components/month-navigator";
 import { PageHeader } from "@/components/page-header";
+import { TabSwitcher } from "@/components/tab-switcher";
+import { AccountTypeSection } from "@/features/reports/account-type";
+import { CashflowSection } from "@/features/reports/cashflow";
+import { currentMonth } from "@/lib/utils";
 
-const screenWidth = Dimensions.get("window").width;
+type ReportTab = "cashflow" | "account-type";
 
-const chartData = {
-  labels: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun"],
-  datasets: [{ data: [1200, 900, 1500, 800, 2000, 1700] }],
-};
-
-const chartConfig = {
-  backgroundGradientFrom: "#ffffff",
-  backgroundGradientTo: "#ffffff",
-  decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(22, 163, 74, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(23, 23, 23, ${opacity})`,
-};
+const REPORT_TABS: { key: ReportTab; label: string }[] = [
+  { key: "cashflow", label: "Cashflow" },
+  { key: "account-type", label: "Per Tipe Akun" },
+];
 
 export default function ReportsPage() {
+  const [tab, setTab] = useState<ReportTab>("cashflow");
+  const [month, setMonth] = useState(currentMonth);
+
+  // Per Tipe Akun adalah saldo saat ini (tidak terikat bulan), jadi
+  // navigator bulan hanya ditampilkan untuk Cashflow.
   return (
     <View className="flex-1 bg-white">
-      <PageHeader title="Laporan" />
-      <ScrollView className="flex-1" contentContainerClassName="p-4">
-        <BarChart
-          data={chartData}
-          width={screenWidth - 32}
-          height={220}
-          yAxisLabel="Rp"
-          yAxisSuffix="rb"
-          chartConfig={chartConfig}
-          fromZero
-        />
+      <PageHeader
+        title={
+          tab === "cashflow" ? (
+            <MonthNavigator
+              month={month}
+              allowAllTime={false}
+              onChange={(next) => next && setMonth(next)}
+            />
+          ) : (
+            "Laporan"
+          )
+        }
+      />
+      <TabSwitcher tabs={REPORT_TABS} active={tab} onChange={setTab} />
+      <ScrollView className="flex-1" contentContainerClassName="p-4 pb-8">
+        {tab === "cashflow" ? <CashflowSection month={month} /> : <AccountTypeSection />}
       </ScrollView>
     </View>
   );

@@ -2,8 +2,7 @@ import { useMemo, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { OptionPicker, type OptionPickerRef } from "@/components/query/shared/option-picker";
-import { toLocalDate } from "@/lib/utils";
-import { shiftMonth } from "../utils/date-filter";
+import { currentMonth, shiftMonth } from "@/lib/utils";
 
 const ALL_TIME = "all";
 const MONTHS_BACK = 36;
@@ -22,24 +21,24 @@ interface MonthNavigatorProps {
   // "YYYY-MM"; null = semua waktu
   month: string | null;
   onChange: (month: string | null) => void;
+  // false untuk layar yang butuh satu bulan pasti (mis. Laporan): opsi
+  // "Semua waktu" tidak ditawarkan.
+  allowAllTime?: boolean;
 }
 
-export function MonthNavigator({ month, onChange }: MonthNavigatorProps) {
+export function MonthNavigator({ month, onChange, allowAllTime = true }: MonthNavigatorProps) {
   const pickerRef = useRef<OptionPickerRef>(null);
 
   const options = useMemo(() => {
-    const current = toLocalDate().slice(0, 7);
+    const current = currentMonth();
     const months = Array.from({ length: MONTHS_BACK + MONTHS_FORWARD + 1 }, (_, i) =>
       shiftMonth(current, MONTHS_FORWARD - i)
-    );
-    return [
-      { value: ALL_TIME, label: "Semua waktu" },
-      ...months.map((m) => ({ value: m, label: formatMonth(m) })),
-    ];
-  }, []);
+    ).map((m) => ({ value: m, label: formatMonth(m) }));
+    return allowAllTime ? [{ value: ALL_TIME, label: "Semua waktu" }, ...months] : months;
+  }, [allowAllTime]);
 
   // Saat "Semua waktu", panah tidak punya arah — mulai dari bulan berjalan.
-  const base = month ?? toLocalDate().slice(0, 7);
+  const base = month ?? currentMonth();
 
   return (
     <View className="flex-row items-center gap-1">

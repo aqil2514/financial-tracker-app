@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDateFilter, buildMonthFilter, shiftMonth, withDateScope } from "./date-filter";
+import { buildDateFilter, buildMonthFilter, withDateScope } from "./date-filter";
 
 describe("buildDateFilter", () => {
   it("membuat rentang 00:00:00 - 23:59:59 untuk satu tanggal kalender", () => {
@@ -23,13 +23,6 @@ describe("buildMonthFilter", () => {
       from: "2028-02-01T00:00:00",
       to: "2028-02-29T23:59:59",
     });
-  });
-});
-
-describe("shiftMonth", () => {
-  it("melewati batas tahun", () => {
-    expect(shiftMonth("2026-01", -1)).toBe("2025-12");
-    expect(shiftMonth("2026-12", 1)).toBe("2027-01");
   });
 });
 

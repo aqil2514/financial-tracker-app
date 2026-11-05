@@ -1,21 +1,15 @@
 import { Pressable, Text, View } from "react-native";
 
-export type TransactionTab = "daily" | "calendar";
-
-const TABS: { key: TransactionTab; label: string }[] = [
-  { key: "daily", label: "Harian" },
-  { key: "calendar", label: "Kalender" },
-];
-
-interface TabSwitcherProps {
-  active: TransactionTab;
-  onChange: (tab: TransactionTab) => void;
+interface TabSwitcherProps<T extends string> {
+  tabs: { key: T; label: string }[];
+  active: T;
+  onChange: (tab: T) => void;
 }
 
-export function TransactionTabSwitcher({ active, onChange }: TabSwitcherProps) {
+export function TabSwitcher<T extends string>({ tabs, active, onChange }: TabSwitcherProps<T>) {
   return (
     <View className="flex-row border-b border-neutral-200 px-4">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const isActive = tab.key === active;
         return (
           <Pressable

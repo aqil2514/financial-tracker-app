@@ -8,11 +8,18 @@ import { TransactionList } from "@/features/transactions/content";
 import { TransactionSummary } from "@/features/transactions/content/transaction-summary";
 import { useTransactions } from "@/features/transactions/content/use-transactions";
 import { TransactionCalendar } from "@/features/transactions/calendar";
-import { TransactionTabSwitcher, type TransactionTab } from "@/features/transactions/tab-switcher";
+import { TabSwitcher } from "@/components/tab-switcher";
 import { withDateScope } from "@/features/transactions/utils/date-filter";
 import { toLocalDate } from "@/lib/utils";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
+
+type TransactionTab = "daily" | "calendar";
+
+const TRANSACTION_TABS: { key: TransactionTab; label: string }[] = [
+  { key: "daily", label: "Harian" },
+  { key: "calendar", label: "Kalender" },
+];
 
 const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
@@ -57,7 +64,7 @@ export default function TransactionsPage() {
         onSortsChange={setSorts}
       />
       <TransactionSummary filters={effectiveFilters} />
-      <TransactionTabSwitcher active={tab} onChange={setTab} />
+      <TabSwitcher tabs={TRANSACTION_TABS} active={tab} onChange={setTab} />
 
       {day && tab === "daily" && (
         <View className="flex-row px-4 pt-3">

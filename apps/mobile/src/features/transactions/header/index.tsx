@@ -1,9 +1,9 @@
 import { View } from "react-native";
+import { MonthNavigator } from "@/components/month-navigator";
 import { PageHeader } from "@/components/page-header";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
 import { TransactionHeaderFilter } from "./filter";
-import { MonthNavigator } from "./month-navigator";
 import { TransactionHeaderSort } from "./sort";
 
 interface TransactionHeaderProps {
