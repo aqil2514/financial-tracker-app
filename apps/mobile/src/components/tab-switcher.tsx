@@ -12,7 +12,7 @@ export function TabSwitcher<T extends string>({ tabs, active, onChange }: TabSwi
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      className="grow-0 border-b border-neutral-200"
+      className="grow-0 shrink-0 border-b border-neutral-200"
       contentContainerClassName="px-4"
     >
       {tabs.map((tab) => {
