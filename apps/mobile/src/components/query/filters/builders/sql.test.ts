@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createSqliteTestDb } from "@/lib/database/testing/sqlite-test-db";
 import { buildWhereClause } from "./sql";
 import type { FilterConfig } from "../filter.interface";
 
@@ -101,5 +102,88 @@ describe("buildWhereClause", () => {
   it("operator yang tidak dikenal: throw", () => {
     const filters = [{ filterKey: "type", filterOperator: "unknown_op", filterValue: "x" }] as unknown as FilterConfig[];
     expect(() => buildWhereClause(filters, ALLOWED)).toThrow(/belum didukung/);
+  });
+});
+
+describe("buildWhereClause: jsonTextColumns (kolom TipTap JSON)", () => {
+  const COLUMNS = ["description", "note"] as const;
+  const options = { jsonTextColumns: ["description"] } as const;
+
+  function tiptap(...paragraphs: string[]) {
+    return JSON.stringify({
+      type: "doc",
+      content: paragraphs.map((text) => ({ type: "paragraph", content: [{ type: "text", text }] })),
+    });
+  }
+
+  async function search(operator: "ilike" | "not_ilike", value: string, rows: Record<number, string | null>) {
+    const db = await createSqliteTestDb();
+    await db.execAsync("CREATE TABLE desc_rows (id INTEGER PRIMARY KEY, description TEXT, note TEXT)");
+    for (const [id, description] of Object.entries(rows)) {
+      await db.runAsync("INSERT INTO desc_rows (id, description, note) VALUES (?, ?, ?)", [
+        Number(id),
+        description,
+        description,
+      ]);
+    }
+    const { whereClause, params } = buildWhereClause(
+      [{ filterKey: "description", filterOperator: operator, filterValue: value }],
+      COLUMNS,
+      [],
+      1,
+      options
+    );
+    const found = await db.getAllAsync<{ id: number }>(
+      `SELECT id FROM desc_rows ${whereClause.replace(/\$\d+/g, "?")} ORDER BY id`,
+      params
+    );
+    return found.map((row) => row.id);
+  }
+
+  const rows = {
+    1: tiptap("Beli ketoprak di warung"),
+    2: tiptap('Catatan "khusus" dengan kutip'),
+    3: "teks lama bukan JSON: ketoprak",
+    4: null,
+  };
+
+  it("pola dikirim dua kali (placeholder positional), nomor tetap urut", () => {
+    const result = buildWhereClause(
+      [{ filterKey: "description", filterOperator: "ilike", filterValue: "x" }],
+      COLUMNS,
+      [{ condition: "date >= $1", params: ["2026-01-01"] }],
+      1,
+      options
+    );
+    expect(result.params).toEqual(["2026-01-01", "%x%", "%x%"]);
+    expect(result.whereClause).toContain("LIKE $2");
+    expect(result.whereClause).toContain("LIKE $3");
+  });
+
+  it("nama node JSON (text, paragraph, doc) tidak lagi cocok ke semua baris", async () => {
+    expect(await search("ilike", "text", rows)).toEqual([]);
+    expect(await search("ilike", "paragraph", rows)).toEqual([]);
+    expect(await search("ilike", "doc", rows)).toEqual([]);
+  });
+
+  it("kata di isi deskripsi ketemu, termasuk yang memuat tanda kutip dan deskripsi lama non-JSON", async () => {
+    expect(await search("ilike", "ketoprak", rows)).toEqual([1, 3]);
+    expect(await search("ilike", '"khusus"', rows)).toEqual([2]);
+  });
+
+  it("not_ilike mengecualikan baris yang cocok, tanpa error pada deskripsi non-JSON", async () => {
+    expect(await search("not_ilike", "ketoprak", rows)).toEqual([2]);
+  });
+
+  it("kolom yang tidak terdaftar di jsonTextColumns tetap pakai LIKE biasa", () => {
+    const result = buildWhereClause(
+      [{ filterKey: "note", filterOperator: "ilike", filterValue: "x" }],
+      COLUMNS,
+      [],
+      1,
+      options
+    );
+    expect(result.whereClause).toBe("WHERE note LIKE $1");
+    expect(result.params).toEqual(["%x%"]);
   });
 });

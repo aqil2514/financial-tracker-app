@@ -2,6 +2,7 @@ import { BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView } from "@g
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useDismissOnBack } from "@/components/use-dismiss-on-back";
 import type { FilterConfig } from "../filter.interface";
 import { FilterPanelContent } from "./content";
 import { FilterPanelFooter } from "./footer";
@@ -42,7 +43,7 @@ function FilterPanelInner() {
   // Dibaca sekali di sini (masih di tree asli, di luar portal
   // BottomSheetModal) lalu diteruskan via props ke FilterPanelContent/
   // FilterPanelFooter — lihat catatan di content.tsx.
-  const { config, selectOptions, snapshot, setSnapshot, activeValue, setOpen, onApplyFilter } =
+  const { config, selectOptions, snapshot, setSnapshot, activeValue, open, setOpen, onApplyFilter } =
     useFilterPanel();
   const sheetRef = useRef<BottomSheetModal>(null);
 
@@ -64,6 +65,8 @@ function FilterPanelInner() {
   const handleClose = useCallback(() => {
     sheetRef.current?.dismiss();
   }, []);
+
+  useDismissOnBack(open, handleClose);
 
   return (
     <>

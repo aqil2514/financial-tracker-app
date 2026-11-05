@@ -1,6 +1,7 @@
 import { FilterPanel } from "@/components/query/filters/panel";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
-import type { FilterKeyOption, SelectOptionsMap } from "@/components/query/filters/panel/panel.interface";
+import type { FilterKeyOption } from "@/components/query/filters/panel/panel.interface";
+import { useTransactionFilterOptions } from "./use-filter-options";
 
 // "Label" dan "Sumber Data" (Retailku import) sengaja belum dimasukkan
 // — tabel transactions belum punya kolom label/source, fiturnya belum
@@ -17,15 +18,12 @@ export const TRANSACTION_FILTER_CONFIG: FilterKeyOption[] = [
 
 interface TransactionHeaderFilterProps {
   filters: FilterConfig[];
-  selectOptions?: SelectOptionsMap;
   onApplyFilter: (state: FilterConfig[]) => void;
 }
 
-export function TransactionHeaderFilter({
-  filters,
-  selectOptions,
-  onApplyFilter,
-}: TransactionHeaderFilterProps) {
+export function TransactionHeaderFilter({ filters, onApplyFilter }: TransactionHeaderFilterProps) {
+  const selectOptions = useTransactionFilterOptions();
+
   return (
     <FilterPanel
       config={TRANSACTION_FILTER_CONFIG}

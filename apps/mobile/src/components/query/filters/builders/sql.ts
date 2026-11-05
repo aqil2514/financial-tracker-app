@@ -41,11 +41,18 @@ export interface ExtraCondition {
  * ditambah tapi builder belum diperbarui) sengaja melempar error di
  * `default`, bukan diam-diam diabaikan.
  */
+export interface WhereClauseOptions {
+  // Kolom berisi string JSON TipTap: ilike/not_ilike dicari hanya di nilai "text"-nya, bukan di JSON mentah
+  // (kalau tidak, kata seperti "text"/"paragraph" cocok ke semua baris dan kutip yang di-escape tak ketemu).
+  jsonTextColumns?: readonly string[];
+}
+
 export function buildWhereClause(
   filters: FilterConfig[],
   allowedColumns: readonly string[],
   extraConditions: ExtraCondition[] = [],
-  startIndex = 1
+  startIndex = 1,
+  options: WhereClauseOptions = {}
 ): WhereClauseResult {
   const conditions: string[] = [];
   const params: (string | number)[] = [];
@@ -85,8 +92,23 @@ export function buildWhereClause(
       case "not_ilike": {
         if (typeof filterValue !== "string" || filterValue === "") break;
         const notPrefix = filterOperator === "not_ilike" ? "NOT " : "";
+        const pattern = `%${filterValue}%`;
+        if (options.jsonTextColumns?.includes(filterKey)) {
+          // CASE (bukan OR): json_tree pada teks bukan-JSON melempar error, jadi baris lama berisi teks polos
+          // harus dicabangkan dulu. Placeholder positional, jadi pola dikirim dua kali.
+          const inJson = nextIndex();
+          params.push(pattern);
+          const asPlain = nextIndex();
+          params.push(pattern);
+          conditions.push(
+            `${notPrefix}CASE WHEN json_valid(${filterKey}) ` +
+              `THEN EXISTS (SELECT 1 FROM json_tree(${filterKey}) WHERE key = 'text' AND atom LIKE $${inJson}) ` +
+              `ELSE ${filterKey} LIKE $${asPlain} END`
+          );
+          break;
+        }
         conditions.push(`${notPrefix}${filterKey} LIKE $${nextIndex()}`);
-        params.push(`%${filterValue}%`);
+        params.push(pattern);
         break;
       }
 

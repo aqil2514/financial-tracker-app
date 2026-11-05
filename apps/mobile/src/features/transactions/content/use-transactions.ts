@@ -39,6 +39,8 @@ const ALLOWED_FILTER_COLUMNS = [
 
 const ALLOWED_SORT_COLUMNS = ["date", "amount"] as const;
 
+const JSON_TEXT_COLUMNS = ["description"] as const;
+
 const DEFAULT_ORDER = "date DESC, created_at DESC";
 
 export function toListItem(row: TransactionRow): TransactionListItem {
@@ -84,7 +86,9 @@ export function useTransactions({ filters = [], sorts = [] }: UseTransactionsOpt
   const refetch = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { whereClause, params } = buildWhereClause(filters, ALLOWED_FILTER_COLUMNS);
+      const { whereClause, params } = buildWhereClause(filters, ALLOWED_FILTER_COLUMNS, [], 1, {
+        jsonTextColumns: JSON_TEXT_COLUMNS,
+      });
       const orderClause = buildOrderClause(sorts, ALLOWED_SORT_COLUMNS, DEFAULT_ORDER);
 
       const sql = toPositionalPlaceholders(

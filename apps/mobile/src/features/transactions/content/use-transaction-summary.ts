@@ -16,6 +16,8 @@ const ALLOWED_FILTER_COLUMNS = [
   "date",
 ] as const;
 
+const JSON_TEXT_COLUMNS = ["description"] as const;
+
 interface SummaryRow {
   income: number | null;
   expense: number | null;
@@ -40,7 +42,9 @@ export function useTransactionSummary({ filters = [] }: { filters?: FilterConfig
   });
 
   const refetch = useCallback(async () => {
-    const { whereClause, params } = buildWhereClause(filters, ALLOWED_FILTER_COLUMNS);
+    const { whereClause, params } = buildWhereClause(filters, ALLOWED_FILTER_COLUMNS, [], 1, {
+      jsonTextColumns: JSON_TEXT_COLUMNS,
+    });
 
     const sql = toPositionalPlaceholders(
       `SELECT
