@@ -7,6 +7,7 @@ import {
   BottomSheetModal,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import { Ionicons } from "@expo/vector-icons";
 import { SheetSearchInput } from "@/components/forms/sheet-search-input";
 import { generateId, useDatabase } from "@/lib/database";
@@ -220,7 +221,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
 
     return (
       <>
-        <BottomSheetModal
+        <SheetModal
           ref={rootSheetRef}
           snapPoints={["60%"]}
           enableDynamicSizing={false}
@@ -298,9 +299,9 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
             />
             )}
           </View>
-        </BottomSheetModal>
+        </SheetModal>
 
-        <BottomSheetModal
+        <SheetModal
           ref={childSheetRef}
           snapPoints={["60%"]}
           enableDynamicSizing={false}
@@ -338,9 +339,9 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
               )}
             />
           </View>
-        </BottomSheetModal>
+        </SheetModal>
 
-        <BottomSheetModal
+        <SheetModal
           ref={createSheetRef}
           snapPoints={["85%", "100%"]}
           enableDynamicSizing={false}
@@ -371,9 +372,9 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
               />
             )}
           </BottomSheetScrollView>
-        </BottomSheetModal>
+        </SheetModal>
 
-        <BottomSheetModal
+        <SheetModal
           ref={createGroupSheetRef}
           snapPoints={["40%", "70%"]}
           enableDynamicSizing={false}
@@ -400,7 +401,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
               inBottomSheet
             />
           </BottomSheetScrollView>
-        </BottomSheetModal>
+        </SheetModal>
       </>
     );
   }

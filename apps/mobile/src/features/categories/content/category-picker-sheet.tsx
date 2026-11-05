@@ -8,6 +8,7 @@ import {
   BottomSheetTextInput,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import { Ionicons } from "@expo/vector-icons";
 import { Badge } from "@/components/badge";
 import { SheetSearchInput } from "@/components/forms/sheet-search-input";
@@ -212,7 +213,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
 
     return (
       <>
-        <BottomSheetModal
+        <SheetModal
           ref={rootSheetRef}
           snapPoints={["60%"]}
           enableDynamicSizing={false}
@@ -278,9 +279,9 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
               />
             )}
           </View>
-        </BottomSheetModal>
+        </SheetModal>
 
-        <BottomSheetModal
+        <SheetModal
           ref={childSheetRef}
           snapPoints={["60%"]}
           enableDynamicSizing={false}
@@ -317,9 +318,9 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
               )}
             />
           </View>
-        </BottomSheetModal>
+        </SheetModal>
 
-        <BottomSheetModal
+        <SheetModal
           ref={createSheetRef}
           snapPoints={["40%"]}
           enableDynamicSizing={false}
@@ -335,7 +336,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
             isPending={isCreating}
             onSubmit={handleCreateSubmit}
           />
-        </BottomSheetModal>
+        </SheetModal>
       </>
     );
   }

@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import {
   CategoryFilterState,
   CategoryStatusFilter,
@@ -71,7 +72,7 @@ export const CategoryFilterSheet = forwardRef<CategoryFilterSheetRef, CategoryFi
     }));
 
     return (
-      <BottomSheetModal
+      <SheetModal
         ref={sheetRef}
         snapPoints={["45%"]}
         enableDynamicSizing={false}
@@ -114,7 +115,7 @@ export const CategoryFilterSheet = forwardRef<CategoryFilterSheetRef, CategoryFi
             />
           </View>
         </BottomSheetView>
-      </BottomSheetModal>
+      </SheetModal>
     );
   }
 );

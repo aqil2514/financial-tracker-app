@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheetBackdrop, BottomSheetFlatList, BottomSheetModal } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import { Ionicons } from "@expo/vector-icons";
 import { SheetSearchInput, type SheetSearchInputRef } from "@/components/forms/sheet-search-input";
 import { generateId, useDatabase } from "@/lib/database";
@@ -76,7 +77,7 @@ export const ContactPickerSheet = forwardRef<ContactPickerSheetRef, ContactPicke
     }
 
     return (
-      <BottomSheetModal
+      <SheetModal
         ref={sheetRef}
         snapPoints={["60%"]}
         enableDynamicSizing={false}
@@ -127,7 +128,7 @@ export const ContactPickerSheet = forwardRef<ContactPickerSheetRef, ContactPicke
             />
           )}
         </View>
-      </BottomSheetModal>
+      </SheetModal>
     );
   }
 );

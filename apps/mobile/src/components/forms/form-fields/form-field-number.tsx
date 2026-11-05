@@ -7,6 +7,7 @@ import {
   BottomSheetTextInput,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import { Ionicons } from "@expo/vector-icons";
 import { NumpadCalculator } from "./numpad-calculator";
 import { formatDecimalDisplay, parseDecimalInput } from "./decimal-input";
@@ -98,7 +99,7 @@ export function FormFieldNumber<TFieldValues extends FieldValues>({
             )}
 
             {useCalculator && (
-              <BottomSheetModal
+              <SheetModal
                 ref={sheetRef}
                 snapPoints={["55%"]}
                 enableDynamicSizing={false}
@@ -117,7 +118,7 @@ export function FormFieldNumber<TFieldValues extends FieldValues>({
                     }}
                   />
                 </BottomSheetView>
-              </BottomSheetModal>
+              </SheetModal>
             )}
           </View>
         );

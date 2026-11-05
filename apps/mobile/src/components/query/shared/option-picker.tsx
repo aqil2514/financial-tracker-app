@@ -4,10 +4,10 @@ import {
   BottomSheetModal,
   BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useDismissOnBack } from "@/components/use-dismiss-on-back";
 
 export interface OptionPickerOption {
   value: string;
@@ -43,9 +43,6 @@ export const OptionPicker = forwardRef<OptionPickerRef, OptionPickerProps>(
     const { title, options, searchable } = props;
     const insets = useSafeAreaInsets();
     const sheetRef = useRef<BottomSheetModal>(null);
-    const [isOpen, setIsOpen] = useState(false);
-    const dismiss = useCallback(() => sheetRef.current?.dismiss(), []);
-    useDismissOnBack(isOpen, dismiss);
     const [draft, setDraft] = useState<string[]>(props.multiple ? props.value : []);
     const [query, setQuery] = useState("");
 
@@ -87,13 +84,11 @@ export const OptionPicker = forwardRef<OptionPickerRef, OptionPickerProps>(
     }, [props, draft]);
 
     return (
-      <BottomSheetModal
+      <SheetModal
         ref={sheetRef}
         snapPoints={["60%"]}
         enableDynamicSizing={false}
         stackBehavior="push"
-        onChange={(index) => setIsOpen(index >= 0)}
-        onDismiss={() => setIsOpen(false)}
         backdropComponent={(bgProps) => (
           <BottomSheetBackdrop {...bgProps} disappearsOnIndex={-1} appearsOnIndex={0} />
         )}
@@ -148,7 +143,7 @@ export const OptionPicker = forwardRef<OptionPickerRef, OptionPickerProps>(
             </Pressable>
           )}
         </View>
-      </BottomSheetModal>
+      </SheetModal>
     );
   }
 );

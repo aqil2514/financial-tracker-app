@@ -1,4 +1,5 @@
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -60,7 +61,7 @@ export function SortDropdown({ config, value, onChange }: SortDropdownProps) {
         )}
       </Pressable>
 
-      <BottomSheetModal
+      <SheetModal
         ref={sheetRef}
         snapPoints={["100%"]}
         enableDynamicSizing={false}
@@ -93,7 +94,7 @@ export function SortDropdown({ config, value, onChange }: SortDropdownProps) {
             <Text className="font-medium text-neutral-900">Tambah urutan</Text>
           </Pressable>
         </BottomSheetScrollView>
-      </BottomSheetModal>
+      </SheetModal>
     </>
   );
 }

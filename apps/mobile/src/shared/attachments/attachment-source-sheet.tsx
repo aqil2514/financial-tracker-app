@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { Pressable, Text } from "react-native";
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -72,7 +73,7 @@ export const AttachmentSourceSheet = forwardRef<AttachmentSourceSheetRef, Attach
     }
 
     return (
-      <BottomSheetModal
+      <SheetModal
         ref={sheetRef}
         snapPoints={["35%"]}
         enableDynamicSizing={false}
@@ -95,7 +96,7 @@ export const AttachmentSourceSheet = forwardRef<AttachmentSourceSheetRef, Attach
             </Pressable>
           ))}
         </BottomSheetView>
-      </BottomSheetModal>
+      </SheetModal>
     );
   }
 );

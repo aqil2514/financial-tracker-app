@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "reac
 import { Keyboard, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import { z } from "zod";
 import { useDatabase } from "@/lib/database";
 import { BaseForm } from "@/components/forms/base-form";
@@ -54,7 +55,7 @@ export const UpdateMarketValueSheet = forwardRef<UpdateMarketValueSheetRef, Upda
     }
 
     return (
-      <BottomSheetModal
+      <SheetModal
         ref={sheetRef}
         snapPoints={["45%", "70%"]}
         enableDynamicSizing={false}
@@ -98,7 +99,7 @@ export const UpdateMarketValueSheet = forwardRef<UpdateMarketValueSheetRef, Upda
             )}
           </BaseForm>
         </BottomSheetScrollView>
-      </BottomSheetModal>
+      </SheetModal>
     );
   }
 );

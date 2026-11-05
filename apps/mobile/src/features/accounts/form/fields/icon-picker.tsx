@@ -2,6 +2,7 @@ import { createElement, useRef } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 import { Pressable, Text, View } from "react-native";
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
+import { SheetModal } from "@/components/sheet-modal";
 import { ACCOUNT_ICON_NAMES, resolveAccountIcon } from "@/lib/account-icons";
 import type { AccountFormOutput, AccountFormValues } from "../schema";
 
@@ -27,7 +28,7 @@ export function IconPickerField() {
               <Text className="text-neutral-900">{field.value ?? "Pilih icon..."}</Text>
             </Pressable>
 
-            <BottomSheetModal
+            <SheetModal
               ref={sheetRef}
               snapPoints={["50%"]}
               enableDynamicSizing={false}
@@ -62,7 +63,7 @@ export function IconPickerField() {
                   })}
                 </View>
               </BottomSheetView>
-            </BottomSheetModal>
+            </SheetModal>
           </View>
         );
       }}
