@@ -1,7 +1,9 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   BottomSheetBackdrop,
+  BottomSheetFlatList,
   BottomSheetModal,
   BottomSheetTextInput,
   BottomSheetView,
@@ -85,6 +87,7 @@ interface CategoryPickerSheetProps {
 export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPickerSheetProps>(
   function CategoryPickerSheet({ type, onSelect }, ref) {
     const db = useDatabase();
+    const insets = useSafeAreaInsets();
     const rootSheetRef = useRef<BottomSheetModal>(null);
     const childSheetRef = useRef<BottomSheetModal>(null);
     const createSheetRef = useRef<BottomSheetModal>(null);
@@ -219,7 +222,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
             <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
           )}
         >
-          <BottomSheetView className="flex-1 px-4 pb-4">
+          <View className="flex-1 px-4" style={{ paddingBottom: insets.bottom + 16 }}>
             <View className="mb-2 flex-row items-center justify-between">
               <Text className="text-lg font-semibold text-neutral-900">Pilih Kategori</Text>
               <Pressable hitSlop={10} onPress={() => openCreate(null)}>
@@ -235,7 +238,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
                   Tidak ada kategori yang cocok.
                 </Text>
               ) : (
-                <FlatList
+                <BottomSheetFlatList
                   data={searchResults}
                   keyExtractor={(item) => item.id}
                   keyboardShouldPersistTaps="handled"
@@ -257,7 +260,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
                 Belum ada kategori aktif untuk tipe ini.
               </Text>
             ) : (
-              <FlatList
+              <BottomSheetFlatList
                 data={rootOptions}
                 keyExtractor={(item) => item.id}
                 keyboardShouldPersistTaps="handled"
@@ -274,7 +277,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
                 )}
               />
             )}
-          </BottomSheetView>
+          </View>
         </BottomSheetModal>
 
         <BottomSheetModal
@@ -286,7 +289,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
             <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
           )}
         >
-          <BottomSheetView className="flex-1 px-4 pb-4">
+          <View className="flex-1 px-4" style={{ paddingBottom: insets.bottom + 16 }}>
             <View className="mb-2 flex-row items-center justify-between">
               <View className="flex-row items-center gap-2">
                 <Pressable hitSlop={10} onPress={() => childSheetRef.current?.dismiss()}>
@@ -301,7 +304,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
                 <Ionicons name="add-circle-outline" size={24} color="#171717" />
               </Pressable>
             </View>
-            <FlatList
+            <BottomSheetFlatList
               data={childOptions}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
@@ -313,7 +316,7 @@ export const CategoryPickerSheet = forwardRef<CategoryPickerSheetRef, CategoryPi
                 </Pressable>
               )}
             />
-          </BottomSheetView>
+          </View>
         </BottomSheetModal>
 
         <BottomSheetModal

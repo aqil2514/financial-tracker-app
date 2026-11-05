@@ -1,11 +1,12 @@
 import {
   BottomSheetBackdrop,
+  BottomSheetFlatList,
   BottomSheetModal,
   BottomSheetTextInput,
-  BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export interface OptionPickerOption {
   value: string;
@@ -39,6 +40,7 @@ type OptionPickerProps = OptionPickerSingleProps | OptionPickerMultipleProps;
 export const OptionPicker = forwardRef<OptionPickerRef, OptionPickerProps>(
   function OptionPicker(props, ref) {
     const { title, options, searchable } = props;
+    const insets = useSafeAreaInsets();
     const sheetRef = useRef<BottomSheetModal>(null);
     const [draft, setDraft] = useState<string[]>(props.multiple ? props.value : []);
     const [query, setQuery] = useState("");
@@ -90,7 +92,8 @@ export const OptionPicker = forwardRef<OptionPickerRef, OptionPickerProps>(
           <BottomSheetBackdrop {...bgProps} disappearsOnIndex={-1} appearsOnIndex={0} />
         )}
       >
-        <BottomSheetView className="flex-1 px-4 pb-4">
+        {/* View biasa, bukan BottomSheetView: yang itu mendaftar sebagai konten non-scroll dan menimpa BottomSheetFlatList. */}
+        <View className="flex-1 px-4" style={{ paddingBottom: insets.bottom + 16 }}>
           <Text className="mb-2 text-lg font-semibold text-neutral-900">{title}</Text>
           {searchable && (
             <BottomSheetTextInput
@@ -100,7 +103,7 @@ export const OptionPicker = forwardRef<OptionPickerRef, OptionPickerProps>(
               className="mb-2 rounded-md border border-neutral-300 px-3 py-2 text-neutral-900"
             />
           )}
-          <FlatList
+          <BottomSheetFlatList
             data={filteredOptions}
             keyExtractor={(item) => item.value}
             renderItem={({ item }) => {
@@ -138,7 +141,7 @@ export const OptionPicker = forwardRef<OptionPickerRef, OptionPickerProps>(
               <Text className="font-medium text-white">Selesai</Text>
             </Pressable>
           )}
-        </BottomSheetView>
+        </View>
       </BottomSheetModal>
     );
   }

@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BottomSheetBackdrop, BottomSheetModal } from "@gorhom/bottom-sheet";
+import { BottomSheetBackdrop, BottomSheetFlatList, BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import { SheetSearchInput, type SheetSearchInputRef } from "@/components/forms/sheet-search-input";
 import { generateId, useDatabase } from "@/lib/database";
@@ -113,7 +113,7 @@ export const ContactPickerSheet = forwardRef<ContactPickerSheetRef, ContactPicke
               {options.length === 0 ? "Belum ada kontak." : "Tidak ada kontak yang cocok."}
             </Text>
           ) : (
-            <FlatList
+            <BottomSheetFlatList
               data={filteredOptions}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (

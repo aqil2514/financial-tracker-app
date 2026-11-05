@@ -1,8 +1,9 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { FlatList, Keyboard, Pressable, Text, View } from "react-native";
+import { Keyboard, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   BottomSheetBackdrop,
+  BottomSheetFlatList,
   BottomSheetModal,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
@@ -251,7 +252,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
               searchResults.length === 0 ? (
                 <Text className="py-4 text-center text-neutral-500">Tidak ada akun yang cocok.</Text>
               ) : (
-                <FlatList
+                <BottomSheetFlatList
                   data={searchResults}
                   keyExtractor={(item) => item.id}
                   keyboardShouldPersistTaps="handled"
@@ -269,7 +270,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
                 />
               )
             ) : (
-            <FlatList
+            <BottomSheetFlatList
               data={rootOptions}
               keyExtractor={(item) => item.id}
               keyboardShouldPersistTaps="handled"
@@ -324,7 +325,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
                 <Ionicons name="add-circle-outline" size={24} color="#171717" />
               </Pressable>
             </View>
-            <FlatList
+            <BottomSheetFlatList
               data={childOptions}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
