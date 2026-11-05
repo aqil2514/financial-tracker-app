@@ -3,6 +3,7 @@ import { Animated, Dimensions, Easing, Text, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 import { formatCurrency } from "@/lib/utils";
 import { breakdownRowKey, type BreakdownChartRow } from "./breakdown-chart-data";
+import { ChartTooltip } from "./chart-tooltip";
 import { computeSlices, describeSector, polar } from "./donut-geometry";
 
 // Layar - padding halaman (p-4 x2) - padding kartu (p-3 x2).
@@ -17,7 +18,6 @@ const ANIMATION_MS = 900;
 const POP_OUT = 8;
 const TOOLTIP_WIDTH = 150;
 const TOOLTIP_HEIGHT = 64;
-const TOOLTIP_MS = 180;
 
 interface BreakdownPieProps {
   rows: BreakdownChartRow[];
@@ -43,7 +43,6 @@ export function BreakdownPie({ rows, selectedKey, onSelect }: BreakdownPieProps)
   const [popAmounts, setPopAmounts] = useState<Record<string, number>>({});
   const popValues = useRef<Record<string, Animated.Value>>({});
   const [tooltipKey, setTooltipKey] = useState<string | null>(null);
-  const [tooltipAnim] = useState(() => new Animated.Value(0));
 
   // Tooltip tetap memegang kunci terakhir supaya bisa memudar keluar saat pilihan dibatalkan.
   if (selectedKey && selectedKey !== tooltipKey) setTooltipKey(selectedKey);
@@ -91,18 +90,6 @@ export function BreakdownPie({ rows, selectedKey, onSelect }: BreakdownPieProps)
     const values = popValues.current;
     return () => Object.values(values).forEach((value) => value.removeAllListeners());
   }, []);
-
-  useEffect(() => {
-    if (selectedKey) tooltipAnim.setValue(0);
-    const animation = Animated.timing(tooltipAnim, {
-      toValue: selectedKey ? 1 : 0,
-      duration: TOOLTIP_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [selectedKey, tooltipAnim]);
 
   if (positive.length === 0) return null;
 
@@ -159,19 +146,12 @@ export function BreakdownPie({ rows, selectedKey, onSelect }: BreakdownPieProps)
       </Svg>
 
       {tooltipRow && tooltipPosition && (
-        <Animated.View
-          pointerEvents="none"
-          className="absolute items-center justify-center rounded-md border border-neutral-200 bg-white px-2 py-1 shadow"
-          style={{
-            ...tooltipPosition,
-            width: TOOLTIP_WIDTH,
-            height: TOOLTIP_HEIGHT,
-            opacity: tooltipAnim,
-            transform: [
-              { translateY: tooltipAnim.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) },
-              { scale: tooltipAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) },
-            ],
-          }}
+        <ChartTooltip
+          key={tooltipKey}
+          visible={selectedKey !== null}
+          width={TOOLTIP_WIDTH}
+          height={TOOLTIP_HEIGHT}
+          {...tooltipPosition}
         >
           <Text className="text-xs text-neutral-500" numberOfLines={1}>
             {tooltipRow.label}
@@ -180,7 +160,7 @@ export function BreakdownPie({ rows, selectedKey, onSelect }: BreakdownPieProps)
             {formatCurrency(tooltipRow.total)}
           </Text>
           <Text className="text-xs text-neutral-500">{tooltipRow.percent.toFixed(1)}%</Text>
-        </Animated.View>
+        </ChartTooltip>
       )}
     </View>
   );

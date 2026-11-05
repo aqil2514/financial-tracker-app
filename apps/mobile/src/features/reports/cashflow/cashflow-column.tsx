@@ -10,9 +10,10 @@ interface CashflowColumnProps {
   title: string;
   rows: CashflowBreakdownRow[];
   isLoading: boolean;
+  onRowPress: (row: CashflowBreakdownRow) => void;
 }
 
-export function CashflowColumn({ title, rows, isLoading }: CashflowColumnProps) {
+export function CashflowColumn({ title, rows, isLoading, onRowPress }: CashflowColumnProps) {
   const { total, rows: chartRows } = toBreakdownChartData(rows);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -56,7 +57,7 @@ export function CashflowColumn({ title, rows, isLoading }: CashflowColumnProps) 
                 className={`flex-row items-center justify-between gap-3 rounded-md border-t border-neutral-100 px-1 py-2 ${
                   isSelected ? "bg-neutral-100" : ""
                 }`}
-                onPress={() => setSelectedKey(isSelected ? null : key)}
+                onPress={() => onRowPress(row)}
               >
                 <View className="flex-1 flex-row items-center gap-2">
                   <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: row.color }}>

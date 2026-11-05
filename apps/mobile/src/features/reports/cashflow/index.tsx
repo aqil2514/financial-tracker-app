@@ -1,9 +1,14 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { monthDateRange } from "@/lib/utils";
 import { CashflowColumn } from "./cashflow-column";
 import { CashflowSummaryCards } from "./cashflow-summary-cards";
-import { useCashflowBreakdown, type CashflowGroupBy } from "./use-cashflow-breakdown";
+import {
+  useCashflowBreakdown,
+  type CashflowBreakdownRow,
+  type CashflowGroupBy,
+} from "./use-cashflow-breakdown";
 import { useCashflowSummary } from "./use-cashflow-summary";
 
 const GROUP_BY_OPTIONS: { value: CashflowGroupBy; label: string }[] = [
@@ -14,6 +19,14 @@ const GROUP_BY_OPTIONS: { value: CashflowGroupBy; label: string }[] = [
 export function CashflowSection({ month }: { month: string }) {
   const { from, to } = monthDateRange(month);
   const [groupBy, setGroupBy] = useState<CashflowGroupBy>("account_group");
+  const router = useRouter();
+
+  function openDetail(type: "income" | "expense", row: CashflowBreakdownRow) {
+    router.push({
+      pathname: "/reports/cashflow-detail",
+      params: { type, groupBy, groupKey: row.group_key ?? "", label: row.label, month },
+    });
+  }
 
   const { data: summary, isLoading: summaryLoading } = useCashflowSummary(from, to);
   const { data: expenseRows, isLoading: expenseLoading } = useCashflowBreakdown(from, to, "expense", groupBy);
@@ -42,8 +55,18 @@ export function CashflowSection({ month }: { month: string }) {
         })}
       </View>
 
-      <CashflowColumn title="Pengeluaran" rows={expenseRows} isLoading={expenseLoading} />
-      <CashflowColumn title="Pemasukan" rows={incomeRows} isLoading={incomeLoading} />
+      <CashflowColumn
+        title="Pengeluaran"
+        rows={expenseRows}
+        isLoading={expenseLoading}
+        onRowPress={(row) => openDetail("expense", row)}
+      />
+      <CashflowColumn
+        title="Pemasukan"
+        rows={incomeRows}
+        isLoading={incomeLoading}
+        onRowPress={(row) => openDetail("income", row)}
+      />
     </View>
   );
 }

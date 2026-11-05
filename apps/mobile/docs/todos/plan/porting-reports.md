@@ -8,7 +8,8 @@ Baru tahap perencanaan, belum ada implementasi. Tab Laporan di mobile (`src/app/
 - [x] Baca logika Cashflow di desktop (`apps/desktop/src/features/reports/content/cashflow/`) supaya hasil hitungan mobile sama persis.
 - [x] Ganti placeholder `reports.tsx` dengan navigator bulan + `CashflowSection` — pindah antar tab laporan menunggu tab kedua ada.
 - [x] Tab Cashflow, tahap 1 — kartu ringkasan, toggle Grup Akun/Kategori Induk, pie chart + daftar untuk pengeluaran dan pemasukan (`features/reports/cashflow/`).
-- [ ] Tab Cashflow, tahap 2 — drill-down tap baris (daftar transaksi grup, filter anak, grafik harian) dan toggle "Label" (menunggu label di mobile).
+- [x] Tab Cashflow, tahap 2 — drill-down tap baris menuju layar detail (`app/reports/cashflow-detail.tsx`): total, filter anak, grafik harian, daftar transaksi per hari yang bisa dibuka ke edit. Belum diverifikasi terhadap desktop.
+- [ ] Toggle "Label" di Cashflow dan drill-down-nya — menunggu label di mobile (lihat `porting-labels.md`).
 - [ ] Verifikasi angka Cashflow tahap 1 terhadap desktop dengan data yang sama — belum dilakukan.
 - [x] Tab Per Tipe Akun — pie chart + kartu per tipe (saldo, % dari total, Unrealized P/L untuk investasi), `features/reports/account-type/`. Belum diverifikasi terhadap desktop.
 - [ ] Tab Tren Keuangan — grafik saldo dari waktu ke waktu.
@@ -41,6 +42,16 @@ Desktop punya halaman laporan dengan 4 tab (`apps/desktop/src/features/reports/c
 - Pie chart digambar sendiri dengan `react-native-svg` (`features/reports/shared/breakdown-pie.tsx`, geometri di `donut-geometry.ts`), bukan `PieChart` chart-kit, supaya bisa berbentuk donut dengan sela antar irisan dan animasi terbuka melingkar seperti Recharts di desktop.
 - Helper bulan (`currentMonth`, `shiftMonth`, `monthDateRange`) ada di `lib/utils/month.ts` dan dipakai bersama halaman Transaksi.
 
+## Catatan implementasi drill-down Cashflow
+
+- Tap baris di daftar breakdown membuka layar `reports/cashflow-detail` (params: type, groupBy, groupKey, label, month); tap irisan donut hanya menyorot dan menampilkan tooltip, tidak navigasi. `groupKey` kosong = bucket "Tanpa Grup"/"Tanpa Kategori".
+- Layar detail meniru dialog desktop: total (ikut filter anak), filter anak, grafik harian, daftar transaksi dikelompokkan per tanggal. Query dan filter dasar sama dengan breakdown (`is_cash_neutral = 0`, tanpa dana pihak ketiga).
+- "Anak" = akun dalam grup akun, atau kategori anak dalam kategori induk, dihitung dari seluruh transaksi grup (tidak ikut berubah saat satu anak dipilih). Transaksi yang langsung memakai kategori induk hanya masuk "Semua", seperti di desktop.
+- Navigator bulan ada di header layar detail; pindah bulan membatalkan anak yang dipilih.
+- Grafik harian digambar sendiri dengan `react-native-svg` (`detail/daily-chart.tsx`, geometri di `shared/line-chart-geometry.ts`) supaya mirip Recharts: kurva monotone, grid putus-putus, garis tergambar dari kiri ke kanan, tap titik menampilkan tooltip tanggal + total hari itu. Label sumbu-X disaring maksimal 5.
+- Efek "tergambar" pada garis memakai `strokeDasharray`/`strokeDashoffset` dan titik muncul saat garis sampai ke sana. Versi pertama memakai `ClipPath` dengan lebar teranimasi, dan garis serta titik tidak tampil di Android (dugaan: `Defs`/`ClipPath` tidak ikut ter-update saat props berubah); jangan dipakai lagi untuk animasi. Lebar chart diukur lewat `onLayout`, bukan dari `Dimensions`.
+- Tooltip pie dan grafik garis memakai komponen bersama `shared/chart-tooltip.tsx`.
+
 ## Catatan implementasi Per Tipe Akun
 
 - Rumus saldo dan filter akun aktif disalin dari desktop (`use-balances-by-account-type.ts`) dan sama dengan rumus saldo di `use-accounts.ts` mobile. Akun nonaktif tidak dihitung.
@@ -50,5 +61,5 @@ Desktop punya halaman laporan dengan 4 tab (`apps/desktop/src/features/reports/c
 
 ## Catatan teknis
 
-- Grafik garis dan batang memakai `react-native-chart-kit`, sesuai keputusan permanen sebelumnya; jangan pakai library chart lain. Pengecualian: pie/donut digambar langsung dengan `react-native-svg` (sudah dependency langsung), bukan library chart baru.
+- `react-native-chart-kit` adalah keputusan permanen sebelumnya dan jangan diganti library chart lain, tapi untuk Laporan pie/donut dan grafik garis digambar langsung dengan `react-native-svg` (sudah dependency langsung) karena butuh animasi dan interaksi seperti Recharts. Chart baru berikutnya (mis. Tren Keuangan) sebaiknya ikut pola ini, bukan library baru.
 - Akun investasi dan dana pihak ketiga punya konsep saldo sendiri — pegang `docs/concept/konsep-investasi.md` saat menghitung saldo/cashflow yang menyentuh keduanya.

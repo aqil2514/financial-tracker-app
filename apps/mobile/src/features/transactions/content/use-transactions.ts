@@ -7,7 +7,7 @@ import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
 import { TransactionListItem } from "../types";
 
-interface TransactionRow {
+export interface TransactionRow {
   id: string;
   note: string;
   description: string | null;
@@ -41,7 +41,7 @@ const ALLOWED_SORT_COLUMNS = ["date", "amount"] as const;
 
 const DEFAULT_ORDER = "date DESC, created_at DESC";
 
-function toListItem(row: TransactionRow): TransactionListItem {
+export function toListItem(row: TransactionRow): TransactionListItem {
   return {
     id: row.id,
     note: row.note,

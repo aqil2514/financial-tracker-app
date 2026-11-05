@@ -18,3 +18,13 @@ export function monthDateRange(month: string): { from: string; to: string } {
   const lastDay = String(new Date(year, monthNumber, 0).getDate()).padStart(2, "0");
   return { from: `${month}-01`, to: `${month}-${lastDay}` };
 }
+
+export const MONTH_NAMES_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
+];
+
+// "2026-11-04" -> "4 Nov 2026" (tanpa zona waktu, aman untuk tanggal kalender polos).
+export function formatShortDate(dateKey: string): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return `${day} ${MONTH_NAMES_SHORT[month - 1]} ${year}`;
+}
