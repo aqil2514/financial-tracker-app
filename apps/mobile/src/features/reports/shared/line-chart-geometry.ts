@@ -10,19 +10,28 @@ export interface BezierSegment {
   p1: Point;
 }
 
-// Tick sumbu-Y "bagus" (0, s, 2s, ...) dengan s = 1/2/5 × 10^k, sampai melewati `max`.
-// Seperti domain otomatis Recharts: sumbu mulai dari 0 dan berakhir di kelipatan s terdekat.
-export function computeYTicks(max: number, targetCount = 4): number[] {
-  if (!(max > 0)) return [0, 1];
+// Tick sumbu-Y "bagus" untuk rentang [min, max] dengan langkah s = 1/2/5 × 10^k, mulai dari kelipatan s
+// di bawah min sampai kelipatan s di atas max. Seperti domain otomatis Recharts. Rentang kosong
+// (min = max) memberi sumbu default.
+export function computeNiceTicks(min: number, max: number, targetCount = 4): number[] {
+  const span = max - min;
+  if (!(span > 0)) return [0, 1];
 
-  const rawStep = max / targetCount;
+  const rawStep = span / targetCount;
   const magnitude = 10 ** Math.floor(Math.log10(rawStep));
   const residual = rawStep / magnitude;
   const step = (residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10) * magnitude;
 
+  const first = Math.floor(min / step);
+  const last = Math.ceil(max / step);
   const ticks: number[] = [];
-  for (let value = 0; value < max + step; value += step) ticks.push(value);
+  for (let i = first; i <= last; i++) ticks.push(i * step);
   return ticks;
+}
+
+// Sumbu-Y yang mulai dari 0 (nilai tidak negatif).
+export function computeYTicks(max: number, targetCount = 4): number[] {
+  return computeNiceTicks(0, max, targetCount);
 }
 
 // Segmen kurva monotone-X (seperti `type="monotone"` Recharts / d3 curveMonotoneX): halus,
@@ -123,4 +132,17 @@ export function pickLabelIndexes(count: number, maxLabels: number): number[] {
   const indexes: number[] = [];
   for (let i = 0; i < count; i += step) indexes.push(i);
   return indexes;
+}
+
+// Posisi-X titik ke-`index` dari `count` titik yang tersebar rata dari tepi kiri ke tepi kanan
+// area plot (seperti AreaChart Recharts); satu titik diletakkan di tengah.
+export function spreadX(index: number, count: number, left: number, plotWidth: number): number {
+  return count <= 1 ? left + plotWidth / 2 : left + (plotWidth * index) / (count - 1);
+}
+
+// Indeks titik terdekat ke posisi sentuh `x`, dijepit ke rentang yang valid.
+export function nearestIndex(x: number, count: number, left: number, plotWidth: number): number {
+  if (count <= 1) return 0;
+  const ratio = (x - left) / plotWidth;
+  return Math.min(Math.max(Math.round(ratio * (count - 1)), 0), count - 1);
 }

@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildMonotonePath,
   buildMonotoneSegments,
+  computeNiceTicks,
   computeYTicks,
   cumulativeLengths,
+  nearestIndex,
   pickLabelIndexes,
+  spreadX,
 } from "./line-chart-geometry";
 
 describe("computeYTicks", () => {
@@ -17,6 +20,22 @@ describe("computeYTicks", () => {
   it("max tidak valid memberi sumbu default", () => {
     expect(computeYTicks(0)).toEqual([0, 1]);
     expect(computeYTicks(NaN)).toEqual([0, 1]);
+  });
+});
+
+describe("computeNiceTicks", () => {
+  it("rentang dengan nilai negatif: ticks melewati 0 di kedua sisi", () => {
+    expect(computeNiceTicks(-300_000, 900_000)).toEqual([-500_000, 0, 500_000, 1_000_000]);
+  });
+
+  it("semua negatif: ticks mencakup rentangnya", () => {
+    const ticks = computeNiceTicks(-900, -100);
+    expect(ticks[0]).toBeLessThanOrEqual(-900);
+    expect(ticks[ticks.length - 1]).toBeGreaterThanOrEqual(-100);
+  });
+
+  it("rentang kosong memberi sumbu default", () => {
+    expect(computeNiceTicks(5, 5)).toEqual([0, 1]);
   });
 });
 
@@ -87,5 +106,21 @@ describe("pickLabelIndexes", () => {
 
   it("tanpa titik: tanpa label", () => {
     expect(pickLabelIndexes(0, 5)).toEqual([]);
+  });
+});
+
+describe("spreadX & nearestIndex", () => {
+  it("titik tersebar dari tepi ke tepi, satu titik di tengah", () => {
+    expect(spreadX(0, 5, 50, 200)).toBe(50);
+    expect(spreadX(4, 5, 50, 200)).toBe(250);
+    expect(spreadX(2, 5, 50, 200)).toBe(150);
+    expect(spreadX(0, 1, 50, 200)).toBe(150);
+  });
+
+  it("sentuhan dipetakan ke titik terdekat dan dijepit di luar area plot", () => {
+    expect(nearestIndex(160, 5, 50, 200)).toBe(2);
+    expect(nearestIndex(0, 5, 50, 200)).toBe(0);
+    expect(nearestIndex(999, 5, 50, 200)).toBe(4);
+    expect(nearestIndex(120, 1, 50, 200)).toBe(0);
   });
 });

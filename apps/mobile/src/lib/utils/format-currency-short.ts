@@ -1,4 +1,5 @@
 export function formatCurrencyShort(amount: number): string {
+  if (amount < 0) return `-${formatCurrencyShort(-amount)}`;
   if (amount >= 1_000_000_000) return `${trimDecimal(amount / 1_000_000_000)}M`;
   if (amount >= 1_000_000) return `${trimDecimal(amount / 1_000_000)}jt`;
   if (amount >= 1_000) return `${trimDecimal(amount / 1_000)}rb`;

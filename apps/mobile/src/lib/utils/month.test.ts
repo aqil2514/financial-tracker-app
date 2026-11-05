@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatShortDate, monthDateRange, shiftMonth } from "./month";
+import { formatShortDate, monthDateRange, shiftMonth, subtractMonths } from "./month";
 
 describe("shiftMonth", () => {
   it("melewati batas tahun", () => {
@@ -19,5 +19,18 @@ describe("formatShortDate", () => {
   it("memformat tanggal kalender polos tanpa pergeseran zona waktu", () => {
     expect(formatShortDate("2026-11-04")).toBe("4 Nov 2026");
     expect(formatShortDate("2026-01-31")).toBe("31 Jan 2026");
+  });
+});
+
+describe("subtractMonths", () => {
+  it("mundur beberapa bulan, termasuk lintas tahun", () => {
+    expect(subtractMonths("2026-11-05", 1)).toBe("2026-10-05");
+    expect(subtractMonths("2026-02-10", 3)).toBe("2025-11-10");
+    expect(subtractMonths("2026-11-05", 12)).toBe("2025-11-05");
+  });
+
+  it("hari dijepit ke akhir bulan tujuan", () => {
+    expect(subtractMonths("2026-03-31", 1)).toBe("2026-02-28");
+    expect(subtractMonths("2028-03-31", 1)).toBe("2028-02-29");
   });
 });

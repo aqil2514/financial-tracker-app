@@ -3,4 +3,4 @@ export { formatCurrencyShort } from "./format-currency-short";
 export { evaluateMathInput } from "./math-input";
 export { descriptionToPlainText, plainTextToDescription } from "./rich-text-description";
 export { LOCAL_DATETIME_SQL, toLocalDate, toLocalDateTime } from "./local-datetime";
-export { currentMonth, formatShortDate, MONTH_NAMES_SHORT, monthDateRange, shiftMonth } from "./month";
+export { currentMonth, formatShortDate, MONTH_NAMES_SHORT, monthDateRange, shiftMonth, subtractMonths } from "./month";

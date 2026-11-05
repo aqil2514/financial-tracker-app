@@ -28,3 +28,14 @@ export function formatShortDate(dateKey: string): string {
   const [year, month, day] = dateKey.split("-").map(Number);
   return `${day} ${MONTH_NAMES_SHORT[month - 1]} ${year}`;
 }
+
+// Mundur `months` bulan dari tanggal kalender polos; hari dijepit ke akhir bulan tujuan
+// ("2026-03-31" - 1 bulan = "2026-02-28", bukan meloncat ke Maret).
+export function subtractMonths(dateKey: string, months: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const target = new Date(year, month - 1 - months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  const mm = String(target.getMonth() + 1).padStart(2, "0");
+  const dd = String(Math.min(day, lastDay)).padStart(2, "0");
+  return `${target.getFullYear()}-${mm}-${dd}`;
+}

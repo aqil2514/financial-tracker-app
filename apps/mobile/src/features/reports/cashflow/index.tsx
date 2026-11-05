@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
+import { SegmentedControl } from "@/components/segmented-control";
 import { monthDateRange } from "@/lib/utils";
 import { CashflowColumn } from "./cashflow-column";
 import { CashflowSummaryCards } from "./cashflow-summary-cards";
@@ -40,20 +41,7 @@ export function CashflowSection({ month }: { month: string }) {
         isLoading={summaryLoading}
       />
 
-      <View className="flex-row self-start overflow-hidden rounded-md border border-neutral-300">
-        {GROUP_BY_OPTIONS.map((option) => {
-          const isActive = option.value === groupBy;
-          return (
-            <Pressable
-              key={option.value}
-              className={isActive ? "bg-neutral-900 px-3 py-2" : "px-3 py-2"}
-              onPress={() => setGroupBy(option.value)}
-            >
-              <Text className={isActive ? "text-white" : "text-neutral-900"}>{option.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <SegmentedControl options={GROUP_BY_OPTIONS} value={groupBy} onChange={setGroupBy} />
 
       <CashflowColumn
         title="Pengeluaran"

@@ -4,22 +4,24 @@ import { MonthNavigator } from "@/components/month-navigator";
 import { PageHeader } from "@/components/page-header";
 import { TabSwitcher } from "@/components/tab-switcher";
 import { AccountTypeSection } from "@/features/reports/account-type";
+import { BalanceTrendSection } from "@/features/reports/balance-trend";
 import { CashflowSection } from "@/features/reports/cashflow";
 import { currentMonth } from "@/lib/utils";
 
-type ReportTab = "cashflow" | "account-type";
+type ReportTab = "cashflow" | "account-type" | "balance-trend";
 
 const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: "cashflow", label: "Cashflow" },
   { key: "account-type", label: "Per Tipe Akun" },
+  { key: "balance-trend", label: "Tren Keuangan" },
 ];
 
 export default function ReportsPage() {
   const [tab, setTab] = useState<ReportTab>("cashflow");
   const [month, setMonth] = useState(currentMonth);
 
-  // Per Tipe Akun adalah saldo saat ini (tidak terikat bulan), jadi
-  // navigator bulan hanya ditampilkan untuk Cashflow.
+  // Hanya Cashflow yang terikat bulan (navigator di header); tab lain memakai
+  // saldo saat ini atau rentang sendiri.
   return (
     <View className="flex-1 bg-white">
       <PageHeader
@@ -37,7 +39,9 @@ export default function ReportsPage() {
       />
       <TabSwitcher tabs={REPORT_TABS} active={tab} onChange={setTab} />
       <ScrollView className="flex-1" contentContainerClassName="p-4 pb-8">
-        {tab === "cashflow" ? <CashflowSection month={month} /> : <AccountTypeSection />}
+        {tab === "cashflow" && <CashflowSection month={month} />}
+        {tab === "account-type" && <AccountTypeSection />}
+        {tab === "balance-trend" && <BalanceTrendSection />}
       </ScrollView>
     </View>
   );

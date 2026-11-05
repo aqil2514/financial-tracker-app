@@ -12,7 +12,7 @@ Baru tahap perencanaan, belum ada implementasi. Tab Laporan di mobile (`src/app/
 - [ ] Toggle "Label" di Cashflow dan drill-down-nya — menunggu label di mobile (lihat `porting-labels.md`).
 - [ ] Verifikasi angka Cashflow tahap 1 terhadap desktop dengan data yang sama — belum dilakukan.
 - [x] Tab Per Tipe Akun — pie chart + kartu per tipe (saldo, % dari total, Unrealized P/L untuk investasi), `features/reports/account-type/`. Belum diverifikasi terhadap desktop.
-- [ ] Tab Tren Keuangan — grafik saldo dari waktu ke waktu.
+- [x] Tab Tren Keuangan — grafik area saldo dengan preset rentang, granularitas, dan filter akun (`features/reports/balance-trend/`). Belum diverifikasi terhadap desktop.
 - [ ] Tab Periode Kategori — ringkasan anggaran per periode kategori, pie chart dan line chart.
 - [ ] Verifikasi angka tiap tab terhadap desktop dengan data yang sama.
 
@@ -51,6 +51,15 @@ Desktop punya halaman laporan dengan 4 tab (`apps/desktop/src/features/reports/c
 - Grafik harian digambar sendiri dengan `react-native-svg` (`detail/daily-chart.tsx`, geometri di `shared/line-chart-geometry.ts`) supaya mirip Recharts: kurva monotone, grid putus-putus, garis tergambar dari kiri ke kanan, tap titik menampilkan tooltip tanggal + total hari itu. Label sumbu-X disaring maksimal 5.
 - Efek "tergambar" pada garis memakai `strokeDasharray`/`strokeDashoffset` dan titik muncul saat garis sampai ke sana. Versi pertama memakai `ClipPath` dengan lebar teranimasi, dan garis serta titik tidak tampil di Android (dugaan: `Defs`/`ClipPath` tidak ikut ter-update saat props berubah); jangan dipakai lagi untuk animasi. Lebar chart diukur lewat `onLayout`, bukan dari `Dimensions`.
 - Tooltip pie dan grafik garis memakai komponen bersama `shared/chart-tooltip.tsx`.
+
+## Catatan implementasi Tren Keuangan
+
+- Query disalin dari desktop (`use-balance-trend.ts`): saldo awal sebelum `from` + perubahan bersih per titik waktu (UNION ALL transaksi langsung dan transfer masuk), saldo berjalan dihitung di JS. SQL dibangun di `balance-trend-query.ts` dan diuji bahwa jumlah placeholder sama dengan params, karena urutan params di dua SELECT mudah keliru.
+- Filter akun (tipe, grup, akun) memakai `FilterPanel` mobile yang sama dengan halaman Transaksi, nilai array dengan operator `eq`; bawaannya hanya tipe Kas seperti desktop. Akun nonaktif dikecualikan kecuali dipilih eksplisit.
+- Rentang tanggal di desktop adalah pemilih bebas (bawaan 1 bulan terakhir); di mobile preset 1 Bln, 3 Bln, 6 Bln, dan 1 Thn yang selalu berakhir hari ini. Pemilih rentang bebas belum dibuat.
+- Grafik area digambar sendiri dengan `react-native-svg` (`balance-trend-chart.tsx`) dengan kurva monotone, gradien, dan sumbu yang selalu memuat 0 (saldo bisa negatif). Sentuh atau seret untuk melihat saldo titik terdekat.
+- Granularitas "Mingguan" memakai `%Y-%W` seperti desktop (bukan minggu ISO), jadi nomor minggunya bisa berbeda dari kalender ISO.
+- `SegmentedControl` dipakai bersama Cashflow dan Tren Keuangan (`components/segmented-control.tsx`).
 
 ## Catatan implementasi Per Tipe Akun
 
