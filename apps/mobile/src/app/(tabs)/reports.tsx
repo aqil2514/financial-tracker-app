@@ -6,14 +6,16 @@ import { TabSwitcher } from "@/components/tab-switcher";
 import { AccountTypeSection } from "@/features/reports/account-type";
 import { BalanceTrendSection } from "@/features/reports/balance-trend";
 import { CashflowSection } from "@/features/reports/cashflow";
+import { CategoryPeriodSection } from "@/features/reports/category-period";
 import { currentMonth } from "@/lib/utils";
 
-type ReportTab = "cashflow" | "account-type" | "balance-trend";
+type ReportTab = "cashflow" | "account-type" | "balance-trend" | "category-period";
 
 const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: "cashflow", label: "Cashflow" },
   { key: "account-type", label: "Per Tipe Akun" },
   { key: "balance-trend", label: "Tren Keuangan" },
+  { key: "category-period", label: "Periode Kategori" },
 ];
 
 export default function ReportsPage() {
@@ -42,6 +44,7 @@ export default function ReportsPage() {
         {tab === "cashflow" && <CashflowSection month={month} />}
         {tab === "account-type" && <AccountTypeSection />}
         {tab === "balance-trend" && <BalanceTrendSection />}
+        {tab === "category-period" && <CategoryPeriodSection />}
       </ScrollView>
     </View>
   );

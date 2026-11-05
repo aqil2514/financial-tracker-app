@@ -13,7 +13,7 @@ Baru tahap perencanaan, belum ada implementasi. Tab Laporan di mobile (`src/app/
 - [ ] Verifikasi angka Cashflow tahap 1 terhadap desktop dengan data yang sama — belum dilakukan.
 - [x] Tab Per Tipe Akun — pie chart + kartu per tipe (saldo, % dari total, Unrealized P/L untuk investasi), `features/reports/account-type/`. Belum diverifikasi terhadap desktop.
 - [x] Tab Tren Keuangan — grafik area saldo dengan preset rentang, granularitas, dan filter akun (`features/reports/balance-trend/`). Belum diverifikasi terhadap desktop.
-- [ ] Tab Periode Kategori — ringkasan anggaran per periode kategori, pie chart dan line chart.
+- [x] Tab Periode Kategori — pemilih periode, kartu ringkasan, pie Pemasukan vs Pengeluaran atau grafik tren dua garis, dan daftar transaksi per tanggal (`features/reports/category-period/`). Belum diverifikasi terhadap desktop.
 - [ ] Verifikasi angka tiap tab terhadap desktop dengan data yang sama.
 
 ## Latar belakang
@@ -51,6 +51,15 @@ Desktop punya halaman laporan dengan 4 tab (`apps/desktop/src/features/reports/c
 - Grafik harian digambar sendiri dengan `react-native-svg` (`detail/daily-chart.tsx`, geometri di `shared/line-chart-geometry.ts`) supaya mirip Recharts: kurva monotone, grid putus-putus, garis tergambar dari kiri ke kanan, tap titik menampilkan tooltip tanggal + total hari itu. Label sumbu-X disaring maksimal 5.
 - Efek "tergambar" pada garis memakai `strokeDasharray`/`strokeDashoffset` dan titik muncul saat garis sampai ke sana. Versi pertama memakai `ClipPath` dengan lebar teranimasi, dan garis serta titik tidak tampil di Android (dugaan: `Defs`/`ClipPath` tidak ikut ter-update saat props berubah); jangan dipakai lagi untuk animasi. Lebar chart diukur lewat `onLayout`, bukan dari `Dimensions`.
 - Tooltip pie dan grafik garis memakai komponen bersama `shared/chart-tooltip.tsx`.
+
+## Catatan implementasi Periode Kategori
+
+- Daftar periode memakai `useCategoryPeriods` yang sudah ada di mobile (halaman Kategori › Periode). Desktop memulai tanpa periode terpilih; mobile langsung memilih periode pertama (yang sedang berjalan diurutkan paling atas).
+- Satu query transaksi (`use-category-period-transactions.ts`) menjadi sumber ringkasan, pie, tren, dan daftar; desktop memakai query SUM terpisah untuk ringkasan, tapi filter dan rentangnya sama (income/expense, bukan netral kas, bukan dana pihak ketiga, tanggal di antara `start_date` dan `end_date`, kategori termasuk periode), jadi hasilnya identik.
+- Pie hanya dua irisan (Pemasukan, Pengeluaran) dengan warna tetap hijau dan merah; irisan bernilai 0 dibuang seperti desktop.
+- Grafik tren dua garis memakai `LineSeriesChart` generik (`shared/line-series-chart.tsx`) yang kini juga dipakai grafik harian drill-down Cashflow. Perubahan perilaku di grafik harian: sentuh atau seret memilih titik terdekat (bukan harus mengenai titiknya), dan pilihan tetap sampai sentuhan berikutnya.
+- Daftar transaksi dirender bertahap (50 per halaman, tombol "Tampilkan lebih banyak") karena berada di dalam ScrollView halaman Laporan; desktop memakai area gulir setinggi tetap tanpa paginasi.
+- `TabSwitcher` kini bisa digeser ke samping karena empat tab Laporan tidak muat dalam satu baris.
 
 ## Catatan implementasi Tren Keuangan
 

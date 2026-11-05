@@ -1,13 +1,14 @@
 import { Text, View } from "react-native";
 import { Skeleton } from "@/components/skeleton";
 import { formatCurrency } from "@/lib/utils";
-import type { CashflowSummary } from "./use-cashflow-summary";
-
-interface CashflowSummaryCardsProps extends CashflowSummary {
+interface IncomeExpenseCardsProps {
+  income: number;
+  expense: number;
   isLoading: boolean;
 }
 
-export function CashflowSummaryCards({ income, expense, isLoading }: CashflowSummaryCardsProps) {
+// Kartu Pemasukan / Pengeluaran / Surplus-Defisit, dipakai Cashflow dan Periode Kategori.
+export function IncomeExpenseCards({ income, expense, isLoading }: IncomeExpenseCardsProps) {
   if (isLoading) {
     return (
       <View className="flex-row gap-2">

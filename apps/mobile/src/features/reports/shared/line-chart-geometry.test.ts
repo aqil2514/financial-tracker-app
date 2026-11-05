@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bandIndex,
   buildMonotonePath,
   buildMonotoneSegments,
   computeNiceTicks,
@@ -122,5 +123,17 @@ describe("spreadX & nearestIndex", () => {
     expect(nearestIndex(0, 5, 50, 200)).toBe(0);
     expect(nearestIndex(999, 5, 50, 200)).toBe(4);
     expect(nearestIndex(120, 1, 50, 200)).toBe(0);
+  });
+});
+
+describe("bandIndex", () => {
+  it("sentuhan dipetakan ke band tempat ia jatuh dan dijepit di luar area plot", () => {
+    // 4 band selebar 50 mulai dari x=100
+    expect(bandIndex(110, 4, 100, 200)).toBe(0);
+    expect(bandIndex(160, 4, 100, 200)).toBe(1);
+    expect(bandIndex(299, 4, 100, 200)).toBe(3);
+    expect(bandIndex(0, 4, 100, 200)).toBe(0);
+    expect(bandIndex(999, 4, 100, 200)).toBe(3);
+    expect(bandIndex(150, 1, 100, 200)).toBe(0);
   });
 });

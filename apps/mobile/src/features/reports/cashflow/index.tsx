@@ -3,8 +3,8 @@ import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { SegmentedControl } from "@/components/segmented-control";
 import { monthDateRange } from "@/lib/utils";
+import { IncomeExpenseCards } from "../shared/income-expense-cards";
 import { CashflowColumn } from "./cashflow-column";
-import { CashflowSummaryCards } from "./cashflow-summary-cards";
 import {
   useCashflowBreakdown,
   type CashflowBreakdownRow,
@@ -35,7 +35,7 @@ export function CashflowSection({ month }: { month: string }) {
 
   return (
     <View className="gap-4">
-      <CashflowSummaryCards
+      <IncomeExpenseCards
         income={summary.income}
         expense={summary.expense}
         isLoading={summaryLoading}

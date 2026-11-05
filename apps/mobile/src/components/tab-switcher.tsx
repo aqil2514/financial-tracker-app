@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text } from "react-native";
 
 interface TabSwitcherProps<T extends string> {
   tabs: { key: T; label: string }[];
@@ -6,9 +6,15 @@ interface TabSwitcherProps<T extends string> {
   onChange: (tab: T) => void;
 }
 
+// Bisa digeser ke samping supaya muat banyak tab dengan label panjang (mis. Laporan).
 export function TabSwitcher<T extends string>({ tabs, active, onChange }: TabSwitcherProps<T>) {
   return (
-    <View className="flex-row border-b border-neutral-200 px-4">
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      className="grow-0 border-b border-neutral-200"
+      contentContainerClassName="px-4"
+    >
       {tabs.map((tab) => {
         const isActive = tab.key === active;
         return (
@@ -23,6 +29,6 @@ export function TabSwitcher<T extends string>({ tabs, active, onChange }: TabSwi
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }

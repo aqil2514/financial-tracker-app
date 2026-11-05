@@ -146,3 +146,11 @@ export function nearestIndex(x: number, count: number, left: number, plotWidth: 
   const ratio = (x - left) / plotWidth;
   return Math.min(Math.max(Math.round(ratio * (count - 1)), 0), count - 1);
 }
+
+// Indeks "band" (sumbu kategori) tempat posisi sentuh `x` jatuh, dijepit ke rentang yang valid.
+// Pasangan toX band-tengah: titik ke-i berada di tengah band ke-i.
+export function bandIndex(x: number, count: number, left: number, plotWidth: number): number {
+  if (count <= 1) return 0;
+  const index = Math.floor(((x - left) / plotWidth) * count);
+  return Math.min(Math.max(index, 0), count - 1);
+}
