@@ -3,7 +3,7 @@ import { Text } from "react-native";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 import { BaseForm } from "@/components/forms/base-form";
 import { FormFieldDate, FormFieldNumber, FormFieldText } from "@/components/forms/form-fields";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatCurrencyPrecise } from "@/lib/utils";
 import { formatUnit } from "../content/pl";
 import { SellAllCheckbox } from "./sell-all-checkbox";
 import { writeOffFormSchema, type WriteOffFormOutput, type WriteOffFormValues } from "./schema";
@@ -51,7 +51,7 @@ function WriteOffFormFields({ form, unitLabel, remainingUnit, averageCost }: Fie
   return (
     <>
       <Text className="text-sm text-neutral-500">
-        Sisa yang bisa dihapus: {formatUnit(remainingUnit)} {unitName} · Average cost {formatCurrency(averageCost)}
+        Sisa yang bisa dihapus: {formatUnit(remainingUnit)} {unitName} · Average cost {formatCurrencyPrecise(averageCost)}
       </Text>
       <Text className="-mt-2 text-xs text-neutral-500">
         Untuk unit yang hilang tanpa uang masuk (hibah keluar, delisting). Dicatat sebagai pengeluaran di akun

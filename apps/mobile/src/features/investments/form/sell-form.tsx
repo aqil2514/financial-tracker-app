@@ -8,7 +8,7 @@ import {
   FormFieldSelect,
   FormFieldToggleGroup,
 } from "@/components/forms/form-fields";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatCurrencyPrecise } from "@/lib/utils";
 import { formatSignedCurrency, formatUnit } from "../content/pl";
 import { computePricePerUnit } from "./derive-purchase";
 import { SellAllCheckbox } from "./sell-all-checkbox";
@@ -81,7 +81,7 @@ function SellFormFields({ form, cashAccountOptions, unitLabel, remainingUnit, av
   return (
     <>
       <Text className="text-sm text-neutral-500">
-        Sisa yang bisa dijual: {formatUnit(remainingUnit)} {unitName} · Average cost {formatCurrency(averageCost)}
+        Sisa yang bisa dijual: {formatUnit(remainingUnit)} {unitName} · Average cost {formatCurrencyPrecise(averageCost)}
       </Text>
 
       <FormFieldToggleGroup form={form} name="status" label="Status" options={STATUS_OPTIONS} />
@@ -111,7 +111,7 @@ function SellFormFields({ form, cashAccountOptions, unitLabel, remainingUnit, av
         grouped
         decimal
       />
-      {perUnitPreview != null && <Hint>{`≈ ${formatCurrency(perUnitPreview)} per ${unitName}`}</Hint>}
+      {perUnitPreview != null && <Hint>{`≈ ${formatCurrencyPrecise(perUnitPreview)} per ${unitName}`}</Hint>}
 
       {isSettled && (
         <FormFieldSelect

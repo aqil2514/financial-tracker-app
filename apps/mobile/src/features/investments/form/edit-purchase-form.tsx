@@ -2,7 +2,7 @@ import { Text } from "react-native";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 import { BaseForm } from "@/components/forms/base-form";
 import { FormFieldNumber, FormFieldToggleGroup } from "@/components/forms/form-fields";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrencyPrecise } from "@/lib/utils";
 import { editPurchaseFormSchema, type EditPurchaseFormOutput, type EditPurchaseFormValues } from "./schema";
 
 const STATUS_OPTIONS = [
@@ -83,7 +83,7 @@ function EditPurchaseFormFields({
         decimal
       />
       {perUnitPreview != null && (
-        <Text className="-mt-2 text-xs text-neutral-500">{`≈ ${formatCurrency(perUnitPreview)} per ${unitName}`}</Text>
+        <Text className="-mt-2 text-xs text-neutral-500">{`≈ ${formatCurrencyPrecise(perUnitPreview)} per ${unitName}`}</Text>
       )}
     </>
   );

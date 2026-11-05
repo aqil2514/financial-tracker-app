@@ -5,7 +5,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { BaseForm } from "@/components/forms/base-form";
 import { FormFieldSelect } from "@/components/forms/form-fields";
 import { useDatabase } from "@/lib/database";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatCurrencyPrecise } from "@/lib/utils";
 import { formatSignedCurrency, formatUnit } from "@/features/investments/content/pl";
 import {
   settleSaleFormSchema,
@@ -95,11 +95,11 @@ export default function SettleInvestmentSalePage() {
         {sale ? (
           <>
             <Text className="text-sm text-neutral-900">
-              {formatUnit(sale.unit)} {sale.unitLabel || "unit"} × {formatCurrency(sale.pricePerUnit)} ={" "}
+              {formatUnit(sale.unit)} {sale.unitLabel || "unit"} × {formatCurrencyPrecise(sale.pricePerUnit)} ={" "}
               {formatCurrency(proceeds)}
             </Text>
             <Text className="text-xs text-neutral-500">
-              Dengan average cost saat ini ({formatCurrency(sale.averageCost)}), Realized P/L ={" "}
+              Dengan average cost saat ini ({formatCurrencyPrecise(sale.averageCost)}), Realized P/L ={" "}
               {formatSignedCurrency(realizedPl)}. Angka final dikunci saat disimpan.
             </Text>
             <BaseForm

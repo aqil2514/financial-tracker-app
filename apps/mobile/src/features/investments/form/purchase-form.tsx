@@ -8,7 +8,7 @@ import {
   FormFieldText,
   FormFieldToggleGroup,
 } from "@/components/forms/form-fields";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrencyPrecise } from "@/lib/utils";
 import { purchaseFormSchema, type PurchaseFormOutput, type PurchaseFormValues } from "./schema";
 
 const SOURCE_OPTIONS = [
@@ -138,7 +138,7 @@ function PurchaseFormFields({
         grouped
         decimal
       />
-      {perUnitPreview != null && <Hint>{`≈ ${formatCurrency(perUnitPreview)} per ${unitLabel || "unit"}`}</Hint>}
+      {perUnitPreview != null && <Hint>{`≈ ${formatCurrencyPrecise(perUnitPreview)} per ${unitLabel || "unit"}`}</Hint>}
 
       <FormFieldDate form={form} name="date" label="Tanggal" />
       <FormFieldText form={form} name="note" label="Catatan" placeholder="Mis. Beli reksadana rutin" />

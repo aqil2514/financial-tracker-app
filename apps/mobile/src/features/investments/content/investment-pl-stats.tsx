@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatCurrencyPrecise } from "@/lib/utils";
 import type { InvestmentAccountSummary } from "@/shared/investments";
 import { computePl, formatAgo, formatSignedCurrency } from "./pl";
 import { StatItem } from "./stat-item";
@@ -36,7 +36,7 @@ export function InvestmentPlStats({
         />
         <StatItem
           label={`Average Cost / ${account.unitLabel}`}
-          value={averageCost != null ? formatCurrency(averageCost) : "—"}
+          value={averageCost != null ? formatCurrencyPrecise(averageCost) : "—"}
         />
         <StatItem label="Nilai Pasar Diupdate" value={formatAgo(account.marketValueUpdatedAt)} />
       </View>

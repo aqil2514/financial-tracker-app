@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { Badge } from "@/components/badge";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrencyPrecise } from "@/lib/utils";
 import type { InvestmentSaleRow } from "@/shared/investments";
 import { formatDate, formatSignedCurrency, formatUnit } from "./pl";
 import { StatusBadge } from "./status-badge";
@@ -22,7 +22,7 @@ export function SaleRow({ sale, unitLabel, onPress, onSettle, onDelete }: SaleRo
         <View className="gap-0.5">
           <Text className="text-sm font-medium text-neutral-900">{formatDate(sale.date)}</Text>
           <Text className="text-xs text-neutral-500">
-            {formatUnit(sale.unit)} {unitLabel} × {formatCurrency(sale.pricePerUnit)}
+            {formatUnit(sale.unit)} {unitLabel} × {formatCurrencyPrecise(sale.pricePerUnit)}
           </Text>
         </View>
         <View className="items-end gap-1">
