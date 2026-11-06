@@ -6,6 +6,7 @@ import { buildOrderClause } from "@/components/query/sort/builders/sql";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
 import { extractLabelCondition } from "@/features/labels/extract-label-condition";
+import { EFFECTIVE_LABELS_SQL, splitEffectiveLabels } from "@/features/labels/effective-labels";
 import { TransactionListItem } from "../types";
 
 export interface TransactionRow {
@@ -22,6 +23,7 @@ export interface TransactionRow {
   transfer_account_id: string | null;
   transfer_account_name: string | null;
   has_attachment: number;
+  effective_labels?: string | null;
 }
 
 // Kolom yang boleh dipakai sebagai filterKey/sortKey — harus sinkron
@@ -56,6 +58,7 @@ export function toListItem(row: TransactionRow): TransactionListItem {
     amount: row.amount,
     date: row.date,
     hasAttachment: row.has_attachment === 1,
+    labels: splitEffectiveLabels(row.effective_labels),
   };
 }
 
@@ -97,7 +100,8 @@ export function useTransactions({ filters = [], sorts = [] }: UseTransactionsOpt
         `SELECT transactions.*,
                 (SELECT name FROM categories WHERE categories.id = transactions.category_id) as category_name,
                 (SELECT name FROM accounts WHERE accounts.id = transactions.account_id) as account_name,
-                (SELECT name FROM accounts WHERE accounts.id = transactions.transfer_account_id) as transfer_account_name
+                (SELECT name FROM accounts WHERE accounts.id = transactions.transfer_account_id) as transfer_account_name,
+                ${EFFECTIVE_LABELS_SQL} as effective_labels
          FROM transactions
          ${whereClause} ${orderClause}`
       );

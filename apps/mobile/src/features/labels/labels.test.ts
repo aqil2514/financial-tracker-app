@@ -5,6 +5,7 @@ import { buildWhereClause } from "@/components/query/filters/builders/sql";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import { applyEntityLabels, loadEntityLabelNames } from "./entity-labels";
 import { extractLabelCondition } from "./extract-label-condition";
+import { EFFECTIVE_LABELS_SQL, splitEffectiveLabels } from "./effective-labels";
 
 describe("applyEntityLabels", () => {
   let db: SQLiteDatabase;
@@ -100,5 +101,30 @@ describe("extractLabelCondition", () => {
   it("digabung dengan filter kolom lain, urutan parameter tetap benar", async () => {
     const note: FilterConfig = { filterKey: "note", filterOperator: "ilike", filterValue: "n" };
     expect(await ids([note, label("eq", ["Konsumtif"])])).toEqual(["t2"]);
+  });
+});
+
+describe("EFFECTIVE_LABELS_SQL", () => {
+  it("label sendiri menang, kosong jatuh ke kategori, nama dengan koma tetap utuh dan terurut", async () => {
+    const db = await createSqliteTestDb();
+    await db.runAsync("INSERT INTO accounts (id, name) VALUES ('a1', 'Kas')");
+    await db.runAsync("INSERT INTO categories (id, name, type) VALUES ('c1', 'Makan', 'expense')");
+    await db.runAsync(
+      "INSERT INTO labels (id, name, scope) VALUES ('l1', 'Beli, Jual', 'transaction_category'), ('l2', 'Awal', 'transaction_category'), ('l3', 'Kategori', 'transaction_category')"
+    );
+    await db.runAsync("INSERT INTO category_labels (id, category_id, label_id) VALUES ('cl', 'c1', 'l3')");
+    const insert = "INSERT INTO transactions (id, note, type, amount, date, account_id, category_id) VALUES (?, 'n', 'expense', 1, '2026-11-01T10:00', 'a1', ?)";
+    await db.runAsync(insert, ["t1", "c1"]);
+    await db.runAsync(insert, ["t2", "c1"]);
+    await db.runAsync(insert, ["t3", null]);
+    await db.runAsync(
+      "INSERT INTO transaction_labels (id, transaction_id, label_id) VALUES ('x1', 't1', 'l1'), ('x2', 't1', 'l2')"
+    );
+
+    const rows = await db.getAllAsync<{ id: string; raw: string | null }>(
+      `SELECT id, ${EFFECTIVE_LABELS_SQL} AS raw FROM transactions ORDER BY id`
+    );
+    const byId = Object.fromEntries(rows.map((row) => [row.id, splitEffectiveLabels(row.raw)]));
+    expect(byId).toEqual({ t1: ["Awal", "Beli, Jual"], t2: ["Kategori"], t3: [] });
   });
 });

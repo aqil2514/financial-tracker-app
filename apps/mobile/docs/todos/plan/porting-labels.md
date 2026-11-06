@@ -16,7 +16,7 @@ Label sudah berfungsi di mobile mengikuti desktop: kamus, tiga junction, sync du
 - [x] Filter "Label" di daftar transaksi (label efektif: milik transaksi, fallback kategori; juga dipakai ringkasan).
 - [x] Label di form akun dan kategori. Form akun di dalam bottom sheet (buat akun dari picker transaksi) sengaja tanpa field label.
 - [ ] Manajemen label (ganti nama, hapus) — belum ada UI di desktop maupun mobile, lihat "Catatan teknis".
-- [ ] Tampilkan label di daftar transaksi/akun/kategori (belum; desktop menampilkan label efektif di baris transaksi).
+- [x] Tampilkan label efektif sebagai badge `# nama` di baris daftar Transaksi (`effective-labels.ts`). Daftar akun dan kategori sengaja belum, desktop juga tidak menampilkannya di sana.
 - [ ] Verifikasi hasil terhadap desktop dengan data yang sama, termasuk label hasil sync dari PC (belum dicoba di HP).
 
 ## Latar belakang

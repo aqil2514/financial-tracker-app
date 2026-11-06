@@ -11,4 +11,6 @@ export interface TransactionListItem {
   amount: number;
   date: string;
   hasAttachment: boolean;
+  // Label efektif (milik transaksi, atau kategorinya kalau kosong). Hanya diisi oleh daftar Transaksi.
+  labels?: string[];
 }

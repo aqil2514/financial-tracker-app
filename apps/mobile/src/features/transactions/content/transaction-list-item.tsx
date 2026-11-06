@@ -58,6 +58,7 @@ export function TransactionItem({
       <View className="mt-2 flex-row items-center gap-2">
         <Badge label={TYPE_LABEL[transaction.type]} />
         {transaction.category && <Badge label={transaction.category} />}
+        {transaction.labels?.map((name) => <Badge key={name} label={`# ${name}`} />)}
         {transaction.hasAttachment && <Badge label="📎" />}
       </View>
     </Pressable>
