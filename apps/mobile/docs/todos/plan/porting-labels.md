@@ -11,7 +11,7 @@ Label sudah berfungsi di mobile mengikuti desktop: kamus, tiga junction, sync du
 - [x] Migrasi junction `0017_label_junctions.ts` (+ perluasan antrean sync).
 - [x] Sync kamus `labels`: pull di `apply-sync-response.ts`, push `POST/DELETE /labels`, migrasi `0016_labels_sync.ts` (antrean + trigger).
 - [x] Sync junction: pull tiga junction, push attach `POST /labels/:scope/:entityId`, detach `DELETE .../:labelId` (payload antrean).
-- [x] Worker: `POST /labels` tidak lagi gagal saat nama+scope sama dengan label soft-deleted (lihat "Catatan teknis"). Perlu deploy Worker supaya berlaku di produksi.
+- [x] Worker: `POST /labels` tidak lagi gagal saat nama+scope sama dengan label soft-deleted (lihat "Catatan teknis"). Ter-deploy ke produksi 2026-11-06 (dari riwayat `wrangler deployments`); belum diuji langsung di produksi dengan hapus lalu buat ulang label bernama sama.
 - [x] Form transaksi: field pilih/pasang label dengan pencarian dan buat label baru inline.
 - [x] Filter "Label" di daftar transaksi (label efektif: milik transaksi, fallback kategori; juga dipakai ringkasan).
 - [x] Label di form akun dan kategori. Form akun di dalam bottom sheet (buat akun dari picker transaksi) sengaja tanpa field label.
