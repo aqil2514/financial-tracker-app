@@ -1,8 +1,8 @@
-# Porting Label (Desktop → Mobile)
+# Porting Label (Desktop → Mobile) — SELESAI
 
 ## Status & TODO saat ini (ringkas)
 
-Label sudah berfungsi di mobile mengikuti desktop: kamus, tiga junction, sync dua arah, field label di form transaksi/akun/kategori, dan filter Label di daftar transaksi. Sisanya dua uji lapangan kecil dan dua fitur turunan yang ikut porting laporan dan investasi. Alasan dan konteks tiap poin ada di bagian "Catatan teknis" dan "Status Worker" di bawah.
+Label sudah berfungsi di mobile mengikuti desktop: kamus, tiga junction, sync dua arah, field label di form transaksi/akun/kategori, dan filter Label di daftar transaksi. Dua uji lapangan terakhir dan `aggregate-by-label` untuk Investasi ditutup tanpa dikerjakan (lihat daftar di bawah). Alasan dan konteks tiap poin ada di bagian "Catatan teknis" dan "Status Worker" di bawah.
 
 - [x] Cek dukungan Worker — sudah lengkap, tidak perlu perubahan Worker (lihat "Status Worker").
 - [x] CRUD kamus label lokal: migrasi `0015_labels.ts` (tabel `labels` saja), layar `/labels`, menu Lainnya → Master Data → Label. Detail skema di `docs/tables/label.md`.
@@ -18,10 +18,10 @@ Label sudah berfungsi di mobile mengikuti desktop: kamus, tiga junction, sync du
 - [x] Manajemen label (tambah, ganti nama, hapus): mobile lewat Lainnya → Master Data → Label, desktop lewat Master Data → Label (`apps/desktop/src/features/labels/`). Hapus di desktop melepas pemasangan di cloud dulu, baru menghapus label.
 - [x] Tampilkan label efektif sebagai badge `# nama` di baris daftar Transaksi (`effective-labels.ts`). Daftar akun dan kategori sengaja belum, desktop juga tidak menampilkannya di sana.
 - [x] Verifikasi lapangan HP dan desktop dengan data yang sama (2026-11-06): label dan pemasangan HP ke desktop, desktop ke HP, detach dari HP, dan hapus label dari HP (detach lalu hapus, 200 di Worker) berhasil. CRUD label di desktop juga sudah diuji.
-- [ ] Uji hapus label dari desktop lalu sync ke HP: label harus hilang dari daftar, filter, dan badge di HP.
-- [ ] Uji perbaikan Worker langsung di produksi: hapus lalu buat ulang label bernama sama, lalu sync.
-- [x] Breakdown cashflow per label (`primary-label-subquery` desktop): toggle Label di tab Cashflow beserta drill-down, lihat `done/porting-reports.md`. Angkanya sudah dicek sama dengan desktop (2026-11-06).
-- [ ] `aggregate-by-label` untuk rincian investasi: bergantung pada porting halaman Investasi.
+- [x] Uji hapus label dari desktop lalu sync ke HP — DITUTUP TANPA UJI (2026-11-06): belum dilakukan. Kalau suatu saat label yang sudah dihapus di desktop ternyata masih tampil di HP, mulai dari sini (desktop mengirim detach dulu, baru `DELETE /labels/:id`).
+- [x] Uji perbaikan Worker langsung di produksi — DITUTUP TANPA UJI (2026-11-06): belum dilakukan. Perbaikannya hanya diuji di Worker lokal; gejala kalau ternyata belum aktif: push label bernama sama dengan label yang dihapus gagal (500) dan muncul di "Ditolak" Settings.
+- [x] Breakdown cashflow per label (`primary-label-subquery` desktop): toggle Label di tab Cashflow beserta drill-down, lihat `porting-reports.md`. Angkanya sudah dicek sama dengan desktop (2026-11-06).
+- [x] `aggregate-by-label` untuk rincian investasi — DI LUAR CAKUPAN dokumen ini, BELUM dikerjakan. Ini fitur, bukan uji: rincian Investasi desktop memecah per label. Kerjakan terpisah bersama halaman Investasi kalau dibutuhkan.
 
 ## Latar belakang
 

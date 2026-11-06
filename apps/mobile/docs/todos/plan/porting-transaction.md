@@ -14,7 +14,7 @@
 - [x] Summary (Pendapatan/Pengeluaran/Total) di atas list — query `SUM()` terpisah (`use-transaction-summary.ts`), ikut filter aktif, independen dari paginasi list nanti.
 - [x] Tab Harian/Kalender di halaman Transaksi — selesai. `TransactionTabSwitcher`, `TransactionCalendar` (`react-native-calendars`, custom `CalendarDay`, `use-month-summary.ts`), tap tanggal gabung filter + pindah ke tab Harian. Lihat bagian "Tab Harian & Kalender" di bawah.
 - [ ] Pagination/infinite-scroll — belum ada sama sekali, query ambil semua baris tanpa LIMIT/OFFSET. Keputusan "klasik vs infinite scroll" masih benar-benar menggantung.
-- [x] Label — field di form, filter, dan badge di baris daftar sudah ada (2026-11-06), lihat `porting-labels.md`.
+- [x] Label — field di form, filter, dan badge di baris daftar sudah ada (2026-11-06), lihat `done/porting-labels.md`.
 - [x] Field debt (`contact_id`, `settle_debt_ids`) di form transaksi sudah ada, lihat `done/porting-account-debt.md`. Field investasi (`unit`, `price_per_unit`, `investment_status`) sengaja TIDAK ada di form umum: beli/jual/write-off hanya lewat layar Investasi (keputusan permanen), lihat `done/porting-account-investment.md`.
 - [ ] Import Retailku — belum dikerjakan, belum dibahas sama sekali.
 - [x] `transactions.category_id` sekarang FK ke tabel `categories` (`ON DELETE SET NULL`) — migrasi `0004_transaction_category_fk.ts`, lihat `porting-category.md` (SELESAI) untuk detail lengkap.
