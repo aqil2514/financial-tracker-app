@@ -77,6 +77,7 @@ const staticCollapsibleNavItems: CollapsibleNavGroup[] = [
       { title: "Grup Akun", url: "/master-data/account-groups" },
       { title: "Kategori", url: "/master-data/categories" },
       { title: "Nama Pihak", url: "/master-data/contacts" },
+      { title: "Label", url: "/master-data/labels" },
     ],
   },
 ];

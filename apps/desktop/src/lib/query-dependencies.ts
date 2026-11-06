@@ -81,6 +81,16 @@ export const QUERY_DEPENDENCIES = {
   categories: [categoriesQueryKey],
   categoryPeriods: [categoryPeriodsQueryKey],
   contacts: [contactsQueryKey],
+  // Prefix: ["labels"] mencakup semua labelsQueryKey(scope) dan labelListQueryKey. Rename/hapus label mengubah
+  // badge di daftar transaksi dan chip di form edit, jadi query turunannya ikut disegarkan.
+  labels: [
+    ["labels"],
+    ["transaction-labels"],
+    ["category-labels"],
+    ["account-labels"],
+    transactionsQueryKey,
+    recentTransactionsQueryKey,
+  ],
   debts: [ongoingDebtsQueryKey, debtsListQueryKey, debtPaymentsQueryKey, contactSummaryQueryKey],
 } satisfies Record<string, QueryKey[]>;
 

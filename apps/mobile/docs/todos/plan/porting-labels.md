@@ -15,7 +15,7 @@ Label sudah berfungsi di mobile mengikuti desktop: kamus, tiga junction, sync du
 - [x] Form transaksi: field pilih/pasang label dengan pencarian dan buat label baru inline.
 - [x] Filter "Label" di daftar transaksi (label efektif: milik transaksi, fallback kategori; juga dipakai ringkasan).
 - [x] Label di form akun dan kategori. Form akun di dalam bottom sheet (buat akun dari picker transaksi) sengaja tanpa field label.
-- [ ] Manajemen label (ganti nama, hapus) — belum ada UI di desktop maupun mobile, lihat "Catatan teknis".
+- [x] Manajemen label (tambah, ganti nama, hapus): mobile lewat Lainnya → Master Data → Label, desktop lewat Master Data → Label (`apps/desktop/src/features/labels/`). Hapus di desktop melepas pemasangan di cloud dulu, baru menghapus label.
 - [x] Tampilkan label efektif sebagai badge `# nama` di baris daftar Transaksi (`effective-labels.ts`). Daftar akun dan kategori sengaja belum, desktop juga tidak menampilkannya di sana.
 - [ ] Verifikasi hasil terhadap desktop dengan data yang sama, termasuk label hasil sync dari PC (belum dicoba di HP).
 
@@ -37,8 +37,6 @@ Worker (`apps/worker/src/modules/labels/`, terdaftar sebagai `/labels`) sudah me
 ## Catatan teknis
 
 - Re-attach label yang pernah dilepas WAJIB me-revive baris junction lama (`deleted_at` dikosongkan), bukan INSERT baru, karena `UNIQUE (…_id, label_id)` tidak mencakup `deleted_at`.
-- Selama sync pull mengabaikan label, label dari PC tidak muncul di mobile, dan edit transaksi di mobile tidak menyentuh label di PC. Tidak ada risiko kehilangan data, hanya fitur yang belum ada.
-- Desktop hanya bisa membuat label baru (saat mengetik nama di field label) dan memasang/melepasnya dari entitas. Tidak ada UI atau query di desktop untuk mengganti nama atau menghapus label itu sendiri, jadi label salah ketik atau tak terpakai menumpuk. Mobile cukup meniru perilaku ini.
-- Backend manajemen label sudah ada (`PATCH`/`DELETE` di Worker, `update_label`/`delete_label` di MCP), yang kurang hanya UI. Kalau mau dibuat, idealnya di desktop dulu, baru mobile mengikuti.
+- Manajemen label sekarang ada di mobile dan desktop (sebelumnya desktop hanya bisa membuat label lewat form dan memasang/melepasnya, sehingga label salah ketik menumpuk). Backend-nya `PATCH`/`DELETE` di Worker dan `update_label`/`delete_label` di MCP.
 - Desktop punya turunan label yang dipakai di tempat lain (mis. `aggregate-by-label` untuk rincian investasi, `effective-label-subquery.ts` dan `primary-label-subquery.ts`). Itu belum dibaca dan dipetakan, jadi jangan dianggap ikut selesai saat tabel dan form label jadi.
 - `UNIQUE (name, scope)` di Worker mencakup baris soft-deleted, jadi dulu membuat ulang label bernama sama setelah dihapus gagal (500). Sekarang `upsertLabel` melepas nama baris terhapus itu (diganti `"<nama> (dihapus <id>)"`, tombstone tetap ada dan tetap tersebar lewat sync) lalu menyimpan label baru. Sengaja bukan me-revive baris lama: junction yang menunjuk label terhapus tidak di-cascade, jadi revive akan menghidupkan lagi pemasangan lama di label yang baru. Kalau bentrok dengan label yang MASIH hidup (id beda), Worker membalas 422 dan klien menerima label itu lewat pull. Diuji manual di Worker lokal (8799, database terpisah).

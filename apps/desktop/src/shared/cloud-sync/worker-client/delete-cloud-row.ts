@@ -13,6 +13,7 @@ export type DeleteCloudPayload =
       targetCategoryId?: string;
     }
   | { table: "contacts" }
+  | { table: "labels" }
   | { table: "transactions" }
   | { table: "debts" }
   | { table: "debt_payments" }
@@ -27,6 +28,7 @@ const DELETE_PATH: Record<DeleteCloudPayload["table"], string> = {
   accounts: "/accounts",
   categories: "/categories",
   contacts: "/contacts",
+  labels: "/labels",
   investment_purchases: "/investments/purchases/push",
   investment_sales: "/investments/sales/push",
   transactions: "/transactions",
