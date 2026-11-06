@@ -20,7 +20,7 @@ Label sudah berfungsi di mobile mengikuti desktop: kamus, tiga junction, sync du
 - [x] Verifikasi lapangan HP dan desktop dengan data yang sama (2026-11-06): label dan pemasangan HP ke desktop, desktop ke HP, detach dari HP, dan hapus label dari HP (detach lalu hapus, 200 di Worker) berhasil. CRUD label di desktop juga sudah diuji.
 - [ ] Uji hapus label dari desktop lalu sync ke HP: label harus hilang dari daftar, filter, dan badge di HP.
 - [ ] Uji perbaikan Worker langsung di produksi: hapus lalu buat ulang label bernama sama, lalu sync.
-- [x] Breakdown cashflow per label (`primary-label-subquery` desktop): toggle Label di tab Cashflow beserta drill-down, lihat `porting-reports.md`. Angkanya belum dibandingkan dengan desktop.
+- [x] Breakdown cashflow per label (`primary-label-subquery` desktop): toggle Label di tab Cashflow beserta drill-down, lihat `porting-reports.md`. Angkanya sudah dicek sama dengan desktop (2026-11-06).
 - [ ] `aggregate-by-label` untuk rincian investasi: bergantung pada porting halaman Investasi.
 
 ## Latar belakang
