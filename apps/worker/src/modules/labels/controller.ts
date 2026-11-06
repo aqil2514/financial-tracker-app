@@ -12,6 +12,9 @@ export async function handlePostLabel(c: Context<AppContext>) {
   if (result.status === "stale") {
     return c.json({ status: "ignored", id: body.id });
   }
+  if (result.status === "name_taken") {
+    return c.json({ error: "Label name already exists in this scope" }, 422);
+  }
   return c.json({ status: "ok", id: result.id }, 201);
 }
 
@@ -36,6 +39,9 @@ export async function handlePatchLabel(c: Context<AppContext>) {
   const result = await upsertLabel(c.env, merged, c.get("syncSource"));
   if (result.status === "stale") {
     return c.json({ status: "ignored", id });
+  }
+  if (result.status === "name_taken") {
+    return c.json({ error: "Label name already exists in this scope" }, 422);
   }
   return c.json({ status: "ok", id: result.id }, 200);
 }

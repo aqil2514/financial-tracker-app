@@ -16,7 +16,7 @@ const JUNCTION: Record<EntityScope, { table: string; column: string }> = {
   accounts: { table: "account_labels", column: "account_id" },
 };
 
-export type UpsertLabelResult = { status: "ok"; id: string } | { status: "stale" };
+export type UpsertLabelResult = { status: "ok"; id: string } | { status: "stale" } | { status: "name_taken" };
 
 // UPSERT dgn LWW, pola PERSIS account-groups/service.ts upsertAccountGroup
 // -- entity paling sederhana di sini (cuma name+scope), scope TIDAK bisa
@@ -42,6 +42,21 @@ export async function upsertLabel(
   const incomingUpdatedAt = resolveIncomingUpdatedAt(payload.updatedAt);
   const decision = decideLww(incomingUpdatedAt, existing?.updated_at ?? null);
   if (decision.outcome === "stale") return { status: "stale" };
+
+  // UNIQUE (name, scope) mencakup baris soft-deleted. Baris terhapus dengan nama yg sama dilepaskan dari
+  // nama itu (tombstone tetap ada dan tetap tersebar lewat sync, junction-nya tidak hidup lagi); baris yg
+  // masih hidup berarti bentrok sungguhan, ditolak -- klien akan menerima baris itu lewat pull.
+  const clash = await env.DB.prepare(
+    "SELECT id, deleted_at FROM labels WHERE name = ?1 AND scope = ?2 AND id <> ?3"
+  )
+    .bind(payload.name, payload.scope, payload.id)
+    .first<{ id: string; deleted_at: string | null }>();
+  if (clash) {
+    if (clash.deleted_at === null) return { status: "name_taken" };
+    await env.DB.prepare("UPDATE labels SET name = ?1 WHERE id = ?2")
+      .bind(`${payload.name} (dihapus ${clash.id})`, clash.id)
+      .run();
+  }
 
   if (!existing) {
     const now = nowText();
