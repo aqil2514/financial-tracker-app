@@ -7,15 +7,15 @@
 - [x] Eksplorasi fitur lengkap halaman transaksi desktop (`apps/desktop/src/features/transactions/`) — tetap valid sebagai referensi, lihat bagian "Halaman transaksi desktop" di bawah.
 - [x] Koneksi database lokal (`expo-sqlite`) + sistem migrasi custom — `apps/mobile/src/lib/database/` (`provider.tsx`, `migrate.ts`, `migrations/`).
 - [x] List transaksi — grouped per tanggal (`SectionList`), query SQL nyata (bukan dummy) di `features/transactions/content/index.tsx` & `use-transactions.ts`.
-- [x] Filter & sort — 7 dari 9 field desktop (note, description, type, category_id, account_id, amount, has_attachment), sort date/amount — `features/transactions/header/`.
+- [x] Filter & sort — 8 dari 9 field desktop (note, description, type, category_id, account_id, label, amount, has_attachment; tinggal `source` milik Retailku), sort date/amount — `features/transactions/header/`.
 - [x] Form create (`app/transactions/new.tsx`) & edit (`app/transactions/[id]/edit.tsx`) untuk transaksi cash dasar (income/expense/transfer) — delete juga sudah ada di halaman edit.
 - [x] Attachment (foto/kamera/dokumen) — `apps/mobile/src/shared/attachments/`, pola pending-save (create) & immediate-save (edit), lihat README-nya.
 - [x] Date-time picker native, numpad calculator untuk field amount, deskripsi sebagai plain multiline text (Tiptap desktop TIDAK diporting — keputusan final, bukan placeholder).
 - [x] Summary (Pendapatan/Pengeluaran/Total) di atas list — query `SUM()` terpisah (`use-transaction-summary.ts`), ikut filter aktif, independen dari paginasi list nanti.
 - [x] Tab Harian/Kalender di halaman Transaksi — selesai. `TransactionTabSwitcher`, `TransactionCalendar` (`react-native-calendars`, custom `CalendarDay`, `use-month-summary.ts`), tap tanggal gabung filter + pindah ke tab Harian. Lihat bagian "Tab Harian & Kalender" di bawah.
 - [ ] Pagination/infinite-scroll — belum ada sama sekali, query ambil semua baris tanpa LIMIT/OFFSET. Keputusan "klasik vs infinite scroll" masih benar-benar menggantung.
-- [ ] Label — belum ada tabel/kolom label di mobile sama sekali (dikonfirmasi komentar di `header/filter.tsx`).
-- [ ] Field debt (`contact_name`, `settle_debt_ids`) & investment (`unit`, `price_per_unit`, `investment_status`) di form — belum dikerjakan, butuh tabel `debts`/`investment_*` yang belum ada di mobile (dikonfirmasi komentar di `form/schema.ts`).
+- [x] Label — field di form, filter, dan badge di baris daftar sudah ada (2026-11-06), lihat `porting-labels.md`.
+- [x] Field debt (`contact_id`, `settle_debt_ids`) di form transaksi sudah ada, lihat `done/porting-account-debt.md`. Field investasi (`unit`, `price_per_unit`, `investment_status`) sengaja TIDAK ada di form umum: beli/jual/write-off hanya lewat layar Investasi (keputusan permanen), lihat `done/porting-account-investment.md`.
 - [ ] Import Retailku — belum dikerjakan, belum dibahas sama sekali.
 - [x] `transactions.category_id` sekarang FK ke tabel `categories` (`ON DELETE SET NULL`) — migrasi `0004_transaction_category_fk.ts`, lihat `porting-category.md` (SELESAI) untuk detail lengkap.
 

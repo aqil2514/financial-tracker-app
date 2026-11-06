@@ -1,4 +1,4 @@
-# Porting Halaman Laporan (Desktop → Mobile)
+# Porting Halaman Laporan (Desktop → Mobile) — SELESAI
 
 ## Status & TODO saat ini (ringkas)
 
@@ -8,12 +8,12 @@ Semua 4 tab Laporan sudah ada di mobile (`src/app/(tabs)/reports.tsx`), sudah di
 - [x] Baca logika Cashflow di desktop (`apps/desktop/src/features/reports/content/cashflow/`) supaya hasil hitungan mobile sama persis.
 - [x] Ganti placeholder `reports.tsx` dengan navigator bulan + `CashflowSection` — pindah antar tab laporan menunggu tab kedua ada.
 - [x] Tab Cashflow, tahap 1 — kartu ringkasan, toggle Grup Akun/Kategori Induk, pie chart + daftar untuk pengeluaran dan pemasukan (`features/reports/cashflow/`).
-- [x] Tab Cashflow, tahap 2 — drill-down tap baris menuju layar detail (`app/reports/cashflow-detail.tsx`): total, filter anak, grafik harian, daftar transaksi per hari yang bisa dibuka ke edit. Belum diverifikasi terhadap desktop.
+- [x] Tab Cashflow, tahap 2 — drill-down tap baris menuju layar detail (`app/reports/cashflow-detail.tsx`): total, filter anak, grafik harian, daftar transaksi per hari yang bisa dibuka ke edit. Angkanya sudah dicek sama dengan desktop (2026-11-05, lihat ringkasan).
 - [x] Toggle "Label" di Cashflow dan drill-down-nya (`features/labels/primary-label.ts`), lihat catatan di bawah. Angkanya sudah dicek sama dengan desktop (2026-11-06).
 - [x] Verifikasi angka Cashflow tahap 1 terhadap desktop dengan data yang sama — sesuai.
-- [x] Tab Per Tipe Akun — pie chart + kartu per tipe (saldo, % dari total, Unrealized P/L untuk investasi), `features/reports/account-type/`. Belum diverifikasi terhadap desktop.
-- [x] Tab Tren Keuangan — grafik area saldo dengan preset rentang, granularitas, dan filter akun (`features/reports/balance-trend/`). Belum diverifikasi terhadap desktop.
-- [x] Tab Periode Kategori — pemilih periode, kartu ringkasan, pie Pemasukan vs Pengeluaran atau grafik tren dua garis, dan daftar transaksi per tanggal (`features/reports/category-period/`). Belum diverifikasi terhadap desktop.
+- [x] Tab Per Tipe Akun — pie chart + kartu per tipe (saldo, % dari total, Unrealized P/L untuk investasi), `features/reports/account-type/`. Angkanya sudah dicek sama dengan desktop (2026-11-05, lihat ringkasan).
+- [x] Tab Tren Keuangan — grafik area saldo dengan preset rentang, granularitas, dan filter akun (`features/reports/balance-trend/`). Angkanya sudah dicek sama dengan desktop (2026-11-05, lihat ringkasan).
+- [x] Tab Periode Kategori — pemilih periode, kartu ringkasan, pie Pemasukan vs Pengeluaran atau grafik tren dua garis, dan daftar transaksi per tanggal (`features/reports/category-period/`). Angkanya sudah dicek sama dengan desktop (2026-11-05, lihat ringkasan).
 - [x] Verifikasi angka tiap tab terhadap desktop dengan data yang sama — sesuai di keempat tab.
 
 ## Latar belakang
