@@ -2,9 +2,10 @@
 
 ## Status & TODO saat ini (ringkas)
 
-Baru tahap perencanaan, belum ada implementasi di mobile. Alasan dan konteks tiap poin ada di bagian "Catatan teknis" dan "Status Worker" di bawah.
+CRUD kamus label lokal sudah ada di mobile (tabel `labels`, layar daftar/tambah/edit/hapus). Belum terhubung ke sync maupun ke entitas manapun. Alasan dan konteks tiap poin ada di bagian "Catatan teknis" dan "Status Worker" di bawah.
 
 - [x] Cek dukungan Worker — sudah lengkap, tidak perlu perubahan Worker (lihat "Status Worker").
+- [x] CRUD kamus label lokal: migrasi `0015_labels.ts` (tabel `labels` saja), layar `/labels`, menu Lainnya → Master Data → Label. Detail skema di `docs/tables/label.md`.
 - [ ] Keputusan scope: label di transaksi saja, atau juga akun dan kategori.
 - [ ] Baca logika label desktop (`apps/desktop/src/shared/labels/`) — lihat "Catatan teknis" soal label efektif/primer.
 - [ ] Migrasi mobile untuk `labels`, `account_labels`, `category_labels`, `transaction_labels` — acuan skema `apps/desktop/docs/tables/label.md`.

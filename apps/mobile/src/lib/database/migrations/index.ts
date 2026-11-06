@@ -13,6 +13,7 @@ import * as m0011 from "./0011_sync_updated_at";
 import * as m0012 from "./0012_cloud_sync";
 import * as m0013 from "./0013_local_datetime_format";
 import * as m0014 from "./0014_attachment_sync_triggers";
+import * as m0015 from "./0015_labels";
 
 export interface Migration {
   up: (db: SQLiteDatabase) => Promise<void>;
@@ -37,4 +38,5 @@ export const MIGRATIONS: Migration[] = [
   m0012,
   m0013,
   m0014,
+  m0015,
 ];
