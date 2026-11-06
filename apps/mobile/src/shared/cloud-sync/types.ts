@@ -16,6 +16,9 @@ export const PUSH_TABLE_ORDER = [
   "investment_sales",
   "third_party_funds",
   "transaction_attachments",
+  "transaction_labels",
+  "category_labels",
+  "account_labels",
 ] as const;
 
 export type PushTable = (typeof PUSH_TABLE_ORDER)[number];

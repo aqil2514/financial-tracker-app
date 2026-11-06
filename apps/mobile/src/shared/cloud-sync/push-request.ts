@@ -4,6 +4,38 @@ import type { PushRequest, PushTable } from "./types";
 // transaction_attachments dikirim multipart (file biner) lewat AttachmentTransport, bukan JSON.
 export type JsonPushTable = Exclude<PushTable, "transaction_attachments">;
 
+// Junction label: tabel -> kolom entitas dan segmen `:scope` di path Worker (`labels.scope` BEDA, jangan tertukar).
+export const LABEL_JUNCTIONS = {
+  transaction_labels: { column: "transaction_id", scope: "transactions" },
+  category_labels: { column: "category_id", scope: "categories" },
+  account_labels: { column: "account_id", scope: "accounts" },
+} as const;
+
+export type LabelJunctionTable = keyof typeof LABEL_JUNCTIONS;
+
+export function isLabelJunction(table: string): table is LabelJunctionTable {
+  return table in LABEL_JUNCTIONS;
+}
+
+export function labelJunctionDeletePath(table: LabelJunctionTable, payload: string | null): string | null {
+  const parsed = payload ? (JSON.parse(payload) as { entityId?: string; labelId?: string }) : null;
+  if (!parsed?.entityId || !parsed.labelId) return null;
+  return `/labels/${LABEL_JUNCTIONS[table].scope}/${encodeURIComponent(parsed.entityId)}/${encodeURIComponent(parsed.labelId)}`;
+}
+
+function junctionBuilder(table: LabelJunctionTable) {
+  const { column, scope } = LABEL_JUNCTIONS[table];
+  return async (db: SQLiteDatabase, id: string): Promise<PushRequest | null> => {
+    const row = await selectOne(db, `SELECT id, ${column} AS entity_id, label_id, updated_at FROM ${table} WHERE id = ?`, id);
+    return (
+      row && {
+        path: `/labels/${scope}/${encodeURIComponent(String(row.entity_id))}`,
+        body: { id: row.id, labelId: row.label_id, updatedAt: updatedAt(row) },
+      }
+    );
+  };
+}
+
 // Satu-satunya tempat bentuk payload push didefinisikan di mobile; salinan kontrak desktop
 // (apps/desktop/src/shared/cloud-sync/worker-client/push-*.ts). Mengembalikan null kalau baris sudah
 // tidak ada atau belum boleh dikirim (Worker mewajibkan transactionId untuk debts/purchases).
@@ -59,6 +91,10 @@ const BUILDERS: Record<JsonPushTable, (db: SQLiteDatabase, id: string) => Promis
       }
     );
   },
+
+  transaction_labels: junctionBuilder("transaction_labels"),
+  category_labels: junctionBuilder("category_labels"),
+  account_labels: junctionBuilder("account_labels"),
 
   accounts: async (db, id) => {
     const row = await selectOne(
@@ -298,7 +334,7 @@ export function buildPushRequest(db: SQLiteDatabase, table: JsonPushTable, id: s
 }
 
 // Path DELETE per tabel (id ditambahkan di belakang). investment_accounts tidak punya endpoint delete.
-export const DELETE_PATH: Record<Exclude<PushTable, "investment_accounts">, string> = {
+export const DELETE_PATH: Record<Exclude<PushTable, "investment_accounts" | LabelJunctionTable>, string> = {
   transaction_attachments: "/attachments",
   account_groups: "/account-groups",
   categories: "/categories",

@@ -15,6 +15,9 @@ function emptyResponse(overrides: Partial<SyncResponse> = {}): SyncResponse {
     categories: [],
     contacts: [],
     labels: [],
+    transactionLabels: [],
+    categoryLabels: [],
+    accountLabels: [],
     accounts: [],
     transactions: [],
     debts: [],
@@ -162,6 +165,28 @@ describe("runPull", () => {
       { id: "cloud", name: "Liburan", scope: "transaction_category" },
     ]);
     expect(await db.getAllAsync("SELECT * FROM cloud_sync_queue WHERE table_name = 'labels' AND row_id = 'cloud'")).toEqual([]);
+  });
+
+  it("junction label: diterapkan, pasangan lokal beda id kalah, tombstone melepas", async () => {
+    await db.runAsync("INSERT INTO accounts (id, name) VALUES ('a1', 'Kas')");
+    await db.runAsync("INSERT INTO labels (id, name, scope, updated_at) VALUES ('l1', 'X', 'account', '2026-11-01 00:00:00')");
+    await db.runAsync("INSERT INTO account_labels (id, account_id, label_id) VALUES ('lokal', 'a1', 'l1')");
+    const row = (deletedAt: string | null) => ({
+      id: "cloud",
+      accountId: "a1",
+      labelId: "l1",
+      updatedAt: deletedAt ?? "2026-11-02 00:00:00",
+      deletedAt,
+    });
+
+    await runPull(db, creds, fetchReturning(emptyResponse({ accountLabels: [row(null)] })).impl);
+    expect(await db.getAllAsync("SELECT id, account_id, label_id FROM account_labels")).toEqual([
+      { id: "cloud", account_id: "a1", label_id: "l1" },
+    ]);
+    expect(await db.getAllAsync("SELECT * FROM cloud_sync_queue WHERE table_name = 'account_labels' AND row_id = 'cloud'")).toEqual([]);
+
+    await runPull(db, creds, fetchReturning(emptyResponse({ accountLabels: [row("2026-11-03 00:00:00")] })).impl);
+    expect(await db.getAllAsync("SELECT id FROM account_labels")).toEqual([]);
   });
 
   it("tombstone label menghapus label lokal", async () => {

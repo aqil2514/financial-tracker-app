@@ -57,7 +57,8 @@ CREATE TABLE cloud_sync_queue (
       'transactions', 'debts', 'debt_payments',
       'investment_accounts', 'investment_purchases', 'investment_sales',
       'category_periods', 'third_party_funds',
-      'transaction_attachments', 'labels'
+      'transaction_attachments', 'labels',
+      'transaction_labels', 'category_labels', 'account_labels'
     )
   ),
   row_id TEXT NOT NULL,
@@ -75,7 +76,7 @@ CREATE TABLE cloud_sync_queue (
 | Kolom | Tipe | Wajib | Default | Keterangan |
 |---|---|---|---|---|
 | `id` | INTEGER | ya | autoincrement | Nomor urut antrean. Pemroses mengurutkan menurut urutan FK tabel dulu (grup/kategori/kontak → akun → transaksi → debts/investasi/third-party → payments/attachments), baru `id`. |
-| `table_name` | TEXT | ya | - | Tabel sumber, dibatasi `CHECK` ke tabel yang punya endpoint push di Worker. `labels` ditambahkan di `0016_labels_sync.ts`; tabel junction label (`*_labels`) belum ada. |
+| `table_name` | TEXT | ya | - | Tabel sumber, dibatasi `CHECK` ke tabel yang punya endpoint push di Worker. `labels` ditambahkan di `0016_labels_sync.ts`, ketiga junction label (`transaction_labels`, `category_labels`, `account_labels`) di `0017_label_junctions.ts`. |
 | `row_id` | TEXT | ya | - | ID baris sumber. Untuk `investment_accounts` isinya `account_id` (primary key tabel itu), untuk `category_periods` isinya `id` periode. |
 | `op` | TEXT | ya | - | `upsert` atau `delete`. |
 | `attempts` | INTEGER | ya | 0 | Jumlah percobaan kirim yang gagal (jaringan/5xx). Direset ke 0 tiap kali baris berubah lagi. |
@@ -89,7 +90,8 @@ CREATE TABLE cloud_sync_queue (
 - Entry `delete` untuk baris yang tidak pernah sampai ke cloud menghasilkan 404 dari Worker; 404 diperlakukan sukses (idempotent), jadi entry tidak macet.
 - Tidak ada FK ke tabel sumber (`table_name` dinamis), sama seperti desktop.
 - Tidak ada endpoint DELETE untuk `investment_accounts` maupun `debt_accounts`, jadi keduanya tidak punya entry `delete` di antrean. Worker hanya me-soft-delete baris `accounts` (`deleteAccount`), sedangkan baris `investment_accounts`/`debt_accounts` dibiarkan; itu aman karena tersembunyi di balik akun yang sudah `deleted_at`. Trigger `DELETE` pada `debt_accounts`/`investment_accounts` tetap me-enqueue upsert (dijaga agar tidak membalik delete), jadi pemroses antrean harus menganggap baris sumber yang sudah tidak ada sebagai selesai.
-- Daftar `CHECK` baru perlu migrasi copy-and-rename kalau ditambah tabel sync baru, seperti `0016_labels_sync.ts`. Selama rename, `PRAGMA legacy_alter_table = ON` wajib menyala: trigger tabel lain merujuk `cloud_sync_queue` yang sesaat tidak ada, dan rename normal menolaknya.
+- Junction label tidak punya baris sumber setelah detach (hard delete), jadi trigger `DELETE`-nya mengisi kolom `payload` dengan JSON `{"entityId", "labelId"}`; pemroses memakainya untuk `DELETE /labels/:scope/:entityId/:labelId` (`:scope` = `transactions`/`categories`/`accounts`, bukan `labels.scope`). Entry `delete` tanpa payload valid dianggap selesai.
+- Daftar `CHECK` baru perlu migrasi copy-and-rename kalau ditambah tabel sync baru, seperti `0016_labels_sync.ts` dan `0017_label_junctions.ts`. Selama rename, `PRAGMA legacy_alter_table = ON` wajib menyala: trigger tabel lain merujuk `cloud_sync_queue` yang sesaat tidak ada, dan rename normal menolaknya.
 
 ## Tabel `cloud_sync_rejected_log`
 

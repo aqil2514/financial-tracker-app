@@ -136,6 +136,28 @@ const idSpec = <TRow extends { id: string; updatedAt: string | null; deletedAt: 
   beforeUpsert,
 });
 
+// UNIQUE (entitas, label): pemasangan lokal dengan pasangan sama tapi id beda (dibuat di HP sebelum sync) kalah
+// dari id cloud, sama seperti bentrok nama pada labels.
+const junctionSpec = <TRow extends { id: string; labelId: string; updatedAt: string | null; deletedAt: string | null }>(
+  table: string,
+  entityColumn: string,
+  rows: TRow[],
+  entityIdOf: (row: TRow) => string
+): Spec<TRow> =>
+  idSpec(
+    table,
+    rows,
+    (r) => ({ [entityColumn]: entityIdOf(r), label_id: r.labelId }),
+    undefined,
+    async (database, r) => {
+      await database.runAsync(`DELETE FROM ${table} WHERE ${entityColumn} = ? AND label_id = ? AND id <> ?`, [
+        entityIdOf(r),
+        r.labelId,
+        r.id,
+      ]);
+    }
+  );
+
 function add(total: ApplyResult, next: ApplyResult) {
   total.applied += next.applied;
   total.rejected += next.rejected;
@@ -270,6 +292,14 @@ export async function applySyncResponse(
     ),
   ];
   for (const spec of rest) add(total, await applyTable(db, spec as Spec<unknown>, options));
+
+  // Junction label paling akhir: butuh label dan entitasnya sudah ada.
+  const junctions = [
+    junctionSpec("transaction_labels", "transaction_id", response.transactionLabels, (r) => r.transactionId),
+    junctionSpec("category_labels", "category_id", response.categoryLabels, (r) => r.categoryId),
+    junctionSpec("account_labels", "account_id", response.accountLabels, (r) => r.accountId),
+  ];
+  for (const spec of junctions) add(total, await applyTable(db, spec as Spec<unknown>, options));
 
   return total;
 }

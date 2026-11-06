@@ -17,7 +17,7 @@ function makeFetch(options: { fail?: boolean } = {}) {
       : url.includes("/sync")
       ? {
           checkpoint: "2026-11-04 10:00:00",
-          accountGroups: [], categories: [], contacts: [], labels: [], accounts: [], transactions: [], debts: [],
+          accountGroups: [], categories: [], contacts: [], labels: [], transactionLabels: [], categoryLabels: [], accountLabels: [], accounts: [], transactions: [], debts: [],
           debtPayments: [], debtAccounts: [], investmentAccounts: [], investmentPurchases: [],
           investmentSales: [], categoryPeriods: [], thirdPartyFunds: [],
         }

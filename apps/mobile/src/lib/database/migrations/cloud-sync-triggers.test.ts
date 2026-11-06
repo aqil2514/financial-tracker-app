@@ -32,6 +32,33 @@ describe("trigger sync", () => {
     expect(await queue(db)).toEqual([{ table_name: "labels", row_id: "l1", op: "delete" }]);
   });
 
+  it("junction label: detach mengantre delete dengan payload pasangan, dan cascade entitas ikut", async () => {
+    await seedAccount(db);
+    await db.runAsync("INSERT INTO labels (id, name, scope) VALUES ('l1', 'X', 'account')");
+    await db.runAsync("INSERT INTO account_labels (id, account_id, label_id) VALUES ('j1', 'acc-1', 'l1')");
+    expect((await queue(db)).filter((row) => row.table_name === "account_labels")).toEqual([
+      { table_name: "account_labels", row_id: "j1", op: "upsert" },
+    ]);
+
+    await clearQueue(db);
+    await db.runAsync("DELETE FROM account_labels WHERE id = 'j1'");
+    expect(
+      await db.getAllAsync("SELECT table_name, row_id, op, payload FROM cloud_sync_queue WHERE table_name = 'account_labels'")
+    ).toEqual([
+      { table_name: "account_labels", row_id: "j1", op: "delete", payload: JSON.stringify({ entityId: "acc-1", labelId: "l1" }) },
+    ]);
+
+    await db.runAsync("INSERT INTO account_labels (id, account_id, label_id) VALUES ('j2', 'acc-1', 'l1')");
+    await clearQueue(db);
+    await db.runAsync("DELETE FROM labels WHERE id = 'l1'");
+    expect(
+      (await queue(db)).filter((row) => row.table_name === "account_labels" || row.table_name === "labels")
+    ).toEqual(expect.arrayContaining([
+      { table_name: "account_labels", row_id: "j2", op: "delete" },
+      { table_name: "labels", row_id: "l1", op: "delete" },
+    ]));
+  });
+
   it("mengisi updated_at saat INSERT tanpa nilai", async () => {
     await seedAccount(db);
     const row = await db.getFirstAsync<{ updated_at: string | null }>("SELECT updated_at FROM accounts WHERE id = 'acc-1'");

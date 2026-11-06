@@ -70,6 +70,24 @@ describe("flushPushQueue", () => {
     expect(await queueRows(db)).toEqual([]);
   });
 
+  it("junction label: attach ke POST /labels/:scope/:entityId, detach ke DELETE .../:labelId", async () => {
+    await db.runAsync("INSERT INTO categories (id, name, type) VALUES ('c1', 'Makan', 'expense')");
+    await db.runAsync("INSERT INTO labels (id, name, scope) VALUES ('l1', 'Rutin', 'transaction_category')");
+    await db.runAsync(
+      "INSERT INTO category_labels (id, category_id, label_id, updated_at) VALUES ('j1', 'c1', 'l1', '2026-11-04 10:00:00')"
+    );
+    const first = fakeFetch();
+    await flushPushQueue(db, creds, first.impl);
+    expect(first.calls.map((call) => `${call.method} ${call.path}`)).toEqual(["POST /categories", "POST /labels", "POST /labels/categories/c1"]);
+    expect(first.calls.at(-1)?.body).toEqual({ id: "j1", labelId: "l1", updatedAt: "2026-11-04 10:00:00" });
+
+    await db.runAsync("DELETE FROM category_labels WHERE id = 'j1'");
+    const second = fakeFetch();
+    await flushPushQueue(db, creds, second.impl);
+    expect(second.calls.map((call) => `${call.method} ${call.path}`)).toEqual(["DELETE /labels/categories/c1/l1"]);
+    expect(await queueRows(db)).toEqual([]);
+  });
+
   it("memetakan transaksi ke payload camelCase dengan boolean dan updatedAt", async () => {
     await db.runAsync("INSERT INTO accounts (id, name) VALUES ('a1', 'Kas')");
     await db.runAsync("INSERT INTO contacts (id, name) VALUES ('k1', 'Budi')");

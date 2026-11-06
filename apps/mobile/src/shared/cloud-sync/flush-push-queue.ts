@@ -1,7 +1,13 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { loadDefaultAttachmentTransport, type AttachmentTransport } from "./attachment-transport-types";
 import { inferContentType } from "./content-type";
-import { buildPushRequest, DELETE_PATH, type JsonPushTable } from "./push-request";
+import {
+  buildPushRequest,
+  DELETE_PATH,
+  isLabelJunction,
+  labelJunctionDeletePath,
+  type JsonPushTable,
+} from "./push-request";
 import { clearRejected, logRejected } from "./rejected-log";
 import { PUSH_TABLE_ORDER, type CloudSyncCredentials, type PushTable } from "./types";
 import { pushDelete, pushUpsert, WorkerRequestError, type FetchLike } from "./worker-client";
@@ -91,7 +97,11 @@ async function pushEntry(
   getTransport: () => Promise<AttachmentTransport>
 ): Promise<"sent" | "failed"> {
   if (entry.op === "delete") {
-    if (table !== "investment_accounts") {
+    if (isLabelJunction(table)) {
+      // Baris sudah hilang lokal; pasangan (entitas, label) untuk path DELETE disimpan trigger di payload.
+      const path = labelJunctionDeletePath(table, entry.payload);
+      if (path) await pushDelete(creds, path, null, fetchImpl);
+    } else if (table !== "investment_accounts") {
       const body = entry.payload ? (JSON.parse(entry.payload) as Record<string, unknown>) : null;
       await pushDelete(creds, `${DELETE_PATH[table]}/${encodeURIComponent(entry.row_id)}`, body, fetchImpl);
     }
