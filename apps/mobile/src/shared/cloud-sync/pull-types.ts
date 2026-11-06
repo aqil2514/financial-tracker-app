@@ -1,5 +1,5 @@
-// Bentuk respons GET /sync (apps/worker/src/modules/sync). Label dan attachment sengaja tidak dimodelkan:
-// label di luar cakupan awal, attachment punya jalur sendiri (Fase 5).
+// Bentuk respons GET /sync (apps/worker/src/modules/sync). Attachment sengaja tidak dimodelkan (jalur sendiri,
+// Fase 5). Dari label, baru kamusnya yang dimodelkan; transactionLabels/categoryLabels/accountLabels menyusul.
 export type SyncRow = { id: string; updatedAt: string | null; deletedAt: string | null };
 
 export type SyncResponse = {
@@ -9,6 +9,7 @@ export type SyncResponse = {
     SyncRow & { name: string; icon: string | null; type: "income" | "expense"; parentId: string | null; isActive: boolean }
   >;
   contacts: Array<SyncRow & { name: string; note: string | null }>;
+  labels: Array<SyncRow & { name: string; scope: "transaction_category" | "account" }>;
   accounts: Array<
     SyncRow & {
       name: string;

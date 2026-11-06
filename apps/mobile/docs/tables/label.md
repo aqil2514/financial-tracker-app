@@ -30,5 +30,6 @@ CREATE INDEX idx_labels_scope ON labels(scope);
 ## Catatan
 
 - Sengaja **tanpa** `deleted_at`/`sync_source` dibanding skema desktop, sama seperti [contact.md](contact.md). Delete di mobile adalah hard delete.
-- **Belum ikut sync.** Tidak ada trigger antrean dan `labels` belum ada di daftar `table_name` `cloud_sync_queue`, jadi label yang dibuat di mobile hanya lokal dan label dari PC belum masuk. Saat sync ditambahkan, baris yang sudah ada perlu di-enqueue ulang.
+- **Ikut sync dua arah** sejak `0016_labels_sync.ts`: trigger antrean `trg_labels_queue_ins/upd/del`, `labels` masuk daftar `CHECK` `cloud_sync_queue`, dan label yang sudah ada saat migrasi di-enqueue sekali. Push lewat `POST /labels` dan `DELETE /labels/:id`; pull menerapkan `labels` dari `GET /sync` (tombstone = hard delete lokal). Hanya kamusnya; junction belum.
+- **Bentrok `UNIQUE (name, scope)` saat pull:** label lokal dengan nama+scope sama tapi id berbeda dihapus, versi cloud menang. Aman selama junction belum ada; setelah junction ditambahkan, penghapusan ini harus memindahkan tautan, bukan membuangnya.
 - Belum ada tabel junction, jadi menghapus label tidak menyentuh data lain. Saat junction ditambahkan, FK-nya `ON DELETE CASCADE` seperti di desktop.

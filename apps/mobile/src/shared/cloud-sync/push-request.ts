@@ -50,6 +50,16 @@ const BUILDERS: Record<JsonPushTable, (db: SQLiteDatabase, id: string) => Promis
     );
   },
 
+  labels: async (db, id) => {
+    const row = await selectOne(db, "SELECT id, name, scope, updated_at FROM labels WHERE id = ?", id);
+    return (
+      row && {
+        path: "/labels",
+        body: { id: row.id, name: row.name, scope: row.scope, updatedAt: updatedAt(row) },
+      }
+    );
+  },
+
   accounts: async (db, id) => {
     const row = await selectOne(
       db,
@@ -293,6 +303,7 @@ export const DELETE_PATH: Record<Exclude<PushTable, "investment_accounts">, stri
   account_groups: "/account-groups",
   categories: "/categories",
   contacts: "/contacts",
+  labels: "/labels",
   accounts: "/accounts",
   category_periods: "/category-periods/push",
   transactions: "/transactions",

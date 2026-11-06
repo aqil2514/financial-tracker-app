@@ -5,6 +5,7 @@ export const PUSH_TABLE_ORDER = [
   "account_groups",
   "categories",
   "contacts",
+  "labels",
   "accounts",
   "category_periods",
   "transactions",

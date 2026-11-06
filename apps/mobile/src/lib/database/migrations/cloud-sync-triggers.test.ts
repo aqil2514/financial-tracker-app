@@ -23,6 +23,15 @@ describe("trigger sync", () => {
     db = await createSqliteTestDb();
   });
 
+  it("labels masuk antrean saat insert/update/delete", async () => {
+    await clearQueue(db);
+    await db.runAsync("INSERT INTO labels (id, name, scope) VALUES ('l1', 'X', 'account')");
+    await db.runAsync("UPDATE labels SET name = 'Y' WHERE id = 'l1'");
+    expect(await queue(db)).toEqual([{ table_name: "labels", row_id: "l1", op: "upsert" }]);
+    await db.runAsync("DELETE FROM labels WHERE id = 'l1'");
+    expect(await queue(db)).toEqual([{ table_name: "labels", row_id: "l1", op: "delete" }]);
+  });
+
   it("mengisi updated_at saat INSERT tanpa nilai", async () => {
     await seedAccount(db);
     const row = await db.getFirstAsync<{ updated_at: string | null }>("SELECT updated_at FROM accounts WHERE id = 'acc-1'");

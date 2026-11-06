@@ -14,6 +14,7 @@ type Spec<TRow> = {
   columns: (row: TRow) => Record<string, Value>;
   // Tabel yang menyimpan baris anak di payload induknya (pivot periode kategori).
   afterUpsert?: (db: SQLiteDatabase, row: TRow) => Promise<void>;
+  beforeUpsert?: (db: SQLiteDatabase, row: TRow) => Promise<void>;
 };
 
 // rejected = gagal sementara (menahan checkpoint); skipped = gagal permanen yang dicatat tapi tidak menahan checkpoint.
@@ -39,6 +40,7 @@ function wins(incoming: string | null, local: string | null): boolean {
 }
 
 async function upsertRow<TRow>(db: SQLiteDatabase, spec: Spec<TRow>, row: TRow) {
+  await spec.beforeUpsert?.(db, row);
   const columns = { [spec.key]: spec.keyOf(row), ...spec.columns(row), updated_at: spec.updatedAtOf(row) };
   const names = Object.keys(columns);
   const updates = names.filter((name) => name !== spec.key).map((name) => `${name} = excluded.${name}`);
@@ -120,7 +122,8 @@ const idSpec = <TRow extends { id: string; updatedAt: string | null; deletedAt: 
   table: string,
   rows: TRow[],
   columns: (row: TRow) => Record<string, Value>,
-  afterUpsert?: Spec<TRow>["afterUpsert"]
+  afterUpsert?: Spec<TRow>["afterUpsert"],
+  beforeUpsert?: Spec<TRow>["beforeUpsert"]
 ): Spec<TRow> => ({
   table,
   key: "id",
@@ -130,6 +133,7 @@ const idSpec = <TRow extends { id: string; updatedAt: string | null; deletedAt: 
   deletedAtOf: (row) => row.deletedAt,
   columns,
   afterUpsert,
+  beforeUpsert,
 });
 
 function add(total: ApplyResult, next: ApplyResult) {
@@ -156,6 +160,16 @@ export async function applySyncResponse(
       is_active: r.isActive ? 1 : 0,
     })),
     idSpec("contacts", response.contacts, (r) => ({ name: r.name, note: r.note })),
+    idSpec(
+      "labels",
+      response.labels,
+      (r) => ({ name: r.name, scope: r.scope }),
+      undefined,
+      // UNIQUE (name, scope): label lokal bernama sama tapi beda id (dibuat di HP sebelum sync) kalah dari versi cloud.
+      async (database, r) => {
+        await database.runAsync("DELETE FROM labels WHERE name = ? AND scope = ? AND id <> ?", [r.name, r.scope, r.id]);
+      }
+    ),
     idSpec("accounts", response.accounts, (r) => ({
       name: r.name,
       icon: r.icon,

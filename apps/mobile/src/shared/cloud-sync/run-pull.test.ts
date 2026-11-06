@@ -14,6 +14,7 @@ function emptyResponse(overrides: Partial<SyncResponse> = {}): SyncResponse {
     accountGroups: [],
     categories: [],
     contacts: [],
+    labels: [],
     accounts: [],
     transactions: [],
     debts: [],
@@ -136,6 +137,45 @@ describe("runPull", () => {
     );
     expect(await db.getAllAsync("SELECT id FROM contacts")).toEqual([]);
     expect(await db.getAllAsync("SELECT * FROM cloud_sync_queue")).toEqual([]);
+  });
+
+  it("label dari cloud diterapkan, dan label lokal sebangsa (nama+scope sama, id beda) kalah", async () => {
+    await db.runAsync("INSERT INTO labels (id, name, scope) VALUES ('lokal', 'Liburan', 'transaction_category')");
+    await db.runAsync("INSERT INTO labels (id, name, scope) VALUES ('aman', 'Liburan', 'account')");
+    const label = (id: string, name: string, scope: "transaction_category" | "account") => ({
+      id,
+      name,
+      scope,
+      updatedAt: "2026-11-02 00:00:00",
+      deletedAt: null,
+    });
+
+    const result = await runPull(
+      db,
+      creds,
+      fetchReturning(emptyResponse({ labels: [label("cloud", "Liburan", "transaction_category")] })).impl
+    );
+
+    expect(result).toMatchObject({ applied: 1, rejected: 0 });
+    expect(await db.getAllAsync("SELECT id, name, scope FROM labels ORDER BY id")).toEqual([
+      { id: "aman", name: "Liburan", scope: "account" },
+      { id: "cloud", name: "Liburan", scope: "transaction_category" },
+    ]);
+    expect(await db.getAllAsync("SELECT * FROM cloud_sync_queue WHERE table_name = 'labels' AND row_id = 'cloud'")).toEqual([]);
+  });
+
+  it("tombstone label menghapus label lokal", async () => {
+    await db.runAsync("INSERT INTO labels (id, name, scope, updated_at) VALUES ('l1', 'X', 'account', '2026-11-01 00:00:00')");
+    await runPull(
+      db,
+      creds,
+      fetchReturning(
+        emptyResponse({
+          labels: [{ id: "l1", name: "X", scope: "account", updatedAt: "2026-11-02 00:00:00", deletedAt: "2026-11-02 00:00:00" }],
+        })
+      ).impl
+    );
+    expect(await db.getAllAsync("SELECT id FROM labels")).toEqual([]);
   });
 
   it("tombstone untuk baris yang tidak ada lokal tidak dihitung sebagai diterapkan", async () => {

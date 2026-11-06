@@ -50,6 +50,26 @@ describe("flushPushQueue", () => {
     expect(await queueRows(db)).toEqual([]);
   });
 
+  it("mengirim label ke /labels dan hapus ke DELETE /labels/:id", async () => {
+    await db.runAsync("INSERT INTO labels (id, name, scope, updated_at) VALUES ('l1', 'Liburan', 'account', '2026-11-04 10:00:00')");
+    const first = fakeFetch();
+    await flushPushQueue(db, creds, first.impl);
+    expect(first.calls).toEqual([
+      {
+        method: "POST",
+        path: "/labels",
+        body: { id: "l1", name: "Liburan", scope: "account", updatedAt: "2026-11-04 10:00:00" },
+        auth: "Bearer tok",
+      },
+    ]);
+
+    await db.runAsync("DELETE FROM labels WHERE id = 'l1'");
+    const second = fakeFetch();
+    await flushPushQueue(db, creds, second.impl);
+    expect(second.calls.map((call) => `${call.method} ${call.path}`)).toEqual(["DELETE /labels/l1"]);
+    expect(await queueRows(db)).toEqual([]);
+  });
+
   it("memetakan transaksi ke payload camelCase dengan boolean dan updatedAt", async () => {
     await db.runAsync("INSERT INTO accounts (id, name) VALUES ('a1', 'Kas')");
     await db.runAsync("INSERT INTO contacts (id, name) VALUES ('k1', 'Budi')");
