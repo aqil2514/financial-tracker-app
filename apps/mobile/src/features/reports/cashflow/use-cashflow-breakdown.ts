@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useDatabase } from "@/lib/database";
 import { EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL } from "@/shared/third-party-funds";
+import { primaryLabelSql } from "@/features/labels/primary-label";
 import { useReportQuery } from "../shared/use-report-query";
 
 const EMPTY_ROWS: CashflowBreakdownRow[] = [];
@@ -12,8 +13,11 @@ export interface CashflowBreakdownRow {
   total: number;
 }
 
-// Dimensi "Label" milik desktop belum ada di mobile (belum ada tabel label) — lihat porting-labels.md.
-export type CashflowGroupBy = "account_group" | "parent_category";
+// Pada dimensi "label", group_key berisi NAMA label (bukan id): label efektif hasil fallback transaksi ke kategori
+// tidak punya satu id yang stabil, dan nama sudah unik per scope.
+export type CashflowGroupBy = "account_group" | "parent_category" | "label";
+
+const PRIMARY_LABEL = primaryLabelSql("transactions");
 
 const BASE_WHERE = `transactions.type = ? AND date(transactions.date) BETWEEN ? AND ?
   AND transactions.is_cash_neutral = 0 AND ${EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL}`;
@@ -37,6 +41,13 @@ const QUERY_BY_GROUP_BY: Record<CashflowGroupBy, string> = {
     FROM transactions
     LEFT JOIN categories c ON c.id = transactions.category_id
     LEFT JOIN categories parent ON parent.id = c.parent_id
+    WHERE ${BASE_WHERE}
+    GROUP BY group_key
+    ORDER BY total DESC`,
+  // Tanpa JOIN ke junction (scalar subquery) supaya transaksi multi-label tidak menggandakan baris.
+  label: `
+    SELECT ${PRIMARY_LABEL} AS group_key, COALESCE(${PRIMARY_LABEL}, 'Tanpa Label') AS label, SUM(transactions.amount) AS total
+    FROM transactions
     WHERE ${BASE_WHERE}
     GROUP BY group_key
     ORDER BY total DESC`,

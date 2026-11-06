@@ -7,7 +7,7 @@ Label sudah berfungsi di mobile mengikuti desktop: kamus, tiga junction, sync du
 - [x] Cek dukungan Worker — sudah lengkap, tidak perlu perubahan Worker (lihat "Status Worker").
 - [x] CRUD kamus label lokal: migrasi `0015_labels.ts` (tabel `labels` saja), layar `/labels`, menu Lainnya → Master Data → Label. Detail skema di `docs/tables/label.md`.
 - [x] Keputusan scope: ikut desktop, ketiganya (transaksi, kategori, akun). Diputuskan 2026-11-06.
-- [x] Logika label desktop dibaca: apply-*-labels, resolve-label-ids, effective-label-subquery diporting. `primary-label-subquery` (breakdown cashflow per label) dan `aggregate-by-label` (investasi) belum.
+- [x] Logika label desktop dibaca: apply-*-labels, resolve-label-ids, effective-label-subquery diporting. `primary-label-subquery` diporting kemudian untuk breakdown cashflow; `aggregate-by-label` (investasi) belum.
 - [x] Migrasi junction `0017_label_junctions.ts` (+ perluasan antrean sync).
 - [x] Sync kamus `labels`: pull di `apply-sync-response.ts`, push `POST/DELETE /labels`, migrasi `0016_labels_sync.ts` (antrean + trigger).
 - [x] Sync junction: pull tiga junction, push attach `POST /labels/:scope/:entityId`, detach `DELETE .../:labelId` (payload antrean).
@@ -20,7 +20,7 @@ Label sudah berfungsi di mobile mengikuti desktop: kamus, tiga junction, sync du
 - [x] Verifikasi lapangan HP dan desktop dengan data yang sama (2026-11-06): label dan pemasangan HP ke desktop, desktop ke HP, detach dari HP, dan hapus label dari HP (detach lalu hapus, 200 di Worker) berhasil. CRUD label di desktop juga sudah diuji.
 - [ ] Uji hapus label dari desktop lalu sync ke HP: label harus hilang dari daftar, filter, dan badge di HP.
 - [ ] Uji perbaikan Worker langsung di produksi: hapus lalu buat ulang label bernama sama, lalu sync.
-- [ ] Breakdown cashflow per label (`primary-label-subquery` desktop): bergantung pada porting laporan, lihat `porting-reports.md`.
+- [x] Breakdown cashflow per label (`primary-label-subquery` desktop): toggle Label di tab Cashflow beserta drill-down, lihat `porting-reports.md`. Angkanya belum dibandingkan dengan desktop.
 - [ ] `aggregate-by-label` untuk rincian investasi: bergantung pada porting halaman Investasi.
 
 ## Latar belakang

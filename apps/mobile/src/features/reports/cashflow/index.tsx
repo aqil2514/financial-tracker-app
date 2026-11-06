@@ -15,6 +15,7 @@ import { useCashflowSummary } from "./use-cashflow-summary";
 const GROUP_BY_OPTIONS: { value: CashflowGroupBy; label: string }[] = [
   { value: "account_group", label: "Grup Akun" },
   { value: "parent_category", label: "Kategori Induk" },
+  { value: "label", label: "Label" },
 ];
 
 export function CashflowSection({ month }: { month: string }) {

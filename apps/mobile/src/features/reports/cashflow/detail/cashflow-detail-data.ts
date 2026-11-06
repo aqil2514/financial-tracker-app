@@ -12,6 +12,10 @@ export interface ChildRow {
   total: number;
 }
 
+// childId null sudah berarti "tidak ada anak terpilih", jadi bucket "Tanpa Kategori" pada dimensi label
+// butuh penanda sendiri.
+export const UNCATEGORIZED_CHILD_ID = "__uncategorized__";
+
 function sum(transactions: CashflowDetailTransaction[]) {
   return transactions.reduce((total, tx) => total + tx.amount, 0);
 }
@@ -24,6 +28,8 @@ export function totalAmount(transactions: CashflowDetailTransaction[]) {
 // dalam kategori induk. Dihitung dari SELURUH transaksi grup (bukan yang sudah difilter anak)
 // supaya total tiap anak tidak ikut berubah saat satu anak dipilih. Transaksi yang langsung
 // memakai kategori induk itu sendiri tidak punya baris anak (hanya masuk "Semua").
+// Dimensi label tidak punya anak struktural; dipecah per kategori (label umumnya diwarisi dari kategori, jadi
+// ini sekaligus menunjukkan dari mana label itu datang), termasuk "Tanpa Kategori".
 export function computeChildRows(
   transactions: CashflowDetailTransaction[],
   groupBy: CashflowGroupBy,
@@ -37,6 +43,9 @@ export function computeChildRows(
     if (groupBy === "account_group") {
       value = tx.accountId;
       label = tx.account;
+    } else if (groupBy === "label") {
+      value = tx.categoryId ?? UNCATEGORIZED_CHILD_ID;
+      label = tx.category ?? "Tanpa Kategori";
     } else {
       value = tx.categoryId !== groupKey ? tx.categoryId : null;
       label = tx.category ?? "Tanpa Kategori";
@@ -59,6 +68,9 @@ export function filterByChild(
   childId: string | null
 ): CashflowDetailTransaction[] {
   if (!childId) return transactions;
+  if (groupBy === "label" && childId === UNCATEGORIZED_CHILD_ID) {
+    return transactions.filter((tx) => tx.categoryId === null);
+  }
   return transactions.filter((tx) =>
     groupBy === "account_group" ? tx.accountId === childId : tx.categoryId === childId
   );

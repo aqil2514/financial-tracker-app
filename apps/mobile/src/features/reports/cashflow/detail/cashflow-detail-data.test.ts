@@ -4,6 +4,7 @@ import {
   dailyTotals,
   filterByChild,
   totalAmount,
+  UNCATEGORIZED_CHILD_ID,
   type CashflowDetailTransaction,
 } from "./cashflow-detail-data";
 
@@ -55,6 +56,28 @@ describe("computeChildRows (kategori induk)", () => {
       "parent"
     );
     expect(rows).toEqual([{ value: "child1", label: "Sarapan", total: 10 }]);
+  });
+});
+
+describe("computeChildRows dan filterByChild (label)", () => {
+  const list = [
+    tx({ id: "1", categoryId: "c1", category: "Makan", amount: 30 }),
+    tx({ id: "2", categoryId: "c1", category: "Makan", amount: 20 }),
+    tx({ id: "3", categoryId: "c2", category: "Transport", amount: 40 }),
+    tx({ id: "4", categoryId: null, category: null, amount: 5 }),
+  ];
+
+  it("dipecah per kategori, termasuk Tanpa Kategori, urut dari yang terbesar", () => {
+    expect(computeChildRows(list, "label", "Konsumtif")).toEqual([
+      { value: "c1", label: "Makan", total: 50 },
+      { value: "c2", label: "Transport", total: 40 },
+      { value: UNCATEGORIZED_CHILD_ID, label: "Tanpa Kategori", total: 5 },
+    ]);
+  });
+
+  it("memfilter menurut kategori, dan penanda Tanpa Kategori memilih yang tidak berkategori", () => {
+    expect(filterByChild(list, "label", "c2").map((t) => t.id)).toEqual(["3"]);
+    expect(filterByChild(list, "label", UNCATEGORIZED_CHILD_ID).map((t) => t.id)).toEqual(["4"]);
   });
 });
 

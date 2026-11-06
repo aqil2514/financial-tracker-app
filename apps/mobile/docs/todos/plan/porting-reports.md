@@ -2,14 +2,14 @@
 
 ## Status & TODO saat ini (ringkas)
 
-Semua 4 tab Laporan sudah ada di mobile (`src/app/(tabs)/reports.tsx`), sudah di-commit, di-build, dan angkanya dicek sama dengan desktop (2026-11-05). Sisa hanya toggle Label di Cashflow yang menunggu label di mobile. Penjelasan tiap poin ada di bagian-bagian di bawah.
+Semua 4 tab Laporan sudah ada di mobile (`src/app/(tabs)/reports.tsx`), sudah di-commit, di-build, dan angkanya dicek sama dengan desktop (2026-11-05). Toggle Label di Cashflow juga sudah ada (2026-11-06), belum dicek angkanya terhadap desktop. Penjelasan tiap poin ada di bagian-bagian di bawah.
 
 - [x] Keputusan scope: porting semua 4 tab bertahap — diputuskan dan selesai.
 - [x] Baca logika Cashflow di desktop (`apps/desktop/src/features/reports/content/cashflow/`) supaya hasil hitungan mobile sama persis.
 - [x] Ganti placeholder `reports.tsx` dengan navigator bulan + `CashflowSection` — pindah antar tab laporan menunggu tab kedua ada.
 - [x] Tab Cashflow, tahap 1 — kartu ringkasan, toggle Grup Akun/Kategori Induk, pie chart + daftar untuk pengeluaran dan pemasukan (`features/reports/cashflow/`).
 - [x] Tab Cashflow, tahap 2 — drill-down tap baris menuju layar detail (`app/reports/cashflow-detail.tsx`): total, filter anak, grafik harian, daftar transaksi per hari yang bisa dibuka ke edit. Belum diverifikasi terhadap desktop.
-- [ ] Toggle "Label" di Cashflow dan drill-down-nya — menunggu label di mobile (lihat `porting-labels.md`).
+- [x] Toggle "Label" di Cashflow dan drill-down-nya (`features/labels/primary-label.ts`), lihat catatan di bawah. Angkanya belum diverifikasi terhadap desktop dengan data yang sama.
 - [x] Verifikasi angka Cashflow tahap 1 terhadap desktop dengan data yang sama — sesuai.
 - [x] Tab Per Tipe Akun — pie chart + kartu per tipe (saldo, % dari total, Unrealized P/L untuk investasi), `features/reports/account-type/`. Belum diverifikasi terhadap desktop.
 - [x] Tab Tren Keuangan — grafik area saldo dengan preset rentang, granularitas, dan filter akun (`features/reports/balance-trend/`). Belum diverifikasi terhadap desktop.
@@ -38,7 +38,7 @@ Desktop punya halaman laporan dengan 4 tab (`apps/desktop/src/features/reports/c
 
 - Periode di mobile satu bulan penuh (navigator bulan bersama, `components/month-navigator.tsx`), bukan rentang bebas seperti `PeriodPicker` desktop.
 - Query dan filter disalin dari desktop: `is_cash_neutral = 0` dan `EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL`; breakdown di-GROUP BY id (bukan nama), kategori anak digabung ke induknya.
-- Dimensi "Label" desktop belum ada di mobile karena tabel label belum ada, lihat `porting-labels.md`.
+- Dimensi "Label" memakai SATU label efektif per transaksi (milik transaksi, atau label kategorinya kalau kosong, lalu yang namanya paling awal secara alfabet), sama dengan desktop. Itu disengaja: breakdown harus berjumlah pas dengan total, sedangkan transaksi multi-label yang dihitung di tiap labelnya akan melebihi total. Label kedua dst tidak terlihat di laporan ini, dan filter Label di daftar transaksi menampilkan semuanya. `group_key` pada dimensi ini berisi NAMA label (bukan id), bucket tanpa label tampil sebagai "Tanpa Label". Drill-down memecah label per kategori (anak = kategori, termasuk "Tanpa Kategori"), seperti desktop.
 - Pie chart digambar sendiri dengan `react-native-svg` (`features/reports/shared/breakdown-pie.tsx`, geometri di `donut-geometry.ts`), bukan `PieChart` chart-kit, supaya bisa berbentuk donut dengan sela antar irisan dan animasi terbuka melingkar seperti Recharts di desktop.
 - Helper bulan (`currentMonth`, `shiftMonth`, `monthDateRange`) ada di `lib/utils/month.ts` dan dipakai bersama halaman Transaksi.
 
