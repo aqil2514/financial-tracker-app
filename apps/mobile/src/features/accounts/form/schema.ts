@@ -16,6 +16,7 @@ export const accountFormSchema = z
     direction: z.enum(["receivable", "payable"]).nullable(),
     unit_label: z.string().nullable(),
     current_market_value: z.coerce.number(),
+    label_names: z.array(z.string()),
   })
   .refine(
     (values) => values.kind !== "account" || values.account_type !== "debt" || values.direction != null,

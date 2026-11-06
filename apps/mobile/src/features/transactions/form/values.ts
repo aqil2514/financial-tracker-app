@@ -13,5 +13,6 @@ export function emptyTransactionValues(): TransactionFormValues {
     date: toLocalDateTime(),
     contact_id: null,
     settle_debt_ids: [],
+    label_names: [],
   };
 }

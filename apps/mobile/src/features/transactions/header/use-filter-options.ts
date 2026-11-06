@@ -21,7 +21,14 @@ export function useTransactionFilterOptions(): SelectOptionsMap {
     const accounts = await db.getAllAsync<FilterAccountRow>(
       `SELECT id, name, is_active FROM accounts ORDER BY name ASC`
     );
-    return buildTransactionFilterOptions(categories, accounts);
+    const labels = await db.getAllAsync<{ name: string }>(
+      `SELECT name FROM labels WHERE scope = 'transaction_category' ORDER BY name COLLATE NOCASE`
+    );
+    return buildTransactionFilterOptions(
+      categories,
+      accounts,
+      labels.map((label) => label.name)
+    );
   }, [db]);
 
   return useReportQuery("transaction-filter-options", fetcher, STATIC_FILTER_SELECT_OPTIONS).data;

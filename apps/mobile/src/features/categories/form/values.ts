@@ -5,5 +5,6 @@ export function emptyCategoryValues(): CategoryFormValues {
     name: "",
     type: "expense",
     parent_id: null,
+    label_names: [],
   };
 }

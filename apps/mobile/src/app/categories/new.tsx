@@ -5,6 +5,7 @@ import { generateId, useDatabase } from "@/lib/database";
 import { CategoryForm } from "@/features/categories/form/category-form";
 import { emptyCategoryValues } from "@/features/categories/form/values";
 import type { CategoryFormOutput } from "@/features/categories/form/schema";
+import { applyEntityLabels } from "@/features/labels/entity-labels";
 
 export default function NewCategoryPage() {
   const router = useRouter();
@@ -15,10 +16,12 @@ export default function NewCategoryPage() {
   async function handleSubmit(values: CategoryFormOutput) {
     setIsPending(true);
     try {
+      const id = generateId();
       await db.runAsync(
         `INSERT INTO categories (id, name, type, parent_id) VALUES (?, ?, ?, ?)`,
-        [generateId(), values.name, values.type, values.parent_id]
+        [id, values.name, values.type, values.parent_id]
       );
+      await applyEntityLabels(db, "category", id, values.label_names);
 
       router.back();
     } finally {

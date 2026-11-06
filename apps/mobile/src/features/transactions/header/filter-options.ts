@@ -12,7 +12,7 @@ export interface FilterAccountRow {
   is_active: number;
 }
 
-// Pilihan tetap sama dengan desktop (list/context/constants.ts). "Label" dan "Sumber Data" belum ada di mobile.
+// Pilihan tetap sama dengan desktop (list/context/constants.ts). "Sumber Data" belum ada di mobile.
 export const STATIC_FILTER_SELECT_OPTIONS: SelectOptionsMap = {
   type: [
     { value: "income", label: "Pemasukan" },
@@ -29,10 +29,13 @@ export const STATIC_FILTER_SELECT_OPTIONS: SelectOptionsMap = {
 // (transaksi lamanya masih ada) dan ditandai.
 export function buildTransactionFilterOptions(
   categories: FilterCategoryRow[],
-  accounts: FilterAccountRow[]
+  accounts: FilterAccountRow[],
+  labelNames: string[] = []
 ): SelectOptionsMap {
   return {
     ...STATIC_FILTER_SELECT_OPTIONS,
+    // Nilai filter label adalah NAMA (bukan id), sama dengan desktop.
+    label: labelNames.map((name) => ({ value: name, label: name })),
     category_id: categories.map((category) => ({
       value: category.id,
       label: category.parent_name ? `${category.parent_name} › ${category.name}` : category.name,

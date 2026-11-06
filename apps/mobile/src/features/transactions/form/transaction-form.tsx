@@ -16,6 +16,7 @@ import { FormFieldAccount } from "./fields/form-field-account";
 import { FormFieldContact } from "./fields/form-field-contact";
 import { FieldDebtAction } from "./fields/field-debt-action";
 import { useTransactionDebtFields } from "./use-transaction-debt-fields";
+import { LabelsField } from "@/features/labels/field/labels-field";
 
 const TYPE_OPTIONS = [
   { value: "income", label: "Pemasukan" },
@@ -160,6 +161,8 @@ function TransactionFormFields({
       {needsDebtAction && settlementDirection && (
         <FieldDebtAction control={form.control} ongoingDebts={ongoingDebts} direction={settlementDirection} />
       )}
+
+      <LabelsField scope="transaction_category" />
 
       <FormFieldDate form={form} name="date" label="Tanggal" />
 

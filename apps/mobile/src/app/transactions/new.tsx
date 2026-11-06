@@ -6,6 +6,7 @@ import { generateId, useDatabase } from "@/lib/database";
 import { TransactionForm, type TransactionFormRef } from "@/features/transactions/form/transaction-form";
 import { emptyTransactionValues } from "@/features/transactions/form/values";
 import type { TransactionFormOutput, TransactionFormValues } from "@/features/transactions/form/schema";
+import { applyEntityLabels } from "@/features/labels/entity-labels";
 import { PendingAttachmentUploader } from "@/shared/attachments/pending-attachment-uploader";
 import { saveAttachmentToTransaction } from "@/shared/attachments/save-pending-attachment";
 import type { PendingAttachment } from "@/shared/attachments/pending-attachment";
@@ -81,6 +82,8 @@ export default function NewTransactionPage() {
           values.contact_id,
         ]
       );
+
+      await applyEntityLabels(db, "transaction", transactionId, values.label_names);
 
       if (values.type === "transfer") {
         await applyDebtTransaction({

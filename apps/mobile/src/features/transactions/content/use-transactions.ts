@@ -5,6 +5,7 @@ import { buildWhereClause } from "@/components/query/filters/builders/sql";
 import { buildOrderClause } from "@/components/query/sort/builders/sql";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { SortConfig } from "@/components/query/sort/sort.interface";
+import { extractLabelCondition } from "@/features/labels/extract-label-condition";
 import { TransactionListItem } from "../types";
 
 export interface TransactionRow {
@@ -86,7 +87,8 @@ export function useTransactions({ filters = [], sorts = [] }: UseTransactionsOpt
   const refetch = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { whereClause, params } = buildWhereClause(filters, ALLOWED_FILTER_COLUMNS, [], 1, {
+      const { remaining, extraConditions } = extractLabelCondition(filters);
+      const { whereClause, params } = buildWhereClause(remaining, ALLOWED_FILTER_COLUMNS, extraConditions, 1, {
         jsonTextColumns: JSON_TEXT_COLUMNS,
       });
       const orderClause = buildOrderClause(sorts, ALLOWED_SORT_COLUMNS, DEFAULT_ORDER);

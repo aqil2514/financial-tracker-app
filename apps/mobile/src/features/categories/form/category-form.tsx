@@ -4,6 +4,7 @@ import { BaseForm } from "@/components/forms/base-form";
 import { FormFieldText, FormFieldToggleGroup } from "@/components/forms/form-fields";
 import { categorySchema } from "./schema";
 import { ParentCategoryField } from "./fields/parent-category";
+import { LabelsField } from "@/features/labels/field/labels-field";
 import { CategoryFormProps } from "../types";
 
 const TYPE_OPTIONS = [
@@ -69,6 +70,8 @@ export function CategoryForm({
           />
 
           <ParentCategoryField excludeId={excludeId} />
+
+          <LabelsField scope="transaction_category" />
         </>
       )}
     </BaseForm>

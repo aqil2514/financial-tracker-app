@@ -3,15 +3,14 @@ import type { FilterConfig } from "@/components/query/filters/filter.interface";
 import type { FilterKeyOption } from "@/components/query/filters/panel/panel.interface";
 import { useTransactionFilterOptions } from "./use-filter-options";
 
-// "Label" dan "Sumber Data" (Retailku import) sengaja belum dimasukkan
-// — tabel transactions belum punya kolom label/source, fiturnya belum
-// diporting. Tambahkan lagi saat tabel pendukungnya sudah ada.
+// "Sumber Data" (Retailku import) sengaja belum dimasukkan, fiturnya belum diporting.
 export const TRANSACTION_FILTER_CONFIG: FilterKeyOption[] = [
   { key: "note", label: "Catatan", type: "text" },
   { key: "description", label: "Deskripsi", type: "text" },
   { key: "type", label: "Tipe Transaksi", type: "select" },
   { key: "category_id", label: "Kategori", type: "combobox" },
   { key: "account_id", label: "Akun", type: "combobox" },
+  { key: "label", label: "Label", type: "combobox" },
   { key: "amount", label: "Jumlah", type: "number" },
   { key: "has_attachment", label: "Gambar", type: "select" },
 ];

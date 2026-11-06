@@ -6,6 +6,7 @@ import { AccountForm } from "@/features/accounts/form/account-form";
 import { emptyAccountValues } from "@/features/accounts/form/values";
 import { upsertInvestmentAccount } from "@/features/accounts/upsert-investment-account";
 import type { AccountFormOutput } from "@/features/accounts/form/schema";
+import { applyEntityLabels } from "@/features/labels/entity-labels";
 
 export default function NewAccountPage() {
   const router = useRouter();
@@ -38,6 +39,8 @@ export default function NewAccountPage() {
             values.account_type,
           ]
         );
+
+        await applyEntityLabels(db, "account", id, values.label_names);
 
         if (values.account_type === "debt" && values.direction) {
           await db.runAsync(`INSERT INTO debt_accounts (account_id, direction) VALUES (?, ?)`, [

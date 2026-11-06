@@ -26,6 +26,7 @@ export const transactionSchema = z
     date: z.string().min(1, "Tanggal wajib diisi"),
     contact_id: z.string().nullable(),
     settle_debt_ids: z.array(z.string()),
+    label_names: z.array(z.string()),
   })
   .superRefine((values, ctx) => {
     if (values.type === "transfer") {

@@ -5,6 +5,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useDatabase } from "@/lib/database";
 import { CategoryForm } from "@/features/categories/form/category-form";
 import type { CategoryFormOutput, CategoryFormValues } from "@/features/categories/form/schema";
+import { applyEntityLabels, loadEntityLabelNames } from "@/features/labels/entity-labels";
 
 interface CategoryRow {
   name: string;
@@ -12,11 +13,12 @@ interface CategoryRow {
   parent_id: string | null;
 }
 
-function toFormValues(row: CategoryRow): CategoryFormValues {
+function toFormValues(row: CategoryRow, labelNames: string[]): CategoryFormValues {
   return {
     name: row.name,
     type: row.type,
     parent_id: row.parent_id,
+    label_names: labelNames,
   };
 }
 
@@ -32,8 +34,8 @@ export default function EditCategoryPage() {
     db.getFirstAsync<CategoryRow>(
       "SELECT name, type, parent_id FROM categories WHERE id = ?",
       [id]
-    ).then((row) => {
-      if (row) setDefaultValues(toFormValues(row));
+    ).then(async (row) => {
+      if (row) setDefaultValues(toFormValues(row, await loadEntityLabelNames(db, "category", id)));
     });
     db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM categories WHERE parent_id = ?",
@@ -48,6 +50,7 @@ export default function EditCategoryPage() {
         `UPDATE categories SET name = ?, type = ?, parent_id = ? WHERE id = ?`,
         [values.name, values.type, values.parent_id, id]
       );
+      await applyEntityLabels(db, "category", id, values.label_names);
       router.back();
     } finally {
       setIsPending(false);

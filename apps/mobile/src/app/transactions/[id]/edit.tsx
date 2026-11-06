@@ -6,6 +6,7 @@ import { useDatabase } from "@/lib/database";
 import { TransactionForm, type TransactionFormRef } from "@/features/transactions/form/transaction-form";
 import type { TransactionFormOutput, TransactionFormValues } from "@/features/transactions/form/schema";
 import { AttachmentUploader } from "@/shared/attachments";
+import { applyEntityLabels, loadEntityLabelNames } from "@/features/labels/entity-labels";
 import {
   applyDebtTransactionEdit,
   applyDirectDebtTransactionEdit,
@@ -41,7 +42,8 @@ interface TransactionRow {
 function toFormValues(
   row: TransactionRow,
   contactId: string | null,
-  settleDebtIds: string[]
+  settleDebtIds: string[],
+  labelNames: string[]
 ): TransactionFormValues {
   return {
     type: row.type,
@@ -54,6 +56,7 @@ function toFormValues(
     date: row.date,
     contact_id: contactId,
     settle_debt_ids: settleDebtIds,
+    label_names: labelNames,
   };
 }
 
@@ -101,7 +104,7 @@ export default function EditTransactionPage() {
 
       setOriginalRow(row);
       setOriginalContactId(contactId);
-      setDefaultValues(toFormValues(row, contactId, settleDebtIds));
+      setDefaultValues(toFormValues(row, contactId, settleDebtIds, await loadEntityLabelNames(db, "transaction", id)));
     }
     load();
   }, [db, id]);
@@ -186,6 +189,7 @@ export default function EditTransactionPage() {
           id,
         ]
       );
+      await applyEntityLabels(db, "transaction", id, values.label_names);
 
       // Status di-query ULANG setelah cleanup (bukan dipakai dari effect
       // load) — cleanupStaleDebtOnAccountChange bisa saja sudah mengubah

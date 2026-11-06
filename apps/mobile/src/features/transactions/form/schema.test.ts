@@ -12,6 +12,7 @@ const BASE = {
   date: "2026-01-01",
   contact_id: null,
   settle_debt_ids: [] as string[],
+  label_names: [] as string[],
 };
 
 describe("transactionSchema", () => {

@@ -14,5 +14,6 @@ export function emptyAccountValues(): AccountFormValues {
     direction: null,
     unit_label: null,
     current_market_value: 0,
+    label_names: [],
   };
 }

@@ -9,6 +9,7 @@ import { OptionPicker, type OptionPickerRef } from "@/components/query/shared/op
 import { CurrentBalanceField } from "@/features/accounts/content/current-balance-field";
 import { correctAccountBalance } from "@/features/accounts/correct-account-balance";
 import { upsertInvestmentAccount } from "@/features/accounts/upsert-investment-account";
+import { applyEntityLabels, loadEntityLabelNames } from "@/features/labels/entity-labels";
 
 const CURRENT_BALANCE_SQL = `
   SELECT
@@ -40,7 +41,7 @@ interface AccountRow {
   current_market_value: number | null;
 }
 
-function toFormValues(row: AccountRow): AccountFormValues {
+function toFormValues(row: AccountRow, labelNames: string[]): AccountFormValues {
   return {
     kind: "account",
     name: row.name,
@@ -54,6 +55,7 @@ function toFormValues(row: AccountRow): AccountFormValues {
     direction: row.direction,
     unit_label: row.unit_label,
     current_market_value: row.current_market_value ?? 0,
+    label_names: labelNames,
   };
 }
 
@@ -79,8 +81,8 @@ export default function EditAccountPage() {
        LEFT JOIN investment_accounts ON investment_accounts.account_id = accounts.id
        WHERE accounts.id = ?`,
       [id]
-    ).then((row) => {
-      if (row) setDefaultValues(toFormValues(row));
+    ).then(async (row) => {
+      if (row) setDefaultValues(toFormValues(row, await loadEntityLabelNames(db, "account", id)));
     });
 
     db.getFirstAsync<{ balance: number }>(CURRENT_BALANCE_SQL, [id]).then((row) => {
@@ -106,6 +108,8 @@ export default function EditAccountPage() {
         id,
       ]
     );
+
+    await applyEntityLabels(db, "account", id, values.label_names);
 
     if (values.account_type === "debt" && values.direction) {
       await db.runAsync(

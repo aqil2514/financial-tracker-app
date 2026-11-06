@@ -13,6 +13,7 @@ import { accountFormSchema, type AccountFormOutput, type AccountFormValues } fro
 import { GroupSelectField } from "./fields/group-select";
 import { IconPickerField } from "./fields/icon-picker";
 import { ColorPickerField } from "./fields/color-picker";
+import { LabelsField } from "@/features/labels/field/labels-field";
 
 const KIND_OPTIONS = [
   { value: "account", label: "Akun" },
@@ -200,6 +201,8 @@ function AccountFields({
         multiline
         inBottomSheet={inBottomSheet}
       />
+
+      {!inBottomSheet && <LabelsField scope="account" />}
 
       <FormFieldToggleGroup
         form={form}

@@ -4,6 +4,7 @@ import { useDatabase } from "@/lib/database";
 import { EXCLUDE_THIRD_PARTY_TRANSACTIONS_SQL } from "@/shared/third-party-funds";
 import { buildWhereClause } from "@/components/query/filters/builders/sql";
 import type { FilterConfig } from "@/components/query/filters/filter.interface";
+import { extractLabelCondition } from "@/features/labels/extract-label-condition";
 
 const ALLOWED_FILTER_COLUMNS = [
   "note",
@@ -42,7 +43,8 @@ export function useTransactionSummary({ filters = [] }: { filters?: FilterConfig
   });
 
   const refetch = useCallback(async () => {
-    const { whereClause, params } = buildWhereClause(filters, ALLOWED_FILTER_COLUMNS, [], 1, {
+    const { remaining, extraConditions } = extractLabelCondition(filters);
+    const { whereClause, params } = buildWhereClause(remaining, ALLOWED_FILTER_COLUMNS, extraConditions, 1, {
       jsonTextColumns: JSON_TEXT_COLUMNS,
     });
 
