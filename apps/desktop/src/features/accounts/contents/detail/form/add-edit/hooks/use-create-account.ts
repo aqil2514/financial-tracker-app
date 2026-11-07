@@ -46,6 +46,12 @@ export function useCreateAccount(options: UseCreateAccountOptions = {}) {
           [id, values.debt_direction]
         );
       }
+      if (values.account_type === "forex") {
+        await db.execute(
+          "INSERT INTO forex_accounts (account_id, country, currency, current_rate) VALUES ($1, $2, $3, $4)",
+          [id, values.forex_country?.trim(), values.forex_currency?.trim(), values.forex_current_rate]
+        );
+      }
       await pushOnWrite("accounts", id);
       if (values.account_type === "investment") {
         void pushOnWrite("investment_accounts", id);

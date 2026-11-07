@@ -36,6 +36,12 @@ import type { AccountType } from "@/lib/account-types";
  * `third_party-cash`) SENGAJA TIDAK ditambahkan — dokumen konsep menolak
  * eksplisit `third_party ↔ cash` sebagai transfer sama sekali (titip/ambil
  * selalu `income`/`expense` satu sisi, bukan transfer).
+ *
+ * **Revisi 2026-11-07**: `cash-forex` dan `forex-cash` ditambahkan (lihat
+ * docs/concept/konsep-valas.md) -- beli dan jual valas, meniru
+ * `cash-investment`/`investment-cash`. Kombinasi valas lain (forex-forex,
+ * forex-debt, dst) TETAP throw UnsupportedAccountPairError; transfer antar
+ * akun valas masuk "Tahap lanjutan" di konsep-valas.md, belum didesain.
  */
 export type AccountPairKind =
   | "cash-cash"
@@ -44,7 +50,9 @@ export type AccountPairKind =
   | "debt-debt"
   | "cash-investment"
   | "investment-cash"
-  | "third_party-third_party";
+  | "third_party-third_party"
+  | "cash-forex"
+  | "forex-cash";
 
 export class UnsupportedAccountPairError extends Error {
   constructor(sourceType: string, destinationType: string) {
@@ -67,5 +75,7 @@ export function classifyAccountPair(
   if (sourceType === "cash" && destinationType === "investment") return "cash-investment";
   if (sourceType === "investment" && destinationType === "cash") return "investment-cash";
   if (sourceType === "third_party" && destinationType === "third_party") return "third_party-third_party";
+  if (sourceType === "cash" && destinationType === "forex") return "cash-forex";
+  if (sourceType === "forex" && destinationType === "cash") return "forex-cash";
   throw new UnsupportedAccountPairError(sourceType, destinationType);
 }

@@ -25,6 +25,10 @@ export async function pushAccountRow(creds: CloudSyncCredentials, id: string): P
   const row = rows[0];
   if (!row) return null;
 
+  // Worker (CHECK account_type di D1) belum mengenal 'forex' -- skip dulu supaya
+  // tidak ditolak/retry terus. Hapus saat tahap sync valas (account-type-forex.md).
+  if (row.account_type === "forex") return null;
+
   let direction: "receivable" | "payable" | null | undefined;
   if (row.account_type === "debt") {
     const debtAccountRows = await db.select<{ direction: "receivable" | "payable" }[]>(

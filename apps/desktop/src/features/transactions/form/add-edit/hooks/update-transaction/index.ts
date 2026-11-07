@@ -1,5 +1,6 @@
 import { getDb, type Transaction } from "@/lib/db";
 import { resolveContactId } from "@/shared/contacts/resolve-contact";
+import { assertForexTransactionSupported } from "@/shared/forex/assert-forex-transaction-supported";
 import type { TransactionDebtStatus } from "@/shared/debts/use-transaction-debt-status";
 import type { TransactionFormOutput } from "../../schema";
 import { updateIncomeTransaction } from "./income";
@@ -16,6 +17,7 @@ export async function updateTransaction(
   const db = await getDb();
 
   const transferAccountId = values.type === "transfer" ? values.transfer_account_id : null;
+  await assertForexTransactionSupported(db, [values.account_id, transferAccountId]);
   const dangerousFieldsChanged =
     values.type !== transaction.type ||
     values.account_id !== transaction.account_id ||

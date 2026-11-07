@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useAccounts } from "@/hooks/resources/use-accounts";
 import { useInvestmentAccount } from "@/shared/investments/use-investment-account";
 import { useDebtAccount } from "@/shared/debts/use-debt-account";
+import { useForexAccount } from "@/shared/forex/use-forex-account";
 import { useAccountLabels } from "@/shared/labels/use-account-labels";
 import { useAccountIsUsed } from "../../form/add-edit/helpers";
 import { AccountForm, accountValuesFromEntity, useUpdateAccount } from "../../form";
@@ -38,6 +39,7 @@ function AccountEditDialog({
 }) {
   const { data: investmentAccount } = useInvestmentAccount(account.id);
   const { data: debtAccount } = useDebtAccount(account.id);
+  const { data: forexAccount } = useForexAccount(account.id);
   const { data: labelNames } = useAccountLabels(account.id);
   const { data: accountTypeLocked } = useAccountIsUsed(account.id);
 
@@ -54,6 +56,9 @@ function AccountEditDialog({
             unit_label: investmentAccount?.unit_label,
             current_market_value: investmentAccount?.current_market_value,
             debt_direction: debtAccount?.direction,
+            forex_country: forexAccount?.country,
+            forex_currency: forexAccount?.currency,
+            forex_current_rate: forexAccount?.current_rate,
             label_names: labelNames,
           })}
           onSubmit={onSubmit}

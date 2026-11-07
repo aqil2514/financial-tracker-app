@@ -15,6 +15,9 @@ export function defaultAccountValues(): AccountFormValues {
     unit_label: null,
     current_market_value: null,
     debt_direction: null,
+    forex_country: null,
+    forex_currency: null,
+    forex_current_rate: null,
     label_names: [],
   };
 }
@@ -25,6 +28,9 @@ export function accountValuesFromEntity(
     unit_label?: string | null;
     current_market_value?: number | null;
     debt_direction?: "receivable" | "payable" | null;
+    forex_country?: string | null;
+    forex_currency?: string | null;
+    forex_current_rate?: number | null;
     label_names?: string[];
   }
 ): AccountFormValues {
@@ -40,6 +46,9 @@ export function accountValuesFromEntity(
     unit_label: extra?.unit_label ?? null,
     current_market_value: extra?.current_market_value ?? null,
     debt_direction: extra?.debt_direction ?? null,
+    forex_country: extra?.forex_country ?? null,
+    forex_currency: extra?.forex_currency ?? null,
+    forex_current_rate: extra?.forex_current_rate ?? null,
     label_names: extra?.label_names ?? [],
   };
 }

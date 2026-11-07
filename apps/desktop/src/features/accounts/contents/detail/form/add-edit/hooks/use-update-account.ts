@@ -59,6 +59,14 @@ export function useUpdateAccount(account: Account, onUpdated?: () => void) {
           [account.id, values.debt_direction]
         );
       }
+      if (values.account_type === "forex") {
+        await db.execute(
+          `INSERT INTO forex_accounts (account_id, country, currency, current_rate) VALUES ($1, $2, $3, $4)
+           ON CONFLICT(account_id) DO UPDATE SET country = excluded.country, currency = excluded.currency,
+             current_rate = excluded.current_rate, updated_at = datetime('now')`,
+          [account.id, values.forex_country?.trim(), values.forex_currency?.trim(), values.forex_current_rate]
+        );
+      }
       await pushOnWrite("accounts", account.id);
       if (values.account_type === "investment") {
         void pushOnWrite("investment_accounts", account.id);

@@ -1,6 +1,6 @@
 import type { Account } from "@/lib/db";
 import { newId } from "@/lib/id";
-import { classifyAccountPair } from "../classify-account-pair";
+import { classifyAccountPair, UnsupportedAccountPairError } from "../classify-account-pair";
 import { settleDebtsFifo } from "./settle-fifo";
 import type { Db, TouchedDebtRows } from "./types";
 
@@ -106,6 +106,12 @@ export async function applyDebtTransaction({
   }
 
   const pairKind = classifyAccountPair(sourceType, destinationType);
+
+  // Pasangan valas bukan urusan logic debt -- classifyAccountPair kini
+  // mengenalnya, jadi tanpa guard ini jatuh ke cabang debt-cash di bawah.
+  if (pairKind === "cash-forex" || pairKind === "forex-cash") {
+    throw new UnsupportedAccountPairError(sourceType, destinationType);
+  }
 
   if (pairKind === "cash-cash" || pairKind === "debt-debt" || pairKind === "cash-investment") {
     return none;

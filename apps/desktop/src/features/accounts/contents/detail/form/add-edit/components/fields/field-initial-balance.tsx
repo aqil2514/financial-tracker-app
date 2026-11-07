@@ -12,7 +12,7 @@ export function FieldInitialBalance() {
       form={form}
       name="initial_balance"
       label="Saldo Awal"
-      disabled={accountType === "third_party"}
+      disabled={accountType === "third_party" || accountType === "forex"}
     />
   );
 }

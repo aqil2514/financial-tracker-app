@@ -6,13 +6,19 @@
  * constraint (migrations/0013_account_type.sql) tetap butuh migrasi
  * baru sendiri — tidak bisa di-reuse dari sini.
  */
-export type AccountType = "cash" | "debt" | "investment" | "third_party";
+export type AccountType =
+  | "cash"
+  | "debt"
+  | "investment"
+  | "third_party"
+  | "forex";
 
 export const ACCOUNT_TYPES = [
   "cash",
   "debt",
   "investment",
   "third_party",
+  "forex",
 ] as const satisfies readonly AccountType[];
 
 export const ACCOUNT_TYPE_OPTIONS: Array<{
@@ -49,6 +55,13 @@ export const ACCOUNT_TYPE_OPTIONS: Array<{
       "Akun virtual untuk titipan dana milik orang lain — bukan uang Anda, dibedakan per kontak.",
     badgeClassName: "bg-amber-600/10 text-amber-600",
   },
+  {
+    value: "forex",
+    label: "Valas",
+    description:
+      "Satu mata uang asing (mis. USD) — melacak jumlah unit, kurs beli, dan nilai terkini dalam rupiah.",
+    badgeClassName: "bg-teal-600/10 text-teal-600",
+  },
 ];
 
 // `third_party` ditambahkan 2026-10-21 (lihat docs/todos/plan/account-type-third-party.md
@@ -60,7 +73,7 @@ export const ACCOUNT_TYPE_OPTIONS: Array<{
 // tolak-total ini SEMENTARA, pola sama persis "debt" sebelum jalur
 // granularnya ada -- lihat docs/todos/done/balance-correction-derived-data-consistency.md.
 const ACCOUNT_TYPES_RESTRICTED_FROM_BALANCE_CORRECTION: readonly AccountType[] =
-  ["debt", "third_party"];
+  ["debt", "third_party", "forex"];
 
 export function isAccountTypeRestrictedFromBalanceCorrection(
   accountType: AccountType,

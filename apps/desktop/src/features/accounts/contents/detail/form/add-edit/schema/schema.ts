@@ -14,9 +14,31 @@ export const accountSchema = z
     unit_label: z.string().nullable(),
     current_market_value: z.coerce.number().nullable(),
     debt_direction: z.enum(["receivable", "payable"]).nullable(),
+    forex_country: z.string().nullable(),
+    forex_currency: z.string().nullable(),
+    forex_current_rate: z.coerce.number().nullable(),
     label_names: z.array(z.string()),
   })
   .superRefine((values, ctx) => {
+    if (values.account_type === "forex") {
+      if (!values.forex_country?.trim()) {
+        ctx.addIssue({ code: "custom", path: ["forex_country"], message: "Negara wajib diisi" });
+      }
+      if (!values.forex_currency?.trim()) {
+        ctx.addIssue({ code: "custom", path: ["forex_currency"], message: "Mata uang wajib diisi" });
+      }
+      if (values.forex_current_rate == null || values.forex_current_rate < 0) {
+        ctx.addIssue({ code: "custom", path: ["forex_current_rate"], message: "Kurs terkini wajib diisi" });
+      }
+      // Modal valas berasal dari riwayat beli (unit + kurs), saldo awal tanpa unit membuat average cost 0.
+      if (values.initial_balance !== 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["initial_balance"],
+          message: "Akun Valas tidak boleh punya saldo awal, catat lewat pembelian",
+        });
+      }
+    }
     if (values.account_type === "investment") {
       if (!values.unit_label?.trim()) {
         ctx.addIssue({ code: "custom", path: ["unit_label"], message: "Satuan unit wajib diisi" });
