@@ -17,6 +17,9 @@ export type QueueableTable =
   | "category_labels"
   | "account_labels"
   | "category_periods"
-  | "third_party_funds";
+  | "third_party_funds"
+  | "forex_accounts"
+  | "forex_purchases"
+  | "forex_sales";
 
 export type DeletableTable = DeleteCloudPayload["table"];

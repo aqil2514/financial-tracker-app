@@ -56,6 +56,9 @@ export function useCreateAccount(options: UseCreateAccountOptions = {}) {
       if (values.account_type === "investment") {
         void pushOnWrite("investment_accounts", id);
       }
+      if (values.account_type === "forex") {
+        void pushOnWrite("forex_accounts", id);
+      }
 
       const labelIds = await resolveLabelIds(values.label_names, "account");
       await applyAccountLabels(id, labelIds);

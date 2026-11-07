@@ -121,6 +121,36 @@ export type SyncResponse = {
       note: string | null;
     }
   >;
+  // forex_accounts BUKAN SyncRow (PK-nya account_id, bukan id), sama seperti investmentAccounts.
+  forexAccounts: Array<{
+    accountId: string;
+    country: string;
+    currency: string;
+    currentRate: number;
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
+  forexPurchases: Array<
+    SyncRow & {
+      accountId: string;
+      transactionId: string | null;
+      unit: number;
+      rate: number;
+      date: string;
+    }
+  >;
+  forexSales: Array<
+    SyncRow & {
+      accountId: string;
+      transactionId: string | null;
+      adjustmentTransactionId: string | null;
+      unit: number;
+      rate: number;
+      averageCostPerUnit: number;
+      realizedPl: number;
+      date: string;
+    }
+  >;
 };
 
 export function pullSync(creds: CloudSyncCredentials, since: string | null): Promise<SyncResponse> {

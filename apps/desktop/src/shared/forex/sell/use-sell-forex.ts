@@ -3,6 +3,7 @@
 import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { dependentKeysOf } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { sellForex } from "../sell-forex";
 import { sellForexSchema, type SellForexFormOutput } from "./schema";
 
@@ -25,7 +26,7 @@ export function useSellForex(forexAccountId: string) {
     resetOnOpen: true,
     mutationFn: async (values: SellForexFormOutput) => {
       const db = await getDb();
-      return sellForex({
+      const result = await sellForex({
         db,
         forexAccountId,
         cashAccountId: values.cash_account_id,
@@ -34,6 +35,14 @@ export function useSellForex(forexAccountId: string) {
         date: values.date,
         note: values.note,
       });
+
+      // forex_sales punya FK ke dua transaksi: await push keduanya dulu.
+      await pushOnWrite("transactions", result.transactionId);
+      if (result.adjustmentTransactionId) {
+        await pushOnWrite("transactions", result.adjustmentTransactionId);
+      }
+      void pushOnWrite("forex_sales", result.saleId);
+      return result;
     },
     invalidateKey: dependentKeysOf("transactions"),
     successMessage: "Penjualan valas berhasil dicatat",

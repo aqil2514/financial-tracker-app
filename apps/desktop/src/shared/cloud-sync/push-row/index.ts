@@ -15,6 +15,9 @@ import { pushLabelRow } from "./push-label-row";
 import { pushLabelJunctionRow } from "./push-label-junction-row";
 import { pushCategoryPeriodRow } from "./push-category-period-row";
 import { pushThirdPartyFundRow } from "./push-third-party-fund-row";
+import { pushForexAccountRow } from "./push-forex-account-row";
+import { pushForexPurchaseRow } from "./push-forex-purchase-row";
+import { pushForexSaleRow } from "./push-forex-sale-row";
 
 export async function pushRowPayload(
   creds: CloudSyncCredentials,
@@ -54,5 +57,11 @@ export async function pushRowPayload(
       return pushCategoryPeriodRow(creds, id);
     case "third_party_funds":
       return pushThirdPartyFundRow(creds, id);
+    case "forex_accounts":
+      return pushForexAccountRow(creds, id);
+    case "forex_purchases":
+      return pushForexPurchaseRow(creds, id);
+    case "forex_sales":
+      return pushForexSaleRow(creds, id);
   }
 }

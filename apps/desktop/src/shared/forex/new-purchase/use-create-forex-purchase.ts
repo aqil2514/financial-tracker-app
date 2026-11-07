@@ -3,6 +3,7 @@
 import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { dependentKeysOf } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { createForexPurchase } from "../create-forex-purchase";
 import { newForexPurchaseSchema, type NewForexPurchaseFormOutput } from "./schema";
 
@@ -12,7 +13,6 @@ function now() {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
-// Belum ada push ke Worker: sync valas menyusul (lihat account-type-forex.md).
 export function useCreateForexPurchase(forexAccountId: string) {
   return useEntityForm({
     schema: newForexPurchaseSchema,
@@ -27,7 +27,7 @@ export function useCreateForexPurchase(forexAccountId: string) {
     resetOnOpen: true,
     mutationFn: async (values: NewForexPurchaseFormOutput) => {
       const db = await getDb();
-      return createForexPurchase({
+      const result = await createForexPurchase({
         db,
         forexAccountId,
         cashAccountId: values.source === "cash" ? values.cash_account_id : null,
@@ -36,6 +36,11 @@ export function useCreateForexPurchase(forexAccountId: string) {
         date: values.date,
         note: values.note,
       });
+
+      // forex_purchases punya FK ke transactions: await push transaksinya dulu.
+      await pushOnWrite("transactions", result.transactionId);
+      void pushOnWrite("forex_purchases", result.purchaseId);
+      return result;
     },
     invalidateKey: dependentKeysOf("transactions"),
     successMessage: "Pembelian valas berhasil dicatat",

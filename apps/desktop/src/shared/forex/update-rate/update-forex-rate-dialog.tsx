@@ -9,6 +9,7 @@ import { EntityFormDialog } from "@/components/forms/entity-form-dialog";
 import { getDb } from "@/lib/db";
 import { useEntityForm } from "@/hooks/use-entity-form";
 import { dependentKeysOf } from "@/lib/query-dependencies";
+import { pushOnWrite } from "@/shared/cloud-sync/push-on-write";
 import { useForexAccount } from "../use-forex-account";
 import { useForexHoldingSummary } from "../use-forex-queries";
 import { RateOrTotalField } from "./rate-or-total-field";
@@ -21,7 +22,6 @@ type FormOutput = z.output<typeof updateForexRateSchema>;
 
 // Update kurs terkini tidak membuat transaksi dan tidak mengubah accounts.balance.
 // Yang tersimpan selalu kurs per unit; mode "Nilai total" hanya cara mengisinya.
-// Belum ada push ke Worker: sync valas menyusul.
 export function UpdateForexRateDialog({ accountId, currentRate }: { accountId: string; currentRate: number }) {
   const { data: holding } = useForexHoldingSummary(accountId);
   const { data: forexAccount } = useForexAccount(accountId);
@@ -36,6 +36,7 @@ export function UpdateForexRateDialog({ accountId, currentRate }: { accountId: s
         "UPDATE forex_accounts SET current_rate = $1, updated_at = datetime('now') WHERE account_id = $2",
         [values.current_rate, accountId]
       );
+      void pushOnWrite("forex_accounts", accountId);
     },
     invalidateKey: dependentKeysOf("accounts"),
     successMessage: "Nilai terkini berhasil diperbarui",

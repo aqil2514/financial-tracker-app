@@ -71,6 +71,9 @@ export function useUpdateAccount(account: Account, onUpdated?: () => void) {
       if (values.account_type === "investment") {
         void pushOnWrite("investment_accounts", account.id);
       }
+      if (values.account_type === "forex") {
+        void pushOnWrite("forex_accounts", account.id);
+      }
 
       const labelIds = await resolveLabelIds(values.label_names, "account");
       await applyAccountLabels(account.id, labelIds);

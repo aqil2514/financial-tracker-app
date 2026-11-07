@@ -14,6 +14,9 @@ export { pushDebtPayment, type PushDebtPaymentPayload } from "./push-debt-paymen
 export { pushInvestmentAccount, type PushInvestmentAccountPayload } from "./push-investment-account";
 export { pushInvestmentPurchase, type PushInvestmentPurchasePayload } from "./push-investment-purchase";
 export { pushInvestmentSale, type PushInvestmentSalePayload } from "./push-investment-sale";
+export { pushForexAccount, type PushForexAccountPayload } from "./push-forex-account";
+export { pushForexPurchase, type PushForexPurchasePayload } from "./push-forex-purchase";
+export { pushForexSale, type PushForexSalePayload } from "./push-forex-sale";
 export { pushCategoryPeriod, type PushCategoryPeriodPayload } from "./push-category-period";
 export { pushThirdPartyFund, type PushThirdPartyFundPayload } from "./push-third-party-fund";
 

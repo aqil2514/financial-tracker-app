@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db";
 
 import { applyCategoryPeriodRow } from "./apply-category-period-row";
+import { applyForexAccountRow } from "./apply-forex-account-row";
 import { applyInvestmentAccountRow } from "./apply-investment-account-row";
 import { applyLabelJunctionRow } from "./apply-label-junction-row";
 import { applyRow } from "./apply-row";
@@ -11,6 +12,8 @@ import { upsertCategory } from "./upsert-category";
 import { upsertContact } from "./upsert-contact";
 import { upsertDebt } from "./upsert-debt";
 import { upsertDebtPayment } from "./upsert-debt-payment";
+import { upsertForexPurchase } from "./upsert-forex-purchase";
+import { upsertForexSale } from "./upsert-forex-sale";
 import { upsertInvestmentPurchase } from "./upsert-investment-purchase";
 import { upsertInvestmentSale } from "./upsert-investment-sale";
 import { upsertLabel } from "./upsert-label";
@@ -61,4 +64,8 @@ export async function applySyncResponse(response: SyncResponse): Promise<void> {
   for (const row of response.thirdPartyFunds) {
     await applyRow(db, "third_party_funds", row, upsertThirdPartyFund);
   }
+
+  for (const row of response.forexAccounts) await applyForexAccountRow(db, row);
+  for (const row of response.forexPurchases) await applyRow(db, "forex_purchases", row, upsertForexPurchase);
+  for (const row of response.forexSales) await applyRow(db, "forex_sales", row, upsertForexSale);
 }

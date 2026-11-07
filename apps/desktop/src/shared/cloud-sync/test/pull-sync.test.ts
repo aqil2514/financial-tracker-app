@@ -72,6 +72,9 @@ function emptySyncResponse(): SyncResponse {
     accountLabels: [],
     categoryPeriods: [],
     thirdPartyFunds: [],
+    forexAccounts: [],
+    forexPurchases: [],
+    forexSales: [],
   };
 }
 
@@ -204,6 +207,33 @@ describe("applySyncResponse", () => {
           note: null,
         },
       ],
+      // forex_accounts BUKAN SyncRow (PK-nya account_id), sama seperti investment_accounts.
+      forexAccounts: [
+        {
+          accountId: "a3",
+          country: "Amerika Serikat",
+          currency: "USD",
+          currentRate: 18037,
+          updatedAt: "2026-10-10 00:00:00",
+          deletedAt: null,
+        },
+      ],
+      forexPurchases: [
+        { ...row({ id: "fp1" }), accountId: "a3", transactionId: "t1", unit: 30, rate: 18142, date: "2026-10-10T14:01" },
+      ],
+      forexSales: [
+        {
+          ...row({ id: "fs1" }),
+          accountId: "a3",
+          transactionId: "t1",
+          adjustmentTransactionId: null,
+          unit: 10,
+          rate: 18200,
+          averageCostPerUnit: 18142,
+          realizedPl: 580,
+          date: "2026-10-11",
+        },
+      ],
     };
 
     await applySyncResponse(response);
@@ -230,6 +260,9 @@ describe("applySyncResponse", () => {
         "category_periods",
         "category_period_categories",
         "third_party_funds",
+        "forex_accounts",
+        "forex_purchases",
+        "forex_sales",
       ])
     );
   });

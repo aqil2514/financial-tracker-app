@@ -7,4 +7,9 @@ export const BACKFILL_ORDER: QueueableTable[] = [
   "accounts",
   "transactions",
   "transaction_attachments",
+  // Valas: data yang dicatat sebelum Worker mengenal tipe forex baru bisa di-push ulang dari sini. Setelah
+  // transactions karena forex_purchases/forex_sales punya FK ke transaksi.
+  "forex_accounts",
+  "forex_purchases",
+  "forex_sales",
 ];

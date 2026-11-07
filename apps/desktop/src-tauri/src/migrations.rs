@@ -344,6 +344,12 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0057_forex_accounts_and_trades.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 58,
+            description: "cloud_sync_queue_forex",
+            sql: include_str!("../migrations/0058_cloud_sync_queue_forex.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -837,5 +843,27 @@ mod tests {
             [],
         );
         assert!(bogus.is_err(), "account_type tak dikenal harus ditolak CHECK");
+    }
+
+    // Migrasi 0058: antrean retry sync harus menerima tabel valas (dan category_periods yang terlewat
+    // sejak 0055) -- tanpa ini enqueue retry push gagal dengan CHECK constraint violation.
+    #[test]
+    fn cloud_sync_queue_menerima_tabel_valas_dan_category_periods() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        for table in ["forex_accounts", "forex_purchases", "forex_sales", "category_periods"] {
+            conn.execute(
+                "INSERT INTO cloud_sync_queue (table_name, row_id, op) VALUES (?1, 'row-1', 'upsert')",
+                [table],
+            )
+            .unwrap_or_else(|e| panic!("enqueue {table} ditolak: {e}"));
+        }
+
+        let bogus = conn.execute(
+            "INSERT INTO cloud_sync_queue (table_name, row_id, op) VALUES ('bogus_table', 'row-1', 'upsert')",
+            [],
+        );
+        assert!(bogus.is_err(), "nama tabel tak dikenal harus ditolak CHECK");
     }
 }

@@ -71,9 +71,18 @@ export function useDeleteTransaction() {
       // third_party_funds TIDAK punya makna sebagai baris yatim (FK
       // ON DELETE SET NULL di skema cuma jaring pengaman, bukan perilaku
       // yang diinginkan) -- dihapus total, pola sama investment_purchases.
-      // Valas: riwayat beli/jual dihapus total bersama transaksinya (pola investasi);
-      // belum ada push ke Worker, sync valas menyusul.
-      await detachForexForDeletedTransaction(db, id);
+      // Valas: riwayat beli/jual dihapus total bersama transaksinya (pola investasi). Dua transaksi sebuah
+      // penjualan saling bergantung, jadi pasangan yang ikut terhapus juga di-push sebagai hapus.
+      const forexInfo = await detachForexForDeletedTransaction(db, id);
+      for (const purchaseId of forexInfo.deletedPurchaseIds) {
+        await pushDeleteOnWrite("forex_purchases", purchaseId, {});
+      }
+      for (const saleId of forexInfo.deletedSaleIds) {
+        await pushDeleteOnWrite("forex_sales", saleId, {});
+      }
+      for (const pairedTransactionId of forexInfo.deletedAdjustmentTransactionIds) {
+        await pushDeleteOnWrite("transactions", pairedTransactionId, {});
+      }
       const thirdPartyInfo = await detachThirdPartyFundsForDeletedTransaction(db, id);
       for (const fundId of thirdPartyInfo.deletedThirdPartyFundIds) {
         void pushDeleteOnWrite("third_party_funds", fundId, {});
