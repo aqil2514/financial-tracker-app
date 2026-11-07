@@ -332,6 +332,18 @@ pub fn get() -> Vec<Migration> {
             sql: include_str!("../migrations/0055_cloud_sync_queue_third_party_funds.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 56,
+            description: "account_type_forex",
+            sql: include_str!("../migrations/0056_account_type_forex.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 57,
+            description: "forex_accounts_and_trades",
+            sql: include_str!("../migrations/0057_forex_accounts_and_trades.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -792,5 +804,38 @@ mod tests {
             )
             .expect("query sisa category_period_categories gagal");
         assert_eq!(remaining_after_period_delete, 0, "pivot harus ikut terhapus saat category_periods dihapus");
+    }
+
+    // Migrasi 0056/0057: 'forex' harus diterima CHECK accounts.account_type
+    // (rebuild 14 tabel rantai FK accounts -- regresi sejenis 0022 kalau ada
+    // yang terlewat), dan forex_accounts/forex_purchases/forex_sales harus
+    // bisa di-insert dgn FK ke accounts/transactions. Tipe tak dikenal tetap
+    // ditolak.
+    #[test]
+    fn insert_akun_forex_dan_riwayat_beli_jual_tidak_gagal() {
+        let conn = rusqlite::Connection::open_in_memory().expect("gagal buka koneksi in-memory");
+        run_all_migrations(&conn);
+
+        conn.execute_batch(
+            "
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-fx-1', 'USD BCA', 'forex');
+            INSERT INTO forex_accounts (account_id, country, currency, current_rate)
+                VALUES ('acc-fx-1', 'Amerika Serikat', 'USD', 16200.0);
+            INSERT INTO accounts (id, name, account_type) VALUES ('acc-cash-fx', 'Kas Test', 'cash');
+            INSERT INTO transactions (id, type, amount, account_id, transfer_account_id, note, date)
+                VALUES ('tx-fx-1', 'transfer', 1600000, 'acc-cash-fx', 'acc-fx-1', 'beli usd', '2026-01-01');
+            INSERT INTO forex_purchases (id, account_id, transaction_id, unit, rate, date)
+                VALUES ('fp-1', 'acc-fx-1', 'tx-fx-1', 100.0, 16000.0, '2026-01-01');
+            INSERT INTO forex_sales (id, account_id, transaction_id, adjustment_transaction_id, unit, rate, average_cost_per_unit, realized_pl, date)
+                VALUES ('fs-1', 'acc-fx-1', 'tx-fx-1', NULL, 10.0, 16300.0, 16000.0, 3000.0, '2026-02-01');
+            ",
+        )
+        .expect("insert akun forex + forex_purchases/forex_sales gagal");
+
+        let bogus = conn.execute(
+            "INSERT INTO accounts (id, name, account_type) VALUES ('acc-bogus', 'X', 'bogus')",
+            [],
+        );
+        assert!(bogus.is_err(), "account_type tak dikenal harus ditolak CHECK");
     }
 }

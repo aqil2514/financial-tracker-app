@@ -23,7 +23,7 @@ Seiring kebutuhan baru muncul, daftar tipe ini akan terus bertambah. Beberapa ya
 
 - **Investasi** — uang yang ditanamkan dan nilainya bisa naik-turun (reksadana, saham, dsb). Beda dari kas: tidak bisa langsung dicairkan kapan saja, dan nilainya tidak tetap. Model akuntansinya sudah dirumuskan lebih detail di [konsep-investasi.md](konsep-investasi.md).
 - **Dana Pihak Ketiga** — uang yang secara fisik tercampur di kas kita, tapi secara substansi bukan milik kita (misalnya titipan tabungan orang lain). Sifatnya penting dibedakan dari kas biasa karena asal dan statusnya berbeda, meskipun aplikasi tidak menghakimi apakah saldo ini "boleh" dianggap kekayaan pribadi atau tidak (lihat "Laporan menampilkan angka apa adanya" di bawah).
-- **Valas** — uang dalam mata uang negara lain. Beda dari kas rupiah karena nilainya mengikuti kurs yang berubah-ubah.
+- **Valas** — uang dalam mata uang negara lain. Beda dari kas rupiah karena nilainya mengikuti kurs yang berubah-ubah. Model akuntansinya sudah dirumuskan di [konsep-valas.md](konsep-valas.md).
 
 Setiap tipe baru ini nantinya bisa membawa fitur dan aturan tampilan laporan masing-masing, sama seperti dua tipe yang sudah ada sekarang.
 
