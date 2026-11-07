@@ -9,6 +9,7 @@ import { OptionPicker, type OptionPickerRef } from "@/components/query/shared/op
 import { CurrentBalanceField } from "@/features/accounts/content/current-balance-field";
 import { correctAccountBalance } from "@/features/accounts/correct-account-balance";
 import { upsertInvestmentAccount } from "@/features/accounts/upsert-investment-account";
+import { upsertForexAccount } from "@/features/accounts/upsert-forex-account";
 import { applyEntityLabels, loadEntityLabelNames } from "@/features/labels/entity-labels";
 
 const CURRENT_BALANCE_SQL = `
@@ -35,10 +36,13 @@ interface AccountRow {
   initial_balance: number;
   description: string | null;
   is_active: number;
-  account_type: "cash" | "debt" | "investment" | "third_party";
+  account_type: "cash" | "debt" | "investment" | "third_party" | "forex";
   direction: "receivable" | "payable" | null;
   unit_label: string | null;
   current_market_value: number | null;
+  forex_country: string | null;
+  forex_currency: string | null;
+  forex_current_rate: number | null;
 }
 
 function toFormValues(row: AccountRow, labelNames: string[]): AccountFormValues {
@@ -55,6 +59,9 @@ function toFormValues(row: AccountRow, labelNames: string[]): AccountFormValues 
     direction: row.direction,
     unit_label: row.unit_label,
     current_market_value: row.current_market_value ?? 0,
+    forex_country: row.forex_country,
+    forex_currency: row.forex_currency,
+    forex_current_rate: row.forex_current_rate ?? 0,
     label_names: labelNames,
   };
 }
@@ -75,10 +82,13 @@ export default function EditAccountPage() {
       `SELECT accounts.name, accounts.icon, accounts.color, accounts.group_id,
               accounts.initial_balance, accounts.description, accounts.is_active,
               accounts.account_type, debt_accounts.direction,
-              investment_accounts.unit_label, investment_accounts.current_market_value
+              investment_accounts.unit_label, investment_accounts.current_market_value,
+              forex_accounts.country AS forex_country, forex_accounts.currency AS forex_currency,
+              forex_accounts.current_rate AS forex_current_rate
        FROM accounts
        LEFT JOIN debt_accounts ON debt_accounts.account_id = accounts.id
        LEFT JOIN investment_accounts ON investment_accounts.account_id = accounts.id
+       LEFT JOIN forex_accounts ON forex_accounts.account_id = accounts.id
        WHERE accounts.id = ?`,
       [id]
     ).then(async (row) => {
@@ -121,6 +131,10 @@ export default function EditAccountPage() {
 
     if (values.account_type === "investment" && values.unit_label) {
       await upsertInvestmentAccount(db, id, values.unit_label, values.current_market_value);
+    }
+
+    if (values.account_type === "forex") {
+      await upsertForexAccount(db, id, values.forex_country ?? "", values.forex_currency ?? "", values.forex_current_rate);
     }
   }
 
@@ -208,7 +222,7 @@ export default function EditAccountPage() {
 
   async function openReassignPicker() {
     const rows = await db.getAllAsync<{ id: string; name: string }>(
-      "SELECT id, name FROM accounts WHERE id != ? AND account_type NOT IN ('investment', 'third_party') ORDER BY name ASC",
+      "SELECT id, name FROM accounts WHERE id != ? AND account_type NOT IN ('investment', 'third_party', 'forex') ORDER BY name ASC",
       [id]
     );
 
@@ -231,6 +245,20 @@ export default function EditAccountPage() {
       Alert.alert(
         "Akun tidak bisa dihapus",
         `Akun ini masih punya ${funds?.count} riwayat titip/ambil/pindah. Hapus semua riwayatnya dulu lewat layar Dana Pihak Ketiga.`
+      );
+      return;
+    }
+
+    // FK forex_purchases/forex_sales.account_id CASCADE menghapus riwayat diam-diam, dan reassign tidak memindahkannya.
+    const forexHistory = await db.getFirstAsync<{ count: number }>(
+      `SELECT (SELECT COUNT(*) FROM forex_purchases WHERE account_id = ?)
+            + (SELECT COUNT(*) FROM forex_sales WHERE account_id = ?) AS count`,
+      [id, id]
+    );
+    if ((forexHistory?.count ?? 0) > 0) {
+      Alert.alert(
+        "Akun tidak bisa dihapus",
+        `Akun ini masih punya ${forexHistory?.count} riwayat beli/jual valas. Hapus transaksi beli/jual-nya dulu lewat halaman Transaksi.`
       );
       return;
     }
@@ -289,6 +317,11 @@ export default function EditAccountPage() {
                   Saldo akun bertipe Dana Pihak Ketiga tidak bisa dikoreksi langsung di sini —
                   saldo akun ini mengikuti riwayat titip/ambil/pindah yang tersimpan. Perbaiki
                   lewat layar Dana Pihak Ketiga.
+                </Text>
+              ) : defaultValues.account_type === "forex" ? (
+                <Text className="text-sm text-neutral-500">
+                  Saldo (modal) akun bertipe Valas tidak bisa dikoreksi langsung di sini — saldo
+                  akun ini mengikuti riwayat beli/jual valas. Catat lewat layar Valas.
                 </Text>
               ) : (
                 <CurrentBalanceField value={currentBalanceInput} onChangeText={setCurrentBalanceInput} />

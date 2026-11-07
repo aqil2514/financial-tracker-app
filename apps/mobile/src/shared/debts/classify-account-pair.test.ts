@@ -9,6 +9,8 @@ describe("classifyAccountPair", () => {
     ["debt", "debt", "debt-debt"],
     ["cash", "investment", "cash-investment"],
     ["investment", "cash", "investment-cash"],
+    ["cash", "forex", "cash-forex"],
+    ["forex", "cash", "forex-cash"],
     ["third_party", "third_party", "third_party-third_party"],
   ])("%s -> %s = %s", (source, destination, expected) => {
     expect(classifyAccountPair(source, destination)).toBe(expected);
@@ -21,6 +23,10 @@ describe("classifyAccountPair", () => {
     ["cash", "third_party"],
     ["third_party", "cash"],
     ["third_party", "debt"],
+    ["forex", "debt"],
+    ["debt", "forex"],
+    ["forex", "forex"],
+    ["forex", "investment"],
   ])("%s -> %s belum didukung", (source, destination) => {
     expect(() => classifyAccountPair(source, destination)).toThrow(UnsupportedAccountPairError);
   });

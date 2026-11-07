@@ -17,7 +17,7 @@ const NODE_SQLITE = "node:sqlite";
 
 // Khusus test: SQLite asli (node:sqlite, in-memory) berbentuk subset SQLiteDatabase yang dipakai kode
 // shared/, dengan SELURUH migrasi mobile sudah dijalankan — jadi test memakai skema dan SQL sungguhan.
-export async function createSqliteTestDb(): Promise<SQLiteDatabase> {
+export async function createSqliteTestDb(upToVersion: number = MIGRATIONS.length): Promise<SQLiteDatabase> {
   const { DatabaseSync } = (await import(NODE_SQLITE)) as { DatabaseSync: new (path: string) => RawDb };
   const raw = new DatabaseSync(":memory:");
   raw.exec("PRAGMA foreign_keys = ON");
@@ -44,6 +44,6 @@ export async function createSqliteTestDb(): Promise<SQLiteDatabase> {
   };
 
   const db = adapter as unknown as SQLiteDatabase;
-  for (const migration of MIGRATIONS) await migration.up(db);
+  for (const migration of MIGRATIONS.slice(0, upToVersion)) await migration.up(db);
   return db;
 }

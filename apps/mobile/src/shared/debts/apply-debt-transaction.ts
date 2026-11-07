@@ -50,12 +50,14 @@ export async function applyDebtTransaction({
 
   const pairKind = classifyAccountPair(sourceType, destinationType);
 
-  // Pasangan investasi/third_party bukan urusan modul debt — tanpa guard ini jatuh ke cabang debt->kas di bawah.
+  // Pasangan investasi/valas/third_party bukan urusan modul debt — tanpa guard ini jatuh ke cabang debt->kas di bawah.
   if (
     pairKind === "cash-cash" ||
     pairKind === "debt-debt" ||
     pairKind === "cash-investment" ||
     pairKind === "investment-cash" ||
+    pairKind === "cash-forex" ||
+    pairKind === "forex-cash" ||
     pairKind === "third_party-third_party"
   ) {
     return NO_TOUCHED_DEBT_ROWS;

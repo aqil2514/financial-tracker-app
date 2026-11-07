@@ -1,7 +1,7 @@
 
 # Tabel `accounts`
 
-Dompet/akun finansial tempat uang disimpan atau mengalir (kas, rekening bank, dompet digital, dll). Satu tabel dipakai bersama untuk semua tipe akun (`cash`, `debt`, `investment`, `third_party`) — field yang hanya relevan untuk tipe tertentu ada di tabel turunan terpisah yang mereferensikan `accounts(id)`. Tipe `cash` sudah selesai porting (`docs/todos/done/porting-account-cash.md`); tipe `debt` punya tabel turunan [debt.md](debt.md) (`debt_accounts`). Lihat [konsep-tipe-akun.md](../../../../docs/concept/konsep-tipe-akun.md).
+Dompet/akun finansial tempat uang disimpan atau mengalir (kas, rekening bank, dompet digital, dll). Satu tabel dipakai bersama untuk semua tipe akun (`cash`, `debt`, `investment`, `third_party`, `forex`) — field yang hanya relevan untuk tipe tertentu ada di tabel turunan terpisah yang mereferensikan `accounts(id)`. Tipe `cash` sudah selesai porting (`docs/todos/done/porting-account-cash.md`); tipe `debt` punya tabel turunan [debt.md](debt.md) (`debt_accounts`). Lihat [konsep-tipe-akun.md](../../../../docs/concept/konsep-tipe-akun.md).
 
 Dibuat di migrasi `0005_accounts.ts`.
 
@@ -14,7 +14,7 @@ CREATE TABLE accounts (
   icon TEXT,
   color TEXT,
   initial_balance REAL NOT NULL DEFAULT 0,
-  account_type TEXT NOT NULL DEFAULT 'cash' CHECK (account_type IN ('cash', 'debt', 'investment', 'third_party')),
+  account_type TEXT NOT NULL DEFAULT 'cash' CHECK (account_type IN ('cash', 'debt', 'investment', 'third_party', 'forex')),
   group_id TEXT REFERENCES account_groups(id) ON DELETE SET NULL,
   description TEXT,
   is_active INTEGER NOT NULL DEFAULT 1,
@@ -34,7 +34,7 @@ CREATE INDEX idx_accounts_group ON accounts(group_id);
 | `icon` | TEXT | tidak | NULL | **Aktif dipakai** (beda dari `categories.icon` yang mati) — identifier ikon Lucide (mis. `Wallet`, `Banknote`), disimpan terpisah dari `name` (bukan ditempel sebagai emoji). Mapping nama→komponen render RN lewat `lucide-react-native` ada di `src/lib/account-icons.ts`, picker UI-nya di `IconPickerField` — lihat `docs/todos/done/porting-account-cash.md` bagian Keputusan #4. |
 | `color` | TEXT | tidak | NULL | **Aktif dipakai**. Value nama warna dari whitelist terbatas (mis. `slate`, `green`), bukan hex bebas — lookup className/hex ada di `src/lib/account-colors.ts`. |
 | `initial_balance` | REAL | ya | 0 | Saldo awal akun sebelum ada transaksi apa pun. Basis hitungan saldo berjalan — lihat bagian Catatan. |
-| `account_type` | TEXT | ya | `cash` | `cash`, `debt`, `investment`, atau `third_party` — dibatasi `CHECK`. **Terkunci** begitu akun pernah dipakai transaksi (tidak bisa diubah lagi lewat form edit). |
+| `account_type` | TEXT | ya | `cash` | `cash`, `debt`, `investment`, `third_party`, atau `forex` — dibatasi `CHECK`. **Terkunci** begitu akun pernah dipakai transaksi (tidak bisa diubah lagi lewat form edit). |
 | `group_id` | TEXT | tidak | NULL | FK ke `account_groups(id)`. `ON DELETE SET NULL` — grup dihapus, akun jadi "Tanpa Grup". |
 | `description` | TEXT | tidak | NULL | Catatan tambahan, bebas. |
 | `is_active` | INTEGER | ya | 1 | Boolean (0/1). Field biasa di form edit (bukan quick-toggle seperti dot status kategori). |

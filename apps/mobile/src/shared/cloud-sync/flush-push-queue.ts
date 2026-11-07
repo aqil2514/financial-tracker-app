@@ -101,7 +101,7 @@ async function pushEntry(
       // Baris sudah hilang lokal; pasangan (entitas, label) untuk path DELETE disimpan trigger di payload.
       const path = labelJunctionDeletePath(table, entry.payload);
       if (path) await pushDelete(creds, path, null, fetchImpl);
-    } else if (table !== "investment_accounts") {
+    } else if (table !== "investment_accounts" && table !== "forex_accounts") {
       const body = entry.payload ? (JSON.parse(entry.payload) as Record<string, unknown>) : null;
       await pushDelete(creds, `${DELETE_PATH[table]}/${encodeURIComponent(entry.row_id)}`, body, fetchImpl);
     }

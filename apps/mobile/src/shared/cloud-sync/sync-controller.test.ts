@@ -19,7 +19,7 @@ function makeFetch(options: { fail?: boolean } = {}) {
           checkpoint: "2026-11-04 10:00:00",
           accountGroups: [], categories: [], contacts: [], labels: [], transactionLabels: [], categoryLabels: [], accountLabels: [], accounts: [], transactions: [], debts: [],
           debtPayments: [], debtAccounts: [], investmentAccounts: [], investmentPurchases: [],
-          investmentSales: [], categoryPeriods: [], thirdPartyFunds: [],
+          investmentSales: [], categoryPeriods: [], thirdPartyFunds: [], forexAccounts: [], forexPurchases: [], forexSales: [],
         }
       : { status: "ok" };
     return { ok: true, status: 200, json: async () => body };

@@ -5,6 +5,7 @@ import { generateId, useDatabase } from "@/lib/database";
 import { AccountForm } from "@/features/accounts/form/account-form";
 import { emptyAccountValues } from "@/features/accounts/form/values";
 import { upsertInvestmentAccount } from "@/features/accounts/upsert-investment-account";
+import { upsertForexAccount } from "@/features/accounts/upsert-forex-account";
 import type { AccountFormOutput } from "@/features/accounts/form/schema";
 import { applyEntityLabels } from "@/features/labels/entity-labels";
 
@@ -51,6 +52,10 @@ export default function NewAccountPage() {
 
         if (values.account_type === "investment" && values.unit_label) {
           await upsertInvestmentAccount(db, id, values.unit_label, values.current_market_value);
+        }
+
+        if (values.account_type === "forex") {
+          await upsertForexAccount(db, id, values.forex_country ?? "", values.forex_currency ?? "", values.forex_current_rate);
         }
       }
 

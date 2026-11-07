@@ -81,7 +81,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
       );
       // Akun investasi dan dana pihak ketiga sengaja tidak dipilih di form transaksi: hanya lewat layar khususnya.
       const ungroupedAccounts = await db.getAllAsync<{ id: string; name: string }>(
-        `SELECT id, name FROM accounts WHERE group_id IS NULL AND is_active = 1 AND account_type NOT IN ('investment', 'third_party') ORDER BY name ASC`
+        `SELECT id, name FROM accounts WHERE group_id IS NULL AND is_active = 1 AND account_type NOT IN ('investment', 'third_party', 'forex') ORDER BY name ASC`
       );
 
       // Semua akun yang bisa dipilih (lintas grup), dipakai hasil pencarian.
@@ -89,7 +89,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
         await db.getAllAsync<AccountSearchRow>(
           `SELECT a.id, a.name, g.name as group_name
            FROM accounts a LEFT JOIN account_groups g ON g.id = a.group_id
-           WHERE a.is_active = 1 AND a.account_type NOT IN ('investment', 'third_party')
+           WHERE a.is_active = 1 AND a.account_type NOT IN ('investment', 'third_party', 'forex')
            ORDER BY a.name ASC`
         )
       );
@@ -116,7 +116,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
     const openChildren = useCallback(
       async (group: { id: string; name: string }) => {
         const rows = await db.getAllAsync<AccountChildOptionRow>(
-          `SELECT id, name FROM accounts WHERE group_id = ? AND is_active = 1 AND account_type NOT IN ('investment', 'third_party') ORDER BY name ASC`,
+          `SELECT id, name FROM accounts WHERE group_id = ? AND is_active = 1 AND account_type NOT IN ('investment', 'third_party', 'forex') ORDER BY name ASC`,
           [group.id]
         );
         setChildOptions(rows);
@@ -368,6 +368,7 @@ export const AccountPickerSheet = forwardRef<AccountPickerSheetRef, AccountPicke
                 hideKindToggle
                 hideInvestmentType
                 hideThirdPartyType
+                hideForexType
                 inBottomSheet
               />
             )}

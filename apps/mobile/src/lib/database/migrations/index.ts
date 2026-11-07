@@ -16,6 +16,8 @@ import * as m0014 from "./0014_attachment_sync_triggers";
 import * as m0015 from "./0015_labels";
 import * as m0016 from "./0016_labels_sync";
 import * as m0017 from "./0017_label_junctions";
+import * as m0018 from "./0018_account_type_forex";
+import * as m0019 from "./0019_forex";
 
 export interface Migration {
   up: (db: SQLiteDatabase) => Promise<void>;
@@ -43,4 +45,6 @@ export const MIGRATIONS: Migration[] = [
   m0015,
   m0016,
   m0017,
+  m0018,
+  m0019,
 ];

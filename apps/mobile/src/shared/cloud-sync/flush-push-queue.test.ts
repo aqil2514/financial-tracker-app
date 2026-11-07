@@ -110,6 +110,43 @@ describe("flushPushQueue", () => {
     expect(body.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   });
 
+  it("mengirim akun, pembelian, dan penjualan valas berurutan FK dengan payload sesuai Worker", async () => {
+    const stamp = "2026-11-07 10:00:00";
+    await db.runAsync("INSERT INTO accounts (id, name, account_type) VALUES ('kas', 'BCA', 'cash'), ('fx', 'USD', 'forex')");
+    await db.runAsync("INSERT INTO forex_accounts (account_id, country, currency, current_rate, updated_at) VALUES ('fx', 'AS', 'USD', 16500, ?)", [stamp]);
+    await db.runAsync("INSERT INTO transactions (id, note, type, amount, date, account_id, transfer_account_id) VALUES ('t1', 'b', 'transfer', 160000, '2026-11-07T10:00', 'kas', 'fx'), ('t2', 'j', 'transfer', 80000, '2026-11-07T11:00', 'fx', 'kas')");
+    await db.runAsync("INSERT INTO forex_purchases (id, account_id, transaction_id, unit, rate, date, updated_at) VALUES ('p1', 'fx', 't1', 10, 16000, '2026-11-07T10:00', ?)", [stamp]);
+    await db.runAsync("INSERT INTO forex_sales (id, account_id, transaction_id, adjustment_transaction_id, unit, rate, average_cost_per_unit, realized_pl, date, updated_at) VALUES ('s1', 'fx', 't2', NULL, 5, 17000, 16000, 5000, '2026-11-07T11:00', ?)", [stamp]);
+
+    const { calls, impl } = fakeFetch();
+    const result = await flushPushQueue(db, creds, impl);
+
+    expect(result).toEqual({ sent: 7, failed: 0, aborted: false });
+    const paths = calls.map((call) => call.path);
+    expect(paths.indexOf("/forex/accounts/push")).toBeGreaterThan(paths.indexOf("/accounts"));
+    expect(paths.indexOf("/forex/purchases/push")).toBeGreaterThan(paths.indexOf("/transactions"));
+    expect(calls.find((call) => call.path === "/forex/accounts/push")?.body).toEqual({
+      accountId: "fx", country: "AS", currency: "USD", currentRate: 16500, updatedAt: stamp,
+    });
+    expect(calls.find((call) => call.path === "/forex/purchases/push")?.body).toEqual({
+      id: "p1", accountId: "fx", transactionId: "t1", unit: 10, rate: 16000, date: "2026-11-07T10:00", updatedAt: stamp,
+    });
+    expect(calls.find((call) => call.path === "/forex/sales/push")?.body).toEqual({
+      id: "s1", accountId: "fx", transactionId: "t2", adjustmentTransactionId: null, unit: 5, rate: 17000,
+      averageCostPerUnit: 16000, realizedPl: 5000, date: "2026-11-07T11:00", updatedAt: stamp,
+    });
+    expect(await queueRows(db)).toEqual([]);
+
+    await db.runAsync("DELETE FROM forex_sales WHERE id = 's1'");
+    await db.runAsync("DELETE FROM forex_purchases WHERE id = 'p1'");
+    const second = fakeFetch();
+    await flushPushQueue(db, creds, second.impl);
+    expect(second.calls.map((call) => `${call.method} ${call.path}`).sort()).toEqual([
+      "DELETE /forex/purchases/push/p1",
+      "DELETE /forex/sales/push/s1",
+    ]);
+  });
+
   it("mengirim direction untuk akun utang", async () => {
     await db.runAsync("INSERT INTO accounts (id, name, account_type) VALUES ('d1', 'Piutang', 'debt')");
     await db.runAsync("INSERT INTO debt_accounts (account_id, direction) VALUES ('d1', 'receivable')");

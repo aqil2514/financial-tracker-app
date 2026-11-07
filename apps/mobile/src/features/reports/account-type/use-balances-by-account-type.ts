@@ -3,9 +3,9 @@ import { useDatabase } from "@/lib/database";
 import { useReportQuery } from "../shared/use-report-query";
 
 export interface AccountTypeBalanceRow {
-  account_type: "cash" | "debt" | "investment" | "third_party";
+  account_type: "cash" | "debt" | "investment" | "third_party" | "forex";
   total: number;
-  // Hanya terisi untuk 'investment': SUM current_market_value akun aktif. MURNI informasional untuk
+  // Hanya terisi untuk 'investment' dan 'forex' (unit x kurs): nilai terkini akun aktif. MURNI informasional untuk
   // baris "Unrealized P/L", tidak pernah ikut ke `total`/pie (agregat kekayaan berbasis modal,
   // lihat docs/concept/konsep-investasi.md).
   total_market_value: number | null;
@@ -28,8 +28,15 @@ export function useBalancesByAccountType() {
                - COALESCE((SELECT SUM(amount) FROM transactions WHERE account_id = a.id AND type = 'transfer'), 0)
                + COALESCE((SELECT SUM(amount) FROM transactions WHERE transfer_account_id = a.id AND type = 'transfer'), 0)
            ) AS total,
-           CASE WHEN a.account_type = 'investment'
-             THEN SUM(COALESCE((SELECT ia.current_market_value FROM investment_accounts ia WHERE ia.account_id = a.id), 0))
+           CASE
+             WHEN a.account_type = 'investment'
+               THEN SUM(COALESCE((SELECT ia.current_market_value FROM investment_accounts ia WHERE ia.account_id = a.id), 0))
+             WHEN a.account_type = 'forex'
+               THEN SUM(
+                 COALESCE((SELECT fa.current_rate FROM forex_accounts fa WHERE fa.account_id = a.id), 0)
+                 * (COALESCE((SELECT SUM(unit) FROM forex_purchases WHERE account_id = a.id), 0)
+                    - COALESCE((SELECT SUM(unit) FROM forex_sales WHERE account_id = a.id), 0))
+               )
              ELSE NULL
            END AS total_market_value
          FROM accounts a

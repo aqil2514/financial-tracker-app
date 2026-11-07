@@ -327,14 +327,82 @@ const BUILDERS: Record<JsonPushTable, (db: SQLiteDatabase, id: string) => Promis
       }
     );
   },
+
+  forex_accounts: async (db, id) => {
+    const row = await selectOne(
+      db,
+      "SELECT account_id, country, currency, current_rate, updated_at FROM forex_accounts WHERE account_id = ?",
+      id
+    );
+    return (
+      row && {
+        path: "/forex/accounts/push",
+        body: {
+          accountId: row.account_id,
+          country: row.country,
+          currency: row.currency,
+          currentRate: row.current_rate,
+          updatedAt: updatedAt(row),
+        },
+      }
+    );
+  },
+
+  forex_purchases: async (db, id) => {
+    const row = await selectOne(
+      db,
+      "SELECT id, account_id, transaction_id, unit, rate, date, updated_at FROM forex_purchases WHERE id = ?",
+      id
+    );
+    // Worker mewajibkan transactionId; baris tanpa transaksi (sudah tidak seharusnya ada) tidak dikirim.
+    if (!row || !row.transaction_id) return null;
+    return {
+      path: "/forex/purchases/push",
+      body: {
+        id: row.id,
+        accountId: row.account_id,
+        transactionId: row.transaction_id,
+        unit: row.unit,
+        rate: row.rate,
+        date: row.date,
+        updatedAt: updatedAt(row),
+      },
+    };
+  },
+
+  forex_sales: async (db, id) => {
+    const row = await selectOne(
+      db,
+      `SELECT id, account_id, transaction_id, adjustment_transaction_id, unit, rate, average_cost_per_unit,
+              realized_pl, date, updated_at
+       FROM forex_sales WHERE id = ?`,
+      id
+    );
+    if (!row || !row.transaction_id) return null;
+    return {
+      path: "/forex/sales/push",
+      body: {
+        id: row.id,
+        accountId: row.account_id,
+        transactionId: row.transaction_id,
+        adjustmentTransactionId: row.adjustment_transaction_id,
+        unit: row.unit,
+        rate: row.rate,
+        averageCostPerUnit: row.average_cost_per_unit,
+        realizedPl: row.realized_pl,
+        date: row.date,
+        updatedAt: updatedAt(row),
+      },
+    };
+  },
 };
 
 export function buildPushRequest(db: SQLiteDatabase, table: JsonPushTable, id: string): Promise<PushRequest | null> {
   return BUILDERS[table](db, id);
 }
 
-// Path DELETE per tabel (id ditambahkan di belakang). investment_accounts tidak punya endpoint delete.
-export const DELETE_PATH: Record<Exclude<PushTable, "investment_accounts" | LabelJunctionTable>, string> = {
+// Path DELETE per tabel (id ditambahkan di belakang). investment_accounts dan forex_accounts tidak punya endpoint delete.
+export const DELETE_PATH: Record<Exclude<PushTable, "investment_accounts" | "forex_accounts" | LabelJunctionTable>, string> = {
   transaction_attachments: "/attachments",
   account_groups: "/account-groups",
   categories: "/categories",
@@ -348,4 +416,6 @@ export const DELETE_PATH: Record<Exclude<PushTable, "investment_accounts" | Labe
   investment_purchases: "/investments/purchases/push",
   investment_sales: "/investments/sales/push",
   third_party_funds: "/third-party-funds/push",
+  forex_purchases: "/forex/purchases/push",
+  forex_sales: "/forex/sales/push",
 };

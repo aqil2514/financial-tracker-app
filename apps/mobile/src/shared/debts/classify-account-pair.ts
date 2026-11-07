@@ -11,6 +11,8 @@ export type AccountPairKind =
   | "debt-debt"
   | "cash-investment"
   | "investment-cash"
+  | "cash-forex"
+  | "forex-cash"
   | "third_party-third_party";
 
 export class UnsupportedAccountPairError extends Error {
@@ -29,6 +31,8 @@ export function classifyAccountPair(sourceType: string, destinationType: string)
   if (sourceType === "debt" && destinationType === "debt") return "debt-debt";
   if (sourceType === "cash" && destinationType === "investment") return "cash-investment";
   if (sourceType === "investment" && destinationType === "cash") return "investment-cash";
+  if (sourceType === "cash" && destinationType === "forex") return "cash-forex";
+  if (sourceType === "forex" && destinationType === "cash") return "forex-cash";
   if (sourceType === "third_party" && destinationType === "third_party") return "third_party-third_party";
   throw new UnsupportedAccountPairError(sourceType, destinationType);
 }

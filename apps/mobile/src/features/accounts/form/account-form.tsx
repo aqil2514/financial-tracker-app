@@ -30,6 +30,7 @@ const ACCOUNT_TYPE_OPTIONS = [
   { value: "debt", label: "Utang Piutang" },
   { value: "investment", label: "Investasi" },
   { value: "third_party", label: "Dana Pihak Ketiga" },
+  { value: "forex", label: "Valas" },
 ];
 
 const DIRECTION_OPTIONS = [
@@ -47,6 +48,7 @@ export function AccountForm({
   hideAccountTypeToggle,
   hideInvestmentType,
   hideThirdPartyType,
+  hideForexType,
   inBottomSheet,
 }: AccountFormProps) {
   return (
@@ -89,6 +91,7 @@ export function AccountForm({
           hideAccountTypeToggle={hideAccountTypeToggle}
           hideInvestmentType={hideInvestmentType}
           hideThirdPartyType={hideThirdPartyType}
+          hideForexType={hideForexType}
           inBottomSheet={inBottomSheet}
         />
       )}
@@ -108,6 +111,8 @@ interface AccountFormProps {
   hideInvestmentType?: boolean;
   // Idem: dana pihak ketiga permanen hanya lewat layar Dana Pihak Ketiga.
   hideThirdPartyType?: boolean;
+  // Idem: valas permanen hanya lewat layar Valas.
+  hideForexType?: boolean;
   inBottomSheet?: boolean;
 }
 
@@ -116,18 +121,20 @@ function AccountFields({
   hideAccountTypeToggle,
   hideInvestmentType,
   hideThirdPartyType,
+  hideForexType,
   inBottomSheet,
 }: {
   form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
   hideAccountTypeToggle?: boolean;
   hideInvestmentType?: boolean;
   hideThirdPartyType?: boolean;
+  hideForexType?: boolean;
   inBottomSheet?: boolean;
 }) {
   const accountType = useWatch({ control: form.control, name: "account_type" });
 
   useEffect(() => {
-    if (accountType === "third_party") form.setValue("initial_balance", 0);
+    if (accountType === "third_party" || accountType === "forex") form.setValue("initial_balance", 0);
   }, [accountType, form]);
 
   return (
@@ -140,7 +147,8 @@ function AccountFields({
           options={ACCOUNT_TYPE_OPTIONS.filter(
             (option) =>
               !(hideInvestmentType && option.value === "investment") &&
-              !(hideThirdPartyType && option.value === "third_party")
+              !(hideThirdPartyType && option.value === "third_party") &&
+              !(hideForexType && option.value === "forex")
           )}
         />
       )}
@@ -175,13 +183,41 @@ function AccountFields({
         </>
       )}
 
+      {accountType === "forex" && (
+        <>
+          <FormFieldText
+            form={form}
+            name="forex_country"
+            label="Negara"
+            placeholder="Mis. Amerika Serikat"
+            inBottomSheet={inBottomSheet}
+          />
+          <FormFieldText
+            form={form}
+            name="forex_currency"
+            label="Mata Uang"
+            placeholder="Mis. USD"
+            inBottomSheet={inBottomSheet}
+          />
+          <FormFieldNumber
+            form={form}
+            name="forex_current_rate"
+            label="Kurs Terkini (Rp per 1 unit)"
+            placeholder="0"
+            prefix="Rp"
+            grouped
+            inBottomSheet={inBottomSheet}
+          />
+        </>
+      )}
+
       <IconPickerField />
 
       <ColorPickerField />
 
       <GroupSelectField />
 
-      {accountType !== "third_party" && (
+      {accountType !== "third_party" && accountType !== "forex" && (
         <FormFieldNumber
           form={form}
           name="initial_balance"
@@ -220,6 +256,7 @@ function AccountFormFields({
   hideAccountTypeToggle,
   hideInvestmentType,
   hideThirdPartyType,
+  hideForexType,
   inBottomSheet,
 }: {
   form: UseFormReturn<AccountFormValues, unknown, AccountFormOutput>;
@@ -227,6 +264,7 @@ function AccountFormFields({
   hideAccountTypeToggle?: boolean;
   hideInvestmentType?: boolean;
   hideThirdPartyType?: boolean;
+  hideForexType?: boolean;
   inBottomSheet?: boolean;
 }) {
   const kind = useWatch({ control: form.control, name: "kind" });
@@ -249,6 +287,7 @@ function AccountFormFields({
           hideAccountTypeToggle={hideAccountTypeToggle}
           hideInvestmentType={hideInvestmentType}
           hideThirdPartyType={hideThirdPartyType}
+          hideForexType={hideForexType}
           inBottomSheet={inBottomSheet}
         />
       )}

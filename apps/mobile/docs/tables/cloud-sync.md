@@ -56,7 +56,7 @@ CREATE TABLE cloud_sync_queue (
       'account_groups', 'categories', 'contacts', 'accounts',
       'transactions', 'debts', 'debt_payments',
       'investment_accounts', 'investment_purchases', 'investment_sales',
-      'category_periods', 'third_party_funds',
+      'category_periods', 'third_party_funds', 'forex_accounts', 'forex_purchases', 'forex_sales',
       'transaction_attachments', 'labels',
       'transaction_labels', 'category_labels', 'account_labels'
     )
@@ -192,7 +192,7 @@ END;
 
 | Tabel sumber | Antrean (`table_name`, `row_id`) | Delete |
 |---|---|---|
-| `account_groups`, `categories`, `contacts`, `accounts`, `transactions`, `debts`, `debt_payments`, `investment_purchases`, `investment_sales`, `third_party_funds`, `category_periods` | tabel itu sendiri, `id` | ya |
+| `account_groups`, `categories`, `contacts`, `accounts`, `transactions`, `debts`, `debt_payments`, `investment_purchases`, `investment_sales`, `third_party_funds`, `forex_purchases`, `forex_sales`, `category_periods` | tabel itu sendiri, `id` | ya |
 | `debt_accounts` | `accounts`, `account_id` (direction ikut payload akun) | tidak |
 | `investment_accounts` | `investment_accounts`, `account_id` | tidak (tidak ada endpoint) |
 | `category_period_categories` | `category_periods`, `period_id` (pivot ikut payload periode) | di-upsert ulang (bukan delete) |
@@ -209,3 +209,7 @@ END;
 
 - Urutan FK dan daftar endpoint push/delete per tabel ada di bagian "Riset: kontrak push dan format" pada [mobile-sync.md](../todos/done/mobile-sync.md).
 - Tabel data yang terdampak: [account-group.md](account-group.md), [account.md](account.md), [category.md](category.md), [category-period.md](category-period.md), [contact.md](contact.md), [debt.md](debt.md), [investment.md](investment.md), [third-party-fund.md](third-party-fund.md), [transaction.md](transaction.md), [transaction-attachment.md](transaction-attachment.md).
+
+## Valas (migrasi 0018 dan 0019)
+
+`forex_purchases` dan `forex_sales` mengantre dirinya sendiri (kunci `id`, hapus mengantre `delete`). `forex_accounts` mengantre dirinya sendiri berkunci `account_id`, dan hapusnya mengantre `upsert` (pola `investment_accounts`, Worker tidak punya endpoint delete akun valas; hilangnya akun ditangani cascade dari `accounts`). `0019` membangun ulang `cloud_sync_queue` untuk memperluas `CHECK` dengan tiga tabel valas. Detail tabel: [forex.md](forex.md).

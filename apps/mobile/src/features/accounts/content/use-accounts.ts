@@ -8,7 +8,7 @@ interface AccountRow {
   name: string;
   icon: string | null;
   color: string | null;
-  account_type: "cash" | "debt" | "investment" | "third_party";
+  account_type: "cash" | "debt" | "investment" | "third_party" | "forex";
   group_id: string | null;
   group_name: string | null;
   is_active: number;

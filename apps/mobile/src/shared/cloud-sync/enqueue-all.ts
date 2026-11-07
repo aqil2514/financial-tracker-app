@@ -8,7 +8,7 @@ export async function enqueueAllRows(db: SQLiteDatabase): Promise<number> {
   let total = 0;
   await db.withTransactionAsync(async () => {
     for (const table of PUSH_TABLE_ORDER) {
-      const key = table === "investment_accounts" ? "account_id" : "id";
+      const key = table === "investment_accounts" || table === "forex_accounts" ? "account_id" : "id";
       const before = await db.getFirstAsync<{ total: number }>("SELECT COUNT(*) AS total FROM cloud_sync_queue");
       await db.runAsync(
         `INSERT INTO cloud_sync_queue (table_name, row_id, op)

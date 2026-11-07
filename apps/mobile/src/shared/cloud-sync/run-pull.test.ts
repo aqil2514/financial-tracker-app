@@ -28,6 +28,9 @@ function emptyResponse(overrides: Partial<SyncResponse> = {}): SyncResponse {
     investmentSales: [],
     categoryPeriods: [],
     thirdPartyFunds: [],
+    forexAccounts: [],
+    forexPurchases: [],
+    forexSales: [],
     ...overrides,
   };
 }
@@ -254,6 +257,37 @@ describe("runPull", () => {
     expect(log[0]).toMatchObject({ table_name: "transactions", row_id: "rusak", direction: "pull" });
     expect(log[0].reason).toMatch(/FOREIGN KEY/i);
     expect(await db.getFirstAsync("SELECT applying_pull FROM cloud_sync_state")).toEqual({ applying_pull: 0 });
+  });
+
+  it("menerapkan akun, pembelian, dan penjualan valas tanpa mengantre ulang; kurs lama tidak menimpa yang lebih baru", async () => {
+    const stamp = "2026-11-01 00:00:00";
+    const response = emptyResponse({
+      accounts: [account("fx", stamp, { accountType: "forex" }), account("kas", stamp)],
+      transactions: [transaction("t1", stamp, { accountId: "kas", transferAccountId: "fx", type: "transfer" })],
+      forexAccounts: [{ accountId: "fx", country: "Amerika Serikat", currency: "USD", currentRate: 16500, updatedAt: stamp, deletedAt: null }],
+      forexPurchases: [{ id: "p1", accountId: "fx", transactionId: "t1", unit: 10, rate: 16000, date: "2026-11-01T00:00", updatedAt: stamp, deletedAt: null }],
+      forexSales: [
+        { id: "s1", accountId: "fx", transactionId: "t1", adjustmentTransactionId: null, unit: 2, rate: 17000, averageCostPerUnit: 16000, realizedPl: 2000, date: "2026-11-02T00:00", updatedAt: stamp, deletedAt: null },
+      ],
+    });
+    await runPull(db, creds, fetchReturning(response).impl);
+    expect(await db.getFirstAsync("SELECT country, currency, current_rate FROM forex_accounts WHERE account_id = 'fx'")).toEqual({
+      country: "Amerika Serikat",
+      currency: "USD",
+      current_rate: 16500,
+    });
+    expect(await db.getFirstAsync("SELECT unit, rate FROM forex_purchases WHERE id = 'p1'")).toEqual({ unit: 10, rate: 16000 });
+    expect(await db.getFirstAsync("SELECT realized_pl, average_cost_per_unit FROM forex_sales WHERE id = 's1'")).toEqual({
+      realized_pl: 2000,
+      average_cost_per_unit: 16000,
+    });
+    expect(await db.getAllAsync("SELECT * FROM cloud_sync_queue")).toEqual([]);
+
+    const older = emptyResponse({
+      forexAccounts: [{ accountId: "fx", country: "AS", currency: "USD", currentRate: 1, updatedAt: "2026-10-01 00:00:00", deletedAt: null }],
+    });
+    await runPull(db, creds, fetchReturning(older).impl);
+    expect(await db.getFirstAsync("SELECT current_rate FROM forex_accounts WHERE account_id = 'fx'")).toEqual({ current_rate: 16500 });
   });
 
   it("pull penuh: FK gagal dilewati permanen (induk memang sudah dihapus), dicatat, dan checkpoint maju", async () => {

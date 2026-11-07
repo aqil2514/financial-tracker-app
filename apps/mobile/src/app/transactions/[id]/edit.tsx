@@ -22,6 +22,11 @@ import {
   InvestmentPurchaseEditBlockedError,
 } from "@/shared/investments";
 import {
+  detachForexForDeletedTransaction,
+  ForexPurchaseDeleteBlockedError,
+  getTransactionForex,
+} from "@/shared/forex";
+import {
   detachThirdPartyFundsForDeletedTransaction,
   getTransactionThirdPartyFund,
   ThirdPartyFundEditBlockedError,
@@ -123,6 +128,16 @@ export default function EditTransactionPage() {
       Alert.alert(
         "Tidak bisa diedit",
         "Transaksi ini bagian dari penjualan investasi. Hapus transaksinya (penjualan ikut terhapus), lalu catat ulang dari layar Investasi."
+      );
+      return;
+    }
+
+    // Beli/jual valas menyimpan unit, kurs, dan average cost sendiri; mengedit transaksinya lewat form umum
+    // membuat keduanya tidak sinkron. Hapus lalu catat ulang dari layar Valas.
+    if ((await getTransactionForex(db, id)).role !== "none") {
+      Alert.alert(
+        "Tidak bisa diedit",
+        "Transaksi ini bagian dari riwayat Valas. Hapus transaksinya (riwayat ikut terhapus), lalu catat ulang dari layar Valas."
       );
       return;
     }
@@ -252,22 +267,43 @@ export default function EditTransactionPage() {
           >;
           let saleResult = { role: "none" } as Awaited<ReturnType<typeof detachInvestmentSaleForDeletedTransaction>>;
           let fundResult = { role: "none" } as Awaited<ReturnType<typeof detachThirdPartyFundsForDeletedTransaction>>;
+          let forexResult = {
+            deletedPurchaseIds: [],
+            deletedSaleIds: [],
+            deletedPairedTransactionIds: [],
+          } as Awaited<ReturnType<typeof detachForexForDeletedTransaction>>;
           try {
             await db.withTransactionAsync(async () => {
               result = await detachDebtForDeletedTransaction(db, id);
               investmentResult = await detachInvestmentPurchaseForDeletedTransaction(db, id);
               saleResult = await detachInvestmentSaleForDeletedTransaction(db, id);
               fundResult = await detachThirdPartyFundsForDeletedTransaction(db, id);
+              forexResult = await detachForexForDeletedTransaction(db, id);
               await db.runAsync("DELETE FROM transactions WHERE id = ?", [id]);
             });
           } catch (error) {
-            if (error instanceof InvestmentPurchaseEditBlockedError || error instanceof ThirdPartyFundEditBlockedError) {
+            if (error instanceof InvestmentPurchaseEditBlockedError ||
+              error instanceof ThirdPartyFundEditBlockedError ||
+              error instanceof ForexPurchaseDeleteBlockedError
+            ) {
               Alert.alert("Tidak bisa dihapus", error.message);
               return;
             }
             throw error;
           }
           router.back();
+
+          if (forexResult.deletedSaleIds.length > 0) {
+            Alert.alert(
+              "Penjualan valas ikut dihapus",
+              "Baris penjualan dan transaksi pasangannya (transfer dan penyesuaian selisih kurs) dihapus bersamanya; unit kembali ke akun valas."
+            );
+          } else if (forexResult.deletedPurchaseIds.length > 0) {
+            Alert.alert(
+              "Pembelian valas ikut dihapus",
+              "Riwayat pembelian yang lahir dari transaksi ini dihapus bersamanya, dan modal akun valas menyesuaikan."
+            );
+          }
 
           if (fundResult.role === "fund") {
             Alert.alert(

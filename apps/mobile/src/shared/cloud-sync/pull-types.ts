@@ -22,7 +22,7 @@ export type SyncResponse = {
       groupId: string | null;
       description: string | null;
       isActive: boolean;
-      accountType: "cash" | "debt" | "investment" | "third_party";
+      accountType: "cash" | "debt" | "investment" | "third_party" | "forex";
     }
   >;
   transactions: Array<
@@ -95,6 +95,35 @@ export type SyncResponse = {
       realizedPl: number | null;
       date: string;
       status: "pending" | "settled";
+    }
+  >;
+  forexAccounts: Array<{
+    accountId: string;
+    country: string;
+    currency: string;
+    currentRate: number;
+    updatedAt: string | null;
+    deletedAt: string | null;
+  }>;
+  forexPurchases: Array<
+    SyncRow & {
+      accountId: string;
+      transactionId: string | null;
+      unit: number;
+      rate: number;
+      date: string;
+    }
+  >;
+  forexSales: Array<
+    SyncRow & {
+      accountId: string;
+      transactionId: string | null;
+      adjustmentTransactionId: string | null;
+      unit: number;
+      rate: number;
+      averageCostPerUnit: number;
+      realizedPl: number;
+      date: string;
     }
   >;
   categoryPeriods: Array<SyncRow & { name: string; startDate: string; endDate: string; categoryIds: string[] }>;
