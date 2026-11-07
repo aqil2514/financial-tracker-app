@@ -9,6 +9,7 @@ import { pushDeleteTransactionOnWrite, pushDeleteOnWrite } from "@/shared/cloud-
 import { detachDebtForDeletedTransaction, type DeletedTransactionDebtInfo } from "@/shared/debts/apply-debt-transaction";
 import { detachInvestmentPurchaseForDeletedTransaction } from "@/shared/investments/apply-investment-transaction";
 import { detachInvestmentSaleForDeletedTransaction } from "@/shared/investments/apply-sell-investment-transaction";
+import { detachForexForDeletedTransaction } from "@/shared/forex/detach-forex-for-deleted-transaction";
 import { detachThirdPartyFundsForDeletedTransaction } from "@/shared/third-party-funds";
 
 // Pesan informatif SETELAH delete berhasil -- dialog konfirmasi tetap
@@ -65,6 +66,9 @@ export function useDeleteTransaction() {
       // third_party_funds TIDAK punya makna sebagai baris yatim (FK
       // ON DELETE SET NULL di skema cuma jaring pengaman, bukan perilaku
       // yang diinginkan) -- dihapus total, pola sama investment_purchases.
+      // Valas: riwayat beli/jual dihapus total bersama transaksinya (pola investasi);
+      // belum ada push ke Worker, sync valas menyusul.
+      await detachForexForDeletedTransaction(db, id);
       const thirdPartyInfo = await detachThirdPartyFundsForDeletedTransaction(db, id);
       for (const fundId of thirdPartyInfo.deletedThirdPartyFundIds) {
         void pushDeleteOnWrite("third_party_funds", fundId, {});

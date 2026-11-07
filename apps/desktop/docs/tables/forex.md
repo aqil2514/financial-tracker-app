@@ -30,7 +30,7 @@ CREATE TABLE forex_accounts (
 | `account_id` | TEXT | ya | - | Primary key SEKALIGUS foreign key ke `accounts(id)`, `ON DELETE CASCADE` — akun induk dihapus, baris detail ini ikut terhapus. Relasinya 1:1, satu akun valas hanya punya satu baris detail. |
 | `country` | TEXT | ya | - | Nama negara asal mata uang, teks bebas (mis. "Amerika Serikat"). Murni informasi untuk UI, tidak dipakai logic apa pun. |
 | `currency` | TEXT | ya | - | Kode atau satuan mata uang, teks bebas (mis. "USD"). Tidak ada daftar baku supaya mata uang apa pun bisa dicatat. |
-| `current_rate` | REAL | ya | 0 | Kurs terkini: rupiah per 1 unit mata uang asing, **diinput manual oleh user**, BUKAN ditarik dari API. Nilai terkini akun = `unit × current_rate`. Update kolom ini TIDAK membuat transaksi apa pun dan TIDAK mengubah `accounts.balance`. Panduan pengisian ada di konsep-valas.md (kurs beli bank, bukan kurs yang dibayar saat membeli). |
+| `current_rate` | REAL | ya | 0 | Kurs terkini: rupiah per 1 unit mata uang asing, **diinput manual oleh user**, BUKAN ditarik dari API. Nilai terkini akun = `unit × current_rate`. Update kolom ini TIDAK membuat transaksi apa pun dan TIDAK mengubah `accounts.balance`. Bisa diisi lewat kurs atau nilai total, yang tersimpan tetap kurs per unit. Panduan pengisian ada di konsep-valas.md (kurs beli bank, bukan kurs yang dibayar saat membeli). |
 | `updated_at` | TEXT | ya | `datetime('now')` | Waktu terakhir baris ini berubah. Dipakai ganda: indikator kurs usang di UI dan timestamp sync. Karena itu mengedit `country`/`currency` juga memperbaruinya, lihat Catatan. |
 | `deleted_at` | TEXT | tidak | NULL | Soft-delete untuk sinkronisasi cloud. |
 | `sync_source` | TEXT | ya | `pc` | `pc` atau `mcp` — asal baris ini untuk mekanisme sync dua-arah ke Cloudflare D1. |
@@ -112,7 +112,7 @@ CREATE INDEX idx_forex_sales_adjustment_transaction ON forex_sales(adjustment_tr
 | `adjustment_transaction_id` | TEXT | tidak | NULL | FK **terpisah** ke `transactions(id)`, `ON DELETE SET NULL` — transaksi `income`/`expense` kedua di akun kas untuk selisih kurs (Realized P/L), karena satu baris transfer cuma punya satu kolom `amount`. NULL kalau `realized_pl` sama dengan 0. |
 | `unit` | REAL | ya | - | Jumlah mata uang asing yang dijual. |
 | `rate` | REAL | ya | - | Kurs jual yang diterima per unit saat itu (rupiah per 1 unit). |
-| `average_cost_per_unit` | REAL | ya | - | Average cost per unit SAAT penjualan, snapshot permanen, tidak dihitung ulang. Rumusnya `SUM(unit × rate) / SUM(unit)` atas `forex_purchases` akun ini. |
+| `average_cost_per_unit` | REAL | ya | - | Average cost per unit SAAT penjualan, snapshot permanen, tidak dihitung ulang. Rumusnya atas posisi tersisa: `(SUM(unit × rate) dari forex_purchases − SUM(unit × average_cost_per_unit) dari forex_sales) / sisa unit`. |
 | `realized_pl` | REAL | ya | - | Laba/rugi kurs terealisasi `= (rate − average_cost_per_unit) × unit`, snapshot permanen. |
 | `date` | TEXT | ya | - | Tanggal penjualan. |
 | `created_at` | TEXT | ya | `datetime('now')` | Waktu baris dibuat. |
@@ -123,7 +123,7 @@ CREATE INDEX idx_forex_sales_adjustment_transaction ON forex_sales(adjustment_tr
 ## Catatan
 
 - **Baru skema, belum ada kode yang memakainya.** Per migrasi ini ditulis, tipe `forex` belum dikenal kode TypeScript (`AccountType`, `classifyAccountPair`, form, laporan), jadi tabel-tabel ini belum terisi data apa pun. Rencana pengerjaan di [account-type-forex.md](../todos/plan/account-type-forex.md).
-- **Average cost, bukan FIFO**, sama seperti investasi. Satu angka rata-rata dipakai untuk semua unit yang dijual. Rumus sisa unit yang bisa dijual: `SUM(unit, forex_purchases) − SUM(unit, forex_sales)`. Tidak ada filter `status` karena tidak ada pending.
+- **Average cost, bukan FIFO.** Satu angka rata-rata dipakai untuk semua unit yang dijual, dihitung atas posisi TERSISA (pembelian dikurangi modal yang sudah dilepas lewat jual), bukan atas semua pembelian sepanjang waktu. Beda dari rumus investasi (`SUM(unit × price) / SUM(unit)` atas semua pembelian): rumus itu bergeser setelah jual lalu beli lagi di kurs berbeda, dan jual semua meninggalkan sisa balance. Dengan rumus valas, average cost × sisa unit selalu sama dengan modal tersisa. Rumus sisa unit yang bisa dijual: `SUM(unit, forex_purchases) − SUM(unit, forex_sales)`. Tidak ada filter `status` karena tidak ada pending.
 - **Efek jual ke `accounts.balance` memakai average cost, bukan nominal jual**, lewat dua transaksi (`transaction_id` dan `adjustment_transaction_id`), pola sama [investment.md](investment.md) bagian Catatan.
 - **`updated_at` di `forex_accounts` dipakai ganda** (indikator kurs usang dan timestamp sync), seperti `investment_accounts`. Mengedit `country`/`currency` ikut memperbaruinya. Kolom `rate_updated_at` terpisah belum ditambahkan, keputusannya belum diambil.
 - Tidak ada `CHECK (unit > 0)` atau sejenisnya; validasi ada di form, konsisten dengan tabel investasi.

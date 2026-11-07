@@ -15,6 +15,7 @@ import {
   Building2,
   ChevronRight,
   TrendingUp,
+  Banknote,
   type LucideIcon,
 } from "lucide-react";
 
@@ -49,6 +50,7 @@ const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Transaksi", url: "/transactions", icon: ArrowLeftRight },
   { title: "Investasi", url: "/investments", icon: TrendingUp },
+  { title: "Valas", url: "/forex", icon: Banknote },
   { title: "Dana Pihak Ketiga", url: "/third-party", icon: HandHelping },
   { title: "Laporan", url: "/reports", icon: PieChart },
 ];

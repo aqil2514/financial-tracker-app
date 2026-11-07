@@ -30,6 +30,8 @@ Tipe akun **Valas** (`account_type = 'forex'`, lihat [konsep-tipe-akun.md](konse
 
 Bank punya dua kurs: kurs jual (yang dibayar nasabah saat membeli valas) dan kurs beli (yang diterima nasabah saat menukar valas kembali ke rupiah), dan kurs beli lebih rendah. Istilah ini terbalik dari sudut pandang nasabah, jadi label di UI harus jelas.
 
+Kurs terkini bisa diisi lewat dua cara, dengan toggle di dialog update: **Nilai total** (menyalin "Nilai IDR" dari aplikasi bank, mode bawaan) atau **Kurs** per unit. Yang tersimpan tetap kurs per unit (`nilai total ÷ jumlah dipegang`), supaya nilai terkini tetap benar setelah beli atau jual berikutnya. Mode nilai total ditambahkan setelah melihat layar Poket Valas BCA, yang menampilkan "Nilai IDR" sebagai angka utama dan tidak menampilkan kurs per unit.
+
 Kurs terkini sebaiknya diisi dengan kurs beli bank, bukan kurs yang dibayar saat membeli. Kalau tidak, Unrealized P/L terlihat nol padahal uang yang benar-benar akan diterima sudah lebih rendah akibat spread. Dengan begitu P/L langsung setelah membeli akan sedikit negatif, dan itu memang yang terjadi secara riil. Ini sekadar panduan pengisian, aplikasi tidak memvalidasi kurs apa yang diinput.
 
 ## Satu poket bank bisa berisi banyak mata uang

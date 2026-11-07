@@ -24,6 +24,11 @@ import { accountSummaryQueryKey } from "@/features/account-detail/header/use-acc
 import { investmentAccountQueryKey } from "@/shared/investments/use-investment-account";
 import { debtAccountQueryKey } from "@/shared/debts/use-debt-account";
 import { forexAccountQueryKey } from "@/shared/forex/use-forex-account";
+import {
+  forexHoldingQueryKey,
+  forexPurchasesQueryKey,
+  forexSalesQueryKey,
+} from "@/shared/forex/use-forex-queries";
 import { transactionInvestmentPurchaseQueryKey } from "@/shared/investments/use-transaction-investment-purchase";
 import { transactionInvestmentSaleQueryKey } from "@/shared/investments/use-transaction-investment-sale";
 import { investmentPurchasesQueryKey } from "@/shared/investments/use-investment-purchases";
@@ -68,6 +73,10 @@ export const QUERY_DEPENDENCIES = {
     investmentHoldingSummaryQueryKey, // transfer investment->cash bisa membuat/edit investment_sales, sisa unit & average cost ikut berubah
     thirdPartyFundsQueryKey, // transaksi third_party (direct/transfer) bisa membuat/edit/hapus third_party_funds
     thirdPartySummaryQueryKey, // sisa titipan per kontak×akun ikut berubah setiap third_party_funds berubah
+    forexPurchasesQueryKey, // beli valas / hapus transaksi mengubah forex_purchases
+    forexSalesQueryKey, // jual valas / hapus transaksi mengubah forex_sales
+    forexHoldingQueryKey, // sisa unit & average cost valas ikut berubah
+    forexAccountQueryKey, // kartu daftar valas (sisa unit) ikut berubah
   ],
   accounts: [
     accountsQueryKey,

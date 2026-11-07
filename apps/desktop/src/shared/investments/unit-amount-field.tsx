@@ -19,6 +19,7 @@ type UnitAmountFieldProps<TFieldValues extends FieldValues> = {
    * punya lebih banyak digit akibat akumulasi average cost floating-point
    * -- lihat komentar "Jual Semua Unit" di sell-investment-form.tsx). */
   disabled?: boolean;
+  placeholder?: string;
 };
 
 /**
@@ -37,6 +38,7 @@ export function UnitAmountField<TFieldValues extends FieldValues>({
   label = "Jumlah Unit",
   optional = true,
   disabled = false,
+  placeholder = "Kosongkan kalau belum tahu",
 }: UnitAmountFieldProps<TFieldValues>) {
   // Display string LOKAL, terpisah dari field.value (number) -- state
   // mentah yang sedang diketik ("7," sebelum digit desimal berikutnya)
@@ -73,7 +75,7 @@ export function UnitAmountField<TFieldValues extends FieldValues>({
               field.onBlur();
             }}
             disabled={disabled}
-            placeholder="Kosongkan kalau belum tahu"
+            placeholder={placeholder}
             decimalsLimit={4}
             groupSeparator="."
             decimalSeparator=","
