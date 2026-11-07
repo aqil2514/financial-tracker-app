@@ -17,6 +17,9 @@ import { fetchCategoryLabels, type CategoryLabelRow } from "./entities/category-
 import { fetchAccountLabels, type AccountLabelRow } from "./entities/account-labels";
 import { fetchCategoryPeriods, type CategoryPeriodRow } from "./entities/category-periods";
 import { fetchThirdPartyFunds, type ThirdPartyFundRow } from "./entities/third-party-funds";
+import { fetchForexAccounts, type ForexAccountRow } from "./entities/forex-accounts";
+import { fetchForexPurchases, type ForexPurchaseRow } from "./entities/forex-purchases";
+import { fetchForexSales, type ForexSaleRow } from "./entities/forex-sales";
 
 export type SyncResponse = {
   checkpoint: string;
@@ -37,6 +40,9 @@ export type SyncResponse = {
   accountLabels: AccountLabelRow[];
   categoryPeriods: CategoryPeriodRow[];
   thirdPartyFunds: ThirdPartyFundRow[];
+  forexAccounts: ForexAccountRow[];
+  forexPurchases: ForexPurchaseRow[];
+  forexSales: ForexSaleRow[];
 };
 
 export async function getSyncSnapshot(env: Env, since: string | null): Promise<SyncResponse> {
@@ -62,6 +68,9 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     accountLabels,
     categoryPeriods,
     thirdPartyFunds,
+    forexAccounts,
+    forexPurchases,
+    forexSales,
   ] = await Promise.all([
     fetchAccountGroups(env, filter, bind),
     fetchCategories(env, filter, bind),
@@ -80,6 +89,9 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     fetchAccountLabels(env, filter, bind),
     fetchCategoryPeriods(env, since),
     fetchThirdPartyFunds(env, filter, bind),
+    fetchForexAccounts(env, filter, bind),
+    fetchForexPurchases(env, filter, bind),
+    fetchForexSales(env, filter, bind),
   ]);
 
   return {
@@ -101,5 +113,8 @@ export async function getSyncSnapshot(env: Env, since: string | null): Promise<S
     accountLabels,
     categoryPeriods,
     thirdPartyFunds,
+    forexAccounts,
+    forexPurchases,
+    forexSales,
   };
 }

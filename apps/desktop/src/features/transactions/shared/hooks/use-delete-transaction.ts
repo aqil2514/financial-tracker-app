@@ -9,6 +9,7 @@ import { pushDeleteTransactionOnWrite, pushDeleteOnWrite } from "@/shared/cloud-
 import { detachDebtForDeletedTransaction, type DeletedTransactionDebtInfo } from "@/shared/debts/apply-debt-transaction";
 import { detachInvestmentPurchaseForDeletedTransaction } from "@/shared/investments/apply-investment-transaction";
 import { detachInvestmentSaleForDeletedTransaction } from "@/shared/investments/apply-sell-investment-transaction";
+import { assertForexPurchaseDeletable } from "@/shared/forex/assert-forex-purchase-deletable";
 import { detachForexForDeletedTransaction } from "@/shared/forex/detach-forex-for-deleted-transaction";
 import { detachThirdPartyFundsForDeletedTransaction } from "@/shared/third-party-funds";
 
@@ -31,6 +32,10 @@ function describeDebtInfo(debtInfo: DeletedTransactionDebtInfo): string | null {
 export function useDeleteTransaction() {
   return useDbMutation({
     mutationFn: async (id: string): Promise<DeletedTransactionDebtInfo> => {
+      // Guard valas SEBELUM apa pun (termasuk push ke Worker): pembelian yang unitnya sudah terpakai
+      // penjualan tidak boleh dihapus, sisa unit akan negatif.
+      await assertForexPurchaseDeletable(await getDb(), id);
+
       // Push SEBELUM hard-delete lokal, pola sama 4 tabel lain
       // (use-delete-contact.ts dst) -- gagal/offline TIDAK memblokir
       // delete lokal (fungsi ini sendiri sudah dijamin tidak pernah

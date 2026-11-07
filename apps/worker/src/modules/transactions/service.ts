@@ -30,6 +30,11 @@ import {
   getAverageCostPerUnit,
 } from "../investments/service";
 import {
+  detachForexForDeletedTransaction,
+  validateForexPurchaseDeletable,
+  validateForexTransactionAllowed,
+} from "../forex/service";
+import {
   applyDirectThirdPartyTransaction,
   applyDirectThirdPartyTransactionEdit,
   validateDirectThirdPartyTransaction,
@@ -178,6 +183,15 @@ async function createTransactionRow(
     transferAccountId: payload.transferAccountId ?? null,
   });
   if (accountPairPrecheck.status === "rejected") return accountPairPrecheck;
+
+  // Transaksi pada akun valas dari sumber non-PC ditolak (tidak ada derivasi forex_purchases/forex_sales
+  // di sini), lihat validateForexTransactionAllowed di forex/service.ts.
+  const forexPrecheck = await validateForexTransactionAllowed(env, {
+    accountId: payload.accountId,
+    transferAccountId: payload.transferAccountId ?? null,
+    syncSource,
+  });
+  if (forexPrecheck.status === "rejected") return forexPrecheck;
 
   const categoryPrecheck = await validateCategoryExists(env, payload.categoryId, payload.type);
   if (categoryPrecheck.status === "rejected") return categoryPrecheck;
@@ -486,6 +500,13 @@ async function updateTransactionRow(
   });
   if (accountPairPrecheck.status === "rejected") return accountPairPrecheck;
 
+  const forexPrecheck = await validateForexTransactionAllowed(env, {
+    accountId: payload.accountId,
+    transferAccountId: payload.transferAccountId ?? null,
+    syncSource,
+  });
+  if (forexPrecheck.status === "rejected") return forexPrecheck;
+
   const categoryPrecheck = await validateCategoryExists(env, payload.categoryId, payload.type);
   if (categoryPrecheck.status === "rejected") return categoryPrecheck;
 
@@ -773,7 +794,8 @@ async function updateTransactionRow(
 
 export type DeleteTransactionResult =
   | { status: "ok"; debtInfo: DeletedTransactionDebtInfo }
-  | { status: "not_found" };
+  | { status: "not_found" }
+  | { status: "rejected"; reason: string };
 
 // Soft delete, pola sama deleteAccount/deleteCategory/dst (`deleted_at`,
 // BUKAN hard DELETE SQL). Tindakan thdp debt/debt_payments terkait
@@ -785,6 +807,11 @@ export async function deleteTransaction(env: Env, id: string): Promise<DeleteTra
     .bind(id)
     .first<{ id: string }>();
   if (!existing) return { status: "not_found" };
+
+  // Pembelian valas yang unitnya sudah terpakai penjualan tidak boleh dihapus (sisa unit akan negatif).
+  // Dicek SEBELUM detach apa pun supaya reject tidak meninggalkan hapus setengah jalan.
+  const forexDeleteGuard = await validateForexPurchaseDeletable(env, id);
+  if (forexDeleteGuard.status === "rejected") return forexDeleteGuard;
 
   // Debt terkait diselesaikan SEBELUM soft-delete baris transaksi --
   // urutan tidak signifikan scr data (keduanya independen), tapi
@@ -810,6 +837,8 @@ export async function deleteTransaction(env: Env, id: string): Promise<DeleteTra
   // transaksi ini (1 baris direct, 2 baris transfer -- transfer belum
   // diwiring Tahap 2 tapi detach ini tetap aman no-op kalau tidak ada).
   await detachThirdPartyFundsForDeletedTransaction(env, id);
+  // Valas: soft-delete riwayat beli/jual (dan transaksi pasangan penjualan), tanpa guard syncSource.
+  await detachForexForDeletedTransaction(env, id);
 
   const now = nowText();
   await env.DB.prepare("UPDATE transactions SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2")

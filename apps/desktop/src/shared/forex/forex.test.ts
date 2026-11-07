@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { DatabaseSync } from "node:sqlite";
+import { assertForexPurchaseDeletable, ForexPurchaseDeleteBlockedError } from "./assert-forex-purchase-deletable";
 import { createForexPurchase } from "./create-forex-purchase";
 import { detachForexForDeletedTransaction } from "./detach-forex-for-deleted-transaction";
 import { getForexAverageCostPerUnit, getForexRemainingUnit } from "./forex-holding-math";
@@ -197,6 +198,45 @@ describe("penjualan valas", () => {
     await expect(
       sellForex({ db, forexAccountId: "fx", cashAccountId: "debt", unit: 1, rate: 16000, date: "2026-11-05", note: "x" })
     ).rejects.toThrow(/Kas/);
+  });
+});
+
+describe("guard hapus pembelian valas", () => {
+  it("menolak hapus pembelian yang unitnya sudah terpakai penjualan", async () => {
+    const first = await buy(30, 18000);
+    await buy(20, 18000);
+    await sellForex({ db, forexAccountId: "fx", cashAccountId: "cash", unit: 40, rate: 17800, date: "2026-11-05", note: "x" });
+
+    await expect(assertForexPurchaseDeletable(db, first.transactionId)).rejects.toBeInstanceOf(
+      ForexPurchaseDeleteBlockedError
+    );
+  });
+
+  it("lolos setelah penjualannya dihapus lebih dulu", async () => {
+    const first = await buy(30, 18000);
+    await buy(20, 18000);
+    const sale = await sellForex({ db, forexAccountId: "fx", cashAccountId: "cash", unit: 40, rate: 17800, date: "2026-11-05", note: "x" });
+
+    await detachForexForDeletedTransaction(db, sale.transactionId);
+    sqlite.prepare("DELETE FROM transactions WHERE id = ?").run(sale.transactionId);
+
+    await expect(assertForexPurchaseDeletable(db, first.transactionId)).resolves.toBeUndefined();
+  });
+
+  it("lolos untuk pembelian yang unitnya belum terpakai", async () => {
+    await buy(30, 18000);
+    const second = await buy(20, 18000);
+    await sellForex({ db, forexAccountId: "fx", cashAccountId: "cash", unit: 30, rate: 17800, date: "2026-11-05", note: "x" });
+
+    await expect(assertForexPurchaseDeletable(db, second.transactionId)).resolves.toBeUndefined();
+  });
+
+  it("lolos untuk transaksi bukan pembelian valas dan untuk transaksi penjualan", async () => {
+    await buy(30, 18000);
+    const sale = await sellForex({ db, forexAccountId: "fx", cashAccountId: "cash", unit: 10, rate: 17800, date: "2026-11-05", note: "x" });
+
+    await expect(assertForexPurchaseDeletable(db, sale.transactionId)).resolves.toBeUndefined();
+    await expect(assertForexPurchaseDeletable(db, "tidak-ada")).resolves.toBeUndefined();
   });
 });
 

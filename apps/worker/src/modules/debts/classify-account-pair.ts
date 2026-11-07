@@ -28,7 +28,9 @@ export type AccountPairKind =
   | "debt-debt"
   | "cash-investment"
   | "investment-cash"
-  | "third_party-third_party";
+  | "third_party-third_party"
+  | "cash-forex"
+  | "forex-cash";
 
 // sourceType/destinationType tetap `string` (bukan AccountType) -- datang
 // mentah dari query SQL (getAccountType, debts/service.ts), DB tidak
@@ -54,5 +56,9 @@ export function classifyAccountPair(sourceType: string, destinationType: string)
   if (sourceType === "cash" && destinationType === "investment") return "cash-investment";
   if (sourceType === "investment" && destinationType === "cash") return "investment-cash";
   if (sourceType === "third_party" && destinationType === "third_party") return "third_party-third_party";
+  // Beli/jual valas (docs/todos/plan/forex-sync.md), padanan desktop cash-forex/forex-cash. Kombinasi valas
+  // lain tetap throw: transfer antar akun valas belum didesain.
+  if (sourceType === "cash" && destinationType === "forex") return "cash-forex";
+  if (sourceType === "forex" && destinationType === "cash") return "forex-cash";
   throw new UnsupportedAccountPairError(sourceType, destinationType);
 }

@@ -55,6 +55,9 @@ export async function handleDeleteTransaction(c: Context<AppContext>) {
   if (result.status === "not_found") {
     return c.json({ error: "Transaction not found" }, 404);
   }
+  if (result.status === "rejected") {
+    return c.json({ error: result.reason }, 422);
+  }
 
   return c.json({ status: "ok", id, debtInfo: result.debtInfo }, 200);
 }

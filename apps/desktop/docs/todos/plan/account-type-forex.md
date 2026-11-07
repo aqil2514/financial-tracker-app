@@ -24,8 +24,7 @@ Konsep dan keputusan desain ada di [docs/concept/konsep-valas.md](../../../../..
 - [ ] Rumus average cost investasi (`investment-holding-math.ts`) kemungkinan punya masalah yang sama, TIDAK disentuh. Perlu dicek dan diputuskan terpisah, lihat bagian "Temuan membaca kode investasi".
 - [ ] Tabel riwayat beli/jual belum punya aksi edit atau hapus. Koreksi lewat halaman Transaksi: hapus transaksi ikut menghapus baris riwayat, edit transaksi valas masih ditolak guard.
 - [ ] Verifikasi manual di `tauri dev`, termasuk mencatat pembelian USD BCA yang sudah terjadi.
-- [ ] Sync ke Worker (tabel D1 + modul sync).
-- [ ] Mobile: layar khusus Valas, akun `forex` disembunyikan dari picker transaksi biasa.
+- [ ] Sync ke Worker dan mobile: dipecah dan dilacak di [docs/todos/plan/forex-sync.md](../../../../../docs/todos/plan/forex-sync.md) (migrasi D1 `0011` sudah ditulis dan diverifikasi lokal).
 - [ ] Sentuh titik rawan tipe akun (lihat [titik-rawan-tipe-akun.md](../done/titik-rawan-tipe-akun.md)): picker akun, koreksi saldo, laporan Per Tipe Akun.
 - [ ] Label UI kurs terkini jelas (kurs beli bank, bukan kurs yang dibayar saat beli) — lihat konsep-valas.md.
 - [ ] Tahap lanjutan, belum didesain: belanja/tarik tunai kartu debit dalam valas, tarik/setor banknotes, transfer antar akun valas (modal ikut pindah), biaya dalam valas — lihat konsep-valas.md bagian "Tahap lanjutan".

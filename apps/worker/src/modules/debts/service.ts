@@ -275,7 +275,11 @@ export async function resolveDebtTransactionOutcome(
     pairKind === "debt-debt" ||
     pairKind === "cash-investment" ||
     pairKind === "investment-cash" ||
-    pairKind === "third_party-third_party"
+    pairKind === "third_party-third_party" ||
+    // Pasangan valas bukan urusan logic debt. Tanpa ini jatuh ke cabang debt di bawah dan salah menuntut
+    // direction akun debt.
+    pairKind === "cash-forex" ||
+    pairKind === "forex-cash"
   ) {
     return { kind: "noop" };
   }

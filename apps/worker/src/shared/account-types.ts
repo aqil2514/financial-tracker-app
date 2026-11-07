@@ -19,9 +19,15 @@
  * celah yang sama persis diperingatkan di komentar atas (6+ lokasi
  * tersebar), terbukti nyata di sini.
  */
-export type AccountType = "cash" | "debt" | "investment" | "third_party";
+export type AccountType = "cash" | "debt" | "investment" | "third_party" | "forex";
 
-export const ACCOUNT_TYPES = ["cash", "debt", "investment", "third_party"] as const satisfies readonly AccountType[];
+export const ACCOUNT_TYPES = [
+  "cash",
+  "debt",
+  "investment",
+  "third_party",
+  "forex",
+] as const satisfies readonly AccountType[];
 
 export function isAccountType(value: unknown): value is AccountType {
   return typeof value === "string" && (ACCOUNT_TYPES as readonly string[]).includes(value);
@@ -55,7 +61,14 @@ export function isAccountType(value: unknown): value is AccountType {
  * `ACCOUNT_TYPES_RESTRICTED_FROM_BALANCE_CORRECTION` desktop
  * (`lib/account-types.ts`, ditambahkan sesi sebelumnya).
  */
-const ACCOUNT_TYPES_RESTRICTED_FROM_DIRECT_TRANSACTION: readonly AccountType[] = ["debt", "investment", "third_party"];
+// "forex" ditambah (docs/todos/plan/forex-sync.md): saldo akun valas py riwayat turunan (forex_purchases/
+// forex_sales), koreksi saldo manual membuat accounts.balance tidak lagi mencerminkan riwayat itu.
+const ACCOUNT_TYPES_RESTRICTED_FROM_DIRECT_TRANSACTION: readonly AccountType[] = [
+  "debt",
+  "investment",
+  "third_party",
+  "forex",
+];
 
 export function isAccountTypeRestrictedFromDirectTransaction(accountType: string): boolean {
   return (ACCOUNT_TYPES_RESTRICTED_FROM_DIRECT_TRANSACTION as readonly string[]).includes(accountType);
