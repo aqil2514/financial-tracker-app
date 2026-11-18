@@ -207,7 +207,11 @@ async function createTransactionRow(
   // direction akun debt yang terlibat lewat resolveDebtTransactionOutcome
   // (sama fungsi yang dipakai applyDebtTransaction sendiri, sumber
   // kebenaran tunggal, lihat debt-account-direction.md).
-  if (payload.type === "transfer") {
+  //
+  // Fix 2026-11-18: income/expense langsung di akun debt juga di-resolve (debt direct, lihat
+  // resolveDebtTransactionOutcome). Untuk syncSource 'pc' dilewati: transaksi PC sudah menulis debts-nya
+  // sendiri, dan jalur ini dulu memang tidak menyentuh income/expense dari PC.
+  if (payload.type === "transfer" || syncSource !== "pc") {
     const outcome = await resolveDebtTransactionOutcome(env, {
       type: payload.type,
       accountId: payload.accountId,
@@ -366,6 +370,24 @@ async function createTransactionRow(
       unit: payload.unit ?? 0,
       pricePerUnit: payload.pricePerUnit ?? 0,
       status: "settled",
+      syncSource,
+    });
+  }
+
+  // Income/expense LANGSUNG pada akun debt (fix 2026-11-18, port applyDirectDebtTransaction desktop):
+  // expense di akun payable / income di akun receivable membuat catatan utang/piutang; selain itu pelunasan.
+  // No-op kalau akunnya bukan debt (resolveDebtTransactionOutcome mengembalikan noop). syncSource !== 'pc'
+  // sama alasannya dgn blok transfer di atas.
+  if (payload.type !== "transfer" && payload.accountId && syncSource !== "pc") {
+    await applyDebtTransaction(env, {
+      transactionId: payload.id,
+      type: payload.type,
+      accountId: payload.accountId,
+      transferAccountId: null,
+      contactId: resolvedContactId,
+      amount: payload.amount,
+      date: payload.date,
+      settleDebtIds: payload.settleDebtIds ?? [],
       syncSource,
     });
   }

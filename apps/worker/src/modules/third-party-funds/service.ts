@@ -119,6 +119,13 @@ export async function applyDirectThirdPartyTransaction(
   env: Env,
   { transactionId, type, accountId, contactId, amount, date, note = null, syncSource }: ApplyDirectThirdPartyTransactionInput
 ): Promise<TouchedThirdPartyFundRows> {
+  // Guard tipe akun (fix 2026-11-18): caller di transactions/service.ts memanggil fungsi ini untuk SETIAP
+  // income/expense yang punya kontak. Tanpa guard ini, income di akun non-third_party (mis. Piutang Dagang)
+  // membuat baris titipan palsu, dan expense di akun non-third_party dianggap "ambil keluar" lalu melempar
+  // InsufficientThirdPartyFundError SETELAH baris transaksi tersimpan (HTTP 500 padahal transaksi sudah ada).
+  // Titip/ambil hanya berlaku pada akun bertipe third_party (lihat validateDirectThirdPartyTransaction).
+  if ((await getAccountType(env, accountId)) !== "third_party") return none;
+
   const direction = type === "income" ? "in" : "out";
 
   if (direction === "out") {
@@ -216,6 +223,13 @@ export async function applyDirectThirdPartyTransactionEdit(
   env: Env,
   input: ApplyDirectThirdPartyTransactionInput
 ): Promise<TouchedThirdPartyFundRows> {
+  // Guard tipe akun, alasan sama dgn applyDirectThirdPartyTransaction. Kalau akun BUKAN third_party dan transaksi
+  // ini sempat punya baris titipan (mis. dibuat sebelum fix 2026-11-18), lepaskan baris itu supaya tidak yatim.
+  if ((await getAccountType(env, input.accountId)) !== "third_party") {
+    await detachThirdPartyFundsForDeletedTransaction(env, input.transactionId);
+    return none;
+  }
+
   const existing = await getTransactionThirdPartyFundRow(env, input.transactionId);
 
   if (existing == null) {

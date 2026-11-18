@@ -261,7 +261,26 @@ export async function resolveDebtTransactionOutcome(
   input: Pick<ApplyDebtTransactionInput, "type" | "accountId" | "transferAccountId">
 ): Promise<DebtTransactionOutcome> {
   const { type, accountId, transferAccountId } = input;
-  if (type !== "transfer" || transferAccountId == null) return { kind: "noop" };
+
+  // Income/expense LANGSUNG pada akun debt (tanpa transfer) -- port applyDirectDebtTransaction desktop
+  // (apps/desktop/src/shared/debts/apply-debt-transaction/apply-direct-debt-transaction.ts), fix 2026-11-18.
+  // Sebelumnya Worker hanya menangani transfer, sehingga expense di akun Utang (payable) atau income di akun
+  // Piutang (receivable) lewat MCP tersimpan sebagai transaksi TANPA catatan utang/piutang (desktop membuatnya).
+  // Utang/piutang BARU: expense di akun payable, income di akun receivable. Selain itu pelunasan (FIFO).
+  if (type !== "transfer") {
+    if (!accountId) return { kind: "noop" };
+    if ((await getAccountType(env, accountId)) !== "debt") return { kind: "noop" };
+    const directDirection = await getDebtAccountDirection(env, accountId);
+    if (directDirection == null) return { kind: "direction_missing", debtAccountId: accountId };
+
+    const createsNewDirectDebt =
+      (directDirection === "payable" && type === "expense") || (directDirection === "receivable" && type === "income");
+    return createsNewDirectDebt
+      ? { kind: "create", type: directDirection, debtAccountId: accountId }
+      : { kind: "settle", debtAccountId: accountId };
+  }
+
+  if (transferAccountId == null) return { kind: "noop" };
 
   const [sourceType, destinationType] = await Promise.all([
     getAccountType(env, accountId),
